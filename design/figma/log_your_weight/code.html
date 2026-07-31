@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&amp;family=DM+Sans:wght@400;500;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@100..900&amp;family=DM+Sans:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(7, 26, 43, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid #1E4C74;
+        }
+        .cta-gradient {
+            background: linear-gradient(135deg, #2fd9f4 0%, #45dfa4 100%);
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .bottom-sheet-enter {
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .bottom-sheet-active {
+            transform: translateY(0);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#2f3638",
+                        "tertiary": "#ffd2d5",
+                        "on-tertiary": "#67001f",
+                        "secondary-container": "#00bd85",
+                        "outline-variant": "#3c494c",
+                        "primary-container": "#22d3ee",
+                        "on-secondary": "#003825",
+                        "surface-container-high": "#242b2d",
+                        "surface-tint": "#2fd9f4",
+                        "tertiary-fixed": "#ffdadc",
+                        "on-secondary-container": "#00452e",
+                        "surface-container": "#1a2122",
+                        "on-tertiary-fixed": "#400010",
+                        "on-tertiary-fixed-variant": "#891933",
+                        "error-container": "#93000a",
+                        "inverse-surface": "#dde4e5",
+                        "on-surface": "#dde4e5",
+                        "on-primary-fixed-variant": "#004e5a",
+                        "on-secondary-fixed-variant": "#005137",
+                        "outline": "#859397",
+                        "primary-fixed-dim": "#2fd9f4",
+                        "surface-container-lowest": "#090f11",
+                        "on-secondary-fixed": "#002114",
+                        "on-background": "#dde4e5",
+                        "primary": "#8aebff",
+                        "background": "#0e1416",
+                        "inverse-on-surface": "#2b3233",
+                        "primary-fixed": "#a2eeff",
+                        "surface-variant": "#2f3638",
+                        "error": "#ffb4ab",
+                        "on-primary": "#00363e",
+                        "secondary-fixed-dim": "#45dfa4",
+                        "on-surface-variant": "#bbc9cd",
+                        "tertiary-container": "#ffaab2",
+                        "on-tertiary-container": "#94223a",
+                        "on-primary-fixed": "#001f25",
+                        "on-primary-container": "#005763",
+                        "tertiary-fixed-dim": "#ffb2b9",
+                        "secondary": "#45dfa4",
+                        "surface-bright": "#343a3c",
+                        "surface-dim": "#0e1416",
+                        "inverse-primary": "#006877",
+                        "surface": "#0e1416",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-low": "#161d1e",
+                        "secondary-fixed": "#68fcbf",
+                        "on-error": "#690005"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "element-gap-md": "1rem",
+                        "container-margin": "1.25rem",
+                        "element-gap-sm": "0.5rem",
+                        "card-padding": "1.25rem",
+                        "section-gap": "2rem",
+                        "gutter": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Barlow Condensed"],
+                        "data-sm": ["DM Sans"],
+                        "label-md": ["DM Sans"],
+                        "data-lg": ["DM Sans"],
+                        "body-md": ["DM Sans"],
+                        "headline-lg": ["Barlow Condensed"],
+                        "display-lg": ["Barlow Condensed"],
+                        "body-lg": ["DM Sans"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                        "data-sm": ["14px", {"lineHeight": "14px", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "data-lg": ["32px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background min-h-screen font-body-md overflow-hidden">
+<!-- Background Atmospheric Layer -->
+<div class="fixed inset-0 z-0">
+
+</div>
+<!-- Background Content (Simulated Dashboard) -->
+<div class="relative z-10 px-container-margin pt-20">
+<div class="flex justify-between items-center mb-section-gap">
+<div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary">Progress</h1>
+<p class="text-on-surface-variant font-label-md">Your weight journey</p>
+</div>
+<div class="w-12 h-12 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">person</span>
+</div>
+</div>
+<div class="space-y-4">
+<div class="glass-panel p-card-padding rounded-xl">
+<div class="flex justify-between mb-4">
+<span class="font-label-md text-on-surface-variant">Weight Trend</span>
+<span class="text-secondary font-data-sm">Goal: 72.0 kg</span>
+</div>
+<div class="h-48 flex items-end gap-2 px-2">
+<div class="flex-1 bg-primary/20 rounded-t-sm" style="height: 60%;"></div>
+<div class="flex-1 bg-primary/20 rounded-t-sm" style="height: 65%;"></div>
+<div class="flex-1 bg-primary/20 rounded-t-sm" style="height: 55%;"></div>
+<div class="flex-1 bg-primary/20 rounded-t-sm" style="height: 70%;"></div>
+<div class="flex-1 bg-primary/20 rounded-t-sm" style="height: 62%;"></div>
+<div class="flex-1 bg-primary/40 rounded-t-sm" style="height: 58%;"></div>
+<div class="flex-1 bg-primary rounded-t-sm" style="height: 54%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Modal Backdrop -->
+<div class="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 transition-opacity duration-300 opacity-0 pointer-events-none" id="modal-backdrop"></div>
+<!-- Log Weight Bottom Sheet -->
+<div class="fixed bottom-0 left-0 w-full z-50 bottom-sheet-enter" id="bottom-sheet">
+<div class="glass-panel bg-surface-container-lowest rounded-t-[32px] border-t border-outline-variant shadow-2xl flex flex-col max-h-[90vh]">
+<!-- Handle -->
+<div class="flex justify-center py-4">
+<div class="w-12 h-1.5 bg-outline-variant rounded-full opacity-50"></div>
+</div>
+<!-- Header -->
+<div class="px-container-margin flex justify-between items-center mb-6">
+<h2 class="font-headline-md text-headline-md text-on-surface">Log Weight</h2>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-variant/30 text-on-surface-variant" onclick="closeModal()">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Content -->
+<div class="px-container-margin flex-1 overflow-y-auto pb-10">
+<div class="flex flex-col items-center mb-8">
+<div class="relative group">
+<input class="w-full text-center bg-transparent border-none focus:ring-0 font-display-lg text-[64px] text-primary placeholder-primary/20 p-0" id="weight-input" placeholder="00.0" step="0.1" type="number" value="74.2"/>
+<div class="text-center font-headline-md text-on-surface-variant mt-[-8px]">KILOGRAMS</div>
+<div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-16 h-1 bg-secondary rounded-full shadow-[0_0_15px_rgba(69,223,164,0.5)]"></div>
+</div>
+<div class="mt-6 flex items-center gap-2 px-4 py-2 bg-secondary/10 rounded-full border border-secondary/20">
+<span class="material-symbols-outlined text-secondary text-[20px]" style="font-variation-settings: 'FILL' 1;">trending_down</span>
+<span class="text-secondary font-label-md">0.4 kg down since last entry</span>
+</div>
+</div>
+<!-- Form Fields -->
+<div class="space-y-6">
+<!-- Date Selector -->
+<div>
+<label class="block font-label-md text-on-surface-variant mb-2">DATE &amp; TIME</label>
+<div class="flex items-center gap-3 p-4 bg-surface-container rounded-xl border border-outline-variant group active:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary">calendar_today</span>
+<input class="bg-transparent border-none text-on-surface focus:ring-0 flex-1 font-body-md appearance-none" type="date" value="2023-10-27"/>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</div>
+</div>
+<!-- Note Field -->
+<div>
+<label class="block font-label-md text-on-surface-variant mb-2">NOTES (OPTIONAL)</label>
+<div class="flex items-start gap-3 p-4 bg-surface-container rounded-xl border border-outline-variant group active:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary mt-1">notes</span>
+<textarea class="bg-transparent border-none text-on-surface focus:ring-0 flex-1 font-body-md resize-none placeholder-on-surface-variant/50" placeholder="How are you feeling today?" rows="3"></textarea>
+</div>
+</div>
+<!-- Quick Adjustments -->
+<div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+<button class="px-4 py-2 rounded-full border border-outline-variant bg-surface-variant/20 font-label-md whitespace-nowrap text-on-surface">Morning Fasted</button>
+<button class="px-4 py-2 rounded-full border border-outline-variant bg-surface-variant/20 font-label-md whitespace-nowrap text-on-surface">Post-Workout</button>
+<button class="px-4 py-2 rounded-full border border-outline-variant bg-surface-variant/20 font-label-md whitespace-nowrap text-on-surface">After Meal</button>
+</div>
+</div>
+<!-- Action Button -->
+<div class="mt-8">
+<button class="cta-gradient w-full h-[56px] rounded-xl flex items-center justify-center gap-2 group active:scale-[0.98] transition-transform" onclick="saveEntry()">
+<span class="text-background font-headline-md uppercase tracking-wider">Save Entry</span>
+<span class="material-symbols-outlined text-background group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Script for Modal Interaction -->
+<script>
+        const bottomSheet = document.getElementById('bottom-sheet');
+        const backdrop = document.getElementById('modal-backdrop');
+
+        function openModal() {
+            backdrop.classList.remove('pointer-events-none', 'opacity-0');
+            backdrop.classList.add('opacity-100');
+            bottomSheet.classList.add('bottom-sheet-active');
+        }
+
+        function closeModal() {
+            backdrop.classList.add('opacity-0');
+            backdrop.classList.add('pointer-events-none');
+            bottomSheet.classList.remove('bottom-sheet-active');
+        }
+
+        function saveEntry() {
+            const btn = document.querySelector('.cta-gradient');
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-background">sync</span>';
+            setTimeout(() => {
+                btn.innerHTML = '<span class="material-symbols-outlined text-background">check_circle</span> <span class="text-background font-headline-md uppercase tracking-wider">Saved</span>';
+                setTimeout(closeModal, 800);
+            }, 1200);
+        }
+
+        // Initialize open for presentation
+        window.onload = () => {
+            setTimeout(openModal, 500);
+        };
+    </script>
+</body></html>

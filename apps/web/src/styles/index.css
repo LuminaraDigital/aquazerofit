@@ -1,0 +1,219 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --azf-surface: #0e1416;
+  --azf-on-surface: #dde4e5;
+  --azf-primary: #8aebff;
+  --azf-border: #1e4c74;
+  /* Telegram theme variables are bound over these at runtime inside the Mini App */
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+/* ---- Scroll behavior ---- */
+html {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(138, 235, 255, 0.15);
+  border-radius: 999px;
+}
+
+body {
+  @apply bg-surface text-on-surface font-body antialiased;
+  -webkit-tap-highlight-color: transparent;
+  letter-spacing: -0.01em;
+}
+
+/* ---- WebGL animated background (fixed, behind everything) ---- */
+.azf-bg-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+/* Diagonal hatch overlay - subtle texture on top of WebGL */
+.azf-bg-hatch {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(138, 235, 255, 0.02) 0px,
+    rgba(138, 235, 255, 0.02) 1px,
+    transparent 1px,
+    transparent 56px
+  );
+}
+
+/* Vignette to darken edges and focus content center */
+.azf-bg-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 30%,
+    rgba(14, 20, 22, 0.6) 100%
+  );
+}
+
+/* App content sits above all background layers */
+.azf-content {
+  position: relative;
+  z-index: 10;
+}
+
+@layer components {
+  /* ---- Card system: glassmorphism with depth ---- */
+
+  /* Hero card: the primary surface for the most important content.
+     Glassmorphism with aqua-tinted gradient, inner highlight, deep shadow. */
+  .card-hero {
+    background:
+      linear-gradient(180deg, rgba(47, 217, 244, 0.08) 0%, transparent 40%),
+      rgba(22, 29, 30, 0.6);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    border: 1px solid rgba(47, 217, 244, 0.2);
+    @apply rounded-card;
+    box-shadow:
+      0 1px 0 0 rgba(138, 235, 255, 0.1) inset,
+      0 20px 40px -12px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Standard glass card: the workhorse surface */
+  .glass-card {
+    background: rgba(22, 29, 30, 0.55);
+    backdrop-filter: blur(16px) saturate(1.1);
+    -webkit-backdrop-filter: blur(16px) saturate(1.1);
+    border: 1px solid rgba(138, 235, 255, 0.1);
+    @apply rounded-card;
+    box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Compact card: borderless, tonal only */
+  .card-compact {
+    background: rgba(26, 33, 34, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    @apply rounded-xl;
+  }
+
+  /* Navigation blur */
+  .glass-blur {
+    background: rgba(14, 20, 22, 0.5);
+    backdrop-filter: blur(24px) saturate(1.3);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  }
+
+  /* ---- CTA gradient with inner light ---- */
+  .cta-gradient {
+    background: linear-gradient(135deg, #2fd9f4 0%, #45dfa4 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.25) inset,
+      0 4px 12px -4px rgba(47, 217, 244, 0.35);
+  }
+
+  .cta-gradient:active:not(:disabled) {
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.12) inset,
+      0 2px 6px -2px rgba(47, 217, 244, 0.2);
+  }
+
+  .heading-display {
+    @apply font-heading font-semibold uppercase tracking-[0.04em];
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24;
+  }
+
+  .safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
+  }
+
+  /* ---- Staggered entrance animations ---- */
+  .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    animation: reveal-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .reveal-2 { animation-delay: 0.08s; }
+  .reveal-3 { animation-delay: 0.16s; }
+  .reveal-4 { animation-delay: 0.24s; }
+  .reveal-5 { animation-delay: 0.32s; }
+  .reveal-6 { animation-delay: 0.40s; }
+
+  @keyframes reveal-up {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* ---- Floating animation for hero cards ---- */
+  .float-gentle {
+    animation: float-bob 6s ease-in-out infinite;
+  }
+
+  @keyframes float-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  /* ---- Shimmer for skeletons ---- */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(36, 43, 45, 0.6) 0%,
+      rgba(47, 54, 56, 0.8) 50%,
+      rgba(36, 43, 45, 0.6) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+}

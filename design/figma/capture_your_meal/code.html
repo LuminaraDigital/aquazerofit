@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&amp;family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scan-line {
+            background: linear-gradient(to bottom, transparent, #8aebff, transparent);
+            height: 100px;
+            width: 100%;
+            position: absolute;
+            top: -100px;
+            animation: scan 3s linear infinite;
+            opacity: 0.3;
+        }
+        @keyframes scan {
+            0% { top: -100px; }
+            100% { top: 100%; }
+        }
+        .shutter-press:active {
+            transform: scale(0.9);
+        }
+        .glass-overlay {
+            background: rgba(7, 26, 43, 0.6);
+            backdrop-filter: blur(8px);
+        }
+        .viewfinder-corner {
+            width: 32px;
+            height: 32px;
+            border-color: #8aebff;
+            position: absolute;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#2f3638",
+                        "tertiary": "#ffd2d5",
+                        "on-tertiary": "#67001f",
+                        "secondary-container": "#00bd85",
+                        "outline-variant": "#3c494c",
+                        "primary-container": "#22d3ee",
+                        "on-secondary": "#003825",
+                        "surface-container-high": "#242b2d",
+                        "surface-tint": "#2fd9f4",
+                        "tertiary-fixed": "#ffdadc",
+                        "on-secondary-container": "#00452e",
+                        "surface-container": "#1a2122",
+                        "on-tertiary-fixed": "#400010",
+                        "on-tertiary-fixed-variant": "#891933",
+                        "error-container": "#93000a",
+                        "inverse-surface": "#dde4e5",
+                        "on-surface": "#dde4e5",
+                        "on-primary-fixed-variant": "#004e5a",
+                        "on-secondary-fixed-variant": "#005137",
+                        "outline": "#859397",
+                        "primary-fixed-dim": "#2fd9f4",
+                        "surface-container-lowest": "#090f11",
+                        "on-secondary-fixed": "#002114",
+                        "on-background": "#dde4e5",
+                        "primary": "#8aebff",
+                        "background": "#0e1416",
+                        "inverse-on-surface": "#2b3233",
+                        "primary-fixed": "#a2eeff",
+                        "surface-variant": "#2f3638",
+                        "error": "#ffb4ab",
+                        "on-primary": "#00363e",
+                        "secondary-fixed-dim": "#45dfa4",
+                        "on-surface-variant": "#bbc9cd",
+                        "tertiary-container": "#ffaab2",
+                        "on-tertiary-container": "#94223a",
+                        "on-primary-fixed": "#001f25",
+                        "on-primary-container": "#005763",
+                        "tertiary-fixed-dim": "#ffb2b9",
+                        "secondary": "#45dfa4",
+                        "surface-bright": "#343a3c",
+                        "surface-dim": "#0e1416",
+                        "inverse-primary": "#006877",
+                        "surface": "#0e1416",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-low": "#161d1e",
+                        "secondary-fixed": "#68fcbf",
+                        "on-error": "#690005"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "element-gap-md": "1rem",
+                        "container-margin": "1.25rem",
+                        "element-gap-sm": "0.5rem",
+                        "card-padding": "1.25rem",
+                        "section-gap": "2rem",
+                        "gutter": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Barlow Condensed"],
+                        "data-sm": ["DM Sans"],
+                        "label-md": ["DM Sans"],
+                        "data-lg": ["DM Sans"],
+                        "body-md": ["DM Sans"],
+                        "headline-lg": ["Barlow Condensed"],
+                        "display-lg": ["Barlow Condensed"],
+                        "body-lg": ["DM Sans"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                        "headline-md-mobile": ["20px", {"lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "32px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                        "data-sm": ["14px", {"lineHeight": "14px", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "data-lg": ["32px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
+<!-- Camera Viewport Layer -->
+<div class="fixed inset-0 z-0">
+<div class="w-full h-full relative">
+<img class="w-full h-full object-cover" data-alt="A top-down cinematic photograph of a vibrant, healthy meal containing seared salmon, bright green asparagus, and quinoa, placed on a dark slate plate. The lighting is crisp and professional, highlighting textures and moisture, with a shallow depth of field. The overall aesthetic is high-end wellness, featuring cool ocean blue tones and fresh organic colors." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSp7_3SsZsaiGnnba2zrOoOVN9z9oNifWIi3wS8EIxiT-ek1IXQeOVmrkAZJ5LkvgAcNfK8Mse6OuMcJA4G4TqZFahnr5EHN59cLQpo4ErTqTc9bBEu_tRz6QtdaGxTovNZ0PUCvdcyYx9MjlnJMcUj_Emqu_TWTAI1OUlvAZOOvSvQ4NB-qDLzaAGKBTRS3mfHGUhGBFcqQbMtcgwsmjUKozM90wAZEEaEy4f89EPIKTJHQuPRL0"/>
+<!-- Scanning Animation -->
+<div class="scan-line"></div>
+<!-- Viewfinder Brackets -->
+<div class="absolute inset-x-container-margin top-[20%] bottom-[35%] flex flex-col justify-between pointer-events-none">
+<div class="flex justify-between">
+<div class="viewfinder-corner border-t-2 border-l-2"></div>
+<div class="viewfinder-corner border-t-2 border-r-2"></div>
+</div>
+<div class="flex justify-between">
+<div class="viewfinder-corner border-b-2 border-l-2"></div>
+<div class="viewfinder-corner border-b-2 border-r-2"></div>
+</div>
+</div>
+<!-- Dynamic AI Overlay (Simulating real-time detection) -->
+<div class="absolute top-[35%] left-[25%] px-3 py-1 bg-secondary/20 backdrop-blur-sm border border-secondary rounded-full flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+<span class="text-secondary font-label-md text-label-md">Detecting Salmon...</span>
+</div>
+</div>
+</div>
+<!-- UI Overlays -->
+<div class="relative z-10 min-h-screen flex flex-col">
+<!-- Header -->
+<header class="bg-surface/40 backdrop-blur-md px-container-margin py-4 flex justify-between items-center border-b border-outline-variant/30">
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-low/60 text-on-surface">
+<span class="material-symbols-outlined">close</span>
+</button>
+<div class="flex flex-col items-center">
+<span class="font-headline-md-mobile text-headline-md-mobile text-primary font-bold">Meal Capture</span>
+<span class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">Smart Scan AI</span>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-low/60 text-on-surface">
+<span class="material-symbols-outlined">flash_auto</span>
+</button>
+</header>
+<!-- Spacer for camera focus area -->
+<div class="flex-grow flex items-center justify-center pointer-events-none">
+<div class="bg-black/40 backdrop-blur-[2px] px-6 py-3 rounded-xl border border-white/10">
+<p class="text-white font-label-md text-label-md flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">center_focus_weak</span>
+                    Center your meal
+                </p>
+</div>
+</div>
+<!-- Controls Section -->
+<div class="bg-gradient-to-t from-black via-black/80 to-transparent pt-12 pb-10 px-container-margin">
+<!-- Quick Actions -->
+<div class="flex justify-center gap-4 mb-8">
+<button class="px-5 py-2.5 rounded-full bg-surface-container-highest/60 backdrop-blur-md border border-outline-variant/50 flex items-center gap-2 hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-primary text-[20px]">edit_note</span>
+<span class="font-label-md text-label-md">Describe instead</span>
+</button>
+</div>
+<!-- Shutter Controls -->
+<div class="flex items-center justify-between max-w-sm mx-auto">
+<!-- Gallery Button -->
+<button class="group flex flex-col items-center gap-1">
+<div class="w-14 h-14 rounded-xl overflow-hidden border-2 border-outline-variant transition-transform group-hover:scale-105">
+<img class="w-full h-full object-cover grayscale-[30%]" data-alt="A small preview thumbnail of a bowl of green salad with sliced avocado and walnuts, shot in the same professional aquatic wellness style with cool lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbf2ItfYjRHTRztkeNlc08mD7oZ7V8ZBLEk6x7zUJ2K6W8Rcm1sbTC7dEhSMjSDUW92_sNGuZnqbJyngUJdefeG3YTLagDt7KnAzzHH8V9aGzYejk55Vg4N-CYH6ku9FXiiS3ZFHpNQwmaxKRw8Iw6ptJM7DATGjjgICaZeGaJVZfR7XfJ2ZmoaGmKeOLLWNb2l8QoPrJHPATqso0YN0MdJIxXyniCNB-LmYsJpWZIK96JR0MlTA4"/>
+</div>
+<span class="text-[10px] text-on-surface-variant font-bold uppercase tracking-tighter">Gallery</span>
+</button>
+<!-- Shutter Button -->
+<div class="relative flex items-center justify-center">
+<div class="absolute w-24 h-24 rounded-full border-2 border-primary/30 animate-ping"></div>
+<button class="shutter-press w-20 h-20 rounded-full bg-white flex items-center justify-center transition-all shadow-[0_0_20px_rgba(138,235,255,0.4)] relative z-20">
+<div class="w-[72px] h-[72px] rounded-full border-2 border-background"></div>
+</button>
+</div>
+<!-- Mode/Switch Button -->
+<button class="w-14 h-14 rounded-full bg-surface-container-highest/40 backdrop-blur-md border border-outline-variant/30 flex items-center justify-center text-on-surface hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">restaurant</span>
+</button>
+</div>
+<!-- Focus Indicators -->
+<div class="mt-8 flex justify-center gap-12">
+<div class="flex flex-col items-center gap-1">
+<span class="font-data-sm text-data-sm text-primary">0.5x</span>
+<div class="h-1 w-1 rounded-full bg-primary/20"></div>
+</div>
+<div class="flex flex-col items-center gap-1">
+<span class="font-data-sm text-data-sm text-white font-bold">1x</span>
+<div class="h-1.5 w-1.5 rounded-full bg-primary"></div>
+</div>
+<div class="flex flex-col items-center gap-1">
+<span class="font-data-sm text-data-sm text-primary">2x</span>
+<div class="h-1 w-1 rounded-full bg-primary/20"></div>
+</div>
+</div>
+</div>
+<!-- Safe Area Inset -->
+<div class="h-safe bg-black"></div>
+</div>
+<!-- AI Insights Drawer (Hidden initially, slides up on scan) -->
+<div class="fixed bottom-0 inset-x-0 z-50 transform translate-y-full transition-transform duration-500 ease-out" id="scan-feedback">
+<div class="bg-surface-container-high rounded-t-3xl border-t border-primary/30 p-container-margin pb-10">
+<div class="w-12 h-1.5 bg-outline-variant rounded-full mx-auto mb-6"></div>
+<div class="flex items-start gap-4 mb-6">
+<div class="w-16 h-16 rounded-2xl bg-secondary-container/20 flex items-center justify-center border border-secondary/30">
+<span class="material-symbols-outlined text-secondary text-3xl">check_circle</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-white">Meal Identified</h3>
+<p class="text-on-surface-variant font-body-md">Grilled Salmon with Asparagus</p>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-3 mb-8">
+<div class="bg-surface-container p-3 rounded-xl border border-outline-variant/30 text-center">
+<span class="block text-primary font-data-sm text-data-sm">480</span>
+<span class="text-[10px] text-on-surface-variant uppercase font-bold">Calories</span>
+</div>
+<div class="bg-surface-container p-3 rounded-xl border border-outline-variant/30 text-center">
+<span class="block text-secondary font-data-sm text-data-sm">42g</span>
+<span class="text-[10px] text-on-surface-variant uppercase font-bold">Protein</span>
+</div>
+<div class="bg-surface-container p-3 rounded-xl border border-outline-variant/30 text-center">
+<span class="block text-tertiary font-data-sm text-data-sm">12g</span>
+<span class="text-[10px] text-on-surface-variant uppercase font-bold">Carbs</span>
+</div>
+</div>
+<button class="w-full h-14 bg-secondary text-on-secondary font-headline-md rounded-xl shadow-[0_4px_15px_rgba(0,189,133,0.3)]">
+                LOG THIS MEAL
+            </button>
+</div>
+</div>
+<script>
+        // Micro-interaction for shutter press
+        const shutter = document.querySelector('.shutter-press');
+        const drawer = document.getElementById('scan-feedback');
+        
+        shutter.addEventListener('click', () => {
+            // Flash effect
+            const flash = document.createElement('div');
+            flash.className = 'fixed inset-0 bg-white z-[100] pointer-events-none opacity-0 transition-opacity duration-100';
+            document.body.appendChild(flash);
+            
+            setTimeout(() => flash.style.opacity = '1', 0);
+            setTimeout(() => flash.style.opacity = '0', 100);
+            setTimeout(() => {
+                flash.remove();
+                // Show drawer
+                drawer.classList.remove('translate-y-full');
+            }, 200);
+        });
+
+        // Close drawer on tap handle
+        drawer.querySelector('.w-12').parentElement.addEventListener('click', () => {
+            drawer.classList.add('translate-y-full');
+        });
+    </script>
+</body></html>

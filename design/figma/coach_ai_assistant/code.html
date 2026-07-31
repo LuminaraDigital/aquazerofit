@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>AquaZeroFit - AI Coach</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&amp;family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-highest": "#2f3638",
+                    "tertiary": "#ffd2d5",
+                    "on-tertiary": "#67001f",
+                    "secondary-container": "#00bd85",
+                    "outline-variant": "#3c494c",
+                    "primary-container": "#22d3ee",
+                    "on-secondary": "#003825",
+                    "surface-container-high": "#242b2d",
+                    "surface-tint": "#2fd9f4",
+                    "tertiary-fixed": "#ffdadc",
+                    "on-secondary-container": "#00452e",
+                    "surface-container": "#1a2122",
+                    "on-tertiary-fixed": "#400010",
+                    "on-tertiary-fixed-variant": "#891933",
+                    "error-container": "#93000a",
+                    "inverse-surface": "#dde4e5",
+                    "on-surface": "#dde4e5",
+                    "on-primary-fixed-variant": "#004e5a",
+                    "on-secondary-fixed-variant": "#005137",
+                    "outline": "#859397",
+                    "primary-fixed-dim": "#2fd9f4",
+                    "surface-container-lowest": "#090f11",
+                    "on-secondary-fixed": "#002114",
+                    "on-background": "#dde4e5",
+                    "primary": "#8aebff",
+                    "background": "#0e1416",
+                    "inverse-on-surface": "#2b3233",
+                    "primary-fixed": "#a2eeff",
+                    "surface-variant": "#2f3638",
+                    "error": "#ffb4ab",
+                    "on-primary": "#00363e",
+                    "secondary-fixed-dim": "#45dfa4",
+                    "on-surface-variant": "#bbc9cd",
+                    "tertiary-container": "#ffaab2",
+                    "on-tertiary-container": "#94223a",
+                    "on-primary-fixed": "#001f25",
+                    "on-primary-container": "#005763",
+                    "tertiary-fixed-dim": "#ffb2b9",
+                    "secondary": "#45dfa4",
+                    "surface-bright": "#343a3c",
+                    "surface-dim": "#0e1416",
+                    "inverse-primary": "#006877",
+                    "surface": "#0e1416",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-low": "#161d1e",
+                    "secondary-fixed": "#68fcbf",
+                    "on-error": "#690005"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "element-gap-md": "1rem",
+                    "container-margin": "1.25rem",
+                    "element-gap-sm": "0.5rem",
+                    "card-padding": "1.25rem",
+                    "section-gap": "2rem",
+                    "gutter": "1rem"
+            },
+            "fontFamily": {
+                    "headline-md": ["Barlow Condensed"],
+                    "data-sm": ["DM Sans"],
+                    "label-md": ["DM Sans"],
+                    "data-lg": ["DM Sans"],
+                    "body-md": ["DM Sans"],
+                    "headline-lg": ["Barlow Condensed"],
+                    "display-lg": ["Barlow Condensed"],
+                    "body-lg": ["DM Sans"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "data-sm": ["14px", {"lineHeight": "14px", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "data-lg": ["32px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #071A2B; /* Brand Deep Ocean Level 0 */
+            -webkit-tap-highlight-color: transparent;
+        }
+        .glass-panel {
+            background: rgba(14, 20, 22, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid #1E4C74;
+        }
+        .chat-bubble-user {
+            background: linear-gradient(135deg, #2fd9f4 0%, #00bd85 100%);
+            border-radius: 18px 18px 4px 18px;
+        }
+        .chat-bubble-coach {
+            background: #1a2122;
+            border: 1px solid #1E4C74;
+            border-radius: 18px 18px 18px 4px;
+        }
+        .orb-glow {
+            box-shadow: 0 0 15px rgba(47, 217, 244, 0.5);
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-on-surface font-body-md overflow-hidden">
+<!-- Top AppBar -->
+<header class="fixed top-0 left-0 w-full z-40 bg-surface/80 backdrop-blur-md border-b border-outline-variant flex justify-between items-center px-container-margin py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">waves</span>
+<h1 class="font-headline-md text-headline-md font-bold tracking-tight text-primary">AquaZeroFit</h1>
+</div>
+<div class="w-10 h-10 rounded-full border border-primary/30 bg-surface-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a person looking fit and healthy, set against a blurred aquatic-themed modern fitness studio background. High-quality lighting highlights clean skin and energetic eyes, fitting the premium Modern Aquatic Wellness aesthetic with cool cyan and navy undertones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfEaQTJ836UsR_dlyW0kRvaepviNdQV0T6mry29ySCwpbQGRUpuHfmY5F87EWGlsS32HUp4qBtZF0BagQHd73rKWOIntENNOpcfit_xVSN25mYBsQbeUlZ8ucOaKoGhmr7dWv55G9nqwt6y2Bo1QPoecMxhTn9MRfcvgEj91C040UVoTlFwmkoZuqk3KmajM-iX3rKlwlbJ3unQ3L6wh6ZsTTBz3HfCG7VrRNSNdxWBKDHJ-JIjG0"/>
+</div>
+</header>
+<!-- Chat Canvas -->
+<main class="flex-1 mt-16 mb-24 overflow-y-auto px-container-margin pt-6 flex flex-col gap-6">
+<!-- Safety Banner -->
+<div class="bg-surface-container-low/50 border border-outline-variant rounded-xl p-3 flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary-container text-[20px]">info</span>
+<p class="font-label-md text-label-md text-on-surface-variant">General wellness guidance only</p>
+</div>
+<!-- Coach Message 1 -->
+<div class="flex flex-col gap-2 max-w-[85%] self-start">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center orb-glow border border-primary/40">
+<span class="material-symbols-outlined text-primary text-[18px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant">Aqua Coach</span>
+</div>
+<div class="chat-bubble-coach p-4 shadow-sm">
+<p class="font-body-md text-body-md leading-relaxed">Welcome back! I've been analyzing your hydration and activity metrics from today. You're 400ml behind your goal for this hour. How are you feeling?</p>
+</div>
+</div>
+<!-- User Message -->
+<div class="flex flex-col gap-2 max-w-[85%] self-end">
+<div class="chat-bubble-user p-4 text-on-primary shadow-lg">
+<p class="font-body-md text-body-md leading-relaxed">I'm feeling a bit sluggish today. Can you check my recent progress and tell me why my weight might have plateaued?</p>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant self-end px-2">Read 2:45 PM</span>
+</div>
+<!-- Coach Message 2 (Structured Reply) -->
+<div class="flex flex-col gap-3 max-w-[90%] self-start">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center orb-glow border border-primary/40">
+<span class="material-symbols-outlined text-primary text-[18px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant">Aqua Coach</span>
+</div>
+<div class="chat-bubble-coach p-4 shadow-sm flex flex-col gap-4">
+<p class="font-body-md text-body-md leading-relaxed">I see. Looking at your data, we've hit a 10-day trend where your caloric intake matches your expenditure exactly. This is a common metabolic adjustment.</p>
+<!-- Small Stat Card within bubble -->
+<div class="bg-surface-container-highest/50 rounded-lg p-3 border border-outline-variant flex items-center justify-between">
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant">Current Trend</p>
+<p class="font-data-sm text-data-sm text-secondary">Maintenance Phase</p>
+</div>
+<div class="text-right">
+<p class="font-data-lg text-data-lg text-primary">0.0<span class="text-label-md">kg</span></p>
+<p class="font-label-md text-label-md text-on-surface-variant">Net Change (7d)</p>
+</div>
+</div>
+<p class="font-body-md text-body-md leading-relaxed">To break this, I suggest increasing your water-based cardio (swimming) by 15 minutes or reducing your evening carbohydrate intake. Would you like a refined meal plan?</p>
+</div>
+</div>
+<!-- Suggestion Chips -->
+<div class="flex flex-wrap gap-2 mt-4">
+<button class="px-4 py-2 rounded-full border border-secondary/40 bg-secondary/10 text-secondary font-label-md text-label-md hover:bg-secondary/20 transition-all active:scale-95">
+                Plan my meals
+            </button>
+<button class="px-4 py-2 rounded-full border border-primary/40 bg-primary/10 text-primary font-label-md text-label-md hover:bg-primary/20 transition-all active:scale-95">
+                Why has my weight plateaued?
+            </button>
+</div>
+</main>
+<!-- Bottom Input Bar & Navigation Container -->
+<div class="fixed bottom-0 left-0 w-full z-50 flex flex-col">
+<!-- Chat Input Bar -->
+<div class="px-container-margin pb-4">
+<div class="glass-panel rounded-2xl flex items-center p-2 gap-2 shadow-xl">
+<button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">photo_camera</span>
+</button>
+<input class="flex-1 bg-transparent border-none focus:ring-0 text-on-surface font-body-md placeholder:text-on-surface-variant/50" placeholder="Ask Aqua Coach..." type="text"/>
+<button class="w-10 h-10 rounded-xl bg-primary text-on-primary flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</div>
+<!-- Shared Component: BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-surface-container-low shadow-lg rounded-t-xl border-t border-outline-variant h-16">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<!-- Nutrition -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="restaurant">restaurant</span>
+<span class="font-label-md text-label-md">Nutrition</span>
+</a>
+<!-- Train -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="fitness_center">fitness_center</span>
+<span class="font-label-md text-label-md">Train</span>
+</a>
+<!-- Coach (Active) -->
+<a class="flex flex-col items-center justify-center text-secondary border-t-4 border-secondary pt-1 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="smart_toy" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span class="font-label-md text-label-md">Coach</span>
+</a>
+<!-- Progress -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="font-label-md text-label-md">Progress</span>
+</a>
+</nav>
+</div>
+<!-- Background Atmospheric Effect -->
+<div class="fixed inset-0 pointer-events-none z-[-1] opacity-20">
+
+</div>
+<script>
+        // Micro-interaction for input focus
+        const chatInput = document.querySelector('input');
+        const inputContainer = chatInput.parentElement;
+        
+        chatInput.addEventListener('focus', () => {
+            inputContainer.style.borderColor = '#8aebff';
+            inputContainer.style.boxShadow = '0 0 15px rgba(138, 235, 255, 0.2)';
+        });
+        
+        chatInput.addEventListener('blur', () => {
+            inputContainer.style.borderColor = '#1E4C74';
+            inputContainer.style.boxShadow = 'none';
+        });
+
+        // Simple scroll to bottom simulation
+        const main = document.querySelector('main');
+        window.onload = () => {
+            main.scrollTop = main.scrollHeight;
+        };
+    </script>
+</body></html>

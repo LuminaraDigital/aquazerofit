@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>AquaZeroFit - Training Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&amp;family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: #0e1416;
+            color: #dde4e5;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+        .cta-gradient {
+            background: linear-gradient(135deg, #2fd9f4 0%, #00bd85 100%);
+        }
+        .glass-card {
+            background: rgba(30, 76, 116, 0.1);
+            backdrop-filter: blur(12px);
+            border: 1px solid #1E4C74;
+        }
+        .active-day-glow {
+            box-shadow: 0 0 15px rgba(138, 235, 255, 0.3);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .fill-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<!-- Tailwind Config Injection -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-highest": "#2f3638",
+                    "tertiary": "#ffd2d5",
+                    "on-tertiary": "#67001f",
+                    "secondary-container": "#00bd85",
+                    "outline-variant": "#3c494c",
+                    "primary-container": "#22d3ee",
+                    "on-secondary": "#003825",
+                    "surface-container-high": "#242b2d",
+                    "surface-tint": "#2fd9f4",
+                    "tertiary-fixed": "#ffdadc",
+                    "on-secondary-container": "#00452e",
+                    "surface-container": "#1a2122",
+                    "on-tertiary-fixed": "#400010",
+                    "on-tertiary-fixed-variant": "#891933",
+                    "error-container": "#93000a",
+                    "inverse-surface": "#dde4e5",
+                    "on-surface": "#dde4e5",
+                    "on-primary-fixed-variant": "#004e5a",
+                    "on-secondary-fixed-variant": "#005137",
+                    "outline": "#859397",
+                    "primary-fixed-dim": "#2fd9f4",
+                    "surface-container-lowest": "#090f11",
+                    "on-secondary-fixed": "#002114",
+                    "on-background": "#dde4e5",
+                    "primary": "#8aebff",
+                    "background": "#0e1416",
+                    "inverse-on-surface": "#2b3233",
+                    "primary-fixed": "#a2eeff",
+                    "surface-variant": "#2f3638",
+                    "error": "#ffb4ab",
+                    "on-primary": "#00363e",
+                    "secondary-fixed-dim": "#45dfa4",
+                    "on-surface-variant": "#bbc9cd",
+                    "tertiary-container": "#ffaab2",
+                    "on-tertiary-container": "#94223a",
+                    "on-primary-fixed": "#001f25",
+                    "on-primary-container": "#005763",
+                    "tertiary-fixed-dim": "#ffb2b9",
+                    "secondary": "#45dfa4",
+                    "surface-bright": "#343a3c",
+                    "surface-dim": "#0e1416",
+                    "inverse-primary": "#006877",
+                    "surface": "#0e1416",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-low": "#161d1e",
+                    "secondary-fixed": "#68fcbf",
+                    "on-error": "#690005"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "element-gap-md": "1rem",
+                    "container-margin": "1.25rem",
+                    "element-gap-sm": "0.5rem",
+                    "card-padding": "1.25rem",
+                    "section-gap": "2rem",
+                    "gutter": "1rem"
+            },
+            "fontFamily": {
+                    "headline-md": ["Barlow Condensed"],
+                    "data-sm": ["DM Sans"],
+                    "label-md": ["DM Sans"],
+                    "data-lg": ["DM Sans"],
+                    "body-md": ["DM Sans"],
+                    "headline-lg": ["Barlow Condensed"],
+                    "display-lg": ["Barlow Condensed"],
+                    "body-lg": ["DM Sans"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "headline-md-mobile": ["20px", {"lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "data-sm": ["14px", {"lineHeight": "14px", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "data-lg": ["32px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "32px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="flex flex-col min-h-screen">
+<!-- Top AppBar -->
+<header class="bg-surface/80 backdrop-blur-md fixed top-0 z-40 w-full border-b border-outline-variant">
+<div class="flex justify-between items-center w-full px-container-margin py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-3xl">waves</span>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold tracking-tight text-primary">AquaZeroFit</h1>
+</div>
+<div class="w-10 h-10 rounded-full overflow-hidden border border-primary/30">
+<img class="w-full h-full object-cover" data-alt="A high-quality studio portrait of a fit, smiling woman with athletic gear, softly lit with cool blue and cyan rim lighting to match the modern aquatic wellness brand identity. The background is a dark, sophisticated navy blue with a subtle gradient effect." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYiLq-DwgLYX1GMpk0548EYkZXfurX_T-TMj6_C_ogHA7JXpd4IFUWPRzChp5vRuNJo8aI8DgeDbPD6IPresOsdZe8Elv4fcEMMYdABfuj_LPrtDRG9s-A971kGI0FCepIGpfES30xBqDYN5vjt3lV5oPJoXlpp0fHXYpcenMNJXflbNpSJk6W9YtG8d9zyB2ALOoE3UxVUHNLOlrRjyIO60C0GFpsncTVpApUxLDqSbUdOndg5nY"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-24 pb-24 px-container-margin space-y-section-gap max-w-2xl mx-auto w-full">
+<!-- This Week Plan Strip -->
+<section>
+<div class="flex justify-between items-center mb-element-gap-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">This Week</h2>
+<span class="font-label-md text-label-md text-secondary">4/7 Completed</span>
+</div>
+<div class="flex justify-between items-center bg-surface-container-low p-4 rounded-xl border border-outline-variant">
+<!-- Day Chip: Monday (Completed) -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label-md text-label-md text-on-surface-variant">M</span>
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary">
+<span class="material-symbols-outlined text-xl font-bold">check</span>
+</div>
+</div>
+<!-- Day Chip: Tuesday (Completed) -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label-md text-label-md text-on-surface-variant">T</span>
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary">
+<span class="material-symbols-outlined text-xl font-bold">check</span>
+</div>
+</div>
+<!-- Day Chip: Wednesday (Today - Active) -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label-md text-label-md text-primary font-bold">W</span>
+<div class="w-10 h-10 rounded-full border-2 border-primary flex items-center justify-center text-primary active-day-glow">
+<span class="font-data-sm text-data-sm">12</span>
+</div>
+</div>
+<!-- Day Chip: Thursday -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label-md text-label-md text-on-surface-variant">T</span>
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant">
+<span class="font-data-sm text-data-sm">13</span>
+</div>
+</div>
+<!-- Day Chip: Friday (Completed) -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label-md text-label-md text-on-surface-variant">F</span>
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary">
+<span class="material-symbols-outlined text-xl font-bold">check</span>
+</div>
+</div>
+<!-- Day Chip: Saturday (Completed) -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label-md text-label-md text-on-surface-variant">S</span>
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary">
+<span class="material-symbols-outlined text-xl font-bold">check</span>
+</div>
+</div>
+<!-- Day Chip: Sunday -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label-md text-label-md text-on-surface-variant">S</span>
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant">
+<span class="font-data-sm text-data-sm">15</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Hero Card: Full Body Strength -->
+<section class="relative overflow-hidden rounded-2xl border border-outline-variant glass-card h-80 flex flex-col justify-end p-6 group transition-all hover:scale-[1.01]">
+<div class="absolute inset-0 z-0">
+<img class="w-full h-full object-cover opacity-60" data-alt="A cinematic, low-angle shot of a high-performance athlete performing a compound movement in a dark, luxury gym setting. The scene is illuminated by dramatic neon aqua and teal lights reflecting off polished dark surfaces, creating a 'digital hydration' aesthetic. Mist or subtle water vapor catches the light in the background, adding depth and a premium atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSga9wEAyjEW12pSzXx_NTE4M-pyOgMGw9kj0Y56vywq4IJytcFjhZiKpv2BBOHVs1Y6FIQYqGtLtmeMkbZIWwPId1QbbrL1ey7_J1FIWNXBS5pp-jCdC4vdZiBIeZSthM3TE5s_w75cNzgiBytZyk78BszLx2XsMi_xgqU2UfnNf1PNyjZFQLMRIhirUUNQSBwWC0UsEI0gPeFnR_7oim5IRDaURnFor9xuG4zVPz22NK_2GEkkc"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent"></div>
+</div>
+<div class="relative z-10 space-y-4">
+<div class="flex flex-wrap gap-2">
+<span class="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-[12px] font-bold uppercase tracking-wider">Advanced</span>
+<span class="bg-secondary/10 text-secondary border border-secondary/20 px-3 py-1 rounded-full text-[12px] font-bold uppercase tracking-wider">30 MIN</span>
+</div>
+<div>
+<h3 class="font-headline-lg text-headline-lg text-on-surface mb-1 leading-tight">Full Body Strength</h3>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">fitness_center</span>
+<span class="font-label-md text-[12px]">Dumbbells</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">person</span>
+<span class="font-label-md text-[12px]">Glutes, Core, Back</span>
+</div>
+</div>
+</div>
+<button class="cta-gradient w-full py-4 rounded-xl font-bold text-background shadow-[0_8px_20px_rgba(47,217,244,0.3)] flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95 duration-200">
+<span class="material-symbols-outlined fill-icon">play_arrow</span>
+                    Start Workout
+                </button>
+</div>
+</section>
+<!-- Library Section: Cardio at Home -->
+<section>
+<div class="flex justify-between items-end mb-4">
+<h2 class="font-headline-md text-headline-md text-on-surface">Cardio at Home</h2>
+<a class="text-primary font-label-md hover:underline" href="#">See all</a>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-4 no-scrollbar -mx-container-margin px-container-margin">
+<!-- Cardio Card 1 -->
+<div class="min-w-[200px] w-[200px] flex flex-col gap-3 group">
+<div class="h-28 rounded-xl overflow-hidden relative border border-outline-variant">
+<img class="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" data-alt="A focused high-energy metabolic conditioning workout at home, minimalist setting with cool lighting and teal accents. Digital art aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_erXcoBfTSfVDsLHeJwSDBQgm255gsw01j9CLhsim2CJqZp6QxgZerUA8bryn9YXq0cSV_Rck3BexLZeNvIDnOFFcKjHU5XE5x5GYLH-yVzMEJznY7PGlDnWHakTwoxNfYGjVJOs__NSAbH_UAFJ6KvvIICm1PUEqPe-8VrytTCABytMcjFSJlwVNiltwEzLAMP0h4xxLvmVVliItzJWjxjCStzTvJy90xsbf9r9a-OomEN3RB-M"/>
+<div class="absolute top-2 right-2 bg-background/60 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-bold">15 MIN</div>
+</div>
+<div>
+<p class="font-label-md text-on-surface font-bold">Metabolic Blast</p>
+<p class="text-[12px] text-on-surface-variant">Medium Intensity</p>
+</div>
+</div>
+<!-- Cardio Card 2 -->
+<div class="min-w-[200px] w-[200px] flex flex-col gap-3 group">
+<div class="h-28 rounded-xl overflow-hidden relative border border-outline-variant">
+<img class="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" data-alt="Professional yoga and breathwork setup in a serene dark room with soft cyan glowing lights, very calm and premium aquatic vibe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1foOFdC842zPUCg14ZIBO_JjO57lSJZWBduQA45FPfEmJHatjVgfuGZtv-fIXpXPhtEQ0eJJtAew-WCalwd4gSf35Z4fDSvjuAfOgL8G_dU5gCtqHGTHT9sYLxXF4IjYnkzds4naDp5ogFDPYuyO3zGxufmKTrs2eSqBoO1BBRN0MYdYnu2kWJJScmBdhDrMBeuzJnZ1OIDGRpJtP_kcdsp431py3syCYdsh_Mw7xBvOb3YmMk7g"/>
+<div class="absolute top-2 right-2 bg-background/60 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-bold">20 MIN</div>
+</div>
+<div>
+<p class="font-label-md text-on-surface font-bold">Aqua Flow Yoga</p>
+<p class="text-[12px] text-on-surface-variant">Low Intensity</p>
+</div>
+</div>
+<!-- Cardio Card 3 -->
+<div class="min-w-[200px] w-[200px] flex flex-col gap-3 group">
+<div class="h-28 rounded-xl overflow-hidden relative border border-outline-variant">
+<img class="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" data-alt="Dynamic HIIT sprinting or jumping rope in a sleek modern indoor gym area with blue and emerald green atmospheric lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCE0-XEFW1c_hznd3B6izdidcGtNCufbE1ZoSZmDAThAUp0Sz_Nx7sq0b6P5NdUZY7Osr3li1LKaC56KRRDuqEc4hbFc9CSVbtKLD1BIUrN9iGmOb0ghPAyV2TOOnkBypO-aMCwbVoIwvxzU7zNysagJB_gkRuC3wdb_nrb1YKAP1diO-g9LMBUzVwb3iaRIvgUjKjvxSpBFfMTq_CyFJIXkVKrIxAtxSiO2xYWdOxGNOecUTT9tQg"/>
+<div class="absolute top-2 right-2 bg-background/60 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-bold">10 MIN</div>
+</div>
+<div>
+<p class="font-label-md text-on-surface font-bold">Sprint Finish</p>
+<p class="text-[12px] text-on-surface-variant">High Intensity</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Library Section: Beginner Friendly -->
+<section>
+<div class="flex justify-between items-end mb-4">
+<h2 class="font-headline-md text-headline-md text-on-surface">Beginner Friendly</h2>
+<a class="text-primary font-label-md hover:underline" href="#">See all</a>
+</div>
+<div class="space-y-3">
+<!-- List Item 1 -->
+<div class="flex items-center gap-4 bg-surface-container rounded-xl p-3 border border-outline-variant hover:bg-surface-container-high transition-colors">
+<div class="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="A fitness instructor demonstrating a simple squat movement in a clean, modern wellness studio with ambient blue lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYNA_QUo0XLmycNRlVzrc6XBcxM-wYgCqOwr4LJ7HOY38zpL2LLy-rTlT_0p37i7IFIsBAg1zhjbmuhOKrRBcsvFeTqGMzXA_VMRfSU7MI3_ZH8rp4INFysKmTXqs-pUyVCYfAI_X-RljrHP2cYVsZDSCv7Wpi-4woFk0Mh0Gmn8jStLCZPGeul8MnUnFtp34qyTWQpiuOh1fVz2g_k6ldp86_4AF5nfYWzgRwkqkUJhK0cXfayQY"/>
+</div>
+<div class="flex-grow">
+<h4 class="font-label-md text-on-surface font-bold">Foundation Basics</h4>
+<p class="text-[12px] text-on-surface-variant">12 Exercises • 25 min</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</div>
+<!-- List Item 2 -->
+<div class="flex items-center gap-4 bg-surface-container rounded-xl p-3 border border-outline-variant hover:bg-surface-container-high transition-colors">
+<div class="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Light stretching and mobility work with an exercise mat in a moody, professional dark fitness space with aquatic accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeSYqBpx73klAUjtn6T-rL_INefvsLYEjrV8zOmK0l6IuI7lNyodI-RKi1GsJ4ojqIyGv2AucJJ4ONUDrOWHBWUmGwZuySVtH4RhdARvZlmXYFzybY042iCCDGBaF1qWLmpl0r9z3fw2ipF1KF2rBnzgXvguTiS7FbHV9z5kh0g3aWHRxXYu4QL8Mb_eQ4WbH9wTNwjaYuPYu3rdcGlHOL7qfXEmFClDq1Db09MrVxWtKmLTP7Nn4"/>
+</div>
+<div class="flex-grow">
+<h4 class="font-label-md text-on-surface font-bold">Morning Mobility</h4>
+<p class="text-[12px] text-on-surface-variant">8 Exercises • 10 min</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom NavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-surface-container-low border-t border-outline-variant">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-2xl">home</span>
+<span class="font-label-md text-label-md mt-1">Home</span>
+</a>
+<!-- Nutrition -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-2xl">restaurant</span>
+<span class="font-label-md text-label-md mt-1">Nutrition</span>
+</a>
+<!-- Train (Active) -->
+<a class="flex flex-col items-center justify-center text-secondary border-t-4 border-secondary pt-1 hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-2xl fill-icon">fitness_center</span>
+<span class="font-label-md text-label-md mt-1">Train</span>
+</a>
+<!-- Coach -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-2xl">smart_toy</span>
+<span class="font-label-md text-label-md mt-1">Coach</span>
+</a>
+<!-- Progress -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-2xl">monitoring</span>
+<span class="font-label-md text-label-md mt-1">Progress</span>
+</a>
+</nav>
+<!-- Micro-interaction Scripts -->
+<script>
+        // Simple day chip click behavior
+        document.querySelectorAll('.day-chip-clickable').forEach(chip => {
+            chip.addEventListener('click', function() {
+                // Remove active state from others
+                // This is a placeholder for logic
+            });
+        });
+
+        // Add subtle animation to CTA
+        const cta = document.querySelector('.cta-gradient');
+        if(cta) {
+            cta.addEventListener('touchstart', () => {
+                cta.style.transform = 'scale(0.95)';
+            });
+            cta.addEventListener('touchend', () => {
+                cta.style.transform = 'scale(1)';
+            });
+        }
+    </script>
+</body></html>

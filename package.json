@@ -1,0 +1,27 @@
+{
+  "name": "aquazerofit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AquaZeroFit — AI-powered wellness platform (web + Telegram Mini App). An AquaZero product.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace apps/web",
+    "api": "npm run dev --workspace apps/api",
+    "build": "npm run build --workspace packages/shared && npm run build --workspace apps/api && npm run build --workspace apps/web",
+    "test": "npm run test --workspace packages/shared --if-present && npm run test --workspace apps/api --if-present && npm run test --workspace apps/web --if-present",
+    "seed": "npm run seed --workspace apps/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "eval": "tsx evals/runner.ts",
+    "verify": "npm run typecheck && npm run test && npm run eval",
+    "start": "npm run start --workspace apps/api"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.2"
+  }
+}

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>AquaZeroFit - Home Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&amp;family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: #0e1416;
+            font-family: 'DM Sans', sans-serif;
+            color: #dde4e5;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-card {
+            background: rgba(22, 29, 30, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid #1E4C74;
+        }
+        .cta-gradient {
+            background: linear-gradient(135deg, #2fd9f4 0%, #45dfa4 100%);
+        }
+        .water-segment {
+            transition: all 0.3s ease;
+        }
+        .water-segment.active {
+            fill: #8aebff;
+            filter: drop-shadow(0 0 4px rgba(138, 235, 255, 0.6));
+        }
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.5s ease-in-out;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#2f3638",
+                        "tertiary": "#ffd2d5",
+                        "on-tertiary": "#67001f",
+                        "secondary-container": "#00bd85",
+                        "outline-variant": "#3c494c",
+                        "primary-container": "#22d3ee",
+                        "on-secondary": "#003825",
+                        "surface-container-high": "#242b2d",
+                        "surface-tint": "#2fd9f4",
+                        "tertiary-fixed": "#ffdadc",
+                        "on-secondary-container": "#00452e",
+                        "surface-container": "#1a2122",
+                        "on-tertiary-fixed": "#400010",
+                        "on-tertiary-fixed-variant": "#891933",
+                        "error-container": "#93000a",
+                        "inverse-surface": "#dde4e5",
+                        "on-surface": "#dde4e5",
+                        "on-primary-fixed-variant": "#004e5a",
+                        "on-secondary-fixed-variant": "#005137",
+                        "outline": "#859397",
+                        "primary-fixed-dim": "#2fd9f4",
+                        "surface-container-lowest": "#090f11",
+                        "on-secondary-fixed": "#002114",
+                        "on-background": "#dde4e5",
+                        "primary": "#8aebff",
+                        "background": "#0e1416",
+                        "inverse-on-surface": "#2b3233",
+                        "primary-fixed": "#a2eeff",
+                        "surface-variant": "#2f3638",
+                        "error": "#ffb4ab",
+                        "on-primary": "#00363e",
+                        "secondary-fixed-dim": "#45dfa4",
+                        "on-surface-variant": "#bbc9cd",
+                        "tertiary-container": "#ffaab2",
+                        "on-tertiary-container": "#94223a",
+                        "on-primary-fixed": "#001f25",
+                        "on-primary-container": "#005763",
+                        "tertiary-fixed-dim": "#ffb2b9",
+                        "secondary": "#45dfa4",
+                        "surface-bright": "#343a3c",
+                        "surface-dim": "#0e1416",
+                        "inverse-primary": "#006877",
+                        "surface": "#0e1416",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-low": "#161d1e",
+                        "secondary-fixed": "#68fcbf",
+                        "on-error": "#690005"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "element-gap-md": "1rem",
+                        "container-margin": "1.25rem",
+                        "element-gap-sm": "0.5rem",
+                        "card-padding": "1.25rem",
+                        "section-gap": "2rem",
+                        "gutter": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Barlow Condensed"],
+                        "data-sm": ["DM Sans"],
+                        "label-md": ["DM Sans"],
+                        "data-lg": ["DM Sans"],
+                        "body-md": ["DM Sans"],
+                        "headline-lg": ["Barlow Condensed"],
+                        "display-lg": ["Barlow Condensed"],
+                        "body-lg": ["DM Sans"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                        "headline-md-mobile": ["20px", {"lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                        "data-sm": ["14px", {"lineHeight": "14px", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "data-lg": ["32px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "32px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="flex flex-col min-h-screen pb-24">
+<!-- Top AppBar -->
+<header class="fixed top-0 left-0 w-full z-40 bg-surface/80 backdrop-blur-md border-b border-outline-variant flex justify-between items-center px-container-margin py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="waves">waves</span>
+<span class="font-headline-lg-mobile text-headline-lg-mobile font-bold tracking-tight text-primary">AquaZeroFit</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center bg-surface-container rounded-full px-3 py-1 border border-outline-variant">
+<span class="material-symbols-outlined text-tertiary-container text-[18px] mr-1" data-icon="local_fire_department" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span class="font-data-sm text-data-sm text-on-surface">12</span>
+</div>
+<div class="w-10 h-10 rounded-full border-2 border-primary overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional studio headshot of a fit young man with a friendly expression, set against a dark, minimalist aquatic-themed background with soft blue backlighting. The lighting is high-end and cinematic, emphasizing a premium health and wellness lifestyle aesthetic. The style is sharp and modern, matching the overall dark mode UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdanhN_xdlUp44oNgBmdtuPO3g2nwboyFo73_2bpshqfx5QLQr-8kg6_kSA2Lems0mmg1KGXBZY9OQI8J6V0ZToER_k4kNTWfe0JARYOs2VRS6S0gFKBv6aT-gjSOBCvmW5bI393CNUEVMtuG6pBOOUWFJ4ouYZhE6xTSuaUkh-SKDfTv0z6WOwXDIDovwJlHuZxTIub1P3BZ156MRJE0ryRnT2uW5jwSM_oQ98zznnftSC_0oAMM"/>
+</div>
+</div>
+</header>
+<!-- Main Content Container -->
+<main class="mt-20 px-container-margin">
+<!-- Header Greeting -->
+<section class="mb-element-gap-md mt-6">
+<h1 class="font-headline-md-mobile text-headline-md-mobile text-on-surface">Hello, Alex</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Your hydration and energy are optimal today.</p>
+</section>
+<!-- AI Insight Banner -->
+<div class="mb-section-gap glass-card rounded-xl p-4 flex items-center gap-4 border-l-4 border-primary">
+<div class="bg-primary/20 p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary" data-icon="smart_toy" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-primary">Coach AI Insight</p>
+<p class="font-body-md text-body-md text-on-surface">Based on your sleep, increase your water intake by 500ml before your workout.</p>
+</div>
+</div>
+<!-- Hero Bento Grid Section -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-element-gap-md mb-section-gap">
+<!-- Nutrition Card (Main Hero) -->
+<div class="glass-card rounded-xl p-card-padding relative overflow-hidden flex flex-col items-center">
+
+<div class="w-full flex justify-between items-start mb-4">
+<h2 class="font-headline-md text-headline-md text-on-surface">Nutrition</h2>
+<span class="font-label-md text-label-md text-on-surface-variant">Daily Goal</span>
+</div>
+<!-- Circular Progress Ring -->
+<div class="relative flex items-center justify-center mb-6">
+<svg class="w-48 h-48">
+<circle class="text-outline-variant" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-primary progress-ring-circle" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-dasharray="502.6" stroke-dashoffset="150" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-display-lg text-display-lg text-primary">1,450</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Remaining kcal</span>
+</div>
+</div>
+<!-- Macro Bars -->
+<div class="w-full grid grid-cols-3 gap-3">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-[12px] font-bold">
+<span class="text-secondary">PROTEIN</span>
+<span class="text-on-surface">65g</span>
+</div>
+<div class="h-1.5 w-full bg-outline-variant rounded-full overflow-hidden">
+<div class="h-full bg-secondary rounded-full" style="width: 75%"></div>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-[12px] font-bold">
+<span class="text-primary">CARBS</span>
+<span class="text-on-surface">120g</span>
+</div>
+<div class="h-1.5 w-full bg-outline-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 45%"></div>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-[12px] font-bold">
+<span class="text-tertiary-container">FAT</span>
+<span class="text-on-surface">32g</span>
+</div>
+<div class="h-1.5 w-full bg-outline-variant rounded-full overflow-hidden">
+<div class="h-full bg-tertiary-container rounded-full" style="width: 60%"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-element-gap-md">
+<!-- Water Card -->
+<div class="glass-card rounded-xl p-card-padding flex-1">
+<div class="flex justify-between items-center mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="water_drop">water_drop</span>
+<h3 class="font-headline-md text-headline-md-mobile text-on-surface">Hydration</h3>
+</div>
+<span class="font-data-sm text-data-sm text-primary">1.2L / 2.5L</span>
+</div>
+<div class="flex justify-between items-center gap-1 mb-4">
+<!-- 8 Droplet Segments -->
+<svg class="water-segment active" height="32" viewbox="0 0 24 32" width="24"><path d="M12 32C5.37258 32 0 26.6274 0 20C0 12 12 0 12 0C12 0 24 12 24 20C24 26.6274 18.6274 32 12 32Z" fill="currentColor"></path></svg>
+<svg class="water-segment active" height="32" viewbox="0 0 24 32" width="24"><path d="M12 32C5.37258 32 0 26.6274 0 20C0 12 12 0 12 0C12 0 24 12 24 20C24 26.6274 18.6274 32 12 32Z" fill="currentColor"></path></svg>
+<svg class="water-segment active" height="32" viewbox="0 0 24 32" width="24"><path d="M12 32C5.37258 32 0 26.6274 0 20C0 12 12 0 12 0C12 0 24 12 24 20C24 26.6274 18.6274 32 12 32Z" fill="currentColor"></path></svg>
+<svg class="water-segment active" height="32" viewbox="0 0 24 32" width="24"><path d="M12 32C5.37258 32 0 26.6274 0 20C0 12 12 0 12 0C12 0 24 12 24 20C24 26.6274 18.6274 32 12 32Z" fill="currentColor"></path></svg>
+<svg class="water-segment text-outline-variant" height="32" viewbox="0 0 24 32" width="24"><path d="M12 32C5.37258 32 0 26.6274 0 20C0 12 12 0 12 0C12 0 24 12 24 20C24 26.6274 18.6274 32 12 32Z" fill="currentColor"></path></svg>
+<svg class="water-segment text-outline-variant" height="32" viewbox="0 0 24 32" width="24"><path d="M12 32C5.37258 32 0 26.6274 0 20C0 12 12 0 12 0C12 0 24 12 24 20C24 26.6274 18.6274 32 12 32Z" fill="currentColor"></path></svg>
+<svg class="water-segment text-outline-variant" height="32" viewbox="0 0 24 32" width="24"><path d="M12 32C5.37258 32 0 26.6274 0 20C0 12 12 0 12 0C12 0 24 12 24 20C24 26.6274 18.6274 32 12 32Z" fill="currentColor"></path></svg>
+<svg class="water-segment text-outline-variant" height="32" viewbox="0 0 24 32" width="24"><path d="M12 32C5.37258 32 0 26.6274 0 20C0 12 12 0 12 0C12 0 24 12 24 20C24 26.6274 18.6274 32 12 32Z" fill="currentColor"></path></svg>
+</div>
+<button class="w-full py-3 rounded-xl border border-primary text-primary font-bold transition-all active:scale-95 flex justify-center items-center gap-2">
+<span class="material-symbols-outlined text-[20px]" data-icon="add">add</span> Log 250ml
+                    </button>
+</div>
+<!-- Today's Plan Card -->
+<div class="glass-card rounded-xl p-card-padding flex-1 relative overflow-hidden group">
+<div class="absolute inset-0 z-0 bg-cover bg-center grayscale transition-transform duration-700 group-hover:scale-110 opacity-20" data-alt="High-resolution, dynamic photograph of an elite swimmer mid-stroke in a crystal-clear pool, with sparkling water droplets and deep blue reflections. The lighting is dramatic and cinematic, emphasizing muscular definition and high performance. The overall aesthetic is dark, luxurious, and modern, perfectly complementing the aquatic wellness theme." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDzntUy23gDsp7jOXwLvbCDpaAzMWYZzlSOLGyqb4X2GAa5mxjh-l6dqoXwOkjGCudkhKzTMS4blKfKH74PH8dWvfwRTl3MastUPabBeREzHBWmWKqgxp9a7tDrL2LDUNMrG9InYVqwa1e54Ybg0S35vpPnd3Ybi4PB3VfxygfJShIoc3-w-JyI1iTsqHx2Cm-CuA6418858UbET5FXFom3G0Ci92l4vax1NpgSEQlOORWdbsrktak')"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="font-headline-md text-headline-md-mobile text-on-surface">Today's Plan</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Hypertrophy Chest &amp; Triceps</p>
+</div>
+<div class="bg-secondary/10 text-secondary px-2 py-1 rounded-full font-bold text-[10px] tracking-widest border border-secondary/20 uppercase">
+                                STRENGTH
+                            </div>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant font-label-md mb-4">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span> 45m
+                            </div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="bolt">bolt</span> 320 kcal
+                            </div>
+</div>
+<button class="cta-gradient w-full py-3 rounded-xl text-on-primary font-bold shadow-lg shadow-primary/20 transition-all active:scale-95">
+                            START WORKOUT
+                        </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Weekly Progress Summary -->
+<section class="mb-section-gap">
+<div class="flex justify-between items-center mb-4">
+<h2 class="font-headline-md text-headline-md text-on-surface">Weekly Flow</h2>
+<button class="text-primary font-label-md flex items-center gap-1">View All <span class="material-symbols-outlined text-[18px]" data-icon="chevron_right">chevron_right</span></button>
+</div>
+<div class="glass-card rounded-xl p-card-padding">
+<div class="flex justify-between items-end h-32 gap-2">
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="w-full bg-outline-variant rounded-full h-12 relative">
+<div class="absolute bottom-0 w-full bg-secondary rounded-full h-8 opacity-60"></div>
+</div>
+<span class="font-label-md text-[12px] text-on-surface-variant">Mon</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="w-full bg-outline-variant rounded-full h-24 relative">
+<div class="absolute bottom-0 w-full bg-secondary rounded-full h-16 opacity-80"></div>
+</div>
+<span class="font-label-md text-[12px] text-on-surface-variant">Tue</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="w-full bg-outline-variant rounded-full h-20 relative">
+<div class="absolute bottom-0 w-full bg-primary rounded-full h-20 shadow-[0_0_12px_rgba(138,235,255,0.4)]"></div>
+</div>
+<span class="font-label-md text-[12px] text-primary font-bold">Wed</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="w-full bg-outline-variant rounded-full h-16 relative"></div>
+<span class="font-label-md text-[12px] text-on-surface-variant">Thu</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="w-full bg-outline-variant rounded-full h-20 relative"></div>
+<span class="font-label-md text-[12px] text-on-surface-variant">Fri</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="w-full bg-outline-variant rounded-full h-14 relative"></div>
+<span class="font-label-md text-[12px] text-on-surface-variant">Sat</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="w-full bg-outline-variant rounded-full h-10 relative"></div>
+<span class="font-label-md text-[12px] text-on-surface-variant">Sun</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-surface-container-low border-t border-outline-variant h-20 rounded-t-xl shadow-lg backdrop-blur-xl">
+<!-- Home Active -->
+<button class="flex flex-col items-center justify-center text-secondary border-t-4 border-secondary pt-1 h-full w-full transition-transform active:scale-90 duration-200">
+<span class="material-symbols-outlined" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</button>
+<!-- Nutrition -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant pt-2 h-full w-full hover:text-primary transition-colors duration-200 active:scale-90">
+<span class="material-symbols-outlined" data-icon="restaurant">restaurant</span>
+<span class="font-label-md text-label-md">Nutrition</span>
+</button>
+<!-- Train -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant pt-2 h-full w-full hover:text-primary transition-colors duration-200 active:scale-90">
+<span class="material-symbols-outlined" data-icon="fitness_center">fitness_center</span>
+<span class="font-label-md text-label-md">Train</span>
+</button>
+<!-- Coach -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant pt-2 h-full w-full hover:text-primary transition-colors duration-200 active:scale-90">
+<span class="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
+<span class="font-label-md text-label-md">Coach</span>
+</button>
+<!-- Progress -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant pt-2 h-full w-full hover:text-primary transition-colors duration-200 active:scale-90">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="font-label-md text-label-md">Progress</span>
+</button>
+</nav>
+<script>
+        // Micro-interaction for water segments
+        document.querySelectorAll('.water-segment').forEach((segment, index) => {
+            segment.addEventListener('click', () => {
+                // Toggle active state for current and all previous segments
+                const allSegments = document.querySelectorAll('.water-segment');
+                allSegments.forEach((s, i) => {
+                    if (i <= index) {
+                        s.classList.add('active');
+                        s.classList.remove('text-outline-variant');
+                        s.classList.add('text-primary');
+                    } else {
+                        s.classList.remove('active');
+                        s.classList.add('text-outline-variant');
+                        s.classList.remove('text-primary');
+                    }
+                });
+            });
+        });
+
+        // Simple animation for macro bars on load
+        window.addEventListener('load', () => {
+            const bars = document.querySelectorAll('.h-full.bg-secondary, .h-full.bg-primary, .h-full.bg-tertiary-container');
+            bars.forEach(bar => {
+                const targetWidth = bar.style.width;
+                bar.style.width = '0';
+                setTimeout(() => {
+                    bar.style.transition = 'width 1s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    bar.style.width = targetWidth;
+                }, 100);
+            });
+        });
+    </script>
+</body></html>

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>AquaZeroFit Notifications</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&amp;family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(14, 20, 22, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid #1E4C74;
+        }
+        .toggle-checkbox:checked + .toggle-slot {
+            background-color: #45dfa4;
+        }
+        .toggle-checkbox:checked + .toggle-slot .toggle-dot {
+            transform: translateX(20px);
+        }
+        body {
+            background-color: #071A2B;
+            color: #dde4e5;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-highest": "#2f3638",
+                    "tertiary": "#ffd2d5",
+                    "on-tertiary": "#67001f",
+                    "secondary-container": "#00bd85",
+                    "outline-variant": "#3c494c",
+                    "primary-container": "#22d3ee",
+                    "on-secondary": "#003825",
+                    "surface-container-high": "#242b2d",
+                    "surface-tint": "#2fd9f4",
+                    "tertiary-fixed": "#ffdadc",
+                    "on-secondary-container": "#00452e",
+                    "surface-container": "#1a2122",
+                    "on-tertiary-fixed": "#400010",
+                    "on-tertiary-fixed-variant": "#891933",
+                    "error-container": "#93000a",
+                    "inverse-surface": "#dde4e5",
+                    "on-surface": "#dde4e5",
+                    "on-primary-fixed-variant": "#004e5a",
+                    "on-secondary-fixed-variant": "#005137",
+                    "outline": "#859397",
+                    "primary-fixed-dim": "#2fd9f4",
+                    "surface-container-lowest": "#090f11",
+                    "on-secondary-fixed": "#002114",
+                    "on-background": "#dde4e5",
+                    "primary": "#8aebff",
+                    "background": "#0e1416",
+                    "inverse-on-surface": "#2b3233",
+                    "primary-fixed": "#a2eeff",
+                    "surface-variant": "#2f3638",
+                    "error": "#ffb4ab",
+                    "on-primary": "#00363e",
+                    "secondary-fixed-dim": "#45dfa4",
+                    "on-surface-variant": "#bbc9cd",
+                    "tertiary-container": "#ffaab2",
+                    "on-tertiary-container": "#94223a",
+                    "on-primary-fixed": "#001f25",
+                    "on-primary-container": "#005763",
+                    "tertiary-fixed-dim": "#ffb2b9",
+                    "secondary": "#45dfa4",
+                    "surface-bright": "#343a3c",
+                    "surface-dim": "#0e1416",
+                    "inverse-primary": "#006877",
+                    "surface": "#0e1416",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-low": "#161d1e",
+                    "secondary-fixed": "#68fcbf",
+                    "on-error": "#690005"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "element-gap-md": "1rem",
+                    "container-margin": "1.25rem",
+                    "element-gap-sm": "0.5rem",
+                    "card-padding": "1.25rem",
+                    "section-gap": "2rem",
+                    "gutter": "1rem"
+            },
+            "fontFamily": {
+                    "headline-md": ["Barlow Condensed"],
+                    "data-sm": ["DM Sans"],
+                    "label-md": ["DM Sans"],
+                    "data-lg": ["DM Sans"],
+                    "body-md": ["DM Sans"],
+                    "headline-lg": ["Barlow Condensed"],
+                    "display-lg": ["Barlow Condensed"],
+                    "body-lg": ["DM Sans"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "data-sm": ["14px", {"lineHeight": "14px", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "data-lg": ["32px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "32px", "letterSpacing": "0.03em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="font-body-md text-on-background selection:bg-primary/30">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 left-0 w-full z-40 bg-surface/80 backdrop-blur-md flex justify-between items-center px-container-margin py-4 border-b border-outline-variant">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-3xl">waves</span>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold tracking-tight text-primary">AquaZeroFit</h1>
+</div>
+<div class="w-10 h-10 rounded-full border border-outline overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional studio portrait of a fitness enthusiast, looking directly at the camera with a calm and confident expression. The lighting is moody and cinematic with cool aqua blue rim lighting against a deep navy background, maintaining the high-end modern aquatic wellness aesthetic of the brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDFFGX1W5GnkHlHniLWaDyaGL8Erqo8zk4f2VYdSSf4rQEiFTAxymRwzMSqbbOZ53pRZaMN1SDwHJjO4UjOO0k9jvXEHgfzBBbKE9wvOYj8zY6DJyQZkYrjPkdPwjYt5WbNBA_jDuAt4z9yvrW_Bumi-7Nm_1CbYyWWXkmDFb6kMTkQ8ysnOE4TeyuDzqcLPchZ3s_o7on94BLrp8r5vr7194kZtlp21PpHBC9KY5opU__f2XK3mCw"/>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="pt-24 pb-32 px-container-margin min-h-screen">
+<!-- Background Atmospheric Element -->
+<div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+
+</div>
+<section class="mb-section-gap">
+<h2 class="font-headline-md text-headline-md text-primary mb-element-gap-md uppercase tracking-wider">Preferences</h2>
+<p class="text-on-surface-variant font-body-md mb-element-gap-md">Stay on track with personalized alerts for your aquatic fitness journey.</p>
+</section>
+<!-- Notification List -->
+<div class="flex flex-col gap-element-gap-md">
+<!-- Meal Reminders -->
+<div class="glass-card rounded-xl p-card-padding flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">restaurant</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">Meal reminders</h3>
+<p class="text-label-md text-on-surface-variant">Don't miss a fueling window</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer h-12 w-12 flex justify-center">
+<input checked="" class="sr-only peer toggle-checkbox" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer transition-all toggle-slot relative">
+<div class="absolute top-[2px] left-[2px] bg-white w-5 h-5 rounded-full transition-transform toggle-dot"></div>
+</div>
+</label>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
+<span class="font-label-md text-on-surface-variant uppercase">Next alert</span>
+<input class="bg-surface-container-low text-primary font-data-sm text-lg border-none rounded-lg p-2 focus:ring-2 focus:ring-primary/50 cursor-pointer" type="time" value="08:30"/>
+</div>
+</div>
+<!-- Water Reminders -->
+<div class="glass-card rounded-xl p-card-padding flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined">water_drop</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">Water reminders</h3>
+<p class="text-label-md text-on-surface-variant">Stay hydrated and fluid</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer h-12 w-12 flex justify-center">
+<input checked="" class="sr-only peer toggle-checkbox" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer transition-all toggle-slot relative">
+<div class="absolute top-[2px] left-[2px] bg-white w-5 h-5 rounded-full transition-transform toggle-dot"></div>
+</div>
+</label>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
+<span class="font-label-md text-on-surface-variant uppercase">Frequency</span>
+<select class="bg-surface-container-low text-secondary font-data-sm text-lg border-none rounded-lg p-2 focus:ring-2 focus:ring-secondary/50 cursor-pointer">
+<option>Every 1 Hour</option>
+<option selected="">Every 2 Hours</option>
+<option>Every 4 Hours</option>
+</select>
+</div>
+</div>
+<!-- Workout Time -->
+<div class="glass-card rounded-xl p-card-padding flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-tertiary/10 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined">fitness_center</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">Workout time</h3>
+<p class="text-label-md text-on-surface-variant">Your daily performance session</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer h-12 w-12 flex justify-center">
+<input checked="" class="sr-only peer toggle-checkbox" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer transition-all toggle-slot relative">
+<div class="absolute top-[2px] left-[2px] bg-white w-5 h-5 rounded-full transition-transform toggle-dot"></div>
+</div>
+</label>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
+<span class="font-label-md text-on-surface-variant uppercase">Session start</span>
+<input class="bg-surface-container-low text-tertiary font-data-sm text-lg border-none rounded-lg p-2 focus:ring-2 focus:ring-tertiary/50 cursor-pointer" type="time" value="17:00"/>
+</div>
+</div>
+<!-- Weekly Weigh-in -->
+<div class="glass-card rounded-xl p-card-padding flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-primary-container/10 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined">monitoring</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">Weekly weigh-in</h3>
+<p class="text-label-md text-on-surface-variant">Track your aquatic transformation</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer h-12 w-12 flex justify-center">
+<input class="sr-only peer toggle-checkbox" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer transition-all toggle-slot relative">
+<div class="absolute top-[2px] left-[2px] bg-white w-5 h-5 rounded-full transition-transform toggle-dot"></div>
+</div>
+</label>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
+<span class="font-label-md text-on-surface-variant uppercase">Day</span>
+<select class="bg-surface-container-low text-primary-container font-data-sm text-lg border-none rounded-lg p-2 focus:ring-2 focus:ring-primary-container/50 cursor-pointer">
+<option selected="">Monday</option>
+<option>Wednesday</option>
+<option>Friday</option>
+</select>
+</div>
+</div>
+</div>
+<!-- Extra Settings -->
+<section class="mt-section-gap">
+<h2 class="font-headline-md text-headline-md text-primary mb-element-gap-md uppercase tracking-wider">System</h2>
+<div class="glass-card rounded-xl divide-y divide-outline-variant/30">
+<button class="w-full flex items-center justify-between p-card-padding hover:bg-surface-container-high transition-colors text-left min-h-[56px]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">volume_up</span>
+<span class="font-body-md">Notification Sound</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</button>
+<button class="w-full flex items-center justify-between p-card-padding hover:bg-surface-container-high transition-colors text-left min-h-[56px]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">vibration</span>
+<span class="font-body-md">Haptic Feedback</span>
+</div>
+<span class="text-primary font-data-sm uppercase">Enabled</span>
+</button>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Shell -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-surface-container-low border-t border-outline-variant shadow-lg rounded-t-xl h-20">
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">restaurant</span>
+<span class="font-label-md text-label-md">Nutrition</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">fitness_center</span>
+<span class="font-label-md text-label-md">Train</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-label-md text-label-md">Coach</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary border-t-4 border-secondary pt-1 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">monitoring</span>
+<span class="font-label-md text-label-md">Progress</span>
+</a>
+</nav>
+<script>
+        // Micro-interactions for toggles and visual feedback
+        document.querySelectorAll('.toggle-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const parent = e.target.closest('.glass-card');
+                if (e.target.checked) {
+                    parent.style.borderColor = '#1E4C74';
+                    parent.style.boxShadow = '0 0 15px rgba(69, 223, 164, 0.1)';
+                } else {
+                    parent.style.borderColor = 'rgba(60, 73, 76, 0.3)';
+                    parent.style.boxShadow = 'none';
+                }
+            });
+        });
+
+        // Simple time picker feedback
+        document.querySelectorAll('input[type="time"]').forEach(picker => {
+            picker.addEventListener('change', (e) => {
+                console.log('Reminder set for:', e.target.value);
+            });
+        });
+    </script>
+</body></html>

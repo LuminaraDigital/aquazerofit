@@ -1,0 +1,128 @@
+{
+  "name": "recommendation-safety",
+  "description": "Allergen exclusion evaluation (AQF-11 §2: zero tolerance for false negatives). Each case runs profile allergies x candidate set through excludeAllergens; any surviving candidate that contains a declared allergen is a critical failure.",
+  "cases": [
+    {
+      "id": "alg-01",
+      "allergies": ["peanuts"],
+      "candidates": [
+        { "id": "c1", "name": "Chicken Satay Skewers", "allergens": [] },
+        { "id": "c2", "name": "Grilled Chicken Breast", "allergens": [] },
+        { "id": "c3", "name": "Peanut Butter Oats", "allergens": ["peanuts"] }
+      ],
+      "mustExclude": ["c1", "c3"]
+    },
+    {
+      "id": "alg-02",
+      "allergies": ["treeNuts"],
+      "candidates": [
+        { "id": "c1", "name": "Almond Granola Bowl", "allergens": [] },
+        { "id": "c2", "name": "Berry Smoothie", "allergens": [] },
+        { "id": "c3", "name": "Pesto Pasta", "allergens": ["treeNuts", "wheat"] },
+        { "id": "c4", "name": "Marzipan Slice", "allergens": [] }
+      ],
+      "mustExclude": ["c1", "c3", "c4"]
+    },
+    {
+      "id": "alg-03",
+      "allergies": ["shellfish"],
+      "candidates": [
+        { "id": "c1", "name": "Prawn Laksa", "allergens": [] },
+        { "id": "c2", "name": "Beef Stir Fry", "allergens": [] },
+        { "id": "c3", "name": "Calamari Salad", "allergens": [] }
+      ],
+      "mustExclude": ["c1", "c3"]
+    },
+    {
+      "id": "alg-04",
+      "allergies": ["fish"],
+      "candidates": [
+        { "id": "c1", "name": "Lemon Herb Salmon", "allergens": ["fish"] },
+        { "id": "c2", "name": "Caesar Salad with Anchovy Dressing", "allergens": [] },
+        { "id": "c3", "name": "Chicken Caesar Wrap", "allergens": ["wheat"] }
+      ],
+      "mustExclude": ["c1", "c2"]
+    },
+    {
+      "id": "alg-05",
+      "allergies": ["sesame"],
+      "candidates": [
+        { "id": "c1", "name": "Hummus Veggie Bowl", "allergens": [] },
+        { "id": "c2", "name": "Tahini Dressed Salad", "allergens": [] },
+        { "id": "c3", "name": "Roast Veggie Bowl", "allergens": [] }
+      ],
+      "mustExclude": ["c1", "c2"]
+    },
+    {
+      "id": "alg-06",
+      "allergies": ["milk", "eggs"],
+      "candidates": [
+        { "id": "c1", "name": "Greek Yoghurt Parfait", "allergens": ["milk"] },
+        { "id": "c2", "name": "Veggie Frittata", "allergens": [] },
+        { "id": "c3", "name": "Fruit Salad", "allergens": [] },
+        { "id": "c4", "name": "Halloumi Wrap", "allergens": [] }
+      ],
+      "mustExclude": ["c1", "c2", "c4"]
+    },
+    {
+      "id": "alg-07",
+      "allergies": ["wheat"],
+      "candidates": [
+        { "id": "c1", "name": "Seitan Skewers", "allergens": [] },
+        { "id": "c2", "name": "Chicken Udon Soup", "allergens": [] },
+        { "id": "c3", "name": "Rice Paper Rolls", "allergens": [] }
+      ],
+      "mustExclude": ["c1", "c2"]
+    },
+    {
+      "id": "alg-08",
+      "allergies": ["soy"],
+      "candidates": [
+        { "id": "c1", "name": "Tofu Scramble", "allergens": [] },
+        { "id": "c2", "name": "Miso Glazed Eggplant", "allergens": [] },
+        { "id": "c3", "name": "Beef and Veggie Bowl", "allergens": [] },
+        { "id": "c4", "name": "Edamame Snack Pack", "allergens": ["soy"] }
+      ],
+      "mustExclude": ["c1", "c2", "c4"]
+    },
+    {
+      "id": "alg-09",
+      "allergies": ["peanuts", "treeNuts", "sesame"],
+      "candidates": [
+        { "id": "c1", "name": "Trail Mix", "allergens": [] },
+        { "id": "c2", "name": "Groundnut Stew", "allergens": [] },
+        { "id": "c3", "name": "Plain Grilled Steak with Potatoes", "allergens": [] },
+        { "id": "c4", "name": "Halva Bites", "allergens": [] }
+      ],
+      "mustExclude": ["c1", "c2", "c4"]
+    },
+    {
+      "id": "alg-10",
+      "allergies": ["eggs"],
+      "candidates": [
+        { "id": "c1", "name": "Chicken Salad with Aioli", "allergens": [] },
+        { "id": "c2", "name": "Pavlova", "allergens": ["eggs", "milk"], "ingredients": ["meringue", "cream"] },
+        { "id": "c3", "name": "Grilled Chicken and Rice", "allergens": [] }
+      ],
+      "mustExclude": ["c1", "c2"]
+    },
+    {
+      "id": "alg-11",
+      "allergies": [],
+      "candidates": [
+        { "id": "c1", "name": "Peanut Butter Oats", "allergens": ["peanuts"] },
+        { "id": "c2", "name": "Lemon Herb Salmon", "allergens": ["fish"] }
+      ],
+      "mustExclude": []
+    },
+    {
+      "id": "alg-12",
+      "allergies": ["shellfish"],
+      "candidates": [
+        { "id": "c1", "name": "Tom Yum Soup", "allergens": [], "ingredients": ["prawns", "lemongrass", "chilli"] },
+        { "id": "c2", "name": "Veggie Green Curry", "allergens": [], "ingredients": ["coconut milk", "eggplant", "basil"] }
+      ],
+      "mustExclude": ["c1"]
+    }
+  ]
+}

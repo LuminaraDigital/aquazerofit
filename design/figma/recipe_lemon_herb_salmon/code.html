@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>Recipe Detail | AquaZeroFit</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&amp;family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(30, 76, 116, 0.1);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(30, 76, 116, 0.5);
+        }
+        .cta-gradient {
+            background: linear-gradient(135deg, #2fd9f4 0%, #00bd85 100%);
+        }
+        body {
+            background-color: #071A2B;
+            -webkit-font-smoothing: antialiased;
+        }
+        .scroll-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .checkbox-custom:checked + label .check-icon {
+            opacity: 1;
+        }
+        .checkbox-custom:checked + label .box {
+            background-color: #45dfa4;
+            border-color: #45dfa4;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-highest": "#2f3638",
+                    "tertiary": "#ffd2d5",
+                    "on-tertiary": "#67001f",
+                    "secondary-container": "#00bd85",
+                    "outline-variant": "#3c494c",
+                    "primary-container": "#22d3ee",
+                    "on-secondary": "#003825",
+                    "surface-container-high": "#242b2d",
+                    "surface-tint": "#2fd9f4",
+                    "tertiary-fixed": "#ffdadc",
+                    "on-secondary-container": "#00452e",
+                    "surface-container": "#1a2122",
+                    "on-tertiary-fixed": "#400010",
+                    "on-tertiary-fixed-variant": "#891933",
+                    "error-container": "#93000a",
+                    "inverse-surface": "#dde4e5",
+                    "on-surface": "#dde4e5",
+                    "on-primary-fixed-variant": "#004e5a",
+                    "on-secondary-fixed-variant": "#005137",
+                    "outline": "#859397",
+                    "primary-fixed-dim": "#2fd9f4",
+                    "surface-container-lowest": "#090f11",
+                    "on-secondary-fixed": "#002114",
+                    "on-background": "#dde4e5",
+                    "primary": "#8aebff",
+                    "background": "#0e1416",
+                    "inverse-on-surface": "#2b3233",
+                    "primary-fixed": "#a2eeff",
+                    "surface-variant": "#2f3638",
+                    "error": "#ffb4ab",
+                    "on-primary": "#00363e",
+                    "secondary-fixed-dim": "#45dfa4",
+                    "on-surface-variant": "#bbc9cd",
+                    "tertiary-container": "#ffaab2",
+                    "on-tertiary-container": "#94223a",
+                    "on-primary-fixed": "#001f25",
+                    "on-primary-container": "#005763",
+                    "tertiary-fixed-dim": "#ffb2b9",
+                    "secondary": "#45dfa4",
+                    "surface-bright": "#343a3c",
+                    "surface-dim": "#0e1416",
+                    "inverse-primary": "#006877",
+                    "surface": "#0e1416",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-low": "#161d1e",
+                    "secondary-fixed": "#68fcbf",
+                    "on-error": "#690005"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "element-gap-md": "1rem",
+                    "container-margin": "1.25rem",
+                    "element-gap-sm": "0.5rem",
+                    "card-padding": "1.25rem",
+                    "section-gap": "2rem",
+                    "gutter": "1rem"
+            },
+            "fontFamily": {
+                    "headline-md": ["Barlow Condensed"],
+                    "data-sm": ["DM Sans"],
+                    "label-md": ["DM Sans"],
+                    "data-lg": ["DM Sans"],
+                    "body-md": ["DM Sans"],
+                    "headline-lg": ["Barlow Condensed"],
+                    "display-lg": ["Barlow Condensed"],
+                    "body-lg": ["DM Sans"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "data-sm": ["14px", {"lineHeight": "14px", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "data-lg": ["32px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="text-on-background font-body-md overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface/80 backdrop-blur-md fixed top-0 left-0 w-full z-40 border-b border-outline-variant">
+<div class="flex justify-between items-center w-full px-container-margin py-4">
+<div class="flex items-center gap-2">
+<button class="flex items-center justify-center p-2 rounded-full hover:bg-surface-variant transition-colors" onclick="history.back()">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<span class="font-headline-md text-headline-md-mobile text-primary font-bold">AquaZeroFit</span>
+</div>
+<div class="w-10 h-10 rounded-full border border-primary/30 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional studio portrait of a fit individual with a serene expression, set against a deep blue aquatic background with soft bokeh lighting. The style is modern and high-end, reflecting an elite fitness and wellness persona within a dark, premium digital ecosystem. The colors are dominated by navy and cyan highlights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeZHT2BHa7YKC-0X0Y7IxzIenxlxrU7mwdSbvLfu0JcwQo56UXs2jEJZzGaK0L5wDYA2q_taf-4cNikvKq963LNBufIyLa-y23-6s_FeF89vPl8eVjd7zMzLAweIQoXLuXJSsOBTWRet8A06T8CCrUHZamfleqvJq09P4Cl-xCkGw13x0kzFxBrrzHW1lr7L8-VbXgIZOmJi8bMEfahonAex_4Rkm9DbKGYWmT9mUpLnJ_2GJAm-4"/>
+</div>
+</div>
+</header>
+<main class="pt-20 pb-32">
+<!-- Hero Section -->
+<section class="px-container-margin mb-section-gap">
+<div class="relative w-full h-[45vh] rounded-[2rem] overflow-hidden shadow-2xl">
+<div class="absolute inset-0 bg-gradient-to-t from-[#071A2B] via-transparent to-transparent z-10"></div>
+<img class="absolute inset-0 w-full h-full object-cover scale-105" data-alt="A gourmet, high-resolution shot of a Seared Salmon fillet with vibrant asparagus and quinoa, plated artistically on a dark ceramic plate. The lighting is dramatic and moody, with shimmering water-like reflections on the background. The aesthetic is clean, refreshing, and premium, using a palette of deep navy, crisp greens, and warm salmon pinks to evoke 'digital hydration' and elite performance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoYXpal8bCk-eYmQJPTUKSn9HXYxXbnWJQ87AlU0addNyv4DR5OlD4KfgVByDIrMmIKRtX3fIs1z9O_4b_t_Oy86GqXIe-aXI1aoBExQiaqjiqXNqlhzKdUyEo2GQOIOTDQVDBLdohhy7zNGZcWHPWU-_ti22TsILt94WgQGMS66Crp7zycic-PYv-1y6SZJ7BqAQ-aqivn_Ccc8QmgspURcEigz9A_4Ilb6SlVP5NZGAlloGcNa4"/>
+<div class="absolute bottom-0 left-0 w-full p-card-padding z-20">
+<h1 class="font-headline-lg text-headline-lg-mobile text-white mb-2 leading-tight">Miso-Glazed Atlantic Salmon</h1>
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1 bg-primary/10 border border-primary/20 backdrop-blur-md rounded-full text-primary font-label-md text-label-md">High Protein</span>
+<span class="px-3 py-1 bg-secondary/10 border border-secondary/20 backdrop-blur-md rounded-full text-secondary font-label-md text-label-md">Omega-3 Rich</span>
+<span class="px-3 py-1 bg-tertiary/10 border border-tertiary/20 backdrop-blur-md rounded-full text-tertiary font-label-md text-label-md">Dairy Free</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Macros Grid -->
+<section class="px-container-margin mb-8">
+<div class="grid grid-cols-4 gap-3">
+<div class="glass-card rounded-2xl p-4 flex flex-col items-center justify-center text-center">
+<span class="text-on-surface-variant font-label-md text-[12px] uppercase tracking-wider mb-1">Calories</span>
+<span class="font-data-lg text-primary">540</span>
+</div>
+<div class="glass-card rounded-2xl p-4 flex flex-col items-center justify-center text-center border-b-2 border-b-secondary">
+<span class="text-on-surface-variant font-label-md text-[12px] uppercase tracking-wider mb-1">Protein</span>
+<span class="font-data-lg text-secondary">42g</span>
+</div>
+<div class="glass-card rounded-2xl p-4 flex flex-col items-center justify-center text-center border-b-2 border-b-tertiary">
+<span class="text-on-surface-variant font-label-md text-[12px] uppercase tracking-wider mb-1">Carbs</span>
+<span class="font-data-lg text-tertiary">28g</span>
+</div>
+<div class="glass-card rounded-2xl p-4 flex flex-col items-center justify-center text-center border-b-2 border-b-primary">
+<span class="text-on-surface-variant font-label-md text-[12px] uppercase tracking-wider mb-1">Fats</span>
+<span class="font-data-lg text-primary">22g</span>
+</div>
+</div>
+</section>
+<!-- Servings Stepper -->
+<section class="px-container-margin mb-8 flex justify-between items-center">
+<div>
+<h3 class="font-headline-md text-headline-md text-white">Servings</h3>
+<p class="text-on-surface-variant font-label-md">Adjust for your meal plan</p>
+</div>
+<div class="flex items-center gap-4 bg-surface-container-high rounded-full p-2 border border-outline-variant">
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container text-primary active:scale-90 transition-transform" onclick="adjustServings(-1)">
+<span class="material-symbols-outlined">remove</span>
+</button>
+<span class="font-data-lg text-white w-6 text-center" id="serving-count">2</span>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container text-primary active:scale-90 transition-transform" onclick="adjustServings(1)">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</section>
+<!-- Ingredients Checklist -->
+<section class="px-container-margin mb-section-gap">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-secondary">shopping_basket</span>
+<h2 class="font-headline-md text-headline-md text-white uppercase tracking-wide">Ingredients</h2>
+</div>
+<div class="space-y-3">
+<div class="flex items-center">
+<input class="hidden checkbox-custom" id="ing-1" type="checkbox"/>
+<label class="flex items-center gap-4 w-full glass-card p-4 rounded-xl cursor-pointer select-none" for="ing-1">
+<div class="box w-6 h-6 rounded-md border-2 border-outline-variant flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined check-icon text-on-secondary opacity-0 text-[18px] font-bold">check</span>
+</div>
+<div class="flex-1 flex justify-between items-center">
+<span class="text-on-surface">Fresh Atlantic Salmon Fillet</span>
+<span class="text-primary font-data-sm">300g</span>
+</div>
+</label>
+</div>
+<div class="flex items-center">
+<input class="hidden checkbox-custom" id="ing-2" type="checkbox"/>
+<label class="flex items-center gap-4 w-full glass-card p-4 rounded-xl cursor-pointer select-none" for="ing-2">
+<div class="box w-6 h-6 rounded-md border-2 border-outline-variant flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined check-icon text-on-secondary opacity-0 text-[18px] font-bold">check</span>
+</div>
+<div class="flex-1 flex justify-between items-center">
+<span class="text-on-surface">Organic White Miso Paste</span>
+<span class="text-primary font-data-sm">2 tbsp</span>
+</div>
+</label>
+</div>
+<div class="flex items-center">
+<input class="hidden checkbox-custom" id="ing-3" type="checkbox"/>
+<label class="flex items-center gap-4 w-full glass-card p-4 rounded-xl cursor-pointer select-none" for="ing-3">
+<div class="box w-6 h-6 rounded-md border-2 border-outline-variant flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined check-icon text-on-secondary opacity-0 text-[18px] font-bold">check</span>
+</div>
+<div class="flex-1 flex justify-between items-center">
+<span class="text-on-surface">Asparagus Spears</span>
+<span class="text-primary font-data-sm">150g</span>
+</div>
+</label>
+</div>
+<div class="flex items-center">
+<input class="hidden checkbox-custom" id="ing-4" type="checkbox"/>
+<label class="flex items-center gap-4 w-full glass-card p-4 rounded-xl cursor-pointer select-none" for="ing-4">
+<div class="box w-6 h-6 rounded-md border-2 border-outline-variant flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined check-icon text-on-secondary opacity-0 text-[18px] font-bold">check</span>
+</div>
+<div class="flex-1 flex justify-between items-center">
+<span class="text-on-surface">Black Quinoa (Dry)</span>
+<span class="text-primary font-data-sm">1/2 cup</span>
+</div>
+</label>
+</div>
+</div>
+</section>
+<!-- Instructions -->
+<section class="px-container-margin mb-section-gap">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary">menu_book</span>
+<h2 class="font-headline-md text-headline-md text-white uppercase tracking-wide">Method</h2>
+</div>
+<div class="space-y-6 relative border-l-2 border-primary/20 ml-4 pl-8">
+<!-- Step 1 -->
+<div class="relative">
+<div class="absolute -left-11 top-0 w-6 h-6 rounded-full bg-primary flex items-center justify-center font-data-sm text-on-primary">1</div>
+<h4 class="font-headline-md text-white mb-2">Prepare Glaze</h4>
+<p class="text-on-surface-variant body-md">Whisk together miso paste, a splash of water, and a touch of honey until smooth. Coat the salmon fillets generously and let marinate for 15 minutes.</p>
+</div>
+<!-- Step 2 -->
+<div class="relative">
+<div class="absolute -left-11 top-0 w-6 h-6 rounded-full bg-primary flex items-center justify-center font-data-sm text-on-primary">2</div>
+<h4 class="font-headline-md text-white mb-2">Cook Quinoa</h4>
+<p class="text-on-surface-variant body-md">Rinse quinoa and combine with 1 cup of water in a small pot. Bring to a boil, then simmer covered for 12-15 minutes until water is absorbed and grains are tender.</p>
+</div>
+<!-- Step 3 -->
+<div class="relative">
+<div class="absolute -left-11 top-0 w-6 h-6 rounded-full bg-primary flex items-center justify-center font-data-sm text-on-primary">3</div>
+<h4 class="font-headline-md text-white mb-2">Sear Salmon &amp; Veg</h4>
+<p class="text-on-surface-variant body-md">Heat a non-stick pan over medium-high. Place salmon skin-side down for 4 minutes until crispy. Add asparagus to the pan. Flip salmon and cook for another 2-3 minutes.</p>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Actions & Navigation Area -->
+<div class="fixed bottom-0 left-0 w-full z-50 p-container-margin bg-gradient-to-t from-[#071A2B] via-[#071A2B] to-transparent">
+<div class="flex flex-col gap-3 mb-6">
+<button class="cta-gradient w-full h-[56px] rounded-xl flex items-center justify-center gap-2 text-on-primary font-bold shadow-lg shadow-secondary/20 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">restaurant</span>
+                Log this meal
+            </button>
+<button class="w-full h-[56px] rounded-xl flex items-center justify-center gap-2 text-secondary border border-secondary/50 glass-card active:scale-95 transition-transform">
+<span class="material-symbols-outlined">sync</span>
+                Swap this meal
+            </button>
+</div>
+<!-- Shared Component: BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-surface-container-low border-t border-outline-variant rounded-t-xl shadow-lg h-20">
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary border-t-4 border-secondary pt-1 hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="restaurant" style="font-variation-settings: 'FILL' 1;">restaurant</span>
+<span class="font-label-md text-label-md">Nutrition</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="fitness_center">fitness_center</span>
+<span class="font-label-md text-label-md">Train</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
+<span class="font-label-md text-label-md">Coach</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="font-label-md text-label-md">Progress</span>
+</a>
+</nav>
+</div>
+<script>
+        function adjustServings(delta) {
+            const display = document.getElementById('serving-count');
+            let current = parseInt(display.innerText);
+            current = Math.max(1, Math.min(10, current + delta));
+            display.innerText = current;
+            
+            // Add subtle pulse animation on change
+            display.classList.remove('scale-110');
+            void display.offsetWidth; // Trigger reflow
+            display.classList.add('scale-110', 'transition-transform', 'duration-100');
+            setTimeout(() => display.classList.remove('scale-110'), 100);
+        }
+
+        // Checklist persistence / interaction
+        document.querySelectorAll('.checkbox-custom').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const label = this.nextElementSibling;
+                if(this.checked) {
+                    label.classList.add('opacity-50');
+                    label.querySelector('.box').classList.add('bg-secondary', 'border-secondary');
+                } else {
+                    label.classList.remove('opacity-50');
+                    label.querySelector('.box').classList.remove('bg-secondary', 'border-secondary');
+                }
+            });
+        });
+    </script>
+</body></html>

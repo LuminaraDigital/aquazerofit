@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>AquaZeroFit - Welcome</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&amp;family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-highest": "#2f3638",
+                    "tertiary": "#ffd2d5",
+                    "on-tertiary": "#67001f",
+                    "secondary-container": "#00bd85",
+                    "outline-variant": "#3c494c",
+                    "primary-container": "#22d3ee",
+                    "on-secondary": "#003825",
+                    "surface-container-high": "#242b2d",
+                    "surface-tint": "#2fd9f4",
+                    "tertiary-fixed": "#ffdadc",
+                    "on-secondary-container": "#00452e",
+                    "surface-container": "#1a2122",
+                    "on-tertiary-fixed": "#400010",
+                    "on-tertiary-fixed-variant": "#891933",
+                    "error-container": "#93000a",
+                    "inverse-surface": "#dde4e5",
+                    "on-surface": "#dde4e5",
+                    "on-primary-fixed-variant": "#004e5a",
+                    "on-secondary-fixed-variant": "#005137",
+                    "outline": "#859397",
+                    "primary-fixed-dim": "#2fd9f4",
+                    "surface-container-lowest": "#090f11",
+                    "on-secondary-fixed": "#002114",
+                    "on-background": "#dde4e5",
+                    "primary": "#8aebff",
+                    "background": "#0e1416",
+                    "inverse-on-surface": "#2b3233",
+                    "primary-fixed": "#a2eeff",
+                    "surface-variant": "#2f3638",
+                    "error": "#ffb4ab",
+                    "on-primary": "#00363e",
+                    "secondary-fixed-dim": "#45dfa4",
+                    "on-surface-variant": "#bbc9cd",
+                    "tertiary-container": "#ffaab2",
+                    "on-tertiary-container": "#94223a",
+                    "on-primary-fixed": "#001f25",
+                    "on-primary-container": "#005763",
+                    "tertiary-fixed-dim": "#ffb2b9",
+                    "secondary": "#45dfa4",
+                    "surface-bright": "#343a3c",
+                    "surface-dim": "#0e1416",
+                    "inverse-primary": "#006877",
+                    "surface": "#0e1416",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-low": "#161d1e",
+                    "secondary-fixed": "#68fcbf",
+                    "on-error": "#690005"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "element-gap-md": "1rem",
+                    "container-margin": "1.25rem",
+                    "element-gap-sm": "0.5rem",
+                    "card-padding": "1.25rem",
+                    "section-gap": "2rem",
+                    "gutter": "1rem"
+            },
+            "fontFamily": {
+                    "headline-md": ["Barlow Condensed"],
+                    "data-sm": ["DM Sans"],
+                    "label-md": ["DM Sans"],
+                    "data-lg": ["DM Sans"],
+                    "body-md": ["DM Sans"],
+                    "headline-lg": ["Barlow Condensed"],
+                    "display-lg": ["Barlow Condensed"],
+                    "body-lg": ["DM Sans"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "headline-md-mobile": ["20px", {"lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "data-sm": ["14px", {"lineHeight": "14px", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "data-lg": ["32px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "32px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #071A2B; /* Deep Ocean Level 0 */
+            color: #dde4e5;
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden;
+        }
+
+        .cta-gradient {
+            background: linear-gradient(135deg, #2fd9f4 0%, #00bd85 100%);
+        }
+
+        .carousel-container {
+            scroll-snap-type: x mandatory;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .carousel-container::-webkit-scrollbar {
+            display: none;
+        }
+        .carousel-item {
+            scroll-snap-align: center;
+            flex-shrink: 0;
+            width: 100%;
+        }
+
+        .glass-panel {
+            background: rgba(7, 26, 43, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(30, 76, 116, 0.4);
+        }
+
+        @keyframes wave-flow {
+            0% { transform: translateX(0) translateY(0); }
+            50% { transform: translateX(-5%) translateY(2%); }
+            100% { transform: translateX(0) translateY(0); }
+        }
+
+        .animated-waves {
+            animation: wave-flow 15s ease-in-out infinite;
+            opacity: 0.4;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="dark font-body-md text-on-background min-h-screen flex flex-col">
+<!-- Background Atmosphere -->
+<div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+<div class="absolute top-[-10%] left-[-10%] w-[120%] h-[120%] opacity-20">
+<svg class="animated-waves w-full h-full" viewbox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg">
+<path d="M0,500 C150,400 350,600 500,500 C650,400 850,600 1000,500 L1000,1000 L0,1000 Z" fill="#2fd9f4"></path>
+</svg>
+</div>
+<div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-[#071A2B] to-transparent"></div>
+</div>
+<!-- Main Content Canvas -->
+<main class="relative z-10 flex-1 flex flex-col px-container-margin pt-12 pb-8">
+<!-- Header Branding (Hidden on Onboarding per Shell Suppression but simulated for identity) -->
+<div class="flex justify-center mb-section-gap">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-4xl" style="font-variation-settings: 'FILL' 1;">waves</span>
+<span class="font-headline-lg-mobile text-headline-lg-mobile font-extrabold tracking-tight text-primary">AquaZeroFit</span>
+</div>
+</div>
+<!-- Carousel Content Area -->
+<div class="flex-1 flex flex-col justify-center">
+<div class="carousel-container flex overflow-x-auto w-full h-full no-scrollbar" id="carousel">
+<!-- Slide 1 -->
+<div class="carousel-item flex flex-col items-center text-center">
+<div class="w-64 h-64 mb-8 relative">
+<div class="absolute inset-0 bg-primary/20 rounded-full blur-3xl"></div>
+<img class="relative z-10 w-full h-full object-contain" data-alt="A highly detailed 3D render of a luminous, abstract glass wave structure in glowing aqua and deep emerald green. The structure is set against a dark, submerged ocean background with cinematic light rays filtering through water. The style is premium, high-tech wellness, with sharp edges and fluid motions that evoke digital hydration and elite performance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZM614Hee90HxE7b_8ocdJyp73Vkvb8JdxEmVLrNc9xBS-Gi_0lyVdqnlSPJgglmIF8SO5LiQRJZrrbddgiDSRqicuwGn2Mr9GfBCQzp16iaI4nFuSNBYAP5tIdif9X9zg9qab-hfWz7Xddb5-TeMheBjUCxZQ9xpg9RmSMPU2RbhR9BeuIeeFcLMN-Bz1Uc1QJ10FdcZuWe-Rx_bCgSoJY3Mo3uKAWjyaoPuBQyXFTKO84YLW9Ao"/>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-4 max-w-xs mx-auto">
+                        Your AI wellness coach for nutrition, weight loss, and home training.
+                    </h1>
+<p class="text-on-surface-variant font-body-md max-w-xs">
+                        Harness the power of personalized data and aquatic-inspired science to transform your body.
+                    </p>
+</div>
+<!-- Slide 2 -->
+<div class="carousel-item flex flex-col items-center text-center">
+<div class="w-64 h-64 mb-8 relative">
+<div class="absolute inset-0 bg-secondary/20 rounded-full blur-3xl"></div>
+<img class="relative z-10 w-full h-full object-contain" data-alt="A sophisticated digital visualization of a human silhouette constructed from glowing aqua particles. The silhouette is surrounded by floating data points and biometric rings in a dark, oceanic environment. The lighting is low-key with vibrant teal accents, creating a mood of advanced health optimization and digital biotechnology." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA7DACTP2oH_EMjc0j6lP9RTM9Tpg9PnMvJf5sEkOuDT4fGl1spJlqoIwfK5INrybjDS0Ggl54OWjJwYCkzwLlBMiemLy-ZVWgmcDvU81fepm1ZZ2DUrcRA7_o18AMlScv6SW11QS3YcAfwElG2rbzlWkdxMIXYfaldAh5v0fFAG8rlyereLoDIfbFUe-lymXuqbqwnPn0aqBUVj1uZh9gv9r-9OOM6NQQME09_J_Am1kUIfBk8DrI"/>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-4 max-w-xs mx-auto">
+                        Personalized Hydration &amp; Nutrition Paths
+                    </h1>
+<p class="text-on-surface-variant font-body-md max-w-xs">
+                        AI-driven plans that adapt to your daily performance and metabolic rhythm.
+                    </p>
+</div>
+<!-- Slide 3 -->
+<div class="carousel-item flex flex-col items-center text-center">
+<div class="w-64 h-64 mb-8 relative">
+<div class="absolute inset-0 bg-tertiary/20 rounded-full blur-3xl"></div>
+<img class="relative z-10 w-full h-full object-contain" data-alt="An elegant, minimalist 3D display of a high-performance fitness tracker integrated with a glowing water droplet. The design features glassmorphic textures and subtle reflections of deep sea navy and vibrant cyan. The scene is lit with a premium, cool-toned studio setup that highlights the fluid, clean, and refreshing digital wellness aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAcfyf8cxQrvsixbrC-O1gje8UkMpARLcjCP-HGwuXXleeKts3SWLelSVXqU7ZFlN_wtfOu918fI9tDS7Fz8n7jYPleVBKZs2z7ILfLRYf9R8-AUdn9b_bD2ilu8720QkiSN9ylkpZ5b44hAOT5A4Vzl7Z-ZcCFi0ZkTW1RLjczIMiAJt8sNt9dmgY1ZjE6UVkJ5ytQWS_MCzzQt9EeNajpukUheu3rp33MkE2ewDzzLmQTt2r8ywg"/>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-4 max-w-xs mx-auto">
+                        Progress with Precision
+                    </h1>
+<p class="text-on-surface-variant font-body-md max-w-xs">
+                        Real-time tracking of your journey with intuitive visual data and motivational insights.
+                    </p>
+</div>
+</div>
+<!-- Indicator Dots -->
+<div class="flex justify-center gap-2 mt-8">
+<div class="w-8 h-1 rounded-full bg-primary transition-all duration-300" id="dot-0"></div>
+<div class="w-2 h-1 rounded-full bg-outline-variant transition-all duration-300" id="dot-1"></div>
+<div class="w-2 h-1 rounded-full bg-outline-variant transition-all duration-300" id="dot-2"></div>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="mt-section-gap space-y-4">
+<button class="cta-gradient w-full h-[56px] rounded-xl font-label-md text-label-md text-on-primary-fixed font-bold shadow-lg shadow-primary/20 active:scale-95 transition-transform" onclick="window.location.reload()">
+                Get started
+            </button>
+<p class="text-center font-label-md text-[12px] text-on-surface-variant/60 uppercase tracking-widest">
+                General wellness support only.
+            </p>
+</div>
+</main>
+<!-- Micro-interactions Script -->
+<script>
+        const carousel = document.getElementById('carousel');
+        const dots = [
+            document.getElementById('dot-0'),
+            document.getElementById('dot-1'),
+            document.getElementById('dot-2')
+        ];
+
+        carousel.addEventListener('scroll', () => {
+            const scrollLeft = carousel.scrollLeft;
+            const width = carousel.offsetWidth;
+            const activeIndex = Math.round(scrollLeft / width);
+
+            dots.forEach((dot, index) => {
+                if (index === activeIndex) {
+                    dot.classList.add('bg-primary', 'w-8');
+                    dot.classList.remove('bg-outline-variant', 'w-2');
+                } else {
+                    dot.classList.remove('bg-primary', 'w-8');
+                    dot.classList.add('bg-outline-variant', 'w-2');
+                }
+            });
+        });
+
+        // Simple automatic scrolling for onboarding feel
+        let autoScrollTimer = setInterval(() => {
+            const width = carousel.offsetWidth;
+            const current = carousel.scrollLeft;
+            const max = carousel.scrollWidth - width;
+
+            if (current >= max - 10) {
+                carousel.scrollTo({ left: 0, behavior: 'smooth' });
+            } else {
+                carousel.scrollBy({ left: width, behavior: 'smooth' });
+            }
+        }, 5000);
+
+        // Pause auto scroll on user interaction
+        carousel.addEventListener('touchstart', () => clearInterval(autoScrollTimer));
+    </script>
+</body></html>

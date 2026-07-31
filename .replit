@@ -1,0 +1,57 @@
+# Replit configuration for AquaZeroFit.
+#
+# SHAPE: one service, one port, one domain. The Express API in apps/api also
+# serves the built React SPA from apps/web/dist (see apps/api/src/app.ts), so
+# there is no second origin, no CORS, and one TLS certificate. Replit exposes
+# exactly one external port per deployment, which makes this the only sensible
+# layout for a monorepo like ours.
+#
+# DEPLOYMENT TARGET: "vm" (Reserved VM), deliberately — NOT autoscale.
+# The data store keeps an in-memory working set backed by Postgres. That is
+# durable, but it is NOT safe across multiple concurrent instances, because
+# each instance would hold its own copy and reads would go stale. Reserved VM
+# is a single machine, so this is correct. Do not switch to autoscale until
+# the store's reads go directly to Postgres.
+#
+# PERSISTENCE: Replit's filesystem is NOT durable — it resets on every publish.
+# Nothing of value may be written to disk. Application data lives in Postgres
+# (DATABASE_URL, injected by Replit) and uploads belong in Object Storage.
+
+entrypoint = "apps/api/src/index.ts"
+modules = ["nodejs-20"]
+
+# Development: run the API and the Vite dev server together.
+run = "npm run api"
+
+hidden = [".config", "node_modules", "dist", ".data"]
+
+[nix]
+channel = "stable-24_05"
+
+# Exactly one external port. Replit maps the first opened port to 80/443.
+# localPort must match what the server listens on — config.port defaults to
+# 4000 and honours PORT if Replit sets it.
+[[ports]]
+localPort = 4000
+externalPort = 80
+
+[env]
+NODE_ENV = "development"
+
+[deployment]
+deploymentTarget = "vm"
+
+# Build once at publish time: shared types, then the SPA. The API runs through
+# tsx and needs no compile step, but its types are still checked here so a
+# broken commit cannot publish.
+build = [
+  "sh",
+  "-c",
+  "npm ci && npm run build --workspace packages/shared && npm run typecheck --workspace apps/api && npm run build --workspace apps/web",
+]
+
+# NODE_ENV=production is load-bearing: without it the API falls back to
+# development secrets. config.assertProductionSecrets() refuses to boot if
+# JWT_ACCESS_SECRET, TELEGRAM_BOT_TOKEN or CORS_ORIGINS are missing, so a
+# misconfigured deploy fails loudly at startup instead of serving insecurely.
+run = ["sh", "-c", "NODE_ENV=production npm run start --workspace apps/api"]

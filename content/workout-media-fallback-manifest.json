@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Decorative category fallback artwork; never exercise-form instruction",
+  "createdAt": "2026-07-31",
+  "owner": "AquaZeroFit",
+  "creator": "OpenAI built-in ImageGen directed by AquaZeroFit",
+  "creationMethod": "ai-generated",
+  "modelToolVersion": "OpenAI built-in ImageGen; model version not exposed",
+  "licence": "AquaZeroFit project asset",
+  "promptSourceReference": "content/workout-media-fallback-prompts.md",
+  "review": {
+    "status": "approved-for-decorative-fallback-use",
+    "reviewedAt": "2026-07-31",
+    "reviewedBy": "Codex implementation review",
+    "formSafetyReviewRequired": false,
+    "reason": "The artwork is category-level, uses neutral poses, and is not presented as movement instruction."
+  },
+  "assets": [
+    {
+      "category": "strength",
+      "file": "strength.webp",
+      "width": 1600,
+      "height": 900,
+      "bytes": 38836,
+      "sha256": "b408c2c5a844f2b0e99933d507a232da5d706507ccb8527b8db363c2a03fabe3"
+    },
+    {
+      "category": "cardio",
+      "file": "cardio.webp",
+      "width": 1600,
+      "height": 900,
+      "bytes": 64000,
+      "sha256": "8b907021118615948742c8eab57ebb06a465fd5d44a72b527c7ade70618ba0f3"
+    },
+    {
+      "category": "core",
+      "file": "core.webp",
+      "width": 1600,
+      "height": 900,
+      "bytes": 66808,
+      "sha256": "3fbddf717b0b71d50e2d0002e873c2da947d353bdf1a4c953dd11fe4a830815e"
+    },
+    {
+      "category": "mobility",
+      "file": "mobility.webp",
+      "width": 1600,
+      "height": 900,
+      "bytes": 53702,
+      "sha256": "a21d85cb436956184e1e018027f4a75df4e1d758923709d06c0149a9b704fa5b"
+    }
+  ]
+}

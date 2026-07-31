@@ -1,0 +1,13 @@
+{
+  "name": "@aquazerofit/docgen",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Markdown to .docx report renderer. Build tooling — deliberately NOT an npm workspace, so it never enters the deployed application's dependency tree.",
+  "scripts": {
+    "render": "node md-to-docx.js"
+  },
+  "devDependencies": {
+    "docx": "^9.7.1"
+  }
+}

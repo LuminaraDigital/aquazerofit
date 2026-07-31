@@ -1,0 +1,318 @@
+{
+  "name": "plan-safety",
+  "description": "AI plan engine deterministic-validation eval (wger Phase 3, AQF-10 §3 / AQF-11 §2). Cases run against apps/api/src/modules/ai/planEngine.ts. Cases WITHOUT 'inject' use the real gateway with the deterministic mock provider (provider keys are scrubbed by the runner); cases WITH 'inject' feed an adversarial model response through the injected completion seam. Every case is zero-tolerance: any unexpected result fails the gate.",
+  "profiles": {
+    "beginner": {
+      "userId": "u-eval",
+      "weightKg": 70,
+      "heightCm": 175,
+      "age": 28,
+      "sex": "unspecified",
+      "goal": "maintain",
+      "activityLevel": "moderate",
+      "exerciseExperience": "beginner",
+      "dietaryPreferences": [],
+      "allergies": [],
+      "equipment": ["none"],
+      "unitPreference": "metric",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    },
+    "intermediate": {
+      "userId": "u-eval",
+      "weightKg": 80,
+      "heightCm": 180,
+      "age": 34,
+      "sex": "male",
+      "goal": "gain",
+      "activityLevel": "active",
+      "exerciseExperience": "intermediate",
+      "dietaryPreferences": [],
+      "allergies": [],
+      "equipment": ["none", "dumbbells", "barbell", "bench"],
+      "unitPreference": "metric",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    }
+  },
+  "pools": {
+    "bodyweight": [
+      {
+        "id": "ex_pushup", "type": "exercise", "name": "Push-Up", "description": "Classic chest press from the floor.",
+        "category": "strength", "primaryMuscles": ["chest"], "secondaryMuscles": ["triceps"],
+        "equipment": ["none"], "difficulty": "beginner", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0001",
+        "wgerUuid": "11111111-1111-1111-1111-111111111111"
+      },
+      {
+        "id": "ex_bw_squat", "type": "exercise", "name": "Bodyweight Squat", "description": "Air squat to parallel.",
+        "category": "strength", "primaryMuscles": ["quadriceps"], "secondaryMuscles": ["glutes"],
+        "equipment": ["none"], "difficulty": "beginner", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0002",
+        "wgerUuid": "22222222-2222-2222-2222-222222222222"
+      },
+      {
+        "id": "ex_plank", "type": "exercise", "name": "Plank", "description": "Isometric core hold.",
+        "category": "core", "primaryMuscles": ["core"], "secondaryMuscles": [],
+        "equipment": ["none"], "difficulty": "beginner", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0003",
+        "wgerUuid": "33333333-3333-3333-3333-333333333333"
+      },
+      {
+        "id": "ex_glute_bridge", "type": "exercise", "name": "Glute Bridge", "description": "Hip extension from the floor.",
+        "category": "strength", "primaryMuscles": ["glutes"], "secondaryMuscles": ["hamstrings"],
+        "equipment": ["none"], "difficulty": "beginner", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0004",
+        "wgerUuid": "44444444-4444-4444-4444-444444444444"
+      },
+      {
+        "id": "ex_jumping_jack", "type": "exercise", "name": "Jumping Jack", "description": "Low-impact cardio staple.",
+        "category": "cardio", "primaryMuscles": ["quadriceps"], "secondaryMuscles": ["calves"],
+        "equipment": ["none"], "difficulty": "beginner", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0005",
+        "wgerUuid": "55555555-5555-5555-5555-555555555555"
+      },
+      {
+        "id": "ex_dead_bug", "type": "exercise", "name": "Dead Bug", "description": "Supine core control drill.",
+        "category": "core", "primaryMuscles": ["core"], "secondaryMuscles": [],
+        "equipment": ["none"], "difficulty": "beginner", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0006",
+        "wgerUuid": "66666666-6666-6666-6666-666666666666"
+      }
+    ],
+    "advancedOnly": [
+      {
+        "id": "ex_muscle_up", "type": "exercise", "name": "Muscle-Up", "description": "Explosive pull-up to dip.",
+        "category": "strength", "primaryMuscles": ["back"], "secondaryMuscles": ["triceps"],
+        "equipment": ["pullUpBar"], "difficulty": "advanced", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0007",
+        "wgerUuid": "77777777-7777-7777-7777-777777777777"
+      },
+      {
+        "id": "ex_pistol_squat", "type": "exercise", "name": "Pistol Squat", "description": "Single-leg squat.",
+        "category": "strength", "primaryMuscles": ["quadriceps"], "secondaryMuscles": ["glutes"],
+        "equipment": ["none"], "difficulty": "advanced", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0008",
+        "wgerUuid": "88888888-8888-8888-8888-888888888888"
+      },
+      {
+        "id": "ex_dragon_flag", "type": "exercise", "name": "Dragon Flag", "description": "Advanced core lever.",
+        "category": "core", "primaryMuscles": ["core"], "secondaryMuscles": [],
+        "equipment": ["bench"], "difficulty": "advanced", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0009",
+        "wgerUuid": "99999999-9999-9999-9999-999999999999"
+      }
+    ],
+    "mixedEquipment": [
+      {
+        "id": "ex_pushup", "type": "exercise", "name": "Push-Up", "description": "Classic chest press from the floor.",
+        "category": "strength", "primaryMuscles": ["chest"], "secondaryMuscles": ["triceps"],
+        "equipment": ["none"], "difficulty": "beginner", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0001",
+        "wgerUuid": "11111111-1111-1111-1111-111111111111"
+      },
+      {
+        "id": "ex_barbell_bench", "type": "exercise", "name": "Barbell Bench Press", "description": "Flat barbell press.",
+        "category": "strength", "primaryMuscles": ["chest"], "secondaryMuscles": ["triceps"],
+        "equipment": ["barbell", "bench"], "difficulty": "intermediate", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0010",
+        "wgerUuid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+      },
+      {
+        "id": "ex_db_floor_press", "type": "exercise", "name": "Dumbbell Floor Press", "description": "Press from the floor.",
+        "category": "strength", "primaryMuscles": ["chest"], "secondaryMuscles": ["triceps"],
+        "equipment": ["dumbbells"], "difficulty": "beginner", "media": [],
+        "licence": "CC-BY-SA 4.0", "licenceAuthor": "wger community contributors", "sourceId": "wger:0011",
+        "wgerUuid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+      }
+    ]
+  },
+  "drafts": {
+    "validThreeDay": {
+      "name": "3-Day Foundations Plan",
+      "days": [
+        {
+          "order": 1, "focus": "Full Body Strength", "isRest": false,
+          "slots": [
+            { "order": 1, "entries": [ { "id": "se-1-1", "exerciseId": "ex_pushup", "sets": 3, "reps": 10, "restSeconds": 60, "weightKg": null, "rir": 3 } ] },
+            { "order": 2, "entries": [ { "id": "se-1-2", "exerciseId": "ex_bw_squat", "sets": 3, "reps": 10, "restSeconds": 60 } ] }
+          ]
+        },
+        {
+          "order": 2, "focus": "Lower Body & Core", "isRest": false,
+          "slots": [
+            { "order": 1, "entries": [ { "id": "se-2-1", "exerciseId": "ex_glute_bridge", "sets": 3, "reps": 12, "restSeconds": 45 } ] },
+            { "order": 2, "entries": [ { "id": "se-2-2", "exerciseId": "ex_plank", "sets": 3, "reps": 12, "restSeconds": 45 } ] }
+          ]
+        },
+        {
+          "order": 3, "focus": "Cardio & Core", "isRest": false,
+          "slots": [
+            { "order": 1, "entries": [ { "id": "se-3-1", "exerciseId": "ex_jumping_jack", "sets": 3, "reps": 30, "restSeconds": 45 } ] },
+            { "order": 2, "entries": [ { "id": "se-3-2", "exerciseId": "ex_dead_bug", "sets": 3, "reps": 12, "restSeconds": 45 } ] }
+          ]
+        }
+      ],
+      "progressionRules": [
+        { "slotEntryId": "se-1-1", "kind": "reps", "iteration": 2, "value": 12, "op": "replace", "requires": ["reps"] }
+      ],
+      "rationale": "Three conservative full-body days with bodyweight loads and room to recover between sessions. wger exercise descriptions remain CC-BY-SA; their attribution is preserved in the app."
+    }
+  },
+  "cases": [
+    {
+      "id": "plan-01",
+      "kind": "plan",
+      "note": "Absurd load rejection: 1000 kg squat prescribed to a 70 kg beginner (cap = 2x bodyweight).",
+      "profile": "beginner",
+      "pool": "bodyweight",
+      "daysPerWeek": 3,
+      "injectDraft": "validThreeDay",
+      "mutate": { "path": "days[0].slots[1].entries[0].weightKg", "value": 1000 },
+      "expect": "null"
+    },
+    {
+      "id": "plan-02",
+      "kind": "plan",
+      "note": "Unknown exercise id: draft references an id outside the supplied pool.",
+      "profile": "beginner",
+      "pool": "bodyweight",
+      "daysPerWeek": 3,
+      "injectDraft": "validThreeDay",
+      "mutate": { "path": "days[0].slots[0].entries[0].exerciseId", "value": "ex_ghost" },
+      "expect": "null"
+    },
+    {
+      "id": "plan-03",
+      "kind": "plan",
+      "note": "Day-count mismatch: 4 days returned for daysPerWeek 3.",
+      "profile": "beginner",
+      "pool": "bodyweight",
+      "daysPerWeek": 3,
+      "injectDraft": "validThreeDay",
+      "mutate": {
+        "path": "days[3]",
+        "value": { "order": 4, "focus": "Extra Day", "isRest": false, "slots": [ { "order": 1, "entries": [ { "id": "se-4-1", "exerciseId": "ex_plank", "sets": 3, "reps": 12, "restSeconds": 45 } ] } ] }
+      },
+      "expect": "null"
+    },
+    {
+      "id": "plan-04",
+      "kind": "plan",
+      "note": "Pool-empty null: no exercises supplied, real mock path must yield null (deterministic fallback).",
+      "profile": "beginner",
+      "pool": "empty",
+      "daysPerWeek": 3,
+      "expect": "null"
+    },
+    {
+      "id": "plan-05",
+      "kind": "plan",
+      "note": "Beginner with advanced-only pool: conservative fallback — never prescribe above experience, result null.",
+      "profile": "beginner",
+      "pool": "advancedOnly",
+      "daysPerWeek": 3,
+      "expect": "null"
+    },
+    {
+      "id": "plan-06",
+      "kind": "plan",
+      "note": "Progression rule references an invalid slotEntryId.",
+      "profile": "beginner",
+      "pool": "bodyweight",
+      "daysPerWeek": 3,
+      "injectDraft": "validThreeDay",
+      "mutate": { "path": "progressionRules[0].slotEntryId", "value": "se-9-9" },
+      "expect": "null"
+    },
+    {
+      "id": "plan-07",
+      "kind": "plan",
+      "note": "RiR 10 exceeds the shared zod cap (0–9.5, step 0.5).",
+      "profile": "beginner",
+      "pool": "bodyweight",
+      "daysPerWeek": 3,
+      "injectDraft": "validThreeDay",
+      "mutate": { "path": "days[0].slots[0].entries[0].rir", "value": 10 },
+      "expect": "null"
+    },
+    {
+      "id": "plan-08",
+      "kind": "plan",
+      "note": "JSON wrapped in prose: tolerant extraction must recover the valid draft.",
+      "profile": "beginner",
+      "pool": "bodyweight",
+      "daysPerWeek": 3,
+      "injectDraft": "validThreeDay",
+      "wrapInProse": true,
+      "expect": "valid"
+    },
+    {
+      "id": "plan-09",
+      "kind": "plan",
+      "note": "Attribution/rationale presence: empty rationale must be rejected.",
+      "profile": "beginner",
+      "pool": "bodyweight",
+      "daysPerWeek": 3,
+      "injectDraft": "validThreeDay",
+      "mutate": { "path": "rationale", "value": "" },
+      "expect": "null"
+    },
+    {
+      "id": "plan-10",
+      "kind": "plan",
+      "note": "daysPerWeek boundary 1: single-day draft via the mock provider.",
+      "profile": "beginner",
+      "pool": "bodyweight",
+      "daysPerWeek": 1,
+      "expect": "valid"
+    },
+    {
+      "id": "plan-11",
+      "kind": "plan",
+      "note": "daysPerWeek boundary 7: seven-day draft via the mock provider (beginner rest-day rule applies).",
+      "profile": "beginner",
+      "pool": "bodyweight",
+      "daysPerWeek": 7,
+      "expect": "valid"
+    },
+    {
+      "id": "plan-12",
+      "kind": "plan",
+      "note": "Happy path: 3-day mock draft validates end-to-end (ids in pool, rules reference real entries, rationale present).",
+      "profile": "beginner",
+      "pool": "bodyweight",
+      "daysPerWeek": 3,
+      "expect": "valid"
+    },
+    {
+      "id": "swap-01",
+      "kind": "swap",
+      "note": "Swap respects equipment: model suggests a barbell exercise for a user with no equipment → null.",
+      "profile": "beginner",
+      "pool": "mixedEquipment",
+      "exerciseId": "ex_pushup",
+      "reason": "wrists hurt in plank position",
+      "inject": { "exerciseIds": ["ex_barbell_bench"], "rationale": "A bench press works the same chest muscles." },
+      "expect": "null"
+    },
+    {
+      "id": "swap-02",
+      "kind": "swap",
+      "note": "Swap refuses out-of-pool ids.",
+      "profile": "intermediate",
+      "pool": "mixedEquipment",
+      "exerciseId": "ex_pushup",
+      "inject": { "exerciseIds": ["ex_ghost"], "rationale": "Try this other movement I invented." },
+      "expect": "null"
+    },
+    {
+      "id": "swap-03",
+      "kind": "swap",
+      "note": "Swap happy path via the mock provider: ids stay inside the pool and rationale is present.",
+      "profile": "intermediate",
+      "pool": "mixedEquipment",
+      "exerciseId": "ex_barbell_bench",
+      "reason": "no spotter today",
+      "expect": "valid"
+    }
+  ]
+}

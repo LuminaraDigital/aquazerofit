@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>AquaZeroFit - Progress Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&amp;family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(14, 20, 22, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid #1E4C74;
+        }
+        .cta-gradient {
+            background: linear-gradient(135deg, #22d3ee 0%, #00bd85 100%);
+        }
+        .chart-gradient {
+            background: linear-gradient(to bottom, rgba(138, 235, 255, 0.2), transparent);
+        }
+        body {
+            background-color: #071A2B;
+            color: #dde4e5;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .segmented-control-active {
+            color: #8aebff;
+            border-bottom: 2px solid #8aebff;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-highest": "#2f3638",
+                    "tertiary": "#ffd2d5",
+                    "on-tertiary": "#67001f",
+                    "secondary-container": "#00bd85",
+                    "outline-variant": "#3c494c",
+                    "primary-container": "#22d3ee",
+                    "on-secondary": "#003825",
+                    "surface-container-high": "#242b2d",
+                    "surface-tint": "#2fd9f4",
+                    "tertiary-fixed": "#ffdadc",
+                    "on-secondary-container": "#00452e",
+                    "surface-container": "#1a2122",
+                    "on-tertiary-fixed": "#400010",
+                    "on-tertiary-fixed-variant": "#891933",
+                    "error-container": "#93000a",
+                    "inverse-surface": "#dde4e5",
+                    "on-surface": "#dde4e5",
+                    "on-primary-fixed-variant": "#004e5a",
+                    "on-secondary-fixed-variant": "#005137",
+                    "outline": "#859397",
+                    "primary-fixed-dim": "#2fd9f4",
+                    "surface-container-lowest": "#090f11",
+                    "on-secondary-fixed": "#002114",
+                    "on-background": "#dde4e5",
+                    "primary": "#8aebff",
+                    "background": "#0e1416",
+                    "inverse-on-surface": "#2b3233",
+                    "primary-fixed": "#a2eeff",
+                    "surface-variant": "#2f3638",
+                    "error": "#ffb4ab",
+                    "on-primary": "#00363e",
+                    "secondary-fixed-dim": "#45dfa4",
+                    "on-surface-variant": "#bbc9cd",
+                    "tertiary-container": "#ffaab2",
+                    "on-tertiary-container": "#94223a",
+                    "on-primary-fixed": "#001f25",
+                    "on-primary-container": "#005763",
+                    "tertiary-fixed-dim": "#ffb2b9",
+                    "secondary": "#45dfa4",
+                    "surface-bright": "#343a3c",
+                    "surface-dim": "#0e1416",
+                    "inverse-primary": "#006877",
+                    "surface": "#0e1416",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-low": "#161d1e",
+                    "secondary-fixed": "#68fcbf",
+                    "on-error": "#690005"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "element-gap-md": "1rem",
+                    "container-margin": "1.25rem",
+                    "element-gap-sm": "0.5rem",
+                    "card-padding": "1.25rem",
+                    "section-gap": "2rem",
+                    "gutter": "1rem"
+            },
+            "fontFamily": {
+                    "headline-md": ["Barlow Condensed"],
+                    "data-sm": ["DM Sans"],
+                    "label-md": ["DM Sans"],
+                    "data-lg": ["DM Sans"],
+                    "body-md": ["DM Sans"],
+                    "headline-lg": ["Barlow Condensed"],
+                    "display-lg": ["Barlow Condensed"],
+                    "body-lg": ["DM Sans"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "headline-md-mobile": ["20px", {"lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "data-sm": ["14px", {"lineHeight": "14px", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "data-lg": ["32px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "32px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="min-h-screen flex flex-col pb-24">
+<!-- Top App Bar -->
+<header class="bg-surface/80 backdrop-blur-md dark:bg-surface/80 docked full-width top-0 z-40 border-b border-outline-variant">
+<div class="flex justify-between items-center w-full px-container-margin py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 0;">waves</span>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold tracking-tight text-primary dark:text-primary">AquaZeroFit</h1>
+</div>
+<div class="w-10 h-10 rounded-full glass-card overflow-hidden flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="A professional fitness portrait of a sleek, athletic person with a soft blue lighting glow, representing a high-performance wellness profile in a modern aquatic-themed UI design. The lighting is ethereal and premium." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAab1J8zvFPPL-R8_lrI5qUR6UQi7-pVi2V7avjq7PXI9eKdCjH_IoDQi1IM2-wMuIosxBrZ3pu40UzdSCLDZ4mx27EodhHnNxEFVFwhtA5o7vF_Mb8xaaTvhSGGCWndtnhp9pe7PHn8uUEXM3FJDlKkWeGcXeHaudttJn3eeUjvxw-Xsemfx5U9K67yzuM4DpWoxyNoW1JjKm-ELhEFF3XlMhzE4qDS4_8djV8O230Rc4DayOrVGI"/>
+</div>
+</div>
+</header>
+<main class="flex-grow px-container-margin py-6 space-y-section-gap overflow-y-auto no-scrollbar">
+<!-- Animated Background Element -->
+<div class="fixed inset-0 pointer-events-none -z-10 opacity-30">
+
+</div>
+<!-- Segmented Control -->
+<section class="w-full overflow-x-auto no-scrollbar">
+<div class="flex space-x-6 border-b border-outline-variant min-w-max">
+<button class="pb-2 font-label-md text-label-md transition-all duration-200 segmented-control-active" id="tab-weight" onclick="switchTab('weight')">Weight</button>
+<button class="pb-2 font-label-md text-label-md transition-all duration-200 text-on-surface-variant" id="tab-nutrition" onclick="switchTab('nutrition')">Nutrition</button>
+<button class="pb-2 font-label-md text-label-md transition-all duration-200 text-on-surface-variant" id="tab-training" onclick="switchTab('training')">Training</button>
+<button class="pb-2 font-label-md text-label-md transition-all duration-200 text-on-surface-variant" id="tab-achievements" onclick="switchTab('achievements')">Achievements</button>
+</div>
+</section>
+<!-- View Containers -->
+<div class="space-y-6" id="weight-view">
+<!-- Summary Stats -->
+<div class="grid grid-cols-2 gap-4">
+<div class="glass-card p-card-padding rounded-xl flex flex-col justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Current Weight</span>
+<div class="flex items-baseline gap-2 mt-2">
+<span class="font-data-lg text-data-lg text-primary">78.5</span>
+<span class="font-label-md text-label-md text-on-surface-variant">kg</span>
+</div>
+</div>
+<div class="glass-card p-card-padding rounded-xl flex flex-col justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Last 30 Days</span>
+<div class="flex items-center gap-1 mt-2">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">trending_down</span>
+<span class="font-data-sm text-data-sm text-secondary">-1.2 kg</span>
+</div>
+</div>
+</div>
+<!-- Weight Chart Card -->
+<div class="glass-card p-card-padding rounded-xl space-y-4">
+<div class="flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md-mobile text-on-surface">Weight Journey</h2>
+<div class="flex bg-surface-container-high rounded-lg p-1">
+<button class="px-3 py-1 text-xs font-bold rounded bg-primary-container text-on-primary-container">1W</button>
+<button class="px-3 py-1 text-xs font-bold text-on-surface-variant">1M</button>
+<button class="px-3 py-1 text-xs font-bold text-on-surface-variant">6M</button>
+</div>
+</div>
+<!-- SVG Area Chart Concept -->
+<div class="relative w-full h-48 mt-4 overflow-hidden">
+<svg class="w-full h-full overflow-visible" viewbox="0 0 400 150">
+<defs>
+<lineargradient id="areaGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#8aebff" stop-opacity="0.3"></stop>
+<stop offset="100%" stop-color="#8aebff" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<!-- Goal Line -->
+<line stroke="#45dfa4" stroke-dasharray="4" stroke-width="1.5" x1="0" x2="400" y1="110" y2="110"></line>
+<text class="text-[10px] font-bold" fill="#45dfa4" x="350" y="105">Goal: 75kg</text>
+<!-- Area Chart -->
+<path d="M0,100 C50,90 100,95 150,70 S250,85 300,50 S350,60 400,40 L400,150 L0,150 Z" fill="url(#areaGradient)"></path>
+<path d="M0,100 C50,90 100,95 150,70 S250,85 300,50 S350,60 400,40" fill="none" stroke="#8aebff" stroke-linecap="round" stroke-width="3"></path>
+<!-- Pulse Point -->
+<circle cx="400" cy="40" fill="#8aebff" r="4">
+<animate attributename="r" dur="2s" repeatcount="indefinite" values="4;6;4"></animate>
+</circle>
+</svg>
+</div>
+<div class="flex justify-between text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mt-2">
+<span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+</div>
+</div>
+</div>
+<!-- Achievements View (Hidden by default) -->
+<div class="hidden space-y-6" id="achievements-view">
+<h2 class="font-headline-md text-headline-md-mobile text-on-surface">Milestones &amp; Badges</h2>
+<div class="grid grid-cols-3 gap-4">
+<!-- Earned Badge -->
+<div class="flex flex-col items-center space-y-2 group cursor-pointer">
+<div class="w-20 h-20 rounded-full cta-gradient p-[2px] shadow-[0_0_15px_rgba(138,235,255,0.4)]">
+<div class="w-full h-full rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-primary text-4xl" style="font-variation-settings: 'FILL' 1;">water_drop</span>
+</div>
+</div>
+<span class="font-label-md text-[12px] text-center text-on-surface">Ocean Diver</span>
+</div>
+<!-- Earned Badge -->
+<div class="flex flex-col items-center space-y-2 group cursor-pointer">
+<div class="w-20 h-20 rounded-full cta-gradient p-[2px] shadow-[0_0_15px_rgba(138,235,255,0.4)]">
+<div class="w-full h-full rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-secondary text-4xl" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+</div>
+<span class="font-label-md text-[12px] text-center text-on-surface">Electric Pace</span>
+</div>
+<!-- Locked Badge -->
+<div class="flex flex-col items-center space-y-2 opacity-40 grayscale group cursor-pointer">
+<div class="w-20 h-20 rounded-full border-2 border-dashed border-outline-variant p-[2px]">
+<div class="w-full h-full rounded-full bg-surface-container-lowest flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-on-surface-variant text-4xl">lock</span>
+</div>
+</div>
+<span class="font-label-md text-[12px] text-center text-on-surface-variant">Deep Sea Pro</span>
+</div>
+<!-- Earned Badge -->
+<div class="flex flex-col items-center space-y-2 group cursor-pointer">
+<div class="w-20 h-20 rounded-full cta-gradient p-[2px] shadow-[0_0_15px_rgba(138,235,255,0.4)]">
+<div class="w-full h-full rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-tertiary text-4xl" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+</div>
+<span class="font-label-md text-[12px] text-center text-on-surface">Flame Tamer</span>
+</div>
+<!-- Locked Badge -->
+<div class="flex flex-col items-center space-y-2 opacity-40 grayscale group cursor-pointer">
+<div class="w-20 h-20 rounded-full border-2 border-dashed border-outline-variant p-[2px]">
+<div class="w-full h-full rounded-full bg-surface-container-lowest flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-on-surface-variant text-4xl">lock</span>
+</div>
+</div>
+<span class="font-label-md text-[12px] text-center text-on-surface-variant">Marathoner</span>
+</div>
+<!-- Locked Badge -->
+<div class="flex flex-col items-center space-y-2 opacity-40 grayscale group cursor-pointer">
+<div class="w-20 h-20 rounded-full border-2 border-dashed border-outline-variant p-[2px]">
+<div class="w-full h-full rounded-full bg-surface-container-lowest flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-on-surface-variant text-4xl">lock</span>
+</div>
+</div>
+<span class="font-label-md text-[12px] text-center text-on-surface-variant">King Triton</span>
+</div>
+</div>
+<div class="glass-card p-card-padding rounded-xl text-center">
+<p class="font-body-md text-on-surface-variant">Complete 3 more High Intensity Training sessions to unlock the <span class="text-secondary font-bold">"Storm Breaker"</span> badge.</p>
+</div>
+</div>
+<!-- Nutrition/Training placeholders -->
+<div class="hidden" id="nutrition-view">
+<div class="glass-card p-card-padding rounded-xl h-48 flex items-center justify-center">
+<span class="text-on-surface-variant font-label-md">Nutrition Analytics Coming Soon</span>
+</div>
+</div>
+<div class="hidden" id="training-view">
+<div class="glass-card p-card-padding rounded-xl h-48 flex items-center justify-center">
+<span class="text-on-surface-variant font-label-md">Training Performance Coming Soon</span>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-surface-container-low h-20 shadow-lg border-t border-outline-variant">
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined">restaurant</span>
+<span class="font-label-md text-label-md">Nutrition</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined">fitness_center</span>
+<span class="font-label-md text-label-md">Train</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant pt-2 hover:text-primary transition-colors duration-200 scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-label-md text-label-md">Coach</span>
+</button>
+<button class="flex flex-col items-center justify-center text-secondary dark:text-secondary border-t-4 border-secondary pt-1 scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">monitoring</span>
+<span class="font-label-md text-label-md">Progress</span>
+</button>
+</nav>
+<script>
+        function switchTab(view) {
+            const views = ['weight', 'nutrition', 'training', 'achievements'];
+            const tabs = {
+                weight: document.getElementById('tab-weight'),
+                nutrition: document.getElementById('tab-nutrition'),
+                training: document.getElementById('tab-training'),
+                achievements: document.getElementById('tab-achievements')
+            };
+
+            views.forEach(v => {
+                const element = document.getElementById(v + '-view');
+                if (v === view) {
+                    element.classList.remove('hidden');
+                    tabs[v].classList.add('segmented-control-active');
+                    tabs[v].classList.remove('text-on-surface-variant');
+                } else {
+                    element.classList.add('hidden');
+                    tabs[v].classList.remove('segmented-control-active');
+                    tabs[v].classList.add('text-on-surface-variant');
+                }
+            });
+        }
+
+        // Ripple Effect for glass cards
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mousedown', function(e) {
+                const ripple = document.createElement('div');
+                ripple.className = 'absolute bg-white/10 rounded-full w-2 h-2 pointer-events-none transform -translate-x-1/2 -translate-y-1/2 scale-0 animate-[ripple_0.6s_ease-out]';
+                ripple.style.left = `${e.offsetX}px`;
+                ripple.style.top = `${e.offsetY}px`;
+                this.appendChild(ripple);
+                setTimeout(() => ripple.remove(), 600);
+            });
+        });
+    </script>
+<style>
+        @keyframes ripple {
+            to {
+                transform: translate(-50%, -50%) scale(50);
+                opacity: 0;
+            }
+        }
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    </style>
+</body></html>

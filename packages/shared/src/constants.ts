@@ -120,5 +120,15 @@ export const CHAT_HISTORY_MAX_CHARS = 6000;
 export const WELLNESS_DISCLAIMER =
   'AquaZeroFit provides general wellness and fitness support only. It does not provide medical diagnosis, treatment or professional healthcare advice.';
 
+/**
+ * AGPL-3.0 §13 network-use clause. Because AquaZeroFit is offered to users over
+ * a network, every deployment must offer those users the corresponding source
+ * of the version they are interacting with. A reachable "Source code" link in
+ * the running application is how this obligation is discharged — a fork that
+ * removes it, or points it at an unmodified upstream, is in violation.
+ * Deployments running modified source MUST repoint this at their own repository.
+ */
+export const SOURCE_CODE_URL = 'https://github.com/LuminaraDigital/aquazerofit';
+
 export const CRISIS_SIGNPOST =
   'It sounds like you may be going through something serious. AquaZeroFit is not able to help with this, but you deserve real support: please reach out to a healthcare professional, or contact Lifeline on 13 11 14 (Australia) or your local crisis service.';

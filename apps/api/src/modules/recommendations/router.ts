@@ -324,7 +324,14 @@ recommendationsRouter.post(
         createdAt: nowIso(),
       };
       await upsertDoc('ai', recommendation);
-      await creditLedger.commit(reservationId);
+      // Real providers failed and the gateway fell back to offline templates —
+      // do not charge. Keyless mock (no providers configured) keeps degraded
+      // false and bills normally per product rules. Same stance as the chat lane.
+      if (result.meta.degraded) {
+        await creditLedger.release(reservationId);
+      } else {
+        await creditLedger.commit(reservationId);
+      }
 
       res.status(201).json({ recommendation, remaining });
     } catch (err) {

@@ -161,6 +161,71 @@ describe('vision confirm macro recalculation', () => {
     expect(res.body.mealLog.totalKcal).toBe(247.5);
   });
 
+  it('releases instead of committing when the analysis came from a degraded gateway', async () => {
+    const degradedJobId = 'vj-confirm-degraded';
+    const reservationId = await creditLedger.reserve(userId, 'mealPhoto');
+    const afterReserve = await creditLedger.balance(userId);
+
+    getStore().upsert('ai', {
+      id: degradedJobId,
+      userId,
+      type: 'cvJob',
+      status: 'succeeded',
+      mealType: 'lunch',
+      predictions: [
+        {
+          name: 'Chicken Breast (grilled)',
+          foodId: 'food-chicken-breast',
+          estimatedGrams: 150,
+          confidence: 0.9,
+          kcal: 247.5,
+          proteinG: 46.5,
+          carbsG: 0,
+          fatG: 5.4,
+        },
+      ],
+      ai: null,
+      // Real providers failed and the offline engine produced these predictions.
+      aiDegraded: true,
+      reservationId,
+      createdAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+    });
+    await getStore().flush();
+
+    const res = await request(app)
+      .post(`${base}/meal-photos/${degradedJobId}/confirm`)
+      .set(auth())
+      .send({
+        mealType: 'lunch',
+        localDate: DATE,
+        items: [
+          {
+            foodId: 'food-chicken-breast',
+            name: 'Chicken Breast (grilled)',
+            grams: 150,
+            kcal: 247.5,
+            proteinG: 46.5,
+            carbsG: 0,
+            fatG: 5.4,
+          },
+        ],
+      });
+    expect(res.status).toBe(201);
+    // The meal log is kept; only the charge is waived.
+    expect(res.body.mealLog.totalKcal).toBe(247.5);
+    expect(await creditLedger.balance(userId)).toBe(afterReserve + CREDIT_COSTS.mealPhoto);
+
+    const settlement = getStore().where(
+      'ledger',
+      (d) => (d as { reservationId?: string }).reservationId === reservationId,
+    );
+    expect(settlement.some((d) => (d as { kind?: string }).kind === 'commit')).toBe(false);
+    // Internal metering state must not reach the client.
+    expect(res.body.job?.aiDegraded).toBeUndefined();
+    expect(res.body.job?.reservationId).toBeUndefined();
+  });
+
   it('rejects an unknown foodId', async () => {
     const unknownJobId = 'vj-confirm-unknown-food';
     getStore().upsert('ai', {

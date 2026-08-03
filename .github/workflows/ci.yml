@@ -1,0 +1,41 @@
+name: CI
+
+# The eval gate is a release gate on paper (AQF-10, AQF-14) but nothing ran it
+# automatically. This workflow makes typecheck, tests and the safety eval a
+# required signal on every push and pull request.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # `npm ci` installs from the committed lockfile; a lockfile that has
+      # drifted from package.json fails here rather than in a deployment.
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      # Zero critical safety misses, zero allergen violations, zero plan-safety
+      # failures. Blocks the build on any regression.
+      - name: Safety eval gate
+        run: npm run eval
+
+      - name: Build
+        run: npm run build

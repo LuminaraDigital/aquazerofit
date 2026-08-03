@@ -8,6 +8,7 @@ import {
   ALLERGENS,
   DIETARY_PREFERENCES,
   RANGES,
+  SOURCE_CODE_URL,
   WELLNESS_DISCLAIMER,
   profileSchema,
   type Allergen,
@@ -560,6 +561,31 @@ export default function Settings() {
           </button>
           <div className="text-center space-y-1">
             <p className="text-xs text-on-surface-variant/40">AquaZeroFit {APP_VERSION}</p>
+            {/*
+              AGPL-3.0 §13: users interacting with this instance over a network must be
+              offered its corresponding source. This link is a licence obligation, not a
+              credit — do not remove it, and repoint it if you deploy modified source.
+            */}
+            <p className="text-[10px] text-on-surface-variant/40">
+              Free software under{' '}
+              <a
+                href={`${SOURCE_CODE_URL}/blob/main/LICENSE`}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="underline hover:text-on-surface-variant/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded"
+              >
+                AGPL-3.0-or-later
+              </a>
+              {' · '}
+              <a
+                href={SOURCE_CODE_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="underline hover:text-on-surface-variant/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded"
+              >
+                Source code
+              </a>
+            </p>
             <p className="text-[10px] text-on-surface-variant/40 max-w-xs mx-auto leading-relaxed">
               {WELLNESS_DISCLAIMER}
             </p>

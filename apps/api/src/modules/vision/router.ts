@@ -34,7 +34,9 @@ export const visionRouter = Router();
 visionRouter.use(requireAuth);
 
 // Jobs carry a private reservation reference that is never returned to clients.
-type StoredVisionJob = VisionJob & { reservationId?: string };
+// `aiDegraded` is recorded when the job is processed but consumed later, at
+// confirm time, because that is where this lane settles its reservation.
+type StoredVisionJob = VisionJob & { reservationId?: string; aiDegraded?: boolean };
 
 // Uploads are re-encoded before they are persisted (see toStorableJpeg), so
 // the bytes on disk are always baseline JPEG whatever the client sent. Storage
@@ -181,9 +183,9 @@ function visionCandidates(foods: Food[]): { id: string; name: string; commonServ
 }
 
 function publicJob(job: StoredVisionJob): Omit<VisionJob, 'imagePath'> {
-  // reservationId is internal metering state; imagePath is a server
-  // filesystem location and must never reach the client.
-  const { reservationId: _hidden, imagePath: _path, ...rest } = job;
+  // reservationId and aiDegraded are internal metering state; imagePath is a
+  // server filesystem location and must never reach the client.
+  const { reservationId: _hidden, imagePath: _path, aiDegraded: _degraded, ...rest } = job;
   return rest;
 }
 
@@ -245,6 +247,8 @@ async function processJob(jobId: string): Promise<void> {
     job.status = 'succeeded';
     job.predictions = predictions;
     job.ai = result.meta;
+    // Carried to the confirm handler, which is where this lane settles credits.
+    job.aiDegraded = result.meta.degraded === true;
     job.completedAt = nowIso();
     await upsertDoc('ai', job);
   } catch (err) {
@@ -449,8 +453,15 @@ visionRouter.post(
     // longer needed and is removed (data minimisation).
     deleteJobImage(job);
 
+    // Predictions that came from the offline engine after real providers failed
+    // are not a model answer the user should pay for, even though they confirmed
+    // a meal log off the back of them. Mirrors the chat and recommendation lanes.
     if (job.reservationId) {
-      await creditLedger.commit(job.reservationId);
+      if (job.aiDegraded) {
+        await creditLedger.release(job.reservationId);
+      } else {
+        await creditLedger.commit(job.reservationId);
+      }
     }
 
     res.status(201).json({ mealLog, job: publicJob(job) });

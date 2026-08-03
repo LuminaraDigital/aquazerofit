@@ -1,5 +1,9 @@
 # AquaZeroFit
 
+[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![Licence: AGPL v3](https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
+
 AI-powered wellness platform under the **AquaZero** brand. Users build a wellness profile, log meals manually or by photograph, and receive personalised calorie targets, meal suggestions and home training plans that adapt to measured progress. A conversational assistant ("Aqua Coach") answers nutrition and fitness questions inside strict safety boundaries.
 
 > AquaZeroFit provides general wellness and fitness support only. It does not provide medical diagnosis, treatment or professional healthcare advice. This boundary is a product requirement, not a disclaimer (AQF-02 §1).
@@ -15,7 +19,7 @@ packages/shared    Shared types, zod validation schemas, error taxonomy, constan
 prompts/           Versioned AI prompt files P-01..P-11 (AQF-10)
 evals/             Safety evaluation sets and runner (pipeline gate)
 content/           Licensing attribution and workout-media governance
-docs/specs/        AQF-01..AQF-21 document set
+docs/specs/        AQF-01..AQF-22 document set
 docs/research/     Upstream integration and licensing research tracks
 docs/plans/        Integration and delivery plans
 design/figma/      Screen references and the Modern Aquatic Wellness design system
@@ -54,7 +58,7 @@ npm run seed       # re-run content/demo seeding
 
 ## Architecture in one paragraph
 
-The frontend detects at bootstrap whether it is running inside Telegram (`isTMA()`): in the browser it renders the AquaZero design system directly; inside Telegram it additionally binds the client theme variables. The API is a stateless TypeScript service exposing the frozen `/api/v1` contract with JWT access tokens and single-use rotating refresh tokens (family revocation on reuse). Data is stored as documents in Cosmos-style containers (`users`, `profiles`, `logs`, `plans`, `content`, `ai`, `ledger`, `audit`) behind a storage abstraction — locally a JSON store, in Azure Cosmos DB (AQF-04). All model access goes through a single AI gateway module with logical model groups (`visionPrimary`, `chatFast`, `planStructured`, `safetyCheap`, `insightBatch`); when no provider keys are configured the gateway falls back to a deterministic offline engine so every core journey works without external AI. Every model-calling endpoint enforces the admission sequence: authenticate → rate limit → tier/credit check → input guardrail → gateway → output guardrail and numeric rules → respond + telemetry (AQF-07 §4).
+The frontend detects at bootstrap whether it is running inside Telegram (`isTMA()`): in the browser it renders the AquaZero design system directly; inside Telegram it additionally binds the client theme variables. The API is a stateless TypeScript service exposing the frozen `/api/v1` contract with JWT access tokens and single-use rotating refresh tokens (family revocation on reuse). Data is stored as documents in logical containers (`users`, `profiles`, `logs`, `plans`, `content`, `ai`, `ledger`, `audit`) behind a storage abstraction: a JSON file store by default, and Postgres when `DATABASE_URL` is set (a single `documents(container, id, doc jsonb)` table, write-through from an in-memory working set). Because each instance hydrates its own working set, the Postgres store is durable for **single-instance** deployments only — scale out requires moving reads off the local copy (AQF-04, AQF-22). All model access goes through a single AI gateway module with logical model groups (`visionPrimary`, `chatFast`, `planStructured`, `safetyCheap`, `insightBatch`); when no provider keys are configured the gateway falls back to a deterministic offline engine so every core journey works without external AI. Every model-calling endpoint enforces the admission sequence: authenticate → rate limit → tier/credit check → input guardrail → gateway → output guardrail and numeric rules → respond + telemetry (AQF-07 §4).
 
 ### Safety invariants (enforced in code, tested)
 
@@ -80,7 +84,12 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | Variable | Purpose |
 | --- | --- |
 | `PORT` | API port (default 4000) |
-| `AZF_DATA_DIR` | Data directory for the local JSON store (default `apps/api/.data`) |
+| `DATABASE_URL` | Postgres connection string. When set, the store switches from JSON files to Postgres; leave unset for local development |
+| `AZF_DATA_DIR` | Data directory for the local JSON store (default `apps/api/.data`; used only when `DATABASE_URL` is unset) |
+| `SERVE_WEB` | Set to `false` for an API-only deployment. By default the API also serves the built SPA from `apps/web/dist`, so one process serves the whole product on one origin |
+| `WEB_DIST_DIR` | Override where the built SPA is found |
+| `TRUST_PROXY` | Proxy hops to trust for `req.ip` (defaults to 1 in production, 0 otherwise). Wrong values collapse every caller into one rate-limit bucket |
+| `APP_VERSION` | Build identity returned by `/health` and `/ready` |
 | `AZF_SEED_DEMO` | Set to `false` to skip demo/admin account seeding (accounts are never seeded in production) |
 | `ADMIN_PASSWORD` | Production-only: seeds the admin account with this password; without it no admin account is created |
 | `EXPOSE_DEV_TOKENS` | Dev-only: echo password-reset tokens in API responses/logs when `true` (requires non-production `NODE_ENV`) |
@@ -110,7 +119,7 @@ The gateway tries providers in order and falls back to a deterministic mock engi
 
 ## Documentation
 
-The authoritative document set lives in `docs/specs/` (AQF-01 Charter … AQF-21 Deployment Plan). The API surface is specified in AQF-07; algorithms in AQF-09; the prompt bank and LLMOps plan in AQF-10; safety and privacy design in AQF-11.
+The authoritative document set lives in `docs/specs/` (AQF-01 Charter … AQF-22 Deployment Guide). The API surface is specified in AQF-07; algorithms in AQF-09; the prompt bank and LLMOps plan in AQF-10; safety and privacy design in AQF-11; deployment and domain setup in AQF-22.
 
 ## Security notes
 
@@ -119,3 +128,21 @@ Accepted tradeoffs for the capstone deployment, reviewed and documented rather t
 - **Tokens in localStorage** — the app runs as a Telegram Mini App where cookie-based sessions are impractical; access tokens are short-lived (15 min) and refresh tokens are single-use, rotated, family-revoked on reuse, and stored server-side only as sha256 hashes.
 - **Pure-JS bcrypt at cost 10** (`bcryptjs`) — the portability floor for this capstone; a native binding and/or higher cost factor is the first hardening step for real production load.
 - **Client-declared MIME with extension-derived content type** for meal-photo uploads — uploads are size-capped, allowlisted (jpeg/png/heic), stored under unguessable UUID names, never statically served, streamed only to their authenticated owner, and deleted on confirm/failure plus a 24 h TTL sweep.
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md) — please do not open a public issue.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Run `npm run verify` (typecheck → tests → safety eval) before opening a pull request; it is exactly what CI runs.
+
+## Licence
+
+Copyright (C) 2026 AquaZero.
+
+AquaZeroFit is free software: you can redistribute it and/or modify it under the terms of the **GNU Affero General Public License** as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [GNU Affero General Public License](LICENSE) for more details.
+
+> **Section 13 — network use.** The AGPL's defining clause: if you run a modified version of AquaZeroFit and let anyone interact with it over a network, you must offer those users the corresponding source of *your* version. Deploying a fork publicly without publishing its source is a licence violation. A "Source code" link in the running application is the customary way to satisfy this.
+
+Third-party dependency and dataset licences — including the CC-BY-SA exercise corpus and ODbL ingredient data, whose terms are independent of this one — are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

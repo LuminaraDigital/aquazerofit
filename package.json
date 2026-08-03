@@ -2,6 +2,7 @@
   "name": "aquazerofit",
   "version": "1.0.0",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "description": "AquaZeroFit — AI-powered wellness platform (web + Telegram Mini App). An AquaZero product.",
   "workspaces": [
     "apps/*",

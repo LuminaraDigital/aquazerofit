@@ -28,6 +28,10 @@ Thumbs.db
 ehthumbs.db
 desktop.ini
 
+# Microsoft Office lock/owner files, created whenever a .docx in docs/specs is
+# open in Word. They are transient local state, not deliverables.
+~$*
+
 # App data & uploads (runtime-generated)
 apps/api/.data/
 apps/api/uploads/

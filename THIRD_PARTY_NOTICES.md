@@ -1,5 +1,7 @@
 # Third-Party Notices
 
+AquaZeroFit itself is licensed under the **GNU Affero General Public License v3.0 or later** (see [LICENSE](LICENSE)). This document covers the third-party software and content it depends on, whose terms are separate from and unaffected by that choice.
+
 AquaZeroFit uses the following open-source software and licensed content. Full licence texts ship with each package under `node_modules/`. Content attribution obligations are recorded in `content/ATTRIBUTION.md` and in AQF-12 (Upstream Integration and Licensing Register).
 
 ## Runtime dependencies
@@ -15,6 +17,10 @@ AquaZeroFit uses the following open-source software and licensed content. Full l
 | jsonwebtoken | MIT | Access/refresh token signing |
 | bcryptjs | MIT | Password hashing |
 | multer | MIT | Multipart photo upload |
+| helmet | MIT | Security response headers (CSP, HSTS) |
+| sharp | Apache-2.0 | Meal-photo re-encoding and EXIF stripping |
+| pg | MIT | Postgres client for the hosted document store |
+| dotenv | BSD-2-Clause | Loads `.env` at API boot |
 
 ## Development dependencies
 
@@ -58,6 +64,6 @@ The following third-party datasets are imported as **data only** via the server-
 
 ### Licence policy verification
 
-- **No AGPL/GPL code in runtime dependencies.** Every runtime dependency above is MIT; development dependencies are MIT or Apache-2.0; fonts are SIL OFL 1.1 or Apache-2.0. The dependency-licence allowlist (MIT / Apache-2.0 / BSD / ISC) is re-verified as part of every release gate (AQF-12).
-- **Zero wger source code in the repository.** wger is AGPL-3.0-or-later (network copyleft); vendoring or linking any of it is prohibited (ADR-013, AQF-12). Integration is strictly a data import over the public REST API plus independent reimplementation of documented design patterns.
+- **No AGPL/GPL code in runtime dependencies.** Every runtime dependency above is MIT, Apache-2.0 (sharp) or BSD-2-Clause (dotenv); development dependencies are MIT or Apache-2.0; fonts are SIL OFL 1.1 or Apache-2.0. The dependency-licence allowlist (MIT / Apache-2.0 / BSD / ISC) is re-verified as part of every release gate (AQF-12).
+- **Zero wger source code in the repository.** wger is AGPL-3.0-or-later. Since AquaZeroFit is now licensed under the same terms, this is no longer a licence-compatibility constraint — but the exclusion stands as an architectural decision (ADR-013, AQF-12): integration is strictly a data import over the public REST API plus independent reimplementation of documented design patterns, which keeps the two codebases free of any derivation relationship. Re-verify this clause before adopting any upstream code.
 - **Attribution fields are never stripped.** `licence`, `licenceAuthor` and `sourceId` are imported per record and preserved through every pipeline (AQF-06 §3.3); removals constitute a release-blocking defect.

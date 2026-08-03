@@ -15,7 +15,7 @@ import sharp from 'sharp';
 import crypto from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { config } from '../../platform/config';
 import { requireAuth } from '../../platform/auth';
 import { AppError } from '../../platform/errors';
 import {
@@ -93,8 +93,7 @@ async function toStorableJpeg(buffer: Buffer, declaredMime?: string): Promise<Bu
 }
 
 function uploadsDir(): string {
-  // .../apps/api/src/modules/vision → .../apps/api/uploads
-  const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..', 'uploads');
+  const dir = config.uploadsDir;
   mkdirSync(dir, { recursive: true });
   return dir;
 }

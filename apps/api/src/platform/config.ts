@@ -72,6 +72,23 @@ export const config = {
     return isProduction() ? 1 : 0;
   },
 
+  /**
+   * Where meal photographs are written while a vision job is in flight.
+   *
+   * Defaults to apps/api/uploads. On a host whose filesystem is ephemeral —
+   * Replit resets it on every publish — point UPLOADS_DIR at a mounted
+   * persistent volume, or in-flight photos vanish on redeploy. The blast
+   * radius is deliberately small (the sweep deletes them within 24 hours
+   * anyway and a missing file is tolerated everywhere it is read), but a lost
+   * photo is a failed analysis the user has to repeat.
+   */
+  get uploadsDir(): string {
+    const override = process.env.UPLOADS_DIR?.trim();
+    if (override) return path.resolve(override);
+    // apps/api/src/platform -> apps/api -> apps/api/uploads
+    return path.resolve(here, '..', '..', 'uploads');
+  },
+
   /** Local JSON persistence root; AZF_DATA_DIR overrides (used by tests). */
   get dataDir(): string {
     // Empty/whitespace AZF_DATA_DIR must fall through to the default:
@@ -130,6 +147,23 @@ export const config = {
   deletionGraceDays: 30,
 
   /**
+   * Public origin of the running app, used to build links inside outbound
+   * mail. Falls back to the Vite dev server so reset links work locally.
+   */
+  get appPublicUrl(): string {
+    const raw = process.env.APP_PUBLIC_URL?.trim();
+    return (raw || 'http://localhost:5173').replace(/\/+$/, '');
+  },
+
+  /**
+   * Envelope sender for outbound mail. Must be a domain verified with the mail
+   * provider or every message is silently dropped by the provider.
+   */
+  get mailFrom(): string {
+    return process.env.MAIL_FROM?.trim() || 'AquaZeroFit <no-reply@localhost>';
+  },
+
+  /**
    * Optional LLM second stage for input guardrails (P-09 safetyCheap lane).
    * Defaults ON when any real AI provider key is configured, OFF when keyless
    * so offline demo mode stays regex-only with zero extra latency. Set
@@ -173,6 +207,30 @@ export function assertProductionSecrets(): void {
   const insecure = origins.filter((o) => o.startsWith('http://'));
   if (insecure.length > 0) {
     throw new Error(`CORS_ORIGINS must use https in production: ${insecure.join(', ')}`);
+  }
+
+  // Account recovery must actually be able to leave the building. The console
+  // transport prints the token to a log sink nobody reads and the request
+  // endpoint still answers 202, so a misconfigured deployment looks healthy
+  // while every locked-out user stays locked out. Refuse to start instead.
+  const provider = process.env.MAIL_PROVIDER?.trim().toLowerCase();
+  const hasResendKey = Boolean(process.env.RESEND_API_KEY?.trim());
+  const effective = provider || (hasResendKey ? 'resend' : 'console');
+  if (effective !== 'resend') {
+    throw new Error(
+      'Refusing to start in production without a real mail transport: set RESEND_API_KEY ' +
+        '(and MAIL_FROM), or set MAIL_PROVIDER explicitly if you have wired another transport. ' +
+        'Password reset is undeliverable without one.',
+    );
+  }
+  if (!hasResendKey) {
+    throw new Error('MAIL_PROVIDER=resend requires RESEND_API_KEY');
+  }
+  if (!process.env.MAIL_FROM?.trim()) {
+    throw new Error('MAIL_FROM must be set in production (a domain verified with the provider)');
+  }
+  if (!process.env.APP_PUBLIC_URL?.trim()) {
+    throw new Error('APP_PUBLIC_URL must be set in production (reset links are built from it)');
   }
 }
 

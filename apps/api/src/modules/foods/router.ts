@@ -70,7 +70,8 @@ foodsRouter.get('/', (req, res) => {
 foodsRouter.get(
   '/barcode/:code',
   asyncHandler(async (req, res) => {
-    const code = req.params.code;
+    // String(): newer @types/express widens route params to string | string[].
+    const code = String(req.params.code ?? '');
     if (!isValidBarcode(code)) {
       throw new AppError('VALIDATION_FAILED', 'Barcode must be a valid EAN-8 or EAN-13');
     }

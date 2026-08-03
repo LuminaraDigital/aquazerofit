@@ -25,6 +25,10 @@ const KEYS = [
   'JWT_ACCESS_SECRET',
   'TELEGRAM_BOT_TOKEN',
   'TRUST_PROXY',
+  'MAIL_PROVIDER',
+  'RESEND_API_KEY',
+  'MAIL_FROM',
+  'APP_PUBLIC_URL',
 ] as const;
 
 const ORIGINAL = Object.fromEntries(KEYS.map((k) => [k, process.env[k]])) as Record<
@@ -38,6 +42,11 @@ function setProductionEnv(overrides: Partial<Record<(typeof KEYS)[number], strin
   process.env.JWT_ACCESS_SECRET = 'x'.repeat(64);
   process.env.TELEGRAM_BOT_TOKEN = 'test-bot-token';
   process.env.CORS_ORIGINS = 'https://app.aquazero.fit';
+  // Account recovery has to be deliverable; see the mail guard below.
+  process.env.RESEND_API_KEY = 're_test_key';
+  process.env.MAIL_FROM = 'AquaZeroFit <no-reply@aquazero.fit>';
+  process.env.APP_PUBLIC_URL = 'https://app.aquazero.fit';
+  delete process.env.MAIL_PROVIDER;
   for (const [k, v] of Object.entries(overrides)) process.env[k] = v;
 }
 
@@ -81,6 +90,40 @@ describe('assertProductionSecrets', () => {
   it('rejects a plaintext http CORS origin in production', () => {
     setProductionEnv({ CORS_ORIGINS: 'http://app.aquazero.fit' });
     expect(() => assertProductionSecrets()).toThrow(/https/);
+  });
+
+  /**
+   * Password reset issued a token whose only delivery path was a console line
+   * gated off in production, so a locked-out user had no route back in and the
+   * endpoint still answered 202. Boot now fails instead of pretending.
+   */
+  it('refuses to boot in production with no mail transport configured', () => {
+    setProductionEnv();
+    delete process.env.RESEND_API_KEY;
+    expect(() => assertProductionSecrets()).toThrow(/mail transport/);
+  });
+
+  it('refuses to boot in production on the console transport', () => {
+    setProductionEnv({ MAIL_PROVIDER: 'console' });
+    expect(() => assertProductionSecrets()).toThrow(/mail transport/);
+  });
+
+  it('refuses to boot when the chosen provider has no API key', () => {
+    setProductionEnv({ MAIL_PROVIDER: 'resend' });
+    delete process.env.RESEND_API_KEY;
+    expect(() => assertProductionSecrets()).toThrow(/RESEND_API_KEY/);
+  });
+
+  it('refuses to boot without a verified sender address', () => {
+    setProductionEnv();
+    delete process.env.MAIL_FROM;
+    expect(() => assertProductionSecrets()).toThrow(/MAIL_FROM/);
+  });
+
+  it('refuses to boot without a public URL to build reset links from', () => {
+    setProductionEnv();
+    delete process.env.APP_PUBLIC_URL;
+    expect(() => assertProductionSecrets()).toThrow(/APP_PUBLIC_URL/);
   });
 });
 

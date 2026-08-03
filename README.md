@@ -113,6 +113,7 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | `AZF_SEED_DEMO` | Set to `false` to skip demo/admin account seeding (accounts are never seeded in production) |
 | `ADMIN_PASSWORD` | Production-only: seeds the admin account with this password; without it no admin account is created |
 | `EXPOSE_DEV_TOKENS` | Dev-only: echo password-reset tokens in API responses/logs when `true` (requires non-production `NODE_ENV`) |
+| `UPLOADS_DIR` | Where in-flight meal photographs are written (default `apps/api/uploads`). Point this at a persistent volume on hosts with an ephemeral filesystem, or a redeploy loses photos mid-analysis |
 | `ENABLE_LLM_SAFETY` | Override LLM second stage for input guardrails (`true`/`false`; defaults on when any AI provider key is set) |
 | `CORS_ORIGINS` | Comma-separated allowed CORS origins |
 
@@ -122,6 +123,19 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | --- | --- |
 | `JWT_ACCESS_SECRET` | Access-token signing secret (**required in production**; refresh tokens are opaque randoms and need no secret) |
 | `TELEGRAM_BOT_TOKEN` | Bot token for Mini App launch-data validation (dev default `dev-bot-token`; **required in production**) |
+
+### Mail (required in production)
+
+Password reset is undeliverable without a real transport, and a deployment
+without one looks healthy while every locked-out user stays locked out — so the
+API refuses to boot in production until these are set.
+
+| Variable | Purpose |
+| --- | --- |
+| `RESEND_API_KEY` | API key for [Resend](https://resend.com). Its presence selects the `resend` transport (**required in production**) |
+| `MAIL_FROM` | Envelope sender, e.g. `AquaZeroFit <no-reply@yourdomain>`. Must be a domain verified with the provider or messages are dropped silently (**required in production**) |
+| `APP_PUBLIC_URL` | Public origin used to build links inside mail, e.g. `https://app.yourdomain` (**required in production**) |
+| `MAIL_PROVIDER` | `resend`, `console` (dev: prints the message) or `memory` (tests). Defaults to `resend` when `RESEND_API_KEY` is set, `console` otherwise |
 
 ### AI Provider Keys (all optional - gateway falls back to offline engine)
 

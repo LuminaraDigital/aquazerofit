@@ -77,7 +77,8 @@ workoutsRouter.post(
   '/:id/swap-exercise',
   asyncHandler(async (req, res) => {
     const { exerciseId, reason } = swapBodySchema.parse(req.body);
-    res.json(await swapExercise(userIdOf(req), req.params.id, exerciseId, { reason }));
+    // String(): newer @types/express widens route params to string | string[].
+    res.json(await swapExercise(userIdOf(req), String(req.params.id ?? ''), exerciseId, { reason }));
   }),
 );
 

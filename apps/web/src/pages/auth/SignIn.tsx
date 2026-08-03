@@ -103,11 +103,17 @@ function SignInInner() {
   const [tgLoading, setTgLoading] = useState(false);
 
   // ---- password reset (backend contract frozen: request → confirm) ----
-  const [resetOpen, setResetOpen] = useState(false);
-  const [resetStep, setResetStep] = useState<'request' | 'confirm'>('request');
+  // The reset email links to /sign-in?reset=<token>. Arriving that way skips
+  // straight to the confirm step with the token filled in — the alternative is
+  // asking someone who just clicked a link to copy a UUID out of the mail.
+  const resetTokenFromLink = params.get('reset')?.trim() ?? '';
+  const [resetOpen, setResetOpen] = useState(resetTokenFromLink !== '');
+  const [resetStep, setResetStep] = useState<'request' | 'confirm'>(
+    resetTokenFromLink !== '' ? 'confirm' : 'request',
+  );
   const [resetEmail, setResetEmail] = useState('');
   const [resetEmailError, setResetEmailError] = useState<string | undefined>(undefined);
-  const [resetToken, setResetToken] = useState('');
+  const [resetToken, setResetToken] = useState(resetTokenFromLink);
   const [resetTokenError, setResetTokenError] = useState<string | undefined>(undefined);
   const [resetTokenIsDev, setResetTokenIsDev] = useState(false);
   const [newPassword, setNewPassword] = useState('');

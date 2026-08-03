@@ -18,6 +18,7 @@ import {
 } from '../../platform/auth';
 import { credentialsId, toPublicUser, type CredentialsDoc } from '../me/service';
 import { validateTelegramInitData, type TelegramUser } from './telegram';
+import { sendPasswordResetEmail } from './emails';
 
 // Cost 10 in real environments; cost 4 under vitest. bcryptjs is pure JS, so
 // even the async API runs on the main thread (chunked via setImmediate) —
@@ -311,9 +312,20 @@ export function requestPasswordReset(email: string, ip?: string): { devToken?: s
   getStore().upsert('users', doc);
   auditAuthEvent(user.id, 'password.reset.requested', { emailHash: hashIdentifier(user.email) }, ip);
 
-  // Dev mail transport: the "email" is the server console. Requires both
-  // isDev and exposeDevTokens — staging must not leak credentials via logs or
-  // response bodies even when NODE_ENV is not production on a misconfigured host.
+  // Deliberately not awaited. Awaiting would make the endpoint's latency a
+  // side channel for whether the account exists, and a provider outage would
+  // turn into a 500 that says the same thing. Delivery failures are logged
+  // without the recipient and never surface to the caller.
+  void sendPasswordResetEmail(user.email, token).catch((err: unknown) => {
+    console.error(
+      `[mail] password reset delivery failed for ${hashIdentifier(user.email)}:`,
+      err instanceof Error ? err.message : err,
+    );
+  });
+
+  // Dev convenience: also echo the token. Requires both isDev and
+  // exposeDevTokens — staging must not leak credentials via logs or response
+  // bodies even when NODE_ENV is not production on a misconfigured host.
   const exposeToken = config.isDev && config.exposeDevTokens;
   if (exposeToken) {
     // eslint-disable-next-line no-console

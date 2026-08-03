@@ -1,5 +1,5 @@
 /**
- * Workout Detail + guided session — pixel reference: full_body_strength_details.
+ * Workout Detail + guided session - pixel reference: full_body_strength_details.
  * Session view for GET /workouts/today (the :id route param is the session id;
  * today's session is always the source of truth). Renders the optional
  * pre-computed `resolved` read model verbatim when present (weight per set,
@@ -36,6 +36,10 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
 import { BottomSheet } from './BottomSheet';
 import { asList, estimateKcal, estimateMinutes, ExerciseImage, unwrapSession } from './WorkoutLibrary';
+import { ShareMoment } from '@/components/share/ShareMoment';
+import type { ShareCardPayload } from '@/lib/shareCard';
+import { useMe } from '@/lib/queries';
+import { AQUA_CHARACTER } from '@aquazerofit/shared';
 
 type Phase = 'overview' | 'work' | 'rest' | 'summary';
 
@@ -71,9 +75,12 @@ export default function WorkoutDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const me = useMe();
+  const [shareOpen, setShareOpen] = useState(false);
+  const [sharePayload, setSharePayload] = useState<ShareCardPayload | null>(null);
 
   // The :id route param is the session id; we always render today's session
-  // (if the id mismatches we still show today's — noted deviation per brief).
+  // (if the id mismatches we still show today's - noted deviation per brief).
   const sessionQuery = useQuery({ queryKey: ['workout', 'today'], queryFn: fetchToday });
   const session = sessionQuery.data?.session ?? null;
   const resolved = sessionQuery.data?.resolved ?? null;
@@ -86,7 +93,7 @@ export default function WorkoutDetail() {
   }, [resolved]);
 
   // Session exercises only carry exerciseId + name; fetch the library once to
-  // resolve each exercise's demonstration media (PRD F7). Best-effort — the
+  // resolve each exercise's demonstration media (PRD F7). Best-effort - the
   // icon placeholder remains if the library is unavailable.
   const libraryQuery = useQuery({
     queryKey: ['exercises', 'all'],
@@ -138,7 +145,7 @@ export default function WorkoutDetail() {
   }, [exercises, setsDone.length]);
 
   // Prefill the actuals inputs from the resolved targets each time the
-  // current exercise changes (targets stay the source of truth — AQF: code
+  // current exercise changes (targets stay the source of truth - AQF: code
   // computes, the user only confirms actuals).
   useEffect(() => {
     if (!currentEntry) {
@@ -262,7 +269,21 @@ export default function WorkoutDetail() {
       void queryClient.invalidateQueries({ queryKey: ['plan'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
       void queryClient.invalidateQueries({ queryKey: ['workout-stats'] });
-      toast.success('Workout complete — great session!');
+      void queryClient.invalidateQueries({ queryKey: ['challenges'] });
+      toast.success('Workout complete - great session!');
+      const mins = durationMinutes();
+      setSharePayload({
+        kind: 'workout',
+        headline: 'Session complete',
+        subline: `${completedSets} sets · ${exercises.length} moves`,
+        stats: [
+          { label: 'Sets', value: String(completedSets) },
+          { label: 'Minutes', value: String(mins) },
+          { label: 'Moves', value: String(exercises.length) },
+        ],
+        catchphrase: AQUA_CHARACTER.catchphrases[3],
+      });
+      setShareOpen(true);
       try {
         const summary = await queryClient.fetchQuery({
           queryKey: ['progress'],
@@ -276,7 +297,6 @@ export default function WorkoutDetail() {
       } catch {
         // achievements toast is best-effort only
       }
-      navigate('/workouts');
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Could not save the workout'),
   });
@@ -291,7 +311,7 @@ export default function WorkoutDetail() {
           setsCompleted: setsDone[i] ?? 0,
           skipped: skippedFlags[i] ?? false,
         };
-        // Attach actuals only when sets were logged — the legacy payload shape
+        // Attach actuals only when sets were logged - the legacy payload shape
         // is preserved exactly for sessions without resolved targets.
         if (logs.length > 0) {
           base.setLogs = logs;
@@ -556,7 +576,7 @@ export default function WorkoutDetail() {
                 }
               />
 
-              {/* Per-set actuals (only when resolved targets exist — otherwise
+              {/* Per-set actuals (only when resolved targets exist - otherwise
                   the legacy tap-through flow is unchanged) */}
               {currentEntry && (
                 <fieldset className="mt-5">
@@ -610,7 +630,7 @@ export default function WorkoutDetail() {
                         step={0.5}
                         value={actualInput.rir}
                         onChange={(e) => setActualInput((s) => ({ ...s, rir: e.target.value }))}
-                        placeholder="—"
+                        placeholder="-"
                         aria-label={`Reps in reserve for set ${(setsDone[exerciseIdx] ?? 0) + 1} of ${current.name}`}
                         className="w-full rounded-lg border border-outline-variant bg-surface-container px-2 py-2 text-center font-bold text-on-surface tabular-nums placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary"
                       />
@@ -814,6 +834,17 @@ export default function WorkoutDetail() {
           </div>
         )}
       </BottomSheet>
+
+      <ShareMoment
+        open={shareOpen}
+        onClose={() => {
+          setShareOpen(false);
+          navigate('/workouts');
+        }}
+        payload={sharePayload}
+        userId={me.data?.id ?? null}
+        invitePath="/welcome"
+      />
     </div>
   );
 }

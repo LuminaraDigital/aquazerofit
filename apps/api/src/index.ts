@@ -15,6 +15,7 @@ import { config, assertProductionSecrets } from './platform/config';
 import { getStore, initStore } from './platform/store';
 import { sweepExpiredDeletions } from './modules/me/service';
 import { sweepVisionArtifacts } from './modules/vision/router';
+import { sweepGrowthEvents } from './modules/analytics/router';
 
 // Fail fast: never boot a production process on dev fallback secrets.
 assertProductionSecrets();
@@ -40,6 +41,15 @@ function runDeletionSweep(): void {
   }
 }
 
+function runGrowthEventSweep(): void {
+  try {
+    const removed = sweepGrowthEvents();
+    if (removed > 0) console.log(`[sweep] removed ${removed} growth event(s) past retention`);
+  } catch (err) {
+    console.error('[sweep] growth event sweep failed', err);
+  }
+}
+
 function runVisionSweep(): void {
   sweepVisionArtifacts()
     .then((n) => {
@@ -49,8 +59,10 @@ function runVisionSweep(): void {
 }
 
 runDeletionSweep();
+runGrowthEventSweep();
 runVisionSweep();
 setInterval(runDeletionSweep, 6 * 3600 * 1000).unref();
+setInterval(runGrowthEventSweep, 6 * 3600 * 1000).unref();
 setInterval(runVisionSweep, 3600 * 1000).unref();
 
 const server = app.listen(config.port, () => {

@@ -254,3 +254,69 @@ export const dateQuerySchema = z.object({
 export const rangeQuerySchema = z.object({
   range: z.enum(['7d', '30d', '90d']).default('30d'),
 });
+
+// ---------- growth ----------
+
+export const createBuddyChallengeSchema = z.object({
+  kind: z.enum(['logging_streak', 'workouts', 'meal_logs']),
+  targetDays: z.number().int().min(3).max(90).default(7),
+  durationDays: z.number().int().min(3).max(90).default(14),
+});
+export type CreateBuddyChallengeInput = z.infer<typeof createBuddyChallengeSchema>;
+
+export const joinBuddyChallengeSchema = z.object({
+  code: z
+    .string()
+    .min(4)
+    .max(24)
+    .transform((s) => s.trim().toUpperCase().replace(/\s+/g, '')),
+});
+export type JoinBuddyChallengeInput = z.infer<typeof joinBuddyChallengeSchema>;
+
+/** Bounds for the unauthenticated growth-event payload (see `props` below). */
+export const GROWTH_EVENT_MAX_PROPS = 12;
+export const GROWTH_EVENT_MAX_KEY_CHARS = 40;
+export const GROWTH_EVENT_MAX_VALUE_CHARS = 200;
+
+export const growthEventSchema = z.object({
+  name: z.enum([
+    'share_opened',
+    'share_copied',
+    'share_native',
+    'share_telegram',
+    'challenge_created',
+    'challenge_joined',
+    'challenge_shared',
+    'invite_captured',
+  ]),
+  /**
+   * Bounded on every axis. The endpoint that accepts this is unauthenticated,
+   * so an uncapped record would let any caller persist megabytes per request
+   * into a container the store keeps resident in memory. Keys and values are
+   * both capped, and the key count with them.
+   */
+  props: z
+    .record(
+      z.string().max(GROWTH_EVENT_MAX_KEY_CHARS),
+      z.union([
+        z.string().max(GROWTH_EVENT_MAX_VALUE_CHARS),
+        z.number().finite(),
+        z.boolean(),
+        z.null(),
+      ]),
+    )
+    .refine((r) => Object.keys(r).length <= GROWTH_EVENT_MAX_PROPS, {
+      message: `At most ${GROWTH_EVENT_MAX_PROPS} properties`,
+    })
+    .default({}),
+  attribution: z
+    .object({
+      ref: z.string().max(80).nullable().optional(),
+      utmSource: z.string().max(80).nullable().optional(),
+      utmMedium: z.string().max(80).nullable().optional(),
+      utmCampaign: z.string().max(120).nullable().optional(),
+      challengeCode: z.string().max(24).nullable().optional(),
+    })
+    .default({}),
+});
+export type GrowthEventInput = z.infer<typeof growthEventSchema>;

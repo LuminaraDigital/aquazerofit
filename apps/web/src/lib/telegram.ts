@@ -1,6 +1,6 @@
 /**
  * Telegram Mini App integration (AQF-09 §2.1 client side).
- * The global is typed minimally here — we only touch the surface we need,
+ * The global is typed minimally here - we only touch the surface we need,
  * and every helper is a safe no-op outside of Telegram.
  */
 
@@ -86,6 +86,30 @@ export function haptic(type: HapticType = 'light'): void {
       h.impactOccurred(type);
     }
   } catch {
-    // Haptics are decorative — never throw.
+    // Haptics are decorative - never throw.
   }
+}
+
+/**
+ * Open an external / Telegram share URL. Uses Telegram.WebApp.openTelegramLink
+ * inside TMA when available; falls back to window.open.
+ */
+export function openTelegramLink(url: string): void {
+  const tg = getWebApp() as TelegramWebApp & {
+    openTelegramLink?: (u: string) => void;
+    openLink?: (u: string) => void;
+  } | undefined;
+  try {
+    if (tg?.openTelegramLink && url.startsWith('https://t.me/')) {
+      tg.openTelegramLink(url);
+      return;
+    }
+    if (tg?.openLink) {
+      tg.openLink(url);
+      return;
+    }
+  } catch {
+    // fall through
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
 }

@@ -89,6 +89,7 @@ describe('auditExerciseMedia', () => {
     expect(report.totalExercises).toBe(5);
     expect(report.countsByMediaStatus).toEqual({
       validWger: 1,
+      adoptedUpstream: 0,
       curated: 1,
       categoryFallback: 0,
       legacyPlaceholder: 1,

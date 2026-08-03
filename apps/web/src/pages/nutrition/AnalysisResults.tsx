@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { MealLogItem, VisionJob } from '@aquazerofit/shared';
+import { AQUA_CHARACTER } from '@aquazerofit/shared';
 import { api } from '@/lib/api';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -9,6 +10,9 @@ import { Chip } from '@/components/ui/Chip';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
+import { ShareMoment } from '@/components/share/ShareMoment';
+import type { ShareCardPayload } from '@/lib/shareCard';
+import { useMe } from '@/lib/queries';
 import { FoodSearchSheet, GramsStepper } from './Nutrition';
 import { fmtInt, round1, todayLocalDate } from '../dashboard/lib';
 
@@ -45,9 +49,12 @@ export default function AnalysisResults() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { show } = useToast();
+  const me = useMe();
 
   const [items, setItems] = useState<ReviewItem[] | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [sharePayload, setSharePayload] = useState<ShareCardPayload | null>(null);
 
   const jobQuery = useQuery({
     queryKey: ['vision', jobId],
@@ -67,7 +74,7 @@ export default function AnalysisResults() {
 
   const job = jobQuery.data;
 
-  // Seed the editable list once when predictions arrive — never auto-commit.
+  // Seed the editable list once when predictions arrive - never auto-commit.
   useEffect(() => {
     if (job?.status === 'succeeded' && items === null) {
       setItems(
@@ -117,9 +124,21 @@ export default function AnalysisResults() {
       show('Meal logged from photo');
       void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
-      navigate('/nutrition');
+      void queryClient.invalidateQueries({ queryKey: ['challenges'] });
+      setSharePayload({
+        kind: 'meal',
+        headline: `${fmtInt(totals.kcal)} kcal logged`,
+        subline: `${computed.length} item${computed.length === 1 ? '' : 's'} · ${job?.mealType ?? 'meal'}`,
+        stats: [
+          { label: 'Protein', value: `${Math.round(totals.proteinG)}g` },
+          { label: 'Carbs', value: `${Math.round(totals.carbsG)}g` },
+          { label: 'Fat', value: `${Math.round(totals.fatG)}g` },
+        ],
+        catchphrase: AQUA_CHARACTER.catchphrases[0],
+      });
+      setShareOpen(true);
     },
-    onError: () => show('Could not save the meal — please try again'),
+    onError: () => show('Could not save the meal - please try again'),
   });
 
   const scanning = !job || job.status === 'queued' || job.status === 'processing';
@@ -161,7 +180,7 @@ export default function AnalysisResults() {
             </GlassCard>
           </section>
         ) : job.status === 'failed' ? (
-          /* Failed state — never auto-commits, offer retry and manual path */
+          /* Failed state - never auto-commits, offer retry and manual path */
           <section>
             <ErrorState
               message={job.error ?? "We couldn't identify this meal from the photo."}
@@ -176,7 +195,7 @@ export default function AnalysisResults() {
             </button>
           </section>
         ) : (
-          /* Succeeded (or already confirmed) — editable review */
+          /* Succeeded (or already confirmed) - editable review */
           <>
             <section aria-label="Analysis summary">
               <GlassCard className="p-card-padding flex items-center justify-between">
@@ -225,7 +244,7 @@ export default function AnalysisResults() {
               {(items ?? []).length === 0 && (
                 <GlassCard className="p-card-padding text-center">
                   <p className="text-sm text-on-surface-variant">
-                    No items on the list — add what was on your plate before confirming.
+                    No items on the list - add what was on your plate before confirming.
                   </p>
                 </GlassCard>
               )}
@@ -303,7 +322,7 @@ export default function AnalysisResults() {
             {/* Disclaimer + confirm */}
             <section className="space-y-4 pb-6">
               <p className="text-xs text-on-surface-variant text-center px-4">
-                These are AI estimates — please check the items and portions before saving. Nothing
+                These are AI estimates - please check the items and portions before saving. Nothing
                 is added to your log until you confirm.
               </p>
               <button
@@ -352,6 +371,17 @@ export default function AnalysisResults() {
           ]);
           setAddOpen(false);
         }}
+      />
+
+      <ShareMoment
+        open={shareOpen}
+        onClose={() => {
+          setShareOpen(false);
+          navigate('/nutrition');
+        }}
+        payload={sharePayload}
+        userId={me.data?.id ?? null}
+        invitePath="/welcome"
       />
     </div>
   );

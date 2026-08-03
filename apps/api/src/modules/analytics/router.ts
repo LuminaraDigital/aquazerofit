@@ -1,17 +1,21 @@
 /**
- * /analytics/nutrition — daily ring DTO and trend series (AQF-07 §3.3).
+ * /analytics/nutrition - daily ring DTO and trend series (AQF-07 §3.3).
  * Pure aggregation over the logs container; all arithmetic is deterministic.
+ * Also hosts growth telemetry (share / invite / challenge events).
  */
 import { Router } from 'express';
 import {
+  GROWTH_EVENT_RETENTION_DAYS,
   dateQuerySchema,
+  growthEventSchema,
   rangeQuerySchema,
   type DailyNutrition,
+  type GrowthEvent,
   type TrendPoint,
   type WorkoutSession,
 } from '@aquazerofit/shared';
-import { requireAuth, userIdOf } from '../../platform/auth';
-import { getStore } from '../../platform/store';
+import { requireAuth, userIdOf, verifyAccess } from '../../platform/auth';
+import { getStore, newId } from '../../platform/store';
 import { lastNDates, rangeToDays, todayFor } from '../../platform/dates';
 import { getTargets } from '../me/service';
 import {
@@ -70,6 +74,61 @@ export function dailyNutrition(userId: string, date: string): DailyNutrition {
 }
 
 export const analyticsRouter = Router();
+
+/**
+ * Growth events may fire before auth (invite capture on landing) or after.
+ * Auth is optional: attach userId when a Bearer token is present.
+ */
+analyticsRouter.post('/events', (req, res, next) => {
+  try {
+    const input = growthEventSchema.parse(req.body);
+    let userId: string | null = null;
+    const header = req.headers.authorization;
+    if (typeof header === 'string' && header.startsWith('Bearer ')) {
+      try {
+        userId = verifyAccess(header.slice(7)).id;
+      } catch {
+        userId = null;
+      }
+    }
+    const event: GrowthEvent = {
+      type: 'growthEvent',
+      id: newId('gev'),
+      userId,
+      name: input.name,
+      props: input.props,
+      attribution: {
+        ref: input.attribution.ref ?? null,
+        utmSource: input.attribution.utmSource ?? null,
+        utmMedium: input.attribution.utmMedium ?? null,
+        utmCampaign: input.attribution.utmCampaign ?? null,
+        challengeCode: input.attribution.challengeCode ?? null,
+      },
+      createdAt: new Date().toISOString(),
+    };
+    getStore().upsert('audit', event);
+    res.status(202).json({ ok: true, id: event.id });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Growth-event retention sweep. This is the only unauthenticated write in the
+ * API, so its records need an expiry or the audit container grows for as long
+ * as the deployment lives. Scheduled on boot and every 6 hours from index.ts.
+ * Returns the number of events removed.
+ */
+export function sweepGrowthEvents(now = new Date()): number {
+  const cutoff = new Date(
+    now.getTime() - GROWTH_EVENT_RETENTION_DAYS * 24 * 3600 * 1000,
+  ).toISOString();
+  return getStore().deleteWhere<GrowthEvent>(
+    'audit',
+    (d) => d.type === 'growthEvent' && d.createdAt < cutoff,
+  );
+}
+
 analyticsRouter.use(requireAuth);
 
 analyticsRouter.get('/nutrition/daily', (req, res) => {

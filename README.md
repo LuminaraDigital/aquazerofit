@@ -44,6 +44,7 @@ docs/plans/        Integration and delivery plans
 design/figma/      Screen references and the Modern Aquatic Wellness design system
 design/brand/      Brand assets
 tools/docgen/      Markdown to .docx renderer (build tooling, not a workspace)
+tools/screenshots/ Re-encodes docs/screenshots into the WebP used by the landing page
 ```
 
 `prompts/` and `evals/` must stay at the repository root: `apps/api/src/modules/ai/prompts.ts`

@@ -18,6 +18,7 @@ import { adminRouter } from './admin/router';
 import { chatRouter } from './chat/router';
 import { visionRouter } from './vision/router';
 import { recommendationsRouter } from './recommendations/router';
+import { challengesRouter } from './challenges/router';
 
 export function buildRouter(): Router {
   const router = Router();
@@ -31,6 +32,7 @@ export function buildRouter(): Router {
   router.use('/exercises', exercisesRouter);
   router.use('/progress', progressRouter);
   router.use('/recipes', recipesRouter);
+  router.use('/challenges', challengesRouter);
   router.use('/admin', adminRouter);
 
   // AI lane

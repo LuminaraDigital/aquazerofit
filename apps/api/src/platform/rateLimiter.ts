@@ -1,7 +1,9 @@
 /**
  * In-memory sliding-window rate limiter (AQF-07 §4 step 2: per user AND per IP).
  * Generous default lane (300/min); stricter lane for model-calling surfaces
- * (/chat, /meal-photos: 20/min). Emits 429 RATE_LIMITED with Retry-After.
+ * (/chat, /meal-photos: 20/min); tighter lane again for the unauthenticated
+ * surfaces (/analytics/events, /challenges/peek: 30/min). Emits 429
+ * RATE_LIMITED with Retry-After.
  */
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
@@ -13,6 +15,8 @@ const DEFAULT_LIMIT = 300;
 const STRICT_LIMIT = 20;
 /** /auth lane: credential guessing surface — strictest lane, keyed per IP. */
 const AUTH_LIMIT = 10;
+/** Unauthenticated telemetry writes and invite peeks. */
+const ANON_LIMIT = 30;
 
 /** key -> sorted request timestamps within the current window */
 const buckets = new Map<string, number[]>();
@@ -36,6 +40,16 @@ function isStrictPath(path: string): boolean {
 
 function isAuthPath(path: string): boolean {
   return path.includes('/auth');
+}
+
+/**
+ * Anonymous write surfaces. /analytics/events accepts a body without a token,
+ * so the default 300/min lane would let one IP persist far more telemetry than
+ * any real share flow produces. Public invite peeks share the lane: they are
+ * the only other route that reads a stored document unauthenticated.
+ */
+function isAnonymousWritePath(path: string): boolean {
+  return path.includes('/analytics/events') || path.includes('/challenges/peek');
 }
 
 /** Best-effort subject extraction for limiter keying only — NOT authentication. */
@@ -70,9 +84,10 @@ export function rateLimiter(req: Request, res: Response, next: NextFunction): vo
   }
   const now = Date.now();
   const auth = isAuthPath(req.path);
-  const strict = !auth && isStrictPath(req.path);
-  const limit = auth ? AUTH_LIMIT : strict ? STRICT_LIMIT : DEFAULT_LIMIT;
-  const lane = auth ? 'auth' : strict ? 'strict' : 'default';
+  const anon = !auth && isAnonymousWritePath(req.path);
+  const strict = !auth && !anon && isStrictPath(req.path);
+  const limit = auth ? AUTH_LIMIT : anon ? ANON_LIMIT : strict ? STRICT_LIMIT : DEFAULT_LIMIT;
+  const lane = auth ? 'auth' : anon ? 'anon' : strict ? 'strict' : 'default';
 
   // Auth lane is per-IP only (requests are unauthenticated by nature);
   // other lanes: per user (or per IP when anonymous) AND per IP.

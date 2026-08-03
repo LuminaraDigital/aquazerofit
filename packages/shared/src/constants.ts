@@ -97,7 +97,7 @@ export const MEMORY_REJECTED_RETENTION_DAYS = 30;
 
 /**
  * Memory extraction (memory feature Phase 2). Every coach turn may suggest at
- * most MEMORY_EXTRACTION_MAX_FACTS_PER_TURN facts (suggested status — never
+ * most MEMORY_EXTRACTION_MAX_FACTS_PER_TURN facts (suggested status - never
  * auto-confirmed). The rolling summary is regenerated when the confirmed-fact
  * count has moved by MEMORY_SUMMARY_REFRESH_FACT_DELTA since the last summary
  * write, or when the summary is empty and MEMORY_SUMMARY_MIN_FACTS confirmed
@@ -110,7 +110,7 @@ export const MEMORY_SUMMARY_MIN_FACTS = 3;
 /**
  * Chat history replay budget (AQF-07 §3.4 streaming turn). The coach receives
  * the last CHAT_HISTORY_MAX_TURNS user/assistant exchanges, truncated
- * oldest-first so total history text stays under CHAT_HISTORY_MAX_CHARS —
+ * oldest-first so total history text stays under CHAT_HISTORY_MAX_CHARS -
  * bounded prompt cost regardless of session length.
  */
 export const CHAT_HISTORY_MAX_TURNS = 12;
@@ -124,7 +124,7 @@ export const WELLNESS_DISCLAIMER =
  * AGPL-3.0 §13 network-use clause. Because AquaZeroFit is offered to users over
  * a network, every deployment must offer those users the corresponding source
  * of the version they are interacting with. A reachable "Source code" link in
- * the running application is how this obligation is discharged — a fork that
+ * the running application is how this obligation is discharged - a fork that
  * removes it, or points it at an unmodified upstream, is in violation.
  * Deployments running modified source MUST repoint this at their own repository.
  */
@@ -132,3 +132,51 @@ export const SOURCE_CODE_URL = 'https://github.com/LuminaraDigital/aquazerofit';
 
 export const CRISIS_SIGNPOST =
   'It sounds like you may be going through something serious. AquaZeroFit is not able to help with this, but you deserve real support: please reach out to a healthcare professional, or contact Lifeline on 13 11 14 (Australia) or your local crisis service.';
+
+/**
+ * Aqua character kit (growth P0). The hero character is Akin with interactive
+ * poses (idle / guard / lift). The AZ monogram (`/logo.png`) stays the brand mark.
+ */
+export const AKIN_POSES = ['idle', 'guard', 'lift'] as const;
+export type AkinPose = (typeof AKIN_POSES)[number];
+
+export const AQUA_CHARACTER = {
+  id: 'akin',
+  name: 'Akin',
+  title: 'Coach Akin',
+  tagline: 'Measured days. Grounded coaching.',
+  /** Default full-body pose (idle / standing). */
+  characterUrl: '/akin-idle.jpg',
+  /** Alias kept for older call sites; same as idle. */
+  markUrl: '/akin-idle.jpg',
+  markUrl2x: '/akin-idle.jpg',
+  /** AZ monogram for app chrome / wordmark pairing. */
+  brandMarkUrl: '/logo.png',
+  /** Pose sheet for interactive Akin stage. */
+  poses: {
+    idle: { url: '/akin-idle.jpg', label: 'Ready', hint: 'Standing by' },
+    guard: { url: '/akin-guard.jpg', label: 'Guard', hint: 'Training focus' },
+    lift: { url: '/akin-lift.jpg', label: 'Lift', hint: 'Strength work' },
+  },
+  /** True once enough poses exist for sticker / share loops. */
+  stickerReady: true,
+  catchphrases: [
+    'Logged. Not guessed.',
+    'Maths in the open.',
+    'One meal. One win.',
+    'Show up. Stay kind.',
+    'Progress you can recompute.',
+  ],
+} as const;
+
+/** Max members in a buddy huddle (private accountability, not a public feed). */
+export const BUDDY_CHALLENGE_MAX_MEMBERS = 4;
+export const BUDDY_CHALLENGE_CODE_PREFIX = 'AQUA';
+
+/**
+ * Growth telemetry retention. The events endpoint is unauthenticated, so
+ * without a ceiling the audit container grows without bound — these records
+ * answer "did the invite loop work", a question that expires. Swept on boot
+ * and every 6 hours alongside the deletion sweep.
+ */
+export const GROWTH_EVENT_RETENTION_DAYS = 180;

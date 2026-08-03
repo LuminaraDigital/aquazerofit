@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { DerivedTargets, ProgressSummary, TrendPoint } from '@aquazerofit/shared';
+import { AQUA_CHARACTER } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
 import { normalizeWorkoutStats, type WorkoutStatsResponse } from '@/lib/contracts';
 import { AppHeader } from '@/components/ui/AppHeader';
@@ -16,10 +17,14 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { Chip } from '@/components/ui/Chip';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
+import { ShareMoment } from '@/components/share/ShareMoment';
+import type { ShareCardPayload } from '@/lib/shareCard';
+import { useMe } from '@/lib/queries';
 import { Sparkline } from '../dashboard/Sparkline';
 
 type Range = '7d' | '30d' | '90d';
@@ -262,7 +267,10 @@ async function orNull<T>(fn: () => Promise<T>): Promise<T | null> {
 export default function Progress() {
   const navigate = useNavigate();
   const toast = useToast();
+  const me = useMe();
   const [range, setRange] = useState<Range>('30d');
+  const [shareOpen, setShareOpen] = useState(false);
+  const [sharePayload, setSharePayload] = useState<ShareCardPayload | null>(null);
 
   const progressQuery = useQuery({
     queryKey: ['progress'],
@@ -624,6 +632,34 @@ export default function Progress() {
               </span>
               Log weight
             </PrimaryButton>
+            <SecondaryButton
+              onClick={() => {
+                const days = summary.streakDays;
+                setSharePayload({
+                  kind: 'streak',
+                  headline: days > 0 ? `${days}-day streak` : 'Starting strong',
+                  subline: `${summary.workoutsCompleted} workouts · ${summary.totalKcalBurned} kcal burned`,
+                  stats: [
+                    { label: 'Streak', value: String(days) },
+                    { label: 'Workouts', value: String(summary.workoutsCompleted) },
+                    {
+                      label: 'Burned',
+                      value:
+                        summary.totalKcalBurned >= 1000
+                          ? `${Math.round(summary.totalKcalBurned / 100) / 10}k`
+                          : String(summary.totalKcalBurned),
+                    },
+                  ],
+                  catchphrase: AQUA_CHARACTER.catchphrases[1],
+                });
+                setShareOpen(true);
+              }}
+            >
+              Share progress
+            </SecondaryButton>
+            <SecondaryButton onClick={() => navigate('/challenges')}>
+              Buddy huddles
+            </SecondaryButton>
             <button
               onClick={() => void exportData()}
               className="w-full text-center text-sm text-primary underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
@@ -633,6 +669,14 @@ export default function Progress() {
           </section>
         </div>
       ) : null}
+
+      <ShareMoment
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        payload={sharePayload}
+        userId={me.data?.id ?? null}
+        invitePath="/welcome"
+      />
     </div>
   );
 }

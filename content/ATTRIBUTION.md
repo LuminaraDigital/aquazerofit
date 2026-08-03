@@ -82,8 +82,20 @@ A lab-grade whole-food layer from **USDA FoodData Central (CC0)** is reserved
 Original seeded exercise entries were modelled on openly licensed community
 exercise data (CC-BY-SA 4.0 style attribution). Where a wger import reconciles
 and replaces a seed, the wger record's licence and author fields take
-precedence and are preserved as above. Demonstration media ships as placeholder
-artwork generated for this project until self-recorded media is produced.
+precedence and are preserved as above.
+
+Seed exercises without a demonstration image of their own fall back to
+AquaZeroFit's decorative category artwork. Where a reviewer has matched a seed
+to a movement wger already illustrates, the seed reuses that **already-mirrored
+wger image** rather than a new asset
+(`apps/api/src/data/media/adopted-upstream-manifest.json`; decisions recorded in
+`content/workout-media-review-log.md`). Those images remain wger records: their
+`licence`, `licenceAuthor`, `licenceUrl` and `is_ai_generated` values are read
+verbatim from `import-attribution.wger.json` at load time and are never
+re-authored, so the in-app "© {author}, {licence}, via wger.de" line and the AI
+disclosure stay accurate. Reuse does not give the seed a wger identity — the
+record keeps its own name, description and `sourceId`, and no `wgerUuid` is
+written.
 
 ## Recipes
 

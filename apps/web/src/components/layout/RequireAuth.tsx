@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import type { WellnessProfile } from '@aquazerofit/shared';
 import { tokenStore } from '../../lib/api';
+import { isTMA } from '../../lib/telegram';
 import { useProfile } from '../../lib/queries';
 import { PageSpinner } from '../ui/PageSpinner';
 import { ErrorState } from '../ui/ErrorState';
@@ -23,8 +24,10 @@ export function useProfileGate(): ProfileGate {
 }
 
 /**
- * Route guard: unauthenticated users go to /welcome (preserving the intended
- * path); authenticated users without a wellness profile go to /onboarding.
+ * Route guard: unauthenticated users go to the marketing landing page on the
+ * web, or straight to /welcome inside Telegram (where the Mini App carousel
+ * and its silent auto-login belong) — in both cases preserving the intended
+ * path; authenticated users without a wellness profile go to /onboarding.
  * Also hosts the toast viewport for the whole authenticated tree.
  */
 export function RequireAuth() {
@@ -35,7 +38,7 @@ export function RequireAuth() {
   if (!isAuthed) {
     return (
       <Navigate
-        to="/welcome"
+        to={isTMA() ? '/welcome' : '/landing'}
         replace
         state={{ from: `${location.pathname}${location.search}` }}
       />

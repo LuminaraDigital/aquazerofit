@@ -20,6 +20,10 @@ const FALLBACK_PREFIX = '/uploads/exercises/fallbacks/';
 
 type MediaStatus =
   | 'validWger'
+  // Mirrored wger media reused by a seed exercise that carries no wgerUuid of
+  // its own. Distinguished from validWger so the report never implies the
+  // record was reconciled against upstream.
+  | 'adoptedUpstream'
   | 'curated'
   | 'categoryFallback'
   | 'legacyPlaceholder'
@@ -219,7 +223,7 @@ function classifyExercise(
   if (sawMissingFile && !sawWger && !sawCurated && !sawFallback && !sawPlaceholder) {
     return 'missingFile';
   }
-  if (sawWger) return 'validWger';
+  if (sawWger) return exercise.wgerUuid ? 'validWger' : 'adoptedUpstream';
   if (sawCurated) return 'curated';
   if (sawFallback) return 'categoryFallback';
   if (sawPlaceholder) return 'legacyPlaceholder';
@@ -245,6 +249,7 @@ export function auditExerciseMedia(
 
   const countsByMediaStatus: Record<MediaStatus, number> = {
     validWger: 0,
+    adoptedUpstream: 0,
     curated: 0,
     categoryFallback: 0,
     legacyPlaceholder: 0,

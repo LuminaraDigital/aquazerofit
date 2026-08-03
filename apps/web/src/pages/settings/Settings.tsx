@@ -509,6 +509,28 @@ export default function Settings() {
                 chevron_right
               </span>
             </Link>
+            <Link
+              to="/challenges"
+              className="flex items-center justify-between p-4 border-t border-outline-variant/50 hover:bg-surface-container-high transition-colors group focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span
+                  className="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors"
+                  aria-hidden="true"
+                >
+                  groups
+                </span>
+                <div className="min-w-0">
+                  <span className="block text-base">Buddy huddles</span>
+                  <span className="block text-xs text-on-surface-variant">
+                    Invite friends to private accountability challenges.
+                  </span>
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-on-surface-variant" aria-hidden="true">
+                chevron_right
+              </span>
+            </Link>
             <button
               type="button"
               onClick={() => void onExport()}

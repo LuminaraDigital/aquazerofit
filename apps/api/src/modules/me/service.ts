@@ -17,6 +17,7 @@ import { config } from '../../platform/config';
 import { getStore, newId, type ContainerName } from '../../platform/store';
 import { revokeAllForUser, sha256Hex } from '../../platform/auth';
 import { computeTargets } from './targets';
+import { removeUserFromChallenges } from '../challenges/service';
 
 export type ProfileDoc = WellnessProfile & { id: string; type: 'wellnessProfile' };
 export type TargetsDoc = DerivedTargets & { id: string; type: 'derivedTargets' };
@@ -235,6 +236,27 @@ function scrubDetail(detail: unknown): unknown {
   return copy;
 }
 
+/**
+ * Growth telemetry keeps its identifiers outside `detail`, so scrubDetail
+ * cannot reach them: the challenge code sits in `props`, and the inviter
+ * reference and challenge code in `attribution`. Left alone they re-link a
+ * purged account to the huddles it joined and the person who invited it, which
+ * is precisely what anonymising the subject id is meant to prevent. The event
+ * itself survives — the aggregate is what the record is for.
+ */
+function scrubGrowthIdentifiers<T extends { id: string }>(doc: T): T {
+  const raw = doc as unknown as Record<string, unknown>;
+  if (raw.type !== 'growthEvent') return doc;
+
+  const props = { ...((raw.props as Record<string, unknown> | undefined) ?? {}) };
+  delete props.code;
+  const attribution = { ...((raw.attribution as Record<string, unknown> | undefined) ?? {}) };
+  attribution.ref = null;
+  attribution.challengeCode = null;
+
+  return { ...doc, props, attribution } as T;
+}
+
 export function purgeUser(userId: string): void {
   const store = getStore();
 
@@ -259,13 +281,21 @@ export function purgeUser(userId: string): void {
   for (const container of ['profiles', 'logs', 'plans', 'ai'] as ContainerName[]) {
     store.deleteWhere<{ id: string; userId?: string }>(container, (d) => d.userId === userId);
   }
+
+  // Buddy challenges live in `logs` but carry no top-level `userId`, so the
+  // sweep above cannot see them — membership has to be unwound explicitly.
+  removeUserFromChallenges(userId);
+
   for (const container of ['ledger', 'audit'] as ContainerName[]) {
     for (const doc of store.where<{ id: string; userId?: string; detail?: unknown }>(
       container,
       (d) => d.userId === userId,
     )) {
       // Anonymise the subject AND hash any raw identifiers left in detail.
-      store.upsert(container, { ...doc, userId: 'anonymised', detail: scrubDetail(doc.detail) });
+      store.upsert(
+        container,
+        scrubGrowthIdentifiers({ ...doc, userId: 'anonymised', detail: scrubDetail(doc.detail) }),
+      );
     }
   }
   revokeAllForUser(userId);

@@ -6,6 +6,13 @@ import type { Exercise, ExerciseMedia } from '@aquazerofit/shared';
 import { inspectImageBytes, isSafeStoredUpstreamImage } from './imageValidation';
 
 const MAX_ASSET_BYTES = 400 * 1024;
+/**
+ * Adopted upstream stills are already-mirrored wger binaries, so they are not
+ * held to the 1600x900 curated master format. They are still held to a mobile
+ * transfer budget — `validWgerMedia` alone would allow a 12 MB PNG onto a
+ * library card.
+ */
+const MAX_ADOPTED_UPSTREAM_BYTES = 600 * 1024;
 const SUPPORTED_EXTENSIONS = new Set(['.webp', '.png', '.jpg', '.jpeg']);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const EXERCISE_ID = /^ex-[a-z0-9][a-z0-9-]{0,119}$/i;
@@ -82,6 +89,7 @@ export interface CuratedMediaValidationOptions {
 
 export interface CuratedMediaResolutionOptions {
   exercisesRoot?: string;
+  adoptedUpstream?: AdoptedUpstreamMediaRegistry;
   categoryFallbacks?: Partial<Record<ExerciseCategory, ExerciseMedia[]>>;
   categoryFallbackAiGenerated?: Partial<Record<ExerciseCategory, boolean>>;
 }
@@ -122,6 +130,157 @@ export class CuratedMediaRegistry {
     return { media: entry.media, isAiGenerated: entry.isAiGenerated };
   }
 }
+
+/**
+ * Seed exercises that carry no wger identity of their own but that a reviewer
+ * has matched to an already-mirrored upstream image.
+ *
+ * This deliberately keys on the stable exercise id and does NOT write
+ * `wgerUuid` onto the record: `wgerUuid` is the wger importer's upsert key, so
+ * setting it would hand the seed's name, category, muscles, equipment and
+ * difficulty to the next import. Media reuse must not change exercise identity.
+ */
+export class AdoptedUpstreamMediaRegistry {
+  readonly size: number;
+  readonly #byExerciseId = new Map<string, Array<{ file: string; media: ExerciseMedia }>>();
+
+  constructor(entries: Array<{ exerciseId: string; assets: Array<{ file: string; media: ExerciseMedia }> }>) {
+    this.size = entries.length;
+    for (const entry of entries) this.#byExerciseId.set(entry.exerciseId, entry.assets);
+  }
+
+  /**
+   * Resolves only when every referenced binary is still present, in range and
+   * inside the exercises root. Fails closed to the category fallback so a wger
+   * re-sync that drops a file degrades instead of serving a broken image.
+   */
+  findForExercise(exerciseId: string, exercisesRoot: string): ExerciseMedia[] {
+    const assets = this.#byExerciseId.get(exerciseId);
+    if (!assets) return [];
+    const root = path.resolve(exercisesRoot);
+    for (const { file } of assets) {
+      if (!adoptedUpstreamFileUsable(root, file)) return [];
+    }
+    return assets.map(({ media }) => ({ ...media }));
+  }
+}
+
+function adoptedUpstreamFileUsable(exercisesRoot: string, file: string): boolean {
+  if (!safeAssetPath(file)) return false;
+  if (!SUPPORTED_EXTENSIONS.has(path.posix.extname(file).toLowerCase())) return false;
+  const absoluteFile = path.resolve(exercisesRoot, ...file.split('/'));
+  if (!isInsideRoot(exercisesRoot, absoluteFile)) return false;
+  try {
+    const stat = fs.lstatSync(absoluteFile);
+    if (
+      !stat.isFile() ||
+      stat.isSymbolicLink() ||
+      stat.size <= 0 ||
+      stat.size > MAX_ADOPTED_UPSTREAM_BYTES
+    ) {
+      return false;
+    }
+    return (
+      isSafeStoredUpstreamImage(absoluteFile) &&
+      isInsideRoot(fs.realpathSync(exercisesRoot), fs.realpathSync(absoluteFile))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Builds the registry from a reviewed exercise-id -> file mapping, taking every
+ * licence field verbatim from the wger import attribution manifest. Attribution
+ * is never authored here, so it cannot drift from the mirrored binaries
+ * (AQF-12). An entry whose attribution is missing is dropped.
+ */
+export function readAdoptedUpstreamMediaRegistry(
+  manifestFile = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'adopted-upstream-manifest.json',
+  ),
+  attributionFile = path.join(defaultExercisesRoot(), 'import-attribution.wger.json'),
+): AdoptedUpstreamMediaRegistry {
+  let manifest: unknown;
+  let attribution: unknown;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8')) as unknown;
+    attribution = JSON.parse(fs.readFileSync(attributionFile, 'utf8')) as unknown;
+  } catch {
+    return new AdoptedUpstreamMediaRegistry([]);
+  }
+  if (
+    !isPlainObject(manifest) ||
+    manifest.schemaVersion !== 1 ||
+    !Array.isArray(manifest.entries) ||
+    !isPlainObject(attribution) ||
+    !Array.isArray(attribution.images)
+  ) {
+    return new AdoptedUpstreamMediaRegistry([]);
+  }
+
+  const attributionByFile = new Map<string, Record<string, unknown>>();
+  for (const image of attribution.images) {
+    if (isPlainObject(image) && typeof image.file === 'string') {
+      attributionByFile.set(image.file, image);
+    }
+  }
+
+  const seen = new Set<string>();
+  const entries: Array<{
+    exerciseId: string;
+    assets: Array<{ file: string; media: ExerciseMedia }>;
+  }> = [];
+
+  for (const raw of manifest.entries) {
+    if (!isPlainObject(raw)) continue;
+    const exerciseId = typeof raw.exerciseId === 'string' ? raw.exerciseId.trim() : '';
+    const wgerUuid = typeof raw.wgerUuid === 'string' ? raw.wgerUuid.trim() : '';
+    if (!EXERCISE_ID.test(exerciseId) || !WGER_UUID.test(wgerUuid)) continue;
+    if (seen.has(exerciseId)) continue;
+    if (!Array.isArray(raw.files) || raw.files.length === 0 || raw.files.length > 2) continue;
+
+    const assets: Array<{ file: string; media: ExerciseMedia }> = [];
+    for (const candidate of raw.files) {
+      if (typeof candidate !== 'string') break;
+      const file = candidate.trim();
+      // The mapping must name a file the import manifest already attributes,
+      // inside the directory of the wger exercise it claims to come from.
+      const record = attributionByFile.get(`exercises/${file}`);
+      if (!record || record.wgerUuid !== wgerUuid) break;
+      if (!file.startsWith(`${wgerUuid}/`)) break;
+      const licenceAuthor =
+        typeof record.licenceAuthor === 'string' && record.licenceAuthor.trim().length > 0
+          ? record.licenceAuthor.trim()
+          : '';
+      const licence = typeof record.licence === 'string' ? record.licence.trim() : '';
+      if (!licence || !licenceAuthor) break;
+      const licenceUrl = typeof record.licenceUrl === 'string' ? record.licenceUrl.trim() : '';
+      assets.push({
+        file,
+        media: {
+          kind: 'image',
+          url: `${WGER_MEDIA_PREFIX}${file}`,
+          source: 'wger',
+          licence,
+          licenceAuthor,
+          ...(licenceUrl ? { licenceUrl } : {}),
+          attributionText: `© ${licenceAuthor}`,
+          isAiGenerated: record.isAiGenerated === true,
+        },
+      });
+    }
+    if (assets.length !== raw.files.length) continue;
+    seen.add(exerciseId);
+    entries.push({ exerciseId, assets });
+  }
+
+  return new AdoptedUpstreamMediaRegistry(entries);
+}
+
+export const DEFAULT_ADOPTED_UPSTREAM_MEDIA: AdoptedUpstreamMediaRegistry =
+  readAdoptedUpstreamMediaRegistry();
 
 function defaultExercisesRoot(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -521,6 +680,19 @@ export function applyCuratedMediaToExercise(
   const upstream = validWgerMedia(exercise, exercisesRoot);
   if (upstream.length > 0) {
     return upstream.length === exercise.media.length ? exercise : { ...exercise, media: upstream };
+  }
+
+  // A record's own upstream media always wins; adopted media only fills a gap.
+  const adopted = (options.adoptedUpstream ?? DEFAULT_ADOPTED_UPSTREAM_MEDIA).findForExercise(
+    exercise.id,
+    exercisesRoot,
+  );
+  if (adopted.length > 0) {
+    return {
+      ...exercise,
+      media: adopted,
+      isAiGeneratedMedia: adopted.some((item) => item.isAiGenerated) || undefined,
+    };
   }
 
   const curated = registry.findForExercise(exercise);

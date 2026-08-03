@@ -200,6 +200,292 @@ body {
     50% { transform: translateY(-4px); }
   }
 
+  /* ---- Akin interactive stage ---- */
+  .akin-bob {
+    animation: akin-float 4.5s ease-in-out infinite;
+    will-change: transform;
+  }
+  .akin-bob-fast {
+    animation-duration: 2.6s;
+  }
+  .akin-bob-off {
+    animation: none !important;
+  }
+  @keyframes akin-float {
+    0%, 100% { transform: translateY(0) rotate(-0.4deg); }
+    50% { transform: translateY(-10px) rotate(0.4deg); }
+  }
+  .akin-pose {
+    transition: opacity 0.48s ease, transform 0.48s ease;
+  }
+  .akin-pose-in {
+    animation: akin-pose-enter 0.5s ease both;
+  }
+  .akin-pose-out {
+    animation: akin-pose-exit 0.48s ease both;
+  }
+  @keyframes akin-pose-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes akin-pose-exit {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10px) scale(1.03);
+    }
+  }
+  .akin-stage-frame:active .akin-bob {
+    animation-play-state: paused;
+    transform: translateY(2px) scale(0.98);
+  }
+
+  /* ================================================================
+     Landing page (marketing surface, web only - never loaded in the
+     Telegram Mini App). Everything here is prefixed .lp- so it cannot
+     collide with the product UI above.
+     ================================================================ */
+
+  /* Scroll-triggered entrance. The element starts hidden and is revealed
+     by an IntersectionObserver adding .lp-in (see pages/landing/motion.tsx). */
+  .lp-reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: var(--lp-delay, 0ms);
+    will-change: opacity, transform;
+  }
+  .lp-reveal.lp-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Pointer-tracked 3D tilt. --lp-rx/--lp-ry are written from JS. */
+  .lp-tilt {
+    transform: perspective(1200px) rotateX(var(--lp-rx, 0deg)) rotateY(var(--lp-ry, 0deg))
+      translateZ(0);
+    transform-style: preserve-3d;
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .lp-tilt[data-active='true'] {
+    transition: transform 0.12s ease-out;
+  }
+
+  /* Cursor spotlight overlay - --lp-mx/--lp-my are written from JS. */
+  .lp-spot::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    background: radial-gradient(
+      340px circle at var(--lp-mx, 50%) var(--lp-my, 50%),
+      rgba(47, 217, 244, 0.16),
+      transparent 65%
+    );
+  }
+  .lp-spot:hover::before,
+  .lp-spot:focus-within::before {
+    opacity: 1;
+  }
+
+  /* Card surface for the landing sections - heavier than .glass-card so it
+     reads on a large viewport, with a hairline top highlight. */
+  .lp-card {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(47, 217, 244, 0.06) 0%, transparent 45%),
+      rgba(22, 29, 30, 0.62);
+    border: 1px solid rgba(138, 235, 255, 0.12);
+    @apply rounded-card;
+    box-shadow:
+      0 1px 0 0 rgba(138, 235, 255, 0.08) inset,
+      0 24px 48px -28px rgba(0, 0, 0, 0.75);
+    overflow: hidden;
+  }
+
+  .lp-card-hover {
+    transition:
+      border-color 0.4s ease,
+      box-shadow 0.4s ease,
+      transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .lp-card-hover:hover {
+    border-color: rgba(47, 217, 244, 0.32);
+    box-shadow:
+      0 1px 0 0 rgba(138, 235, 255, 0.14) inset,
+      0 32px 60px -30px rgba(0, 0, 0, 0.85),
+      0 0 40px -18px rgba(47, 217, 244, 0.5);
+  }
+
+  .lp-gradient-text {
+    background: linear-gradient(120deg, #8aebff 0%, #2fd9f4 42%, #45dfa4 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Perspective floor grid behind the hero. */
+  .lp-floor {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 46vh;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(138, 235, 255, 0.14) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(138, 235, 255, 0.14) 1px, transparent 1px);
+    background-size: 64px 64px;
+    transform: perspective(520px) rotateX(72deg);
+    transform-origin: bottom center;
+    mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent 72%);
+    -webkit-mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent 72%);
+    animation: lp-floor-drift 14s linear infinite;
+  }
+  @keyframes lp-floor-drift {
+    to {
+      background-position:
+        0 64px,
+        0 0;
+    }
+  }
+
+  /* Device mock: a real 3D transform, not a skewed image. */
+  .lp-stage {
+    perspective: 1600px;
+    perspective-origin: 50% 40%;
+  }
+  .lp-device {
+    transform-style: preserve-3d;
+    transform: rotateY(var(--lp-ry, -16deg)) rotateX(var(--lp-rx, 7deg));
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .lp-device[data-active='true'] {
+    transition: transform 0.15s ease-out;
+  }
+  /* Layers lifted off the device surface in Z so the parallax is genuine. */
+  .lp-layer-1 {
+    transform: translateZ(38px);
+  }
+  .lp-layer-2 {
+    transform: translateZ(68px);
+  }
+  .lp-layer-3 {
+    transform: translateZ(96px);
+  }
+
+  .lp-orbit {
+    animation: lp-spin 26s linear infinite;
+  }
+  .lp-orbit-reverse {
+    animation: lp-spin 34s linear infinite reverse;
+  }
+  @keyframes lp-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .lp-marquee {
+    display: flex;
+    width: max-content;
+    animation: lp-marquee 38s linear infinite;
+  }
+  .lp-marquee-track:hover .lp-marquee {
+    animation-play-state: paused;
+  }
+  @keyframes lp-marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  /* Vertical progress rail for the "how it works" steps. */
+  .lp-rail {
+    background: linear-gradient(
+      to bottom,
+      rgba(47, 217, 244, 0.9),
+      rgba(69, 223, 164, 0.55),
+      transparent
+    );
+    transform-origin: top;
+    transform: scaleY(0);
+    transition: transform 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .lp-in .lp-rail,
+  .lp-rail.lp-in {
+    transform: scaleY(1);
+  }
+
+  .lp-bubble {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+    transition:
+      opacity 0.55s ease,
+      transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: var(--lp-delay, 0ms);
+  }
+  .lp-in .lp-bubble {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Print: nothing may stay hidden behind an animation that will never run. */
+  @media print {
+    .lp-reveal,
+    .lp-bubble {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Honour the user's motion preference: no drift, no orbit, no marquee,
+     and reveals become immediate rather than animated. */
+  @media (prefers-reduced-motion: reduce) {
+    .lp-reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+    .lp-bubble {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+    .lp-rail {
+      transform: scaleY(1);
+      transition: none;
+    }
+    .lp-floor,
+    .lp-orbit,
+    .lp-orbit-reverse,
+    .lp-marquee {
+      animation: none;
+    }
+    .lp-tilt,
+    .lp-device {
+      transform: none;
+      transition: none;
+    }
+    .akin-bob,
+    .akin-pose-in,
+    .akin-pose-out {
+      animation: none !important;
+    }
+  }
+
   /* ---- Shimmer for skeletons ---- */
   .shimmer {
     background: linear-gradient(

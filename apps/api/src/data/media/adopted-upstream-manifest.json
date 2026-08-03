@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Assigns already-mirrored, per-record-attributed wger exercise images to seed exercises that have no upstream media of their own.",
+  "attributionSource": "apps/api/assets/exercises/import-attribution.wger.json",
+  "reviewedAt": "2026-08-04",
+  "entries": [
+    {
+      "exerciseId": "ex-decline-push-up",
+      "wgerUuid": "50037aaf-34f1-4018-b504-206623b77c46",
+      "wgerExerciseName": "Push-Ups | Decline",
+      "files": [
+        "50037aaf-34f1-4018-b504-206623b77c46/81f40bee-4adf-4317-8476-1a87706e3031.png"
+      ],
+      "note": "Anatomical render, feet elevated on bench; start and finish in one frame."
+    },
+    {
+      "exerciseId": "ex-reverse-lunge",
+      "wgerUuid": "616f9026-1a1d-4ed8-b068-cfbb81b6a000",
+      "wgerExerciseName": "Reverse lunges",
+      "files": [
+        "616f9026-1a1d-4ed8-b068-cfbb81b6a000/d0931eb3-8db0-4049-bb08-aa4036072056.jpg"
+      ],
+      "note": "Photographic four-frame sequence; matches the bodyweight reverse lunge."
+    },
+    {
+      "exerciseId": "ex-chair-dip",
+      "wgerUuid": "7c8eb1ac-2d7e-4ca7-919a-1848ba38e0f4",
+      "wgerExerciseName": "Dips Between Two Benches",
+      "files": [
+        "7c8eb1ac-2d7e-4ca7-919a-1848ba38e0f4/e543fb73-06d0-4e1b-8645-d5706da9504a.png"
+      ],
+      "note": "Line drawing of a bench dip; seed lists a bench as the required equipment."
+    },
+    {
+      "exerciseId": "ex-db-goblet-squat",
+      "wgerUuid": "b7c6a444-90ea-4f5b-9fea-748311606eaa",
+      "wgerExerciseName": "Dumbbell Goblet Squat",
+      "files": [
+        "b7c6a444-90ea-4f5b-9fea-748311606eaa/1c052351-2af0-4227-aeb0-244008e4b0a8.jpeg"
+      ],
+      "note": "Photograph holding a single dumbbell at chest height; start and finish shown."
+    },
+    {
+      "exerciseId": "ex-db-romanian-deadlift",
+      "wgerUuid": "65d12ecf-54b8-466d-a412-e55c396cad69",
+      "wgerExerciseName": "Dumbbell Romanian Deadlift",
+      "files": [
+        "65d12ecf-54b8-466d-a412-e55c396cad69/0306c8c0-70cc-45d4-92de-6fa72ceaa834.webp"
+      ],
+      "note": "Anatomical render, hinge and lockout with dumbbells; 1200x630 fits the media box."
+    },
+    {
+      "exerciseId": "ex-db-bench-press",
+      "wgerUuid": "e4966cb8-9089-4595-9c78-99a27821e6ff",
+      "wgerExerciseName": "Dumbbell Floor Press",
+      "files": [
+        "e4966cb8-9089-4595-9c78-99a27821e6ff/91dd5a95-1c45-46f2-a074-de41b6ad599b.jpg"
+      ],
+      "note": "Photograph of a floor press with knees bent; matches the seed name and equipment."
+    },
+    {
+      "exerciseId": "ex-db-overhead-triceps",
+      "wgerUuid": "19133a0d-e6b2-4d57-8a84-8aac3d962a99",
+      "wgerExerciseName": "Triceps Overhead (Dumbbell)",
+      "files": [
+        "19133a0d-e6b2-4d57-8a84-8aac3d962a99/ebf88217-df26-4ef7-94cb-f0c2220c6abe.webp"
+      ],
+      "note": "Anatomical render, two-handed dumbbell overhead extension, triceps highlighted."
+    },
+    {
+      "exerciseId": "ex-db-lateral-raise",
+      "wgerUuid": "63375f5b-2d81-471c-bea4-fc3d207e96cb",
+      "wgerExerciseName": "Lateral Raises",
+      "files": [
+        "63375f5b-2d81-471c-bea4-fc3d207e96cb/239d43a2-b86f-4dc7-aab2-27c8c2f7de47.png"
+      ],
+      "note": "Line drawing at the top of the raise (arms at shoulder height), not the rest position."
+    },
+    {
+      "exerciseId": "ex-plank",
+      "wgerUuid": "c9e57bbe-e839-44c6-861d-1c8dd2845e36",
+      "wgerExerciseName": "Plank",
+      "files": [
+        "c9e57bbe-e839-44c6-861d-1c8dd2845e36/e13f92a4-69ae-4043-ae1f-70f155a53024.png"
+      ],
+      "note": "Forearm plank illustration with a neutral spine; 1800x656 crops cleanly."
+    },
+    {
+      "exerciseId": "ex-russian-twist",
+      "wgerUuid": "10510fb5-6ebd-4ddc-b03e-423b15deceea",
+      "wgerExerciseName": "Russian Twist",
+      "files": [
+        "10510fb5-6ebd-4ddc-b03e-423b15deceea/70ca5d80-3847-4a8c-8882-c6e9e485e29e.png"
+      ],
+      "note": "Anatomical render of a seated twist. Depicts an optional medicine ball; seed lists no equipment."
+    },
+    {
+      "exerciseId": "ex-leg-raise",
+      "wgerUuid": "9e34bc01-9cec-4ee2-a9bb-9c937a471c24",
+      "wgerExerciseName": "Leg Raises, Lying",
+      "files": [
+        "9e34bc01-9cec-4ee2-a9bb-9c937a471c24/7cd81b4a-15f1-464d-96db-c2f01152fb04.png"
+      ],
+      "note": "Line drawing at the top of the lying leg raise, lower back flat."
+    },
+    {
+      "exerciseId": "ex-jumping-jacks",
+      "wgerUuid": "4d255f25-f199-401a-bc81-7ffab1d0ed24",
+      "wgerExerciseName": "Jumping Jacks",
+      "files": [
+        "4d255f25-f199-401a-bc81-7ffab1d0ed24/6c9124b6-3551-47a8-9c22-20141c8b9c53.png"
+      ],
+      "note": "Line drawing, closed and open positions. Upstream flags this as AI-generated; disclosure is preserved."
+    },
+    {
+      "exerciseId": "ex-hip-flexor-stretch",
+      "wgerUuid": "0cf08c73-6af3-4852-97a5-1dff53531971",
+      "wgerExerciseName": "Hip Flexor Stretch",
+      "files": [
+        "0cf08c73-6af3-4852-97a5-1dff53531971/767631e5-10d2-46b8-b03f-cc298f96963b.png"
+      ],
+      "note": "Photograph of a half-kneeling hip flexor stretch on a mat."
+    },
+    {
+      "exerciseId": "ex-worlds-greatest-stretch",
+      "wgerUuid": "558b3385-f1a2-47d2-8473-e1be2c7726aa",
+      "wgerExerciseName": "Lunge with Twist Stretch",
+      "files": [
+        "558b3385-f1a2-47d2-8473-e1be2c7726aa/446e7065-215d-4a91-9da7-9416101442bb.png"
+      ],
+      "note": "Photograph of a half-kneeling lunge with thoracic rotation."
+    }
+  ]
+}

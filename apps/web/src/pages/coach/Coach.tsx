@@ -1,10 +1,10 @@
 /**
- * Aqua Coach — pixel reference: coach_ai_assistant.
+ * Aqua Coach - pixel reference: coach_ai_assistant.
  * Most-recent session bootstrap (GET/POST /chat/sessions), streaming replies
  * via streamChat() with a typing indicator, tool-result GlassCards, suggested
  * prompt chips, persistent wellness disclaimer, supportive safety frames
  * (never alarm-styled), report flow, and a minimal safe markdown renderer
- * (bold + bullets — no dangerouslySetInnerHTML).
+ * (bold + bullets - no dangerouslySetInnerHTML).
  */
 import {
   Fragment,
@@ -18,7 +18,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ChatMessage, ChatSession, ChatToolCall } from '@aquazerofit/shared';
-import { WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
+import { AQUA_CHARACTER, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
 import { api, ApiError, streamChat } from '@/lib/api';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -29,6 +29,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
 import { BottomSheet } from '@/pages/training/BottomSheet';
+import { AquaMascot } from '@/components/brand/AquaMascot';
+import { AkinStage } from '@/components/brand/AkinStage';
 
 const SUGGESTED_PROMPTS = [
   'What should I eat tonight?',
@@ -140,11 +142,11 @@ function CoachAvatar() {
     <div className="flex items-center gap-2">
       <div
         aria-hidden="true"
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/40 bg-primary/20 shadow-[0_0_10px_rgba(138,235,255,0.35)]"
+        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-primary/40 bg-primary/20 shadow-[0_0_10px_rgba(138,235,255,0.35)]"
       >
-        <span className="material-symbols-outlined text-[18px] text-primary">smart_toy</span>
+        <AquaMascot size="sm" decorative className="scale-110" />
       </div>
-      <span className="text-sm text-on-surface-variant">Aqua Coach</span>
+      <span className="text-sm text-on-surface-variant">{AQUA_CHARACTER.name}</span>
     </div>
   );
 }
@@ -228,12 +230,12 @@ export default function Coach() {
       setPendingUser(text);
       setStreaming(true);
       setStreamText('');
-      setLiveNote('Aqua Coach is replying');
+      setLiveNote(`${AQUA_CHARACTER.name} is replying`);
       try {
         await streamChat(sessionId, text, (token) => {
           setStreamText((s) => s + token);
         });
-        setLiveNote('Aqua Coach has replied');
+        setLiveNote(`${AQUA_CHARACTER.name} has replied`);
         await queryClient.invalidateQueries({ queryKey: ['chat', 'messages', sessionId] });
         void queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] });
       } catch (e) {
@@ -242,7 +244,7 @@ export default function Coach() {
             ? e.body.message
             : 'The coach is unavailable right now. Please try again in a moment.';
         // Safety blocks are persisted server-side as supportive assistant
-        // messages, so the refetch below already surfaces them — adding a
+        // messages, so the refetch below already surfaces them - adding a
         // frame too would show the refusal twice.
         const persistedByServer =
           e instanceof ApiError && (e.code === 'SAFETY_INPUT' || e.code === 'SAFETY_OUTPUT');
@@ -290,7 +292,7 @@ export default function Coach() {
       api<void>(`/chat/messages/${messageId}/report`, { method: 'POST' }),
     onSuccess: () => {
       setMenuFor(null);
-      toast.success('Thanks — this response has been reported for review.');
+      toast.success('Thanks - this response has been reported for review.');
       void queryClient.invalidateQueries({ queryKey: ['chat', 'messages', sessionId] });
     },
     onError: () => toast.error('Could not report the message. Please try again.'),
@@ -306,7 +308,7 @@ export default function Coach() {
   return (
     <div className="flex min-h-screen w-full flex-col">
       <AppHeader
-        title="Aqua Coach"
+        title={AQUA_CHARACTER.title}
         right={
           <div className="flex items-center gap-1">
             <Link
@@ -333,7 +335,7 @@ export default function Coach() {
         }
       />
 
-      {/* persistent wellness disclaimer (AQF-11) — sits below the sticky header,
+      {/* persistent wellness disclaimer (AQF-11) - sits below the sticky header,
           not competing with it for the same top-0 slot */}
       <div className="sticky top-[65px] z-30 bg-surface/90 px-container-margin py-2 backdrop-blur-md">
         <div className="flex items-center gap-3 rounded-card border border-outline-variant bg-surface-container-low/60 p-3">
@@ -371,18 +373,13 @@ export default function Coach() {
           <>
             {showEmpty && (
               <div className="mt-4 flex flex-col items-center gap-4 text-center">
-                <div
-                  aria-hidden="true"
-                  className="flex h-16 w-16 items-center justify-center rounded-full border border-primary/40 bg-primary/15 shadow-[0_0_20px_rgba(138,235,255,0.35)]"
-                >
-                  <span className="material-symbols-outlined text-3xl text-primary">smart_toy</span>
-                </div>
+                <AkinStage size="lg" showCaption={false} className="mx-auto" />
                 <div>
                   <h2 className="heading-display font-heading text-2xl text-on-surface">
-                    Hi, I'm Aqua Coach
+                    Hi, I'm {AQUA_CHARACTER.name}
                   </h2>
                   <p className="mt-1 text-sm text-on-surface-variant">
-                    Ask me about your nutrition, training or progress.
+                    {AQUA_CHARACTER.tagline} Ask me about your nutrition, training or progress.
                   </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -481,7 +478,7 @@ export default function Coach() {
                   {streamText ? (
                     renderMarkdown(streamText)
                   ) : (
-                    <span className="flex items-center gap-1.5" aria-label="Aqua Coach is typing">
+                    <span className="flex items-center gap-1.5" aria-label={`${AQUA_CHARACTER.name} is typing`}>
                       {[0, 1, 2].map((i) => (
                         <span
                           key={i}
@@ -496,7 +493,7 @@ export default function Coach() {
               </div>
             )}
 
-            {/* supportive system frames (safety / availability) — calm styling */}
+            {/* supportive system frames (safety / availability) - calm styling */}
             {frames.map((f) => (
               <div key={f.id} className="flex max-w-[90%] flex-col gap-2 self-start">
                 <CoachAvatar />
@@ -540,7 +537,7 @@ export default function Coach() {
         </div>
       </BottomSheet>
 
-      {/* ---- input bar — sits above the bottom nav ---- */}
+      {/* ---- input bar - sits above the bottom nav ---- */}
       <div className="sticky bottom-0 z-30 bg-gradient-to-t from-surface via-surface to-transparent px-container-margin pb-20 pt-2">
         <form
           onSubmit={(e) => {
@@ -550,13 +547,13 @@ export default function Coach() {
           className="glass-card flex items-center gap-2 rounded-card p-2 focus-within:border-primary focus-within:shadow-[0_0_15px_rgba(138,235,255,0.2)]"
         >
           <label htmlFor="coach-input" className="sr-only">
-            Message Aqua Coach
+            Message {AQUA_CHARACTER.name}
           </label>
           <input
             id="coach-input"
             type="text"
             maxLength={4000}
-            placeholder="Ask Aqua Coach…"
+            placeholder={`Ask ${AQUA_CHARACTER.name}…`}
             value={input}
             disabled={streaming || sessionId === ''}
             onChange={(e) => setInput(e.target.value)}

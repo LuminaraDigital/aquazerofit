@@ -1,0 +1,36 @@
+# Line endings
+#
+# The repository stores LF and checks out LF on every platform. Without this,
+# each collaborator's local core.autocrlf decides how files are normalised, so
+# the same edit produces a whole-file diff on one machine and none on another.
+* text=auto eol=lf
+
+# Windows-only helper scripts, if any are added later, must keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets — never normalise, never diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+
+# Generated: collapsed by default in pull-request diffs and excluded from the
+# repository language statistics.
+package-lock.json linguist-generated=true
+tools/docgen/package-lock.json linguist-generated=true
+
+# Documentation and design assets are not the codebase — keep GitHub's language
+# breakdown reflecting the actual source.
+docs/** linguist-documentation=true
+design/** linguist-documentation=true
+content/** linguist-documentation=true

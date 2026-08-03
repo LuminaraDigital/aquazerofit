@@ -1,0 +1,55 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        **Do not report security vulnerabilities here.** See
+        [SECURITY.md](../blob/HEAD/SECURITY.md) for private disclosure.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Sign in as demo@aquazero.fit
+        2. Go to Nutrition → Capture meal
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - Web app (apps/web)
+        - Telegram Mini App
+        - API (apps/api)
+        - Build / tooling
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: The commit SHA, or the `version` field from `/health`.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Logs or screenshots
+      description: >-
+        Redact anything personal. Never paste API keys, tokens or another
+        person's health data.

@@ -1,0 +1,49 @@
+node_modules/
+dist/
+build/
+coverage/
+*.local
+
+# Secrets - never commit environment files with real keys
+.env
+.env.*
+!.env.example
+
+# AI coding-assistant workspaces. These are developer-local scratch state, not
+# product code. Previously clean only because of a machine-local global ignore,
+# which does not travel with a clone.
+.claude/
+.cursor/
+.windsurf/
+.aider*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Microsoft Office lock/owner files, created whenever a .docx in docs/specs is
+# open in Word. They are transient local state, not deliverables.
+~$*
+
+# App data & uploads (runtime-generated)
+apps/api/.data/
+apps/api/uploads/
+*.tsbuildinfo
+
+# Logs & tool caches
+*.log
+npm-debug.log*
+.vite/
+.turbo/
+node_modules/.cache/
+
+# Generated documents at root — regenerate with tools/docgen.
+# Anchored so the deliverable set in docs/specs/ is still tracked.
+/*.docx

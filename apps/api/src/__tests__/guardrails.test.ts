@@ -103,6 +103,44 @@ describe('NumericRules.check (rules a model cannot be trusted to respect)', () =
   it('accepts sane macro figures', () => {
     expect(NumericRules.check('Around 120 g of protein and 60 g of fat fits your targets.').ok).toBe(true);
   });
+
+  // Regression: a remaining-budget readout below the floor is normal any time a
+  // user has eaten more than target - floor. Treating it as advised intake made
+  // post() block the turn and answer a benign question with the eating-disorder
+  // signpost. The floor still applies to anything prescriptive.
+  it('does not flag a remaining-calorie readout below the floor', () => {
+    const readouts = [
+      "You've had 954 kcal so far. You have around 1135 calories left for today.",
+      'Nice work — that leaves you about 1135 kcal to play with before dinner.',
+      'You have about 900 kcal remaining today.',
+      'That is around 1100 calories to go before you hit your target.',
+    ];
+    for (const text of readouts) {
+      expect(NumericRules.check(text).ok, text).toBe(true);
+      expect(post(text).blocked, text).toBe(false);
+    }
+  });
+
+  it('still flags hedged advice that is not a remaining-budget readout', () => {
+    for (const text of [
+      'Try eating around 900 kcal a day to speed things up.',
+      'Something about 800 calories daily would get you there faster.',
+    ]) {
+      expect(NumericRules.check(text).ok, text).toBe(false);
+      expect(NumericRules.check(text).violations[0]?.rule, text).toBe('kcalFloor');
+    }
+  });
+
+  it('still flags directive sub-floor advice regardless of nearby wording', () => {
+    for (const text of [
+      'Stick to 1000 kcal and you will have plenty left over.',
+      'Limit yourself to 800 calories for the remaining days.',
+      'Aim for around 1100 kcal per day.',
+    ]) {
+      expect(NumericRules.check(text).ok, text).toBe(false);
+      expect(NumericRules.check(text).violations[0]?.rule, text).toBe('kcalFloor');
+    }
+  });
 });
 
 describe('guardrails.post (output filter)', () => {

@@ -346,8 +346,37 @@ export interface NumericRuleViolation {
   detail: string;
 }
 
-const KCAL_ADVICE =
-  /\b(?:aim\s+for|target|eat|stick\s+to|limit\s+(?:yourself\s+)?to|reduce\s+(?:intake\s+)?to|drop\s+to|only\s+eat|cap\s+(?:it\s+)?at|around|about)\b[^.\n]{0,40}?\b(\d{3,4})\s*(?:k?cal(?:orie)?s?|calory)\b/gi;
+// The kcal floor must catch a model *prescribing* a sub-floor intake without
+// firing on the app's own arithmetic. Reporting a remaining budget ("you have
+// around 1135 kcal left") is normal any time a user has eaten more than
+// target - floor, i.e. most evenings; treating it as advice replaced a routine
+// answer with the eating-disorder signpost (see the regression cases in
+// guardrails.test.ts). So the triggers are split by force.
+
+/** Directive phrasing: unconditionally advice, whatever the surrounding text. */
+const KCAL_DIRECTIVE =
+  /\b(?:aim\s+for|target|eat|stick\s+to|limit\s+(?:yourself\s+)?to|reduce\s+(?:intake\s+)?to|drop\s+to|only\s+eat|cap\s+(?:it\s+)?at)\b[^.\n]{0,40}?\b(\d{3,4})\s*(?:k?cal(?:orie)?s?|calory)\b/gi;
+
+/**
+ * Hedges. "around 900 kcal a day" is still advice, but "around 1135 kcal left"
+ * is a budget readout, so a hedge only counts when its sentence is not
+ * reporting what remains.
+ */
+const KCAL_HEDGE =
+  /\b(?:around|about)\b[^.\n]{0,40}?\b(\d{3,4})\s*(?:k?cal(?:orie)?s?|calory)\b/gi;
+
+/** Remaining-budget phrasing that makes a hedged figure a readout, not advice. */
+const REMAINING_BUDGET = /\b(?:left|remaining|remains|leftover|to\s+go|leaves?\s+you)\b/i;
+
+/** The sentence containing `index`, used to judge a hedge in context. */
+function sentenceAround(text: string, index: number): string {
+  const start = Math.max(...['.', '\n', '!', '?'].map((c) => text.lastIndexOf(c, index)), -1) + 1;
+  const ends = ['.', '\n', '!', '?']
+    .map((c) => text.indexOf(c, index))
+    .filter((i) => i !== -1);
+  const end = ends.length ? Math.min(...ends) : text.length;
+  return text.slice(start, end);
+}
 const MACRO_CLAIM = /\b(\d{2,5})\s*g(?:rams)?\s+(?:of\s+)?(protein|carbs?|carbohydrates?|fat)\b/gi;
 
 const MACRO_MAX: Record<string, number> = { protein: 400, carbs: 1200, fat: 350 };
@@ -356,16 +385,25 @@ export const NumericRules = {
   check(text: string): { ok: boolean; violations: NumericRuleViolation[] } {
     const violations: NumericRuleViolation[] = [];
 
-    KCAL_ADVICE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = KCAL_ADVICE.exec(text)) !== null) {
+    const flagged = new Set<number>();
+    const flagKcal = (m: RegExpExecArray) => {
       const kcal = Number(m[1]);
-      if (kcal > 0 && kcal < KCAL_FLOOR.unspecified) {
-        violations.push({
-          rule: 'kcalFloor',
-          detail: `advised intake ${kcal} kcal is below the ${KCAL_FLOOR.unspecified} kcal safety floor`,
-        });
-      }
+      if (kcal <= 0 || kcal >= KCAL_FLOOR.unspecified || flagged.has(m.index)) return;
+      flagged.add(m.index);
+      violations.push({
+        rule: 'kcalFloor',
+        detail: `advised intake ${kcal} kcal is below the ${KCAL_FLOOR.unspecified} kcal safety floor`,
+      });
+    };
+
+    KCAL_DIRECTIVE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = KCAL_DIRECTIVE.exec(text)) !== null) flagKcal(m);
+
+    KCAL_HEDGE.lastIndex = 0;
+    while ((m = KCAL_HEDGE.exec(text)) !== null) {
+      if (REMAINING_BUDGET.test(sentenceAround(text, m.index))) continue;
+      flagKcal(m);
     }
 
     MACRO_CLAIM.lastIndex = 0;

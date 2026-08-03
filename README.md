@@ -10,6 +10,25 @@ AI-powered wellness platform under the **AquaZero** brand. Users build a wellnes
 
 One React codebase delivers **two targets**: a responsive web application (the assessed surface) and a **Telegram Mini App** (theme binding + native controls when launched inside Telegram).
 
+## The product
+
+Captured from the running application (`npm run api` + `npm run dev`) signed in as the
+seeded demo account — not mockups. Design references for each screen live in
+`design/figma/`.
+
+| Dashboard | Nutrition | Aqua Coach |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/03-dashboard.png" alt="Home dashboard showing calories remaining, macro split and hydration" width="240"> | <img src="docs/screenshots/04-nutrition.png" alt="Nutrition day view with calorie ring, macro targets and per-meal logging" width="240"> | <img src="docs/screenshots/07-coach.png" alt="Aqua Coach chat grounded in today's nutrition, workout and plan context" width="240"> |
+| Deterministic calorie maths, macro split and hydration for the day | Per-meal logging with a searchable food corpus and day navigation | Conversational coach grounded in the user's real context, with the wellness boundary always visible |
+
+| AI meal plan | Workout library | Progress |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/06-meal-plan.png" alt="AI generated meal plan matched to calorie and macro targets" width="240"> | <img src="docs/screenshots/08-workouts.png" alt="Workout library browsing the attributed exercise corpus" width="240"> | <img src="docs/screenshots/09-progress.png" alt="Progress view with weight journey chart and calorie trend" width="240"> |
+| Suggestions generated against the user's targets and allergen exclusions | Exercise corpus with per-record licence attribution preserved | Weight journey and calorie trend over 7/30/90 days |
+
+Also captured: [welcome](docs/screenshots/01-welcome.png), [sign-in](docs/screenshots/02-sign-in.png),
+[meal photo capture](docs/screenshots/05-capture-meal.png) and [settings](docs/screenshots/10-settings.png).
+
 ## Repository layout
 
 ```

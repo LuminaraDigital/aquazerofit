@@ -123,7 +123,13 @@ export function createApp() {
     // Client-side routing: deep links like /nutrition/analysis/:id must return
     // the shell. Only GET/HEAD, and only when the client actually wants HTML —
     // an errant fetch for a missing JSON resource should get a 404, not markup.
-    app.get('*', (req, res, next) => {
+    //
+    // Pathless app.use rather than app.get('*'): Express 5 moved to
+    // path-to-regexp v8, which rejects the bare '*' outright ("Missing
+    // parameter name at index 1") and takes the whole server down at boot. A
+    // pathless use matches every path on both 4 and 5, and the method guard
+    // below already does what app.get was contributing.
+    app.use((req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();
       if (req.path.startsWith(config.basePath) || req.path.startsWith('/uploads')) return next();
       if (!req.accepts('html')) return next();

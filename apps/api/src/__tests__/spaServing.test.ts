@@ -10,6 +10,12 @@
  *
  * A fixture directory is used rather than the real apps/web/dist so the
  * behaviour is identical whether or not the developer has run a web build.
+ *
+ * The fallback is registered as a pathless `app.use`, never `app.get('*')`.
+ * Express 5 moved to path-to-regexp v8, which rejects a bare '*' and throws
+ * at route-registration time — so the old form did not merely fail to match,
+ * it took the whole server down on boot. `assertNoBareWildcardRoute` below
+ * pins that, because the failure only shows up on a dependency bump.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -43,6 +49,22 @@ describe('SPA hosting enabled', () => {
   beforeAll(() => {
     process.env.WEB_DIST_DIR = fixtureDir;
     delete process.env.SERVE_WEB;
+  });
+
+  /**
+   * REGRESSION: `app.get('*')` boots fine on Express 4 and throws on Express 5
+   * ("Missing parameter name at index 1"), so a dependency bump turned a
+   * working server into one that could not start. Asserting on the registered
+   * route stack catches the reintroduction on the version we run today,
+   * instead of waiting for the upgrade to fail.
+   */
+  it('registers the SPA fallback without a bare wildcard path', () => {
+    const app = createApp();
+    const stack = (app as unknown as { _router?: { stack: { route?: { path?: unknown } }[] } })
+      ._router?.stack;
+    expect(stack).toBeDefined();
+    const bareWildcards = stack!.filter((layer) => layer.route?.path === '*');
+    expect(bareWildcards).toHaveLength(0);
   });
 
   it('serves the shell at the root', async () => {

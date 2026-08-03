@@ -8,10 +8,19 @@ updates:
     open-pull-requests-limit: 5
     groups:
       # One PR per ecosystem-wide bump rather than a dozen; CI still gates each.
+      #
+      # Majors are deliberately excluded from the groups so they arrive as
+      # their own PRs. Grouping them together meant a single major needing a
+      # real migration (react-router 6 -> 7) held every security patch in the
+      # same PR hostage behind work nobody had scheduled — the group went red
+      # and stayed red. Patches and minors now merge on their own schedule;
+      # each major gets its own PR and its own migration.
       dev-dependencies:
         dependency-type: development
+        update-types: ['minor', 'patch']
       production-dependencies:
         dependency-type: production
+        update-types: ['minor', 'patch']
 
   # Outside the workspaces on purpose (see tools/docgen/package.json).
   - package-ecosystem: npm

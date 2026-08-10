@@ -37,7 +37,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/multer": "^2.0.0",
     "@types/node": "^20.14.0",
-    "@types/pg": "^8.11.10",
+    "@types/pg": "^8.20.4",
     "@types/supertest": "^6.0.2",
     "supertest": "^7.0.0",
     "typescript": "^5.5.4",

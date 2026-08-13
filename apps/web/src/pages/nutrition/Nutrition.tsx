@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type {
@@ -21,6 +21,10 @@ import { useToast } from '@/components/ui/Toast';
 import { MacroBar } from '../dashboard/MacroBar';
 import { WaterCard } from '../dashboard/WaterCard';
 import { BarcodeSheet } from './BarcodeSheet';
+import { CircularMacroRing } from '@/components/ui/CircularMacroRing';
+import { AquaCalendarPicker, type DayStatus } from '@/components/ui/AquaCalendarPicker';
+import { AquaStatusline } from '@/components/ui/AquaStatusline';
+import { useDeepLinkRouter } from '@/lib/deeplink';
 import {
   MEAL_ICON,
   MEAL_LABEL,
@@ -128,11 +132,15 @@ export function FoodSearchSheet({
   title,
   onClose,
   onPick,
+  pending = false,
 }: {
   open: boolean;
   title?: string;
   onClose: () => void;
   onPick: (item: MealLogItem) => void;
+  /** True while the caller's log mutation is in flight — disables Add so a
+   *  double-tap cannot submit twice. */
+  pending?: boolean;
 }) {
   const [term, setTerm] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -287,10 +295,11 @@ export function FoodSearchSheet({
             )}
             <button
               type="button"
-              onClick={() => preview && onPick(preview)}
-              className="cta-gradient w-full h-14 rounded-xl text-on-primary font-bold active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              onClick={() => preview && !pending && onPick(preview)}
+              disabled={pending || !preview}
+              className="cta-gradient w-full h-14 rounded-xl text-on-primary font-bold active:scale-[0.98] transition-transform disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
-              Add {grams}g
+              {pending ? 'Adding…' : `Add ${grams}g`}
             </button>
           </div>
         )}
@@ -323,14 +332,32 @@ export default function Nutrition() {
   const queryClient = useQueryClient();
   const { show } = useToast();
 
+  useDeepLinkRouter(navigate);
+
   const today = todayLocalDate();
   const [date, setDate] = useState(today);
   const isToday = date === today;
 
   const [addSheetMeal, setAddSheetMeal] = useState<MealType | null>(null);
   const [barcodeOpen, setBarcodeOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [showStatusline, setShowStatusline] = useState(false);
+  const [microOpen, setMicroOpen] = useState(false);
+  const [macroRingMode, setMacroRingMode] = useState<'concentric' | 'single'>('concentric');
   const [editingLog, setEditingLog] = useState<MealLog | null>(null);
-  const [editItems, setEditItems] = useState<MealLogItem[]>([]);
+  // Each editable row keeps the ORIGINAL logged item beside the shown one, so
+  // rescaling stays anchored to the right food even after a sibling row is
+  // removed (an index lookup into the unfiltered list rebased onto the wrong
+  // item once a row above it was deleted).
+  const [editRows, setEditRows] = useState<{ original: MealLogItem; current: MealLogItem }[]>([]);
+
+  // One idempotency key per sheet opening, not per request: a double-tap on
+  // Add re-sends the SAME key, which the API replays instead of double-logging
+  // (same pattern as LogWeight). Regenerated whenever a log sheet opens.
+  const addKeyRef = useRef(newIdempotencyKey());
+  useEffect(() => {
+    if (addSheetMeal !== null || barcodeOpen) addKeyRef.current = newIdempotencyKey();
+  }, [addSheetMeal, barcodeOpen]);
 
   const dailyQuery = useQuery({
     queryKey: ['nutrition', 'daily', date],
@@ -341,6 +368,12 @@ export default function Nutrition() {
     queryFn: () => api<TrendsResponse>('/analytics/nutrition/trends', { query: { range: '7d' } }),
   });
 
+  const yesterdayDate = shiftLocalDate(date, -1);
+  const yesterdayQuery = useQuery({
+    queryKey: ['nutrition', 'daily', yesterdayDate],
+    queryFn: () => api<DailyNutrition>('/analytics/nutrition/daily', { query: { date: yesterdayDate } }),
+  });
+
   const daily = dailyQuery.data;
 
   const invalidateLogs = () => {
@@ -348,12 +381,46 @@ export default function Nutrition() {
     void queryClient.invalidateQueries({ queryKey: ['progress'] });
   };
 
+  const copyYesterdayMeals = useMutation({
+    mutationFn: async () => {
+      const prevDaily = yesterdayQuery.data;
+      if (!prevDaily) throw new Error("Yesterday's nutrition data not loaded");
+      const promises: Promise<unknown>[] = [];
+      for (const mt of MEAL_TYPES) {
+        const logs = prevDaily.meals[mt] ?? [];
+        for (const log of logs) {
+          if (log.items.length > 0) {
+            promises.push(
+              api('/meal-logs', {
+                method: 'POST',
+                body: { mealType: mt, items: log.items, localDate: date },
+                idempotencyKey: newIdempotencyKey(),
+              }),
+            );
+          }
+        }
+      }
+      if (promises.length === 0) {
+        throw new Error('No logged meals found from yesterday to copy');
+      }
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      show("Copied yesterday's meals!");
+      invalidateLogs();
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Could not copy yesterday's meals";
+      show(msg);
+    },
+  });
+
   const addMeal = useMutation({
     mutationFn: ({ mealType, item }: { mealType: MealType; item: MealLogItem }) =>
       api('/meal-logs', {
         method: 'POST',
         body: { mealType, items: [item], localDate: date },
-        idempotencyKey: newIdempotencyKey(),
+        idempotencyKey: addKeyRef.current,
       }),
     onSuccess: () => {
       setAddSheetMeal(null);
@@ -367,7 +434,11 @@ export default function Nutrition() {
     mutationFn: (log: MealLog) =>
       api(`/meal-logs/${log.id}`, {
         method: 'PUT',
-        body: { mealType: log.mealType, items: editItems, localDate: log.localDate },
+        body: {
+          mealType: log.mealType,
+          items: editRows.map((r) => r.current),
+          localDate: log.localDate,
+        },
       }),
     onSuccess: () => {
       setEditingLog(null);
@@ -389,14 +460,78 @@ export default function Nutrition() {
   const kcalTrend = trendsQuery.data?.kcal ?? [];
   const maxTrend = Math.max(1, ...kcalTrend.map((p) => p.value));
 
-  const totalLoggedMeals = useMemo(() => {
-    if (!daily) return 0;
-    return MEAL_TYPES.reduce((acc, mt) => acc + (daily.meals[mt]?.length ?? 0), 0);
+  const micronutrients = useMemo(() => {
+    if (!daily) return { fiberG: 0, sugarG: 0, sodiumMg: 0, potassiumMg: 0, calciumMg: 0, ironMg: 0 };
+    let fiberG = 0;
+    let sugarG = 0;
+    let sodiumMg = 0;
+    let potassiumMg = 0;
+    let calciumMg = 0;
+    let ironMg = 0;
+
+    for (const mt of MEAL_TYPES) {
+      const logs = daily.meals[mt] ?? [];
+      for (const log of logs) {
+        for (const item of log.items) {
+          if (item.fiberG) fiberG += item.fiberG;
+          if (item.sugarG) sugarG += item.sugarG;
+          if (item.sodiumMg) sodiumMg += item.sodiumMg;
+          if (item.potassiumMg) potassiumMg += item.potassiumMg;
+          if (item.calciumMg) calciumMg += item.calciumMg;
+          if (item.ironMg) ironMg += item.ironMg;
+        }
+      }
+    }
+
+    return {
+      fiberG: round1(fiberG),
+      sugarG: round1(sugarG),
+      sodiumMg: Math.round(sodiumMg),
+      potassiumMg: Math.round(potassiumMg),
+      calciumMg: Math.round(calciumMg),
+      ironMg: round1(ironMg),
+    };
   }, [daily]);
+
+  const totalLoggedMeals = useMemo(
+    () => (daily ? MEAL_TYPES.reduce((acc, mt) => acc + (daily.meals[mt]?.length ?? 0), 0) : 0),
+    [daily]
+  );
+
+  const statusData = useMemo<Record<string, DayStatus>>(() => {
+    const map: Record<string, DayStatus> = {};
+    const kcalTrend = trendsQuery.data?.kcal ?? [];
+    for (const pt of kcalTrend) {
+      if (pt.value > 0) {
+        map[pt.date] = {
+          logged: true,
+          targetMet: daily?.kcalTarget ? pt.value >= daily.kcalTarget * 0.9 : false,
+          streak: true,
+        };
+      }
+    }
+    if (daily) {
+      const totalMeals = MEAL_TYPES.reduce((acc, mt) => acc + (daily.meals[mt]?.length ?? 0), 0);
+      map[date] = {
+        logged: totalMeals > 0,
+        targetMet: daily.kcalConsumed >= daily.kcalTarget * 0.9 && daily.kcalConsumed <= daily.kcalTarget * 1.1,
+        streak: totalMeals > 0,
+      };
+    }
+    return map;
+  }, [trendsQuery.data, daily, date]);
 
   return (
     <div>
-      <AppHeader title="Nutrition" />
+      <AppHeader
+        title="Nutrition"
+        showStatuslineToggle
+        onToggleStatusline={() => setShowStatusline((s) => !s)}
+        showCalendarTrigger
+        onOpenCalendar={() => setCalendarOpen(true)}
+      />
+
+      {showStatusline && <AquaStatusline className="mx-container-margin mt-3 mb-1" />}
 
       <main className="px-container-margin">
         {/* Date selector */}
@@ -412,9 +547,16 @@ export default function Nutrition() {
             </span>
           </button>
           <div className="flex flex-col items-center">
-            <span className="font-heading font-semibold uppercase tracking-[0.02em] text-xl text-on-surface">
-              {isToday ? 'Today' : formatShortDate(date)}
-            </span>
+            <button
+              type="button"
+              onClick={() => setCalendarOpen(true)}
+              className="flex items-center gap-1 font-heading font-semibold uppercase tracking-[0.02em] text-xl text-on-surface hover:text-primary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              <span>{isToday ? 'Today' : formatShortDate(date)}</span>
+              <span className="material-symbols-outlined text-[20px] text-primary" aria-hidden="true">
+                calendar_today
+              </span>
+            </button>
             {!isToday && (
               <button
                 type="button"
@@ -455,24 +597,47 @@ export default function Nutrition() {
             <section className="mb-4" aria-label="Calories remaining">
               <GlassCard className="p-card-padding">
                 <div className="flex flex-col items-center">
-                  <h2 className="w-full font-heading font-semibold uppercase tracking-[0.02em] text-2xl text-on-surface mb-4">
-                    Calories Remaining
-                  </h2>
-                  <div className="mb-5">
-                    <RingProgress
-                      value={daily.kcalConsumed}
-                      target={daily.kcalTarget}
-                      size={160}
-                      strokeWidth={8}
-                      tone="aqua"
+                  <div className="w-full flex items-center justify-between mb-4">
+                    <h2 className="font-heading font-semibold uppercase tracking-[0.02em] text-2xl text-on-surface">
+                      Calories Remaining
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setMacroRingMode((m) => (m === 'concentric' ? 'single' : 'concentric'))}
+                      aria-label="Toggle macro ring view mode"
+                      className="px-2.5 py-1 rounded-full text-xs font-bold border border-outline-variant/50 bg-surface-container-high text-primary hover:bg-surface-container-highest transition-colors flex items-center gap-1"
                     >
-                      <div className="flex flex-col items-center">
-                        <span className="text-3xl font-bold text-primary tabular-nums">
-                          {fmtInt(Math.max(0, daily.kcalRemaining))}
-                        </span>
-                        <span className="text-sm text-on-surface-variant">kcal left</span>
-                      </div>
-                    </RingProgress>
+                      <span className="material-symbols-outlined text-[14px]">donut_large</span>
+                      <span>{macroRingMode === 'concentric' ? 'Concentric' : 'Single'}</span>
+                    </button>
+                  </div>
+
+                  <div className="mb-5 w-full flex justify-center">
+                    {macroRingMode === 'concentric' ? (
+                      <CircularMacroRing
+                        calories={{ consumed: daily.kcalConsumed, target: daily.kcalTarget }}
+                        protein={daily.proteinG}
+                        carbs={daily.carbsG}
+                        fat={daily.fatG}
+                        water={daily.waterMl}
+                        size={250}
+                      />
+                    ) : (
+                      <RingProgress
+                        value={daily.kcalConsumed}
+                        target={daily.kcalTarget}
+                        size={160}
+                        strokeWidth={8}
+                        tone="aqua"
+                      >
+                        <div className="flex flex-col items-center">
+                          <span className="text-3xl font-bold text-primary tabular-nums">
+                            {fmtInt(Math.max(0, daily.kcalRemaining))}
+                          </span>
+                          <span className="text-sm text-on-surface-variant">kcal left</span>
+                        </div>
+                      </RingProgress>
+                    )}
                   </div>
                   <div
                     className="w-full grid grid-cols-4 text-center tabular-nums"
@@ -543,8 +708,64 @@ export default function Nutrition() {
               />
             </section>
 
-            {/* Scan + AI plan quick actions */}
-            <section className="mb-4 grid grid-cols-3 gap-3" aria-label="Quick actions">
+            {/* Micronutrient breakdown accordion */}
+            <section className="mb-4" aria-label="Micronutrient breakdown">
+              <GlassCard className="p-card-padding">
+                <button
+                  type="button"
+                  onClick={() => setMicroOpen((o) => !o)}
+                  className="w-full flex justify-between items-center text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[22px]" aria-hidden="true">
+                      biotech
+                    </span>
+                    <h3 className="font-heading font-semibold uppercase tracking-[0.02em] text-xl text-on-surface">
+                      Micronutrients
+                    </h3>
+                  </div>
+                  <span
+                    className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
+                    style={{ transform: microOpen ? 'rotate(180deg)' : 'none' }}
+                    aria-hidden="true"
+                  >
+                    expand_more
+                  </span>
+                </button>
+
+                {microOpen && (
+                  <div className="mt-4 pt-3 border-t border-outline-variant/40 grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm animate-fade-in">
+                    <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/30">
+                      <span className="text-xs text-on-surface-variant block">Dietary Fiber</span>
+                      <span className="font-bold text-on-surface tabular-nums">{micronutrients.fiberG} g</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/30">
+                      <span className="text-xs text-on-surface-variant block">Sugars</span>
+                      <span className="font-bold text-on-surface tabular-nums">{micronutrients.sugarG} g</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/30">
+                      <span className="text-xs text-on-surface-variant block">Sodium</span>
+                      <span className="font-bold text-on-surface tabular-nums">{micronutrients.sodiumMg} mg</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/30">
+                      <span className="text-xs text-on-surface-variant block">Potassium</span>
+                      <span className="font-bold text-on-surface tabular-nums">{micronutrients.potassiumMg} mg</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/30">
+                      <span className="text-xs text-on-surface-variant block">Calcium</span>
+                      <span className="font-bold text-on-surface tabular-nums">{micronutrients.calciumMg} mg</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/30">
+                      <span className="text-xs text-on-surface-variant block">Iron</span>
+                      <span className="font-bold text-on-surface tabular-nums">{micronutrients.ironMg} mg</span>
+                    </div>
+                  </div>
+                )}
+              </GlassCard>
+            </section>
+
+            {/* Quick actions */}
+            <section className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="Quick actions">
               <button
                 type="button"
                 onClick={() => navigate('/nutrition/capture')}
@@ -569,6 +790,20 @@ export default function Nutrition() {
               </button>
               <button
                 type="button"
+                onClick={() => copyYesterdayMeals.mutate()}
+                disabled={copyYesterdayMeals.isPending}
+                className="glass-card p-4 flex flex-col items-start gap-2 active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60"
+              >
+                <span className="material-symbols-outlined text-emerald-400" aria-hidden="true">
+                  content_copy
+                </span>
+                <span className="font-bold text-on-surface text-sm text-left">
+                  {copyYesterdayMeals.isPending ? 'Copying…' : "Copy Yesterday's"}
+                </span>
+                <span className="text-xs text-on-surface-variant text-left">Duplicate meals</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => navigate('/nutrition/meal-plan')}
                 className="glass-card p-4 flex flex-col items-start gap-2 active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               >
@@ -577,7 +812,7 @@ export default function Nutrition() {
                 </span>
                 <span className="font-bold text-on-surface text-sm text-left">AI meal plan</span>
                 <span className="text-xs text-on-surface-variant text-left">
-                  Suggestions for your targets
+                  Suggestions for target
                 </span>
               </button>
             </section>
@@ -693,7 +928,9 @@ export default function Nutrition() {
                                     aria-label={`Edit ${MEAL_LABEL[mealType]} entry`}
                                     onClick={() => {
                                       setEditingLog(log);
-                                      setEditItems(log.items.map((i) => ({ ...i })));
+                                      setEditRows(
+                                        log.items.map((i) => ({ original: i, current: { ...i } })),
+                                      );
                                     }}
                                     className="text-on-surface-variant hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                                   >
@@ -793,8 +1030,9 @@ export default function Nutrition() {
         open={addSheetMeal !== null}
         title={addSheetMeal ? `Add to ${MEAL_LABEL[addSheetMeal]}` : undefined}
         onClose={() => setAddSheetMeal(null)}
+        pending={addMeal.isPending}
         onPick={(item) => {
-          if (addSheetMeal) addMeal.mutate({ mealType: addSheetMeal, item });
+          if (addSheetMeal && !addMeal.isPending) addMeal.mutate({ mealType: addSheetMeal, item });
         }}
       />
 
@@ -804,7 +1042,7 @@ export default function Nutrition() {
         onClose={() => setBarcodeOpen(false)}
         onLog={(item, mealType) => {
           setBarcodeOpen(false);
-          addMeal.mutate({ mealType, item });
+          if (!addMeal.isPending) addMeal.mutate({ mealType, item });
         }}
       />
 
@@ -828,9 +1066,9 @@ export default function Nutrition() {
               Edit {MEAL_LABEL[editingLog.mealType]}
             </h3>
             <div className="space-y-3 mb-4">
-              {editItems.map((item, idx) => (
+              {editRows.map(({ current: item, original }, idx) => (
                 <div
-                  key={`${item.name}-${idx}`}
+                  key={`${original.name}-${idx}`}
                   className="p-3 rounded-xl bg-surface-container-low border border-outline-variant"
                 >
                   <div className="flex justify-between items-center gap-3 mb-2">
@@ -844,20 +1082,18 @@ export default function Nutrition() {
                       value={Math.round(item.grams)}
                       label={item.name}
                       onChange={(grams) =>
-                        setEditItems((items) =>
-                          items.map((it, i) =>
-                            i === idx
-                              ? rescaleItem(editingLog.items[idx] ?? it, grams)
-                              : it,
+                        setEditRows((rows) =>
+                          rows.map((r, i) =>
+                            i === idx ? { ...r, current: rescaleItem(r.original, grams) } : r,
                           ),
                         )
                       }
                     />
-                    {editItems.length > 1 && (
+                    {editRows.length > 1 && (
                       <button
                         type="button"
                         aria-label={`Remove ${item.name}`}
-                        onClick={() => setEditItems((items) => items.filter((_, i) => i !== idx))}
+                        onClick={() => setEditRows((rows) => rows.filter((_, i) => i !== idx))}
                         className="text-on-surface-variant hover:text-tertiary-container focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                       >
                         <span className="material-symbols-outlined" aria-hidden="true">
@@ -872,7 +1108,7 @@ export default function Nutrition() {
             <button
               type="button"
               onClick={() => updateMeal.mutate(editingLog)}
-              disabled={updateMeal.isPending || editItems.length === 0}
+              disabled={updateMeal.isPending || editRows.length === 0}
               className="cta-gradient w-full h-14 rounded-xl text-on-primary font-bold active:scale-[0.98] transition-transform disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
               {updateMeal.isPending ? 'Saving…' : 'Save changes'}
@@ -880,6 +1116,15 @@ export default function Nutrition() {
           </div>
         </div>
       )}
+
+      {/* Month calendar picker modal */}
+      <AquaCalendarPicker
+        open={calendarOpen}
+        selectedDate={date}
+        onSelectDate={(newDate) => setDate(newDate)}
+        onClose={() => setCalendarOpen(false)}
+        statusData={statusData}
+      />
     </div>
   );
 }

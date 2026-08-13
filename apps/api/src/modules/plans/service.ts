@@ -29,6 +29,7 @@ import {
 import { AppError } from '../../platform/errors';
 import { getStore, newId } from '../../platform/store';
 import { addDays } from '../../platform/dates';
+import { assessReadiness } from './readiness';
 
 const EXPERIENCE_RANK: Record<ExerciseExperience, number> = {
   beginner: 0,
@@ -151,6 +152,71 @@ export function prescriptionFor(
   return { sets: 4, reps: 10, restSeconds: 90 };
 }
 
+/** setsSchema bounds — a scaled prescription may never leave this range. */
+const MIN_WORKING_SETS = 1;
+const MAX_WORKING_SETS = 20;
+
+function clampSets(value: number): number {
+  return Math.min(MAX_WORKING_SETS, Math.max(MIN_WORKING_SETS, value));
+}
+
+/**
+ * Apply a readiness multiplier on the **sets** axis, and to the day's set
+ * total rather than exercise by exercise.
+ *
+ * Sets, because it is the only axis that survives being scaled across the
+ * whole library. Reps are bound up with what a movement *means* — a cardio
+ * slot's `reps: 30` is a work count and a plank's is a hold — so scaling reps
+ * silently turns a 30-second interval into an 18-second one and changes the
+ * exercise rather than its dose. Weight is governed by the AQF-11 load caps
+ * and by progression's own logs-gated rules, which readiness must not reach
+ * into. Sets are the axis a coach deloads on, and progression already treats
+ * them as first-class, so a rescaled base flows through the existing rules.
+ *
+ * On the day total, because per-exercise rounding destroys the intent in both
+ * directions: round(3 × 1.1) = 3, so `progress` would be a no-op, while
+ * round(3 × 0.6) = 2 over-delivers the cut on a 5-slot day. Scaling the total
+ * and distributing the remainder deterministically lands the intended dose
+ * while every exercise keeps at least one working set — a protect week never
+ * empties a day or prescribes a fractional set, it just weighs less.
+ *
+ * A multiplier of exactly 1 returns the input unchanged, so the `maintain`
+ * path is byte-identical to the pre-readiness engine.
+ */
+export function scaleWorkingSets(baseSets: number[], multiplier: number): number[] {
+  if (multiplier === 1 || baseSets.length === 0) return [...baseSets];
+
+  const total = baseSets.reduce((sum, sets) => sum + sets, 0);
+  const target = Math.min(
+    baseSets.length * MAX_WORKING_SETS,
+    Math.max(baseSets.length * MIN_WORKING_SETS, Math.round(total * multiplier)),
+  );
+  const scaled = baseSets.map((sets) => clampSets(Math.floor(sets * multiplier)));
+
+  // Spend the rounding remainder on the largest prescriptions first, ties by
+  // position, so the output is a function of the input alone.
+  const order = baseSets
+    .map((sets, index) => ({ sets, index }))
+    .sort((a, b) => b.sets - a.sets || a.index - b.index)
+    .map((entry) => entry.index);
+
+  let remaining = target - scaled.reduce((sum, sets) => sum + sets, 0);
+  const step = remaining > 0 ? 1 : -1;
+  while (remaining !== 0) {
+    let moved = false;
+    for (const index of order) {
+      if (remaining === 0) break;
+      const next = scaled[index]! + step;
+      if (next < MIN_WORKING_SETS || next > MAX_WORKING_SETS) continue;
+      scaled[index] = next;
+      remaining -= step;
+      moved = true;
+    }
+    if (!moved) break; // everything is already at its clamp
+  }
+  return scaled;
+}
+
 function pickExercise(
   pool: Exercise[],
   spec: SlotSpec,
@@ -179,11 +245,17 @@ export interface BuildPlanOptions {
   focus: PlanFocus;
   startDate: string; // local YYYY-MM-DD
   now?: Date;
+  /**
+   * Readiness working-volume multiplier (READINESS_VOLUME_MULTIPLIER). Defaults
+   * to 1 so every existing caller keeps the pre-readiness prescription exactly.
+   */
+  volumeMultiplier?: number;
 }
 
 export function buildPlan(opts: BuildPlanOptions): TrainingPlan {
   const { userId, profile, exercises, daysPerWeek, focus, startDate } = opts;
   const now = opts.now ?? new Date();
+  const volumeMultiplier = opts.volumeMultiplier ?? 1;
   const pool = buildExercisePool(exercises, profile);
   if (pool.length < 8) {
     throw new AppError(
@@ -224,33 +296,51 @@ export function buildPlan(opts: BuildPlanOptions): TrainingPlan {
     const dayFocus = focuses[workoutIdx]!;
     const specs = FOCUS_SLOTS[dayFocus] ?? FOCUS_SLOTS['Full Body Strength']!;
     const used = new Set<string>();
-    const slots: PlanSlot[] = [];
+    const picks: { slotIdx: number; exercise: Exercise; rx: Prescription }[] = [];
 
     specs.forEach((spec, slotIdx) => {
       const exercise = pickExercise(pool, spec, workoutIdx * 2 + slotIdx, used);
       if (!exercise) return; // slot skipped when the pool cannot cover it
       used.add(exercise.id);
-      const rx = prescriptionFor(profile.exerciseExperience, exercise.category);
+      picks.push({
+        slotIdx,
+        exercise,
+        rx: prescriptionFor(profile.exerciseExperience, exercise.category),
+      });
+    });
+
+    // Readiness lands here: the day's set total is scaled once the day is
+    // known, so the multiplier applies to the dose rather than to each
+    // exercise's rounding error.
+    const daySets = scaleWorkingSets(
+      picks.map((p) => p.rx.sets),
+      volumeMultiplier,
+    );
+
+    const slots: PlanSlot[] = picks.map(({ slotIdx, exercise, rx }, i) => {
+      const sets = daySets[i]!;
       const entryId = `se-${order}-${slotIdx + 1}`;
-      slots.push({
+      // Progressive overload as inspectable data, keyed by iteration:
+      // reps first, then volume, then rest density (AQF-09 §2.4 overload order).
+      // The volume rule builds on the prescribed sets, so an eased week
+      // progresses from where it actually started rather than snapping back.
+      progressionRules.push(
+        { slotEntryId: entryId, kind: 'reps', iteration: 2, value: rx.reps + 2 },
+        { slotEntryId: entryId, kind: 'sets', iteration: 3, value: clampSets(sets + 1) },
+        { slotEntryId: entryId, kind: 'rest', iteration: 4, value: Math.max(30, rx.restSeconds - 15) },
+      );
+      return {
         order: slotIdx + 1,
         entries: [
           {
             id: entryId,
             exerciseId: exercise.id,
-            sets: rx.sets,
+            sets,
             reps: rx.reps,
             restSeconds: rx.restSeconds,
           },
         ],
-      });
-      // Progressive overload as inspectable data, keyed by iteration:
-      // reps first, then volume, then rest density (AQF-09 §2.4 overload order).
-      progressionRules.push(
-        { slotEntryId: entryId, kind: 'reps', iteration: 2, value: rx.reps + 2 },
-        { slotEntryId: entryId, kind: 'sets', iteration: 3, value: rx.sets + 1 },
-        { slotEntryId: entryId, kind: 'rest', iteration: 4, value: Math.max(30, rx.restSeconds - 15) },
-      );
+      };
     });
 
     days.push({ order, focus: dayFocus, isRest: false, slots });
@@ -415,6 +505,44 @@ export function aiDraftIsValid(
   return true;
 }
 
+/**
+ * Readiness applies to the AI lane as well. The model proposes the week; code
+ * still decides how much of it is actually prescribed — otherwise a
+ * model-authored plan would be the one path where a hard week is ignored.
+ * Runs after aiDraftIsValid so the draft is validated exactly as written, and
+ * reuses the same clamps so the result stays inside setsSchema.
+ */
+export function applyReadinessToDraft(draft: AiPlanDraft, multiplier: number): AiPlanDraft {
+  if (multiplier === 1) return draft;
+
+  const days = draft.days.map((day) => {
+    if (day.isRest) return day;
+    const entries = day.slots.flatMap((slot) => slot.entries);
+    const scaled = scaleWorkingSets(
+      entries.map((entry) => entry.sets),
+      multiplier,
+    );
+    let cursor = 0;
+    return {
+      ...day,
+      slots: day.slots.map((slot) => ({
+        ...slot,
+        entries: slot.entries.map((entry) => ({ ...entry, sets: scaled[cursor++]! })),
+      })),
+    };
+  });
+
+  // An absolute `sets` rule would snap the week back at the next iteration, so
+  // it moves with the base. Deltas (add/subtract) and percentages already do.
+  const progressionRules = draft.progressionRules.map((rule) =>
+    rule.kind === 'sets' && (rule.op ?? 'replace') === 'replace' && rule.step !== 'percent'
+      ? { ...rule, value: clampSets(Math.round(rule.value * multiplier)) }
+      : rule,
+  );
+
+  return { ...draft, days, progressionRules };
+}
+
 function planFromAiDraft(
   userId: string,
   draft: AiPlanDraft,
@@ -463,6 +591,11 @@ export async function generatePlanForUser(
   const exercises = store.where<Exercise>('content', (d) => d.type === 'exercise');
   const now = new Date();
 
+  // Adaptive readiness: how the trailing week actually went, computed in code
+  // from the ledger. Applied to both lanes below so the plan absorbs a hard
+  // week instead of holding the user to one they did not get.
+  const readiness = assessReadiness(userId, startDate);
+
   // P-05: give the AI lane first pass over the same pre-filtered pool the
   // deterministic engine uses. The draft is zod- and contract-validated; any
   // failure falls back to buildPlan unchanged.
@@ -477,7 +610,8 @@ export async function generatePlanForUser(
         daysPerWeek: input.daysPerWeek,
       });
       if (result && result.draft && result.ai && aiDraftIsValid(result.draft, pool, input.daysPerWeek)) {
-        plan = planFromAiDraft(userId, result.draft, result.ai, startDate, now);
+        const adjusted = applyReadinessToDraft(result.draft, readiness.volumeMultiplier);
+        plan = planFromAiDraft(userId, adjusted, result.ai, startDate, now);
       }
     } catch {
       plan = null; // model failure must never break plan generation
@@ -492,6 +626,7 @@ export async function generatePlanForUser(
       focus: input.focus,
       startDate,
       now,
+      volumeMultiplier: readiness.volumeMultiplier,
     });
   }
 

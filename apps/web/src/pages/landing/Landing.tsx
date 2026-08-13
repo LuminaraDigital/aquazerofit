@@ -1,9 +1,16 @@
 /**
- * AquaZeroFit marketing landing page - the web front door.
+ * AquaZeroFit marketing landing page — the web front door, served in place at
+ * `/` for signed-out browser visitors.
  *
- * This is the browser surface only. Inside Telegram the Mini App keeps its
- * compact carousel (pages/auth/Welcome), and signed-in users never see this
- * page at all; both redirects happen below before anything renders.
+ * Its single job is conversion into Telegram, where the product actually
+ * lives. The web is marketing; Telegram is the app. So the primary CTA leaves
+ * this origin, and the browser sign-up sits beside it as the deliberate
+ * second path for anyone whose network blocks Telegram — see BrowserPath.
+ *
+ * There are no auth or Telegram redirects in here any more. RequireAuth
+ * decides who sees this page (signed-out, not in Telegram, at `/`) and this
+ * component trusts that decision — a second copy of the rule inside a page
+ * rendered *at* `/` could only ever redirect `/` to `/`.
  *
  * Motion budget: one WebGL draw call (HeroOrb), CSS transforms driven by
  * custom properties, and IntersectionObserver reveals. No animation library,
@@ -12,12 +19,10 @@
  *
  * Header and footer live in Chrome.tsx, shared with /features.
  */
-import { useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
-import { tokenStore } from '../../lib/api';
-import { isTMA } from '../../lib/telegram';
+import { Link } from 'react-router-dom';
+import { useSeo } from '../../lib/seo';
 import { AppBackground } from '../../components/layout/AppBackground';
-import { CtaButton, Footer, TopBar } from './Chrome';
+import { Footer, TelegramCta, TopBar, WebFallbackLink } from './Chrome';
 import { HeroOrb } from './HeroOrb';
 import { PhoneShowcase } from './PhoneShowcase';
 import { Reveal, useHashScroll } from './motion';
@@ -69,16 +74,17 @@ function Hero() {
 
           <Reveal delay={230}>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <CtaButton to="/sign-in?mode=register">
-                Start free
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                  arrow_forward
-                </span>
-              </CtaButton>
-              <CtaButton to="/sign-in" variant="ghost">
-                I already have an account
-              </CtaButton>
+              <TelegramCta placement="hero" />
+              <WebFallbackLink placement="hero" />
             </div>
+            {/* Named right under the CTA rather than buried in a FAQ. The
+                visitor deciding between these two buttons is exactly the
+                person who needs to know the second one is a real product and
+                not a demo. */}
+            <p className="mt-3 text-[12px] leading-relaxed text-on-surface-variant/60">
+              No install — the Mini App opens inside Telegram. Blocked at work?
+              The browser version is the same app, same account.
+            </p>
           </Reveal>
 
           <Reveal delay={300}>
@@ -97,9 +103,9 @@ function Hero() {
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[15px]" aria-hidden="true">
-                  send
+                  bolt
                 </span>
-                Works in Telegram
+                Free to start
               </span>
             </p>
           </Reveal>
@@ -142,20 +148,19 @@ function FinalCta() {
             Start with one honest number
           </h2>
           <p className="relative mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-on-surface-variant/75 sm:text-base">
-            Build your profile in a couple of minutes and see your targets, computed from your
+            Open the Mini App, answer a few questions, and see your targets computed from your
             own figures. Everything after that is just logging your day.
           </p>
           <div className="relative mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-            <CtaButton to="/sign-in?mode=register">
-              Create your account
-              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                arrow_forward
-              </span>
-            </CtaButton>
-            <CtaButton to="/sign-in" variant="ghost">
-              Sign in
-            </CtaButton>
+            <TelegramCta placement="final" />
+            <WebFallbackLink placement="final" />
           </div>
+          <p className="relative mt-5 text-[12px] text-on-surface-variant/60">
+            Already have an account?{' '}
+            <Link to="/sign-in" className="text-primary transition-colors hover:text-secondary">
+              Sign in
+            </Link>
+          </p>
         </div>
       </Reveal>
     </section>
@@ -163,27 +168,11 @@ function FinalCta() {
 }
 
 export default function Landing() {
-  /* Signed-in visitors belong in the app; Telegram gets the Mini App welcome. */
-  const authed = tokenStore.isAuthenticated;
-  const telegram = isTMA();
-
-  useEffect(() => {
-    if (authed || telegram) return;
-    const previous = document.title;
-    document.title = 'AquaZeroFit - AI wellness with the maths in the open';
-    return () => {
-      document.title = previous;
-    };
-  }, [authed, telegram]);
-
-  if (authed) return <Navigate to="/" replace />;
-  if (telegram) return <Navigate to="/welcome" replace />;
-
-  return <LandingContent />;
-}
-
-function LandingContent() {
-  /* Honours /landing#screens arriving from another marketing page. */
+  /* Title, description, canonical and OG tags for `/`. The prerendered shell
+     already carries them for the first paint; this keeps them right after a
+     client-side navigation back here from another marketing route. */
+  useSeo('/');
+  /* Honours `/#screens` arriving from another marketing page. */
   useHashScroll();
 
   return (

@@ -46,11 +46,32 @@ const calls: WireCall[] = [];
 
 vi.stubGlobal(
   'fetch',
-  vi.fn(async (_url: string, init: { body: string }) => {
+  vi.fn(async (url: string, init: { body: string }) => {
     const body = JSON.parse(init.body) as WireCall;
     calls.push({ model: body.model, messages: body.messages });
-    // The extraction lane asks for JSON; the chat lane wants prose.
-    const content = body.model === EXTRACTION_MODEL ? '{"facts":[]}' : 'Grounded reply.';
+    // The extraction lane asks for JSON; the chat lane wants prose (SSE stream).
+    const isStream = init.body && JSON.parse(init.body).stream === true;
+    const isExtraction = body.model === EXTRACTION_MODEL;
+    
+    if (isStream && !isExtraction) {
+      // Return proper SSE stream for chat lane
+      const streamContent = 'data: {"choices":[{"delta":{"content":"Grounded "}}]}\n\n' +
+                            'data: {"choices":[{"delta":{"content":"reply."}}]}\n\n' +
+                            'data: [DONE]\n\n';
+      return {
+        ok: true,
+        headers: { get: (name: string) => name.toLowerCase() === 'content-type' ? 'text/event-stream' : null },
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(streamContent));
+            controller.close();
+          }
+        }),
+      };
+    }
+    
+    // Non-streaming (extraction) response
+    const content = isExtraction ? '{"facts":[]}' : 'Grounded reply.';
     return {
       ok: true,
       json: async () => ({

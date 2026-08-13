@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 /**
- * The landing page is the web front door, so the three audiences it has to
- * separate are worth pinning: anonymous browsers see the page, signed-in users
- * are sent to the app, and Telegram gets the Mini App welcome instead (its
- * silent auto-login lives there — landing a Mini App user here would strand
- * them on a marketing page).
+ * The landing page is the only cold-traffic surface in a Telegram-first
+ * product, so what is pinned here is its conversion contract rather than its
+ * appearance: the primary action leaves for Telegram carrying attribution with
+ * it, and the browser path is offered beside it rather than buried.
+ *
+ * Who is allowed to see this page at all is no longer decided here — that
+ * moved to RequireAuth, and is covered in RequireAuth.routing.test.tsx.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
@@ -13,26 +15,27 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 const mocks = vi.hoisted(() => ({
   tokenStore: { isAuthenticated: false },
   isTMA: vi.fn(() => false),
+  trackGrowth: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../lib/api', () => ({ tokenStore: mocks.tokenStore }));
 vi.mock('../../lib/telegram', () => ({ isTMA: mocks.isTMA }));
+vi.mock('../../lib/growth', () => ({ trackGrowth: mocks.trackGrowth }));
 
 import Landing from './Landing';
 
 function renderAt() {
   return render(
-    <MemoryRouter initialEntries={['/landing']}>
+    <MemoryRouter initialEntries={['/']}>
       <Routes>
-        <Route path="/landing" element={<Landing />} />
-        <Route path="/" element={<p>app dashboard</p>} />
-        <Route path="/welcome" element={<p>mini app welcome</p>} />
+        <Route path="/" element={<Landing />} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
 beforeEach(() => {
+  localStorage.clear();
   mocks.tokenStore.isAuthenticated = false;
   mocks.isTMA.mockReturnValue(false);
   // jsdom implements neither. Returning a null WebGL context is also the real
@@ -53,15 +56,54 @@ afterEach(() => {
 });
 
 describe('Landing', () => {
-  it('renders the hero and both entry points for an anonymous web visitor', () => {
+  it('renders the hero for an anonymous web visitor', () => {
     renderAt();
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/aquazerofit/i);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/your day, measured/i);
-    expect(screen.getByRole('link', { name: /start free/i }).getAttribute('href')).toBe(
-      '/sign-in?mode=register',
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading.textContent).toMatch(/aquazerofit/i);
+    expect(heading.textContent).toMatch(/your day, measured/i);
+  });
+
+  it('makes Telegram the primary action', () => {
+    renderAt();
+
+    const ctas = screen.getAllByRole('link', { name: /open in telegram/i });
+    expect(ctas.length).toBeGreaterThan(0);
+    for (const cta of ctas) {
+      expect(cta.getAttribute('href')).toMatch(/^https:\/\/t\.me\//);
+    }
+  });
+
+  it('carries stored attribution into the Telegram deep link', () => {
+    localStorage.setItem(
+      'azf_attr_v1',
+      JSON.stringify({
+        ref: 'abc123',
+        utmSource: 'reddit',
+        utmMedium: null,
+        utmCampaign: null,
+        challengeCode: 'HUDDLE7',
+        capturedAt: new Date().toISOString(),
+      }),
     );
-    expect(screen.getAllByRole('link', { name: /sign in/i }).length).toBeGreaterThan(0);
+
+    renderAt();
+
+    const href = screen.getAllByRole('link', { name: /open in telegram/i })[0].getAttribute('href');
+    expect(href).toContain('startapp=');
+    expect(href).toContain('r-abc123');
+    expect(href).toContain('c-HUDDLE7');
+    expect(href).toContain('s-reddit');
+  });
+
+  it('offers the browser as a real second path, not a hidden one', () => {
+    renderAt();
+
+    const fallbacks = screen.getAllByRole('link', { name: /use it in your browser/i });
+    expect(fallbacks.length).toBeGreaterThan(0);
+    expect(fallbacks[0].getAttribute('href')).toBe('/sign-in?mode=register');
+    // The segment this exists for has to be told that it exists.
+    expect(screen.getAllByText(/blocked/i).length).toBeGreaterThan(0);
   });
 
   it('links to the dedicated product pages from the footer', () => {
@@ -84,20 +126,5 @@ describe('Landing', () => {
     renderAt();
 
     expect(screen.getAllByText(/does not provide medical diagnosis/i).length).toBeGreaterThan(0);
-  });
-
-  it('sends an authenticated visitor to the app instead of the marketing page', () => {
-    mocks.tokenStore.isAuthenticated = true;
-    renderAt();
-
-    expect(screen.getByText('app dashboard')).toBeTruthy();
-    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
-  });
-
-  it('sends a Telegram Mini App visitor to the welcome carousel', () => {
-    mocks.isTMA.mockReturnValue(true);
-    renderAt();
-
-    expect(screen.getByText('mini app welcome')).toBeTruthy();
   });
 });

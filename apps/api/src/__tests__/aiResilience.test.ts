@@ -297,7 +297,8 @@ describe('max_tokens ceiling', () => {
     await complete('chatFast', MESSAGES, {});
 
     expect(groqCalls(calls)[0]!.body.max_tokens).toBe(256);
-    expect(groqCalls(calls)[1]!.body.max_tokens).toBe(1024);
+    // chatFast lane now has a per-ModelGroup default of 512 (MODEL_GROUP_MAX_TOKENS.chatFast)
+    expect(groqCalls(calls)[1]!.body.max_tokens).toBe(512);
   });
 });
 

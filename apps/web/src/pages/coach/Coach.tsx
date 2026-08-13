@@ -17,9 +17,10 @@ import {
 } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ChatMessage, ChatSession, ChatToolCall } from '@aquazerofit/shared';
+import type { ChatMessage, ChatSession, ChatToolCall, MealType } from '@aquazerofit/shared';
 import { AQUA_CHARACTER, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
 import { api, ApiError, streamChat } from '@/lib/api';
+import { useCoachRoster, type CoachCardData } from '@/lib/queries';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Chip } from '@/components/ui/Chip';
@@ -30,7 +31,10 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
 import { BottomSheet } from '@/pages/training/BottomSheet';
 import { AquaMascot } from '@/components/brand/AquaMascot';
+import { CoachAvatar } from '@/components/coach/CoachAvatar';
 import { AkinStage } from '@/components/brand/AkinStage';
+import { MealDraftCard } from './MealDraftCard';
+import type { ChatMealDraft, ConfirmSelection } from './mealDraft';
 
 const SUGGESTED_PROMPTS = [
   'What should I eat tonight?',
@@ -38,6 +42,14 @@ const SUGGESTED_PROMPTS = [
   "Adjust today's workout",
   'How much protein do I need?',
 ];
+
+/** The user's own calendar day, which is the day a meal belongs to. */
+function localToday(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
 
 const TOOL_LABELS: Record<string, string> = {
   getTodayNutrition: "Today's nutrition",
@@ -137,16 +149,28 @@ function asList<T>(data: unknown): T[] {
   return [];
 }
 
-function CoachAvatar() {
+/**
+ * Byline above each assistant turn. Shows the user's selected coach, falling
+ * back to the Aqua mascot before the roster query resolves — the alternative
+ * (an empty slot that pops in) makes the first paint of every conversation
+ * flicker on the slowest connections, which is where it is most visible.
+ */
+function AssistantByline({ coach }: { coach: CoachCardData | undefined }) {
   return (
     <div className="flex items-center gap-2">
-      <div
-        aria-hidden="true"
-        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-primary/40 bg-primary/20 shadow-[0_0_10px_rgba(138,235,255,0.35)]"
-      >
-        <AquaMascot size="sm" decorative className="scale-110" />
-      </div>
-      <span className="text-sm text-on-surface-variant">{AQUA_CHARACTER.name}</span>
+      {coach ? (
+        <CoachAvatar art={coach.art} name={coach.name} colour={coach.colour} size={32} />
+      ) : (
+        <div
+          aria-hidden="true"
+          className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-primary/40 bg-primary/20 shadow-[0_0_10px_rgba(138,235,255,0.35)]"
+        >
+          <AquaMascot size="sm" decorative className="scale-110" />
+        </div>
+      )}
+      <span className="text-sm text-on-surface-variant">
+        {coach ? coach.name.split(' ')[0] : AQUA_CHARACTER.name}
+      </span>
     </div>
   );
 }
@@ -169,6 +193,16 @@ function ToolCards({ toolCalls }: { toolCalls: ChatToolCall[] }) {
 export default function Coach() {
   const queryClient = useQueryClient();
   const toast = useToast();
+  // Who is answering. The roster is cached across the app, so this is usually
+  // already warm by the time the chat mounts.
+  const roster = useCoachRoster();
+  const activeCoach = roster.data?.roster.find((c) => c.id === roster.data?.activeCoachId);
+  // Every user-facing mention of "who you are talking to" — composer label,
+  // typing indicator, live-region announcements, empty-state greeting — names
+  // the ACTIVE coach, falling back to the default character until the roster
+  // loads. The message bubbles already did this (AssistantByline).
+  const coachName = activeCoach ? activeCoach.name.split(' ')[0] : AQUA_CHARACTER.name;
+  const coachTagline = activeCoach?.tagline ?? AQUA_CHARACTER.tagline;
 
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -178,6 +212,7 @@ export default function Coach() {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [clearOpen, setClearOpen] = useState(false);
   const [liveNote, setLiveNote] = useState('');
+  const [draft, setDraft] = useState<ChatMealDraft | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const creatingRef = useRef(false);
 
@@ -216,10 +251,25 @@ export default function Coach() {
   });
   const messages = useMemo(() => messagesQuery.data ?? [], [messagesQuery.data]);
 
+  // ---- pending meal proposal ----
+  // Rehydrated from the server rather than kept only in memory: a proposal is
+  // the confirmation step of a logging flow, and a refresh must not quietly
+  // drop it (the user would have to retype and pay a second credit).
+  const pendingDrafts = useQuery({
+    queryKey: ['chat', 'meal-drafts'],
+    queryFn: () => api<{ drafts: ChatMealDraft[] }>('/chat/meal-drafts'),
+  });
+
+  useEffect(() => {
+    if (draft) return;
+    const latest = pendingDrafts.data?.drafts?.[0];
+    if (latest) setDraft(latest);
+  }, [pendingDrafts.data, draft]);
+
   // ---- scroll to latest ----
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages.length, streamText, pendingUser, frames.length]);
+  }, [messages.length, streamText, pendingUser, frames.length, draft]);
 
   // ---- send / stream ----
   const send = useCallback(
@@ -230,12 +280,12 @@ export default function Coach() {
       setPendingUser(text);
       setStreaming(true);
       setStreamText('');
-      setLiveNote(`${AQUA_CHARACTER.name} is replying`);
+      setLiveNote(`${coachName} is replying`);
       try {
         await streamChat(sessionId, text, (token) => {
           setStreamText((s) => s + token);
         });
-        setLiveNote(`${AQUA_CHARACTER.name} has replied`);
+        setLiveNote(`${coachName} has replied`);
         await queryClient.invalidateQueries({ queryKey: ['chat', 'messages', sessionId] });
         void queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] });
       } catch (e) {
@@ -260,8 +310,57 @@ export default function Coach() {
         setPendingUser(null);
       }
     },
-    [sessionId, streaming, queryClient],
+    [sessionId, streaming, queryClient, coachName],
   );
+
+  // ---- chat-native logging: propose → confirm ----
+  const proposeMeal = useMutation({
+    mutationFn: (text: string) =>
+      api<{ draft: ChatMealDraft }>('/chat/meal-drafts', {
+        method: 'POST',
+        body: { text, sessionId: sessionId || undefined, localDate: localToday() },
+      }),
+    onSuccess: (data) => {
+      setInput('');
+      setDraft(data.draft);
+      void queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
+    },
+    onError: (e) =>
+      toast.error(
+        e instanceof ApiError ? e.message : 'Could not read that as a meal. Please try again.',
+      ),
+  });
+
+  const confirmDraft = useMutation({
+    mutationFn: (payload: {
+      mealType: MealType;
+      items: ConfirmSelection[];
+      acknowledgeAllergens: boolean;
+    }) =>
+      api<{ mealLog: { totalKcal: number } }>(`/chat/meal-drafts/${draft?.id ?? ''}/confirm`, {
+        method: 'POST',
+        body: { ...payload, localDate: localToday() },
+      }),
+    onSuccess: async (data) => {
+      setDraft(null);
+      toast.success(`Logged ${Math.round(data.mealLog.totalKcal)} kcal`);
+      await queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
+      // The dashboard and food log read the same rows this just wrote.
+      void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (e) =>
+      toast.error(e instanceof ApiError ? e.message : 'Could not log that meal. Please try again.'),
+  });
+
+  const dismissDraft = useMutation({
+    mutationFn: (draftId: string) =>
+      api<void>(`/chat/meal-drafts/${draftId}/dismiss`, { method: 'POST' }),
+    onSettled: () => {
+      setDraft(null);
+      void queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
+    },
+  });
 
   // ---- clear conversation ----
   const clearConversation = useMutation({
@@ -308,9 +407,23 @@ export default function Coach() {
   return (
     <div className="flex min-h-screen w-full flex-col">
       <AppHeader
-        title={AQUA_CHARACTER.title}
+        title={activeCoach ? `Coach ${activeCoach.name.split(' ')[0]}` : AQUA_CHARACTER.title}
         right={
           <div className="flex items-center gap-1">
+            {activeCoach && (
+              <Link
+                to="/coach/select"
+                aria-label={`${activeCoach.name} is your coach. Change coach.`}
+                className="flex h-10 w-10 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                <CoachAvatar
+                  art={activeCoach.art}
+                  name={activeCoach.name}
+                  colour={activeCoach.colour}
+                  size={30}
+                />
+              </Link>
+            )}
             <Link
               to="/settings/memory"
               aria-label="What your coach remembers"
@@ -373,13 +486,24 @@ export default function Coach() {
           <>
             {showEmpty && (
               <div className="mt-4 flex flex-col items-center gap-4 text-center">
-                <AkinStage size="lg" showCaption={false} className="mx-auto" />
+                {/* The default character has a bespoke animated stage; any
+                    other coach greets with their own portrait. */}
+                {activeCoach && activeCoach.id !== AQUA_CHARACTER.id ? (
+                  <CoachAvatar
+                    art={activeCoach.art}
+                    name={activeCoach.name}
+                    colour={activeCoach.colour}
+                    size={112}
+                  />
+                ) : (
+                  <AkinStage size="lg" showCaption={false} className="mx-auto" />
+                )}
                 <div>
                   <h2 className="heading-display font-heading text-2xl text-on-surface">
-                    Hi, I'm {AQUA_CHARACTER.name}
+                    Hi, I'm {coachName}
                   </h2>
                   <p className="mt-1 text-sm text-on-surface-variant">
-                    {AQUA_CHARACTER.tagline} Ask me about your nutrition, training or progress.
+                    {coachTagline} Ask me about your nutrition, training or progress.
                   </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -387,6 +511,13 @@ export default function Coach() {
                     <Chip key={p} label={p} tone="aqua" onClick={() => void send(p)} />
                   ))}
                 </div>
+                <p className="max-w-[300px] text-xs text-on-surface-variant">
+                  Or type what you ate - “two eggs on toast and a flat white” - and tap the
+                  <span className="material-symbols-outlined mx-1 align-middle text-[16px]" aria-hidden="true">
+                    restaurant
+                  </span>
+                  button to turn it into a meal log.
+                </p>
               </div>
             )}
 
@@ -403,7 +534,7 @@ export default function Coach() {
               ) : (
                 <div key={m.id} className="flex max-w-[90%] flex-col gap-2 self-start">
                   <div className="flex items-center justify-between">
-                    <CoachAvatar />
+                    <AssistantByline coach={activeCoach} />
                     <div className="relative">
                       <button
                         aria-label="Message options"
@@ -473,12 +604,12 @@ export default function Coach() {
             {/* streaming assistant bubble / typing indicator */}
             {streaming && (
               <div className="flex max-w-[90%] flex-col gap-2 self-start">
-                <CoachAvatar />
+                <AssistantByline coach={activeCoach} />
                 <div className="glass-card rounded-bl-md p-4 text-base leading-relaxed text-on-surface">
                   {streamText ? (
                     renderMarkdown(streamText)
                   ) : (
-                    <span className="flex items-center gap-1.5" aria-label={`${AQUA_CHARACTER.name} is typing`}>
+                    <span className="flex items-center gap-1.5" aria-label={`${coachName} is typing`}>
                       {[0, 1, 2].map((i) => (
                         <span
                           key={i}
@@ -496,7 +627,7 @@ export default function Coach() {
             {/* supportive system frames (safety / availability) - calm styling */}
             {frames.map((f) => (
               <div key={f.id} className="flex max-w-[90%] flex-col gap-2 self-start">
-                <CoachAvatar />
+                <AssistantByline coach={activeCoach} />
                 <div className="rounded-card rounded-bl-md border border-secondary/30 bg-secondary/10 p-4">
                   <div className="flex items-start gap-2">
                     <span
@@ -512,6 +643,30 @@ export default function Coach() {
             ))}
           </>
         )}
+
+        {/* meal proposal awaiting confirmation - nothing is logged until the
+            user taps through it (FR-013) */}
+        {draft && (draft.status === 'proposed' || draft.status === 'empty') && (
+          <div className="flex max-w-[95%] flex-col gap-2 self-start">
+            <AssistantByline coach={activeCoach} />
+            <MealDraftCard
+              draft={draft}
+              pending={confirmDraft.isPending}
+              onConfirm={(payload) => confirmDraft.mutate(payload)}
+              onDismiss={() => dismissDraft.mutate(draft.id)}
+            />
+          </div>
+        )}
+
+        {proposeMeal.isPending && (
+          <div className="flex max-w-[90%] flex-col gap-2 self-start">
+            <AssistantByline coach={activeCoach} />
+            <div className="glass-card rounded-bl-md p-4 text-sm text-on-surface-variant">
+              Reading that as a meal…
+            </div>
+          </div>
+        )}
+
         <div ref={endRef} />
       </main>
 
@@ -547,18 +702,36 @@ export default function Coach() {
           className="glass-card flex items-center gap-2 rounded-card p-2 focus-within:border-primary focus-within:shadow-[0_0_15px_rgba(138,235,255,0.2)]"
         >
           <label htmlFor="coach-input" className="sr-only">
-            Message {AQUA_CHARACTER.name}
+            Message {coachName}
           </label>
           <input
             id="coach-input"
             type="text"
             maxLength={4000}
-            placeholder={`Ask ${AQUA_CHARACTER.name}…`}
+            placeholder={`Ask ${coachName}…`}
             value={input}
             disabled={streaming || sessionId === ''}
             onChange={(e) => setInput(e.target.value)}
             className="flex-1 border-none bg-transparent px-2 text-base text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:ring-0 disabled:opacity-60"
           />
+          {/* Logging is a separate, explicit action rather than something the
+              coach infers from a chat turn: guessing "I ate X" from a sentence
+              would either surprise the user or burn a credit on every message.
+              Two taps, zero ambiguity about what is about to happen. */}
+          <button
+            type="button"
+            aria-label="Log this as a meal"
+            title="Log this as a meal"
+            disabled={
+              streaming || proposeMeal.isPending || input.trim() === '' || sessionId === ''
+            }
+            onClick={() => proposeMeal.mutate(input.trim())}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/60 text-primary transition-transform active:scale-90 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+              restaurant
+            </span>
+          </button>
           <button
             type="submit"
             aria-label="Send message"

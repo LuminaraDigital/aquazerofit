@@ -29,6 +29,7 @@ import { byIdDoc, localToday, readTargets, round1, whereDocs } from '../ai/util'
 // API — both are consent-aware read paths, not aggregation helpers.
 import { getProfile } from '../me/service';
 import { getMemoryForPrompt } from '../memory/service';
+import { computeConsistency, computeStreak, type UserActivity } from '../progress/service';
 
 interface ToolOutcome<T> {
   data: T;
@@ -197,31 +198,37 @@ export async function getProgressSummary(userId: string): Promise<ToolOutcome<Mo
   const start = weights.length > 0 ? (weights[0] as WeightLog).weightKg : null;
   const deltaKg = current != null && start != null ? round1(current - start) : null;
 
-  // Streak = consecutive localDates (ending today or yesterday) with any log.
-  const dates = new Set(userLogs.map((l) => l.localDate));
-  let streak = 0;
-  const cursor = new Date();
-  if (!dates.has(localToday())) cursor.setDate(cursor.getDate() - 1); // today not logged yet
-  for (;;) {
-    const y = cursor.getFullYear();
-    const m = String(cursor.getMonth() + 1).padStart(2, '0');
-    const d = String(cursor.getDate()).padStart(2, '0');
-    if (!dates.has(`${y}-${m}-${d}`)) break;
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sessionPred = (d: any) => d?.userId === userId && d?.type === 'workoutSession' && d?.status === 'completed';
   const completedA = await whereDocs<WorkoutSession>('plans', sessionPred);
   const completedB = completedA.length > 0 ? [] : await whereDocs<WorkoutSession>('logs', sessionPred);
-  const workoutsCompleted = completedA.length + completedB.length;
+  const completedSessions = [...completedA, ...completedB];
+  const workoutsCompleted = completedSessions.length;
+
+  // Consistency is computed by the progress module rather than duplicated here.
+  // This is a deliberate exception to the local-aggregation rule above: how
+  // consistency is counted is a product decision (a missed day is absorbed, not
+  // punished), not an aggregation detail. A second local implementation is how
+  // the coach ends up consoling a user over a broken streak the UI is telling
+  // them is intact. Both functions are pure over the activity they are handed.
+  const today = localToday();
+  const activity: UserActivity = {
+    meals: userLogs.filter((d): d is MealLog => d.type === 'mealLog'),
+    waters: userLogs.filter((d): d is WaterLog => d.type === 'waterLog'),
+    weights,
+    completedSessions,
+  };
+  const consistency = computeConsistency(activity, today);
 
   const data: MockProgressContext = {
     currentWeightKg: current,
     startWeightKg: start,
     deltaKg,
-    streakDays: streak,
+    streakDays: computeStreak(activity, today),
+    activeDays: consistency.activeDays,
+    windowDays: consistency.windowDays,
+    bestDays: consistency.bestDays,
+    consistencyState: consistency.state,
     workoutsCompleted,
   };
   return {
@@ -229,7 +236,7 @@ export async function getProgressSummary(userId: string): Promise<ToolOutcome<Mo
     call: {
       tool: 'getProgressSummary',
       args: {},
-      resultSummary: `weight ${current ?? 'n/a'} kg (Δ ${deltaKg ?? 'n/a'}), streak ${streak}d, ${workoutsCompleted} workouts`,
+      resultSummary: `weight ${current ?? 'n/a'} kg (Δ ${deltaKg ?? 'n/a'}), ${consistency.activeDays}/${consistency.windowDays} days active, ${workoutsCompleted} workouts`,
     },
   };
 }

@@ -2,12 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ====================================================================
+   Design tokens — the single binding point for the palette.
+
+   Values are space-separated sRGB channels, not hex, because that is the
+   only form Tailwind can compose an alpha modifier against
+   (`bg-surface/60` -> `rgb(var(--azf-surface) / 0.6)`). Tailwind reads
+   these through tailwind.config.js; no component references them directly.
+
+   Everything below is the literal value the "Modern Aquatic Wellness"
+   palette shipped with, so the browser target is unchanged by the
+   indirection. Inside Telegram, lib/telegram.ts overwrites a *subset* of
+   these on :root at runtime — see the NEUTRALS/BRAND split there.
+   ==================================================================== */
 :root {
-  --azf-surface: #0e1416;
-  --azf-on-surface: #dde4e5;
-  --azf-primary: #8aebff;
-  --azf-border: #1e4c74;
-  /* Telegram theme variables are bound over these at runtime inside the Mini App */
+  /* Neutrals — bound to the Telegram host when it is dark enough to keep
+     the fixed brand foregrounds at WCAG AA. */
+  --azf-surface: 14 20 22;
+  --azf-surface-dim: 14 20 22;
+  --azf-surface-bright: 52 58 60;
+  --azf-surface-container-lowest: 9 15 17;
+  --azf-surface-container-low: 22 29 30;
+  --azf-surface-container: 26 33 34;
+  --azf-surface-container-high: 36 43 45;
+  --azf-surface-container-highest: 47 54 56;
+  --azf-on-surface: 221 228 229;
+  --azf-on-surface-variant: 187 201 205;
+  --azf-outline: 133 147 151;
+  --azf-outline-variant: 60 73 76;
+
+  /* Brand — never bound to a host theme. These are the product's identity
+     (aqua / mint / coral) and the pairs they are used with; letting a chat
+     client repaint them would make AquaZeroFit unrecognisable. */
+  --azf-surface-tint: 47 217 244;
+  --azf-primary: 138 235 255;
+  --azf-on-primary: 0 54 62;
+  --azf-primary-container: 34 211 238;
+  --azf-on-primary-container: 0 87 99;
+  --azf-secondary: 69 223 164;
+  --azf-on-secondary: 0 56 37;
+  --azf-secondary-container: 0 189 133;
+  --azf-on-secondary-container: 0 69 46;
+  --azf-tertiary: 255 210 213;
+  --azf-on-tertiary: 103 0 31;
+  --azf-tertiary-container: 255 170 178;
+  --azf-on-tertiary-container: 148 34 58;
+  --azf-error: 255 180 171;
+  --azf-on-error: 105 0 5;
+  --azf-error-container: 147 0 10;
+  --azf-on-error-container: 255 218 214;
+  --azf-primary-fixed-dim: 47 217 244;
+  --azf-secondary-fixed-dim: 69 223 164;
+  --azf-tertiary-fixed-dim: 255 178 185;
+  --azf-border-aqua: 30 76 116;
+  --azf-coral: 255 178 185;
 }
 
 html,
@@ -20,6 +68,14 @@ body,
 html {
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
+}
+
+/* A user who asked for less motion should not be flown down the page by an
+   in-page anchor. Kept next to the rule it cancels so the pair stays honest. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 .no-scrollbar {
@@ -37,7 +93,7 @@ html {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(138, 235, 255, 0.15);
+  background: rgb(var(--azf-primary) / 0.15);
   border-radius: 999px;
 }
 
@@ -82,8 +138,17 @@ body {
   background: radial-gradient(
     ellipse at center,
     transparent 30%,
-    rgba(14, 20, 22, 0.6) 100%
+    rgb(var(--azf-surface) / 0.6) 100%
   );
+}
+
+/* Inside a bound Telegram theme the host's background colour is the one the
+   user chose, and an opaque full-screen aurora would hide it completely.
+   The shader stays — it is brand — but drops to a texture the host colour
+   can read through. Only ever set when lib/telegram.ts actually bound a
+   theme, so the browser target never sees this rule apply. */
+html[data-tg-theme] .azf-bg-canvas {
+  opacity: 0.3;
 }
 
 /* App content sits above all background layers */
@@ -99,8 +164,8 @@ body {
      Glassmorphism with aqua-tinted gradient, inner highlight, deep shadow. */
   .card-hero {
     background:
-      linear-gradient(180deg, rgba(47, 217, 244, 0.08) 0%, transparent 40%),
-      rgba(22, 29, 30, 0.6);
+      linear-gradient(180deg, rgb(var(--azf-surface-tint) / 0.08) 0%, transparent 40%),
+      rgb(var(--azf-surface-container-low) / 0.6);
     backdrop-filter: blur(20px) saturate(1.2);
     -webkit-backdrop-filter: blur(20px) saturate(1.2);
     border: 1px solid rgba(47, 217, 244, 0.2);
@@ -112,17 +177,17 @@ body {
 
   /* Standard glass card: the workhorse surface */
   .glass-card {
-    background: rgba(22, 29, 30, 0.55);
+    background: rgb(var(--azf-surface-container-low) / 0.55);
     backdrop-filter: blur(16px) saturate(1.1);
     -webkit-backdrop-filter: blur(16px) saturate(1.1);
-    border: 1px solid rgba(138, 235, 255, 0.1);
+    border: 1px solid rgb(var(--azf-primary) / 0.1);
     @apply rounded-card;
     box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.3);
   }
 
   /* Compact card: borderless, tonal only */
   .card-compact {
-    background: rgba(26, 33, 34, 0.4);
+    background: rgb(var(--azf-surface-container) / 0.4);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.04);
@@ -131,7 +196,7 @@ body {
 
   /* Navigation blur */
   .glass-blur {
-    background: rgba(14, 20, 22, 0.5);
+    background: rgb(var(--azf-surface) / 0.5);
     backdrop-filter: blur(24px) saturate(1.3);
     -webkit-backdrop-filter: blur(24px) saturate(1.3);
   }
@@ -168,6 +233,44 @@ body {
 
   .safe-bottom {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
+  }
+
+  /* ---- Deep-link target highlight ----
+     Applied by pages/settings/useHashTarget.ts when a `#id` deep link lands
+     on a section, then removed. A single monotonic fade rather than a pulse:
+     a repeating flash is a vestibular and photosensitivity hazard and reads
+     as an error. Brand aqua, deliberately not the coral/error tone — nothing
+     has gone wrong, the user is just being shown where they asked to go.
+     Colour is never the only signal: the hook also moves focus to the
+     section, so assistive tech announces the arrival. */
+  .azf-hash-target {
+    animation: azf-hash-settle 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes azf-hash-settle {
+    0% {
+      box-shadow:
+        0 0 0 2px rgb(var(--azf-primary) / 0.55),
+        0 0 28px -6px rgb(var(--azf-surface-tint) / 0.45);
+    }
+    60% {
+      box-shadow:
+        0 0 0 2px rgb(var(--azf-primary) / 0.4),
+        0 0 28px -6px rgb(var(--azf-surface-tint) / 0.3);
+    }
+    100% {
+      box-shadow:
+        0 0 0 2px rgb(var(--azf-primary) / 0),
+        0 0 28px -6px rgb(var(--azf-surface-tint) / 0);
+    }
+  }
+
+  /* Reduced motion: same ring, held still, removed by the hook's timer. */
+  @media (prefers-reduced-motion: reduce) {
+    .azf-hash-target {
+      animation: none;
+      box-shadow: 0 0 0 2px rgb(var(--azf-primary) / 0.5);
+    }
   }
 
   /* ---- Staggered entrance animations ---- */
@@ -490,9 +593,9 @@ body {
   .shimmer {
     background: linear-gradient(
       90deg,
-      rgba(36, 43, 45, 0.6) 0%,
-      rgba(47, 54, 56, 0.8) 50%,
-      rgba(36, 43, 45, 0.6) 100%
+      rgb(var(--azf-surface-container-high) / 0.6) 0%,
+      rgb(var(--azf-surface-container-highest) / 0.8) 50%,
+      rgb(var(--azf-surface-container-high) / 0.6) 100%
     );
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;

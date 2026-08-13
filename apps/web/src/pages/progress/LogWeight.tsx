@@ -8,8 +8,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { UnitPreference, WeightLog, WellnessProfile } from '@aquazerofit/shared';
+import type { UnitPreference, WeightLog } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
+import { useProfile } from '@/lib/queries';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Chip } from '@/components/ui/Chip';
@@ -60,10 +61,10 @@ export default function LogWeight() {
   const [error, setError] = useState<string | null>(null);
   const idemKeyRef = useRef<string>(crypto.randomUUID());
 
-  const profileQuery = useQuery({
-    queryKey: ['profile'],
-    queryFn: () => api<WellnessProfile>('/me/profile'),
-  });
+  // Shared ['profile'] cache key: the data-layer hook caches the *unwrapped*
+  // profile, so reading /me/profile raw here would cache the { profile }
+  // envelope instead and hand every other consumer the wrong shape.
+  const profileQuery = useProfile();
 
   // Honour the profile's unit preference until the user toggles manually.
   useEffect(() => {

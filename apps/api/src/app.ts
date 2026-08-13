@@ -47,9 +47,15 @@ export function createApp() {
               formAction: ["'self'"],
             }
           : {
-              defaultSrc: ["'none'"],
+              defaultSrc: ["'self'"],
+              scriptSrc: ["'self'"],
+              styleSrc: ["'self'"],
               imgSrc: ["'self'", 'data:', 'blob:'],
+              connectSrc: ["'self'"],
               frameAncestors: ["'none'"],
+              objectSrc: ["'none'"],
+              baseUri: ["'self'"],
+              formAction: ["'self'"],
             },
       },
       // frameguard sends X-Frame-Options, which would override the multi-origin

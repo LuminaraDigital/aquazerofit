@@ -133,6 +133,33 @@ describe('meal logs', () => {
       .set('Authorization', `Bearer ${other.body.accessToken}`);
     expect(day.body.meals.breakfast).toHaveLength(0);
   });
+
+  // TC-NUT-07: the grams schema is positive().max(5000) — every invalid
+  // portion must be rejected as VALIDATION_FAILED, never stored.
+  it.each([
+    ['zero', 0],
+    ['negative', -50],
+    ['non-numeric', 'abc'],
+    ['over the 5000g cap', 6000],
+    ['missing', undefined],
+  ])('rejects a meal item with %s grams', async (_label, grams) => {
+    const item: Record<string, unknown> = {
+      name: 'Bad Portion',
+      kcal: 100,
+      proteinG: 1,
+      carbsG: 1,
+      fatG: 1,
+    };
+    if (grams !== undefined) item.grams = grams;
+    const res = await request(app)
+      .post(`${base}/meal-logs`)
+      .set(auth())
+      .send({ mealType: 'snack', localDate: DATE, items: [item] });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_FAILED');
+    const day = await request(app).get(`${base}/meal-logs?date=${DATE}`).set(auth());
+    expect(day.body.meals.snack).toHaveLength(0);
+  });
 });
 
 describe('water logs', () => {

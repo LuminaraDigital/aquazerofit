@@ -247,7 +247,7 @@ function Step({ step, index }: { step: StepSpec; index: number }) {
 
 export default function HowItWorksPage() {
   return (
-    <MarketingPage documentTitle="How it works — AquaZeroFit">
+    <MarketingPage path="/how-it-works">
       <PageHero
         crumb="How it works"
         title={

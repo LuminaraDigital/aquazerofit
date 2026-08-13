@@ -16,14 +16,14 @@ export interface Clause {
 }
 
 export function LegalPage({
-  documentTitle,
+  path,
   crumb,
   title,
   lead,
   clauses,
   children,
 }: {
-  documentTitle: string;
+  path: string;
   crumb: string;
   title: string;
   lead: string;
@@ -31,7 +31,7 @@ export function LegalPage({
   children: React.ReactNode;
 }) {
   return (
-    <MarketingPage documentTitle={documentTitle}>
+    <MarketingPage path={path}>
       <section className="relative overflow-hidden pt-28 pb-10 sm:pt-36 sm:pb-12">
         <div className="lp-floor" aria-hidden="true" />
         <div className="relative mx-auto max-w-6xl px-5">

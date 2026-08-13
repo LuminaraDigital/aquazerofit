@@ -22,6 +22,7 @@ import {
   type WorkoutSession,
 } from '@aquazerofit/shared';
 import { api, ApiError, mediaUrl } from '@/lib/api';
+import { todayWorkoutQuery, unwrapWorkoutSession } from '@/lib/queries';
 import { EQUIPMENT_ICONS, EQUIPMENT_LABELS } from '@/lib/equipmentMeta';
 import { normalizeExercisesPage } from '@/lib/contracts';
 import { AppHeader } from '@/components/ui/AppHeader';
@@ -88,14 +89,12 @@ function unwrapPlan(data: unknown): TrainingPlan | null {
     : null;
 }
 
-/** /workouts/today responds { rest, focus, iteration, session }; session is null on rest days. */
-export function unwrapSession(data: unknown): WorkoutSession | null {
-  if (!data || typeof data !== 'object') return null;
-  const maybe = (data as { session?: unknown }).session ?? data;
-  return maybe && typeof maybe === 'object' && Array.isArray((maybe as WorkoutSession).exercises)
-    ? (maybe as WorkoutSession)
-    : null;
-}
+/**
+ * /workouts/today responds { rest, focus, iteration, session }; session is
+ * null on rest days. Re-exported from the data layer so this page and
+ * WorkoutDetail share one definition with useTodayWorkout.
+ */
+export const unwrapSession = unwrapWorkoutSession;
 
 export function estimateMinutes(session: WorkoutSession): number {
   const seconds = session.exercises.reduce(
@@ -426,10 +425,8 @@ export default function WorkoutLibrary() {
     queryFn: async () => unwrapPlan(await orNull(() => api<unknown>('/plans/current'))),
   });
 
-  const todayQuery = useQuery({
-    queryKey: ['workout', 'today'],
-    queryFn: async () => unwrapSession(await orNull(() => api<unknown>('/workouts/today'))),
-  });
+  // Shared cache key ⇒ shared queryFn (raw envelope); carve with `select`.
+  const todayQuery = useQuery({ ...todayWorkoutQuery, select: unwrapSession });
 
   // Server-driven search + pagination (limit/offset). Legacy array responses
   // normalise to a single page so the UI is stable during backend rollout.

@@ -133,10 +133,11 @@ describe('SPA hosting disabled (API-only deployment)', () => {
     delete process.env.SERVE_WEB;
   });
 
-  it('locks the CSP down to default-src none when no SPA is served', async () => {
+  it('locks the CSP down to default-src self when no SPA is served', async () => {
     process.env.WEB_DIST_DIR = path.join(fixtureDir, 'does-not-exist');
     const res = await request(createApp()).get('/health');
-    expect(res.headers['content-security-policy']).toContain("default-src 'none'");
+    // API-only mode now has a baseline CSP with default-src 'self' (not 'none')
+    expect(res.headers['content-security-policy']).toContain("default-src 'self'");
     process.env.WEB_DIST_DIR = fixtureDir;
   });
 });

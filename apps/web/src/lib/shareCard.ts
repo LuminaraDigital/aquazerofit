@@ -4,7 +4,11 @@
  */
 import { AKIN_POSES, AQUA_CHARACTER } from '@aquazerofit/shared';
 
-export type ShareKind = 'meal' | 'workout' | 'streak' | 'challenge';
+/**
+ * `consistency` replaced the old `streak` kind: a shared card must never be
+ * able to announce a lost run. Nothing in the app produces `streak` any more.
+ */
+export type ShareKind = 'meal' | 'workout' | 'consistency' | 'challenge';
 
 export interface ShareCardPayload {
   kind: ShareKind;

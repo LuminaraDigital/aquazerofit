@@ -73,6 +73,36 @@ export type CreditTask = keyof typeof CREDIT_COSTS;
 
 export const FREE_TIER_DAILY_CREDITS = 50;
 
+/**
+ * Consistency model (recovery-aware streak, AQF-11 §6 weight-neutral copy).
+ *
+ * GRACE is why a missed day does not reset the run: the documented harm is not
+ * the gap itself but the punishment displayed for it. One absorbed day turns
+ * "you broke it" into "you are still going", which is both kinder and true.
+ */
+export const CONSISTENCY_WINDOW_DAYS = 28;
+export const CONSISTENCY_GRACE_DAYS = 1;
+/** Run length at which `building` becomes `steady`. */
+export const CONSISTENCY_STEADY_DAYS = 7;
+
+/** Trailing period a progress insight describes. */
+export const INSIGHT_PERIOD_DAYS = 7;
+/** Minimum active days in the period before an insight is worth generating. */
+export const INSIGHT_MIN_ACTIVE_DAYS = 2;
+
+/**
+ * Readiness bands (Protect / Maintain / Progress) and the working-volume
+ * multiplier each applies. Protect deliberately reduces load rather than
+ * holding a user to a plan built for a week they did not have.
+ */
+export const READINESS_PROTECT_MAX_SCORE = 39;
+export const READINESS_MAINTAIN_MAX_SCORE = 74;
+export const READINESS_VOLUME_MULTIPLIER = {
+  protect: 0.6,
+  maintain: 1,
+  progress: 1.1,
+} as const;
+
 /** Logical model groups (AQF-09 §2.3): app code never names real providers. */
 export const MODEL_GROUPS = {
   visionPrimary: 'visionPrimary',

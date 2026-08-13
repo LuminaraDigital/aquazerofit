@@ -260,11 +260,9 @@ function SignInInner() {
         ? await register({ email, password, displayName: displayName.trim() || undefined })
         : await login(email, password);
       haptic('success');
-      if (!res.user.hasProfile) {
-        navigate('/onboarding', { replace: true });
-      } else {
-        navigate(safeInternalPath(from), { replace: true });
-      }
+      // Straight into the app whether or not a wellness profile exists — the
+      // essentials are asked for by the surfaces that need them, not here.
+      navigate(safeInternalPath(from), { replace: true });
     } catch (err) {
       haptic('error');
       if (err instanceof ApiError) {
@@ -294,9 +292,9 @@ function SignInInner() {
     if (!initData) return;
     setTgLoading(true);
     try {
-      const res = await telegramLogin(initData);
+      await telegramLogin(initData);
       haptic('success');
-      navigate(res.user.hasProfile ? safeInternalPath(from) : '/onboarding', { replace: true });
+      navigate(safeInternalPath(from), { replace: true });
     } catch {
       haptic('error');
       toast.error('Telegram sign-in failed. Please try again.');

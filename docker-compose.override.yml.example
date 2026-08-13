@@ -1,0 +1,16 @@
+# Example docker-compose.override.yml for local development with seccomp profile
+# Copy to docker-compose.override.yml and adjust paths as needed
+
+version: '3.8'
+
+services:
+  api:
+    # The seccomp profile path is relative to the build context (repo root)
+    # On Linux, this works directly. On Docker Desktop (Mac/Windows), the profile
+    # must be accessible inside the VM - use an absolute path or mount it.
+    security_opt:
+      - seccomp:./apps/api/seccomp-profile.json
+    # For development, you might want to mount source for hot reload
+    # volumes:
+    #   - ./apps/api:/repo/apps/api:ro
+    #   - ./packages/shared:/repo/packages/shared:ro

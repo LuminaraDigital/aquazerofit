@@ -3,12 +3,17 @@
  */
 import { Router } from 'express';
 import {
+  CREDIT_COSTS,
+  FREE_TIER_DAILY_CREDITS,
   consentsSchema,
   profileSchema,
   telegramAuthSchema,
   updateIdentitySchema,
   type User,
 } from '@aquazerofit/shared';
+import { creditLedger } from '../ai/creditLedger';
+import { PREMIUM_LANES } from '../ai/tierPolicy';
+import { asyncHandler } from '../ai/util';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { AppError } from '../../platform/errors';
 import { getStore } from '../../platform/store';
@@ -33,6 +38,42 @@ meRouter.use(requireAuth);
 
 // AI memory lives under /me/memory (its own module + consent gate, memory Phase 1).
 meRouter.use('/memory', memoryRouter);
+
+/**
+ * What this account can currently do, and how much of today's allowance is
+ * left. Exposed so the plan surface can state the actual position rather than
+ * marketing it — "you have used 38 of 50 credits today" is a fact the user can
+ * act on, where "upgrade for more!" is not.
+ *
+ * Read-only by construction. There is deliberately no route here (or anywhere
+ * client-reachable) that changes `tier`: a self-serve tier flip with no payment
+ * behind it is an entitlement any caller could grant themselves.
+ */
+meRouter.get(
+  '/entitlements',
+  // Express 4 does not forward a rejected promise to the error middleware, so
+  // an unwrapped async handler would leave the request hanging until timeout.
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    const user = getStore().byId<User>('users', userId);
+    if (!user) throw new AppError('NOT_FOUND', 'Account not found.');
+    // The daily grant is lazy — it is appended by the first `reserve` of the
+    // day, not by a scheduler. Reading the balance without it would report a
+    // true-but-meaningless 0 to anyone who has not yet triggered an AI action,
+    // which on this surface reads as "you have nothing" rather than "you have
+    // not started". The call is idempotent per UTC day, so doing it here just
+    // moves the same grant slightly earlier.
+    await creditLedger.grantDailyIfNeeded(userId);
+    const remaining = await creditLedger.balance(userId);
+    res.json({
+      tier: user.tier,
+      dailyCredits: FREE_TIER_DAILY_CREDITS,
+      creditsRemaining: remaining,
+      costs: CREDIT_COSTS,
+      premiumLanes: PREMIUM_LANES,
+    });
+  }),
+);
 
 meRouter.get('/profile', (req, res) => {
   const userId = userIdOf(req);

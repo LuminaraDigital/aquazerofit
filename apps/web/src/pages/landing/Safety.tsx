@@ -112,7 +112,7 @@ export default function SafetyPage() {
   const formats = MEAL_PHOTO_MIME.map((m) => m.replace('image/', '').toUpperCase()).join(', ');
 
   return (
-    <MarketingPage documentTitle="Safety — AquaZeroFit">
+    <MarketingPage path="/safety">
       <PageHero
         crumb="Safety"
         title={

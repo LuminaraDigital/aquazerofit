@@ -113,7 +113,7 @@ export default function FeaturesPage() {
   const formats = MEAL_PHOTO_MIME.map((m) => m.replace('image/', '').toUpperCase()).join(', ');
 
   return (
-    <MarketingPage documentTitle="Features — AquaZeroFit">
+    <MarketingPage path="/features">
       <PageHero
         crumb="Features"
         title={

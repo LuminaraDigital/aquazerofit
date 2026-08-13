@@ -122,12 +122,12 @@ export function revokeFamily(familyId: string): void {
  * Rotate a refresh token: single use. A second presentation of the same token
  * is treated as theft — the entire family is revoked (AQF-07 §2.1).
  *
- * Concurrency note: rotation is read-modify-write, not an atomic CAS. The
- * JsonStore gives single-writer semantics in one process; Postgres or any
- * multi-instance store must compare-and-swap on tokenHash/usedAt (or use a
- * row-level lock) so two concurrent refresh requests cannot both succeed.
+ * Atomic compare-and-swap ensures multi-instance safety:
+ * - JsonStore: single-writer in one process, CAS is a no-op but keeps the interface.
+ * - PostgresStore: uses an UPDATE ... WHERE usedAt IS NULL AND revokedAt IS NULL
+ *   with a returning clause so only one concurrent refresh succeeds.
  */
-export function rotateRefresh(token: string): IssuedRefresh & { userId: string } {
+export async function rotateRefresh(token: string): Promise<IssuedRefresh & { userId: string }> {
   const store = getStore();
   const tokenHash = sha256Hex(token);
   const existing = store.findOne<RefreshTokenRecord>(
@@ -142,7 +142,20 @@ export function rotateRefresh(token: string): IssuedRefresh & { userId: string }
   if (new Date(existing.expiresAt).getTime() < Date.now()) {
     throw new AppError('AUTH_INVALID', 'Refresh token expired');
   }
-  store.upsert('users', { ...existing, usedAt: new Date().toISOString() });
+
+  // Atomic CAS: mark token as used only if still unused.
+  // Returns the marked record on success, undefined if another request won the race.
+  const marked = await store.compareAndSwapRefreshToken(
+    existing.id,
+    tokenHash,
+    new Date().toISOString()
+  );
+  if (!marked) {
+    // Another concurrent refresh already consumed this token.
+    revokeFamily(existing.familyId);
+    throw new AppError('AUTH_INVALID', 'Refresh token reuse detected; session revoked');
+  }
+
   const next = issueRefresh(existing.userId, existing.familyId);
   return { ...next, userId: existing.userId };
 }

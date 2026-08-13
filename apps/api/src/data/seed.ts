@@ -8,7 +8,8 @@
  * of meal/water/weight history, an active 4-day plan and 8 completed workout
  * sessions so every screen renders populated on first open.
  */
-import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
+import { Worker } from 'node:worker_threads';
 import type {
   ConsentState,
   DerivedTargets,
@@ -38,13 +39,41 @@ const DEMO_EMAIL = 'demo@aquazero.fit';
 const DEMO_PASSWORD = 'AquaZeroDemo!2026';
 const ADMIN_USER_ID = 'usr-admin';
 const ADMIN_EMAIL = 'admin@aquazero.fit';
-/** Dev-only default when ADMIN_PASSWORD is unset; never used in production. */
-const ADMIN_PASSWORD_DEV_DEFAULT = 'AquaZeroAdmin!2026';
 
 function adminPasswordForSeed(isProduction: boolean): string | undefined {
   const fromEnv = process.env.ADMIN_PASSWORD?.trim();
   if (isProduction) return fromEnv || undefined;
-  return fromEnv || ADMIN_PASSWORD_DEV_DEFAULT;
+  return fromEnv || undefined; // No default — requires explicit ADMIN_PASSWORD in non-prod
+}
+
+async function bcryptHashAsync(password: string, rounds: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const id = crypto.randomUUID();
+    const worker = new Worker(`
+      const { parentPort } = require('worker_threads');
+      const bcrypt = require('bcryptjs');
+      
+      parentPort.on('message', (msg) => {
+        if (msg.type === 'hash') {
+          bcrypt.hash(msg.password, msg.rounds)
+            .then(hash => parentPort.postMessage({ id: msg.id, hash }))
+            .catch(err => parentPort.postMessage({ id: msg.id, error: err.message }));
+        }
+      });
+    `, { eval: true });
+    
+    const handler = (msg: { id: string; hash?: string; error?: string }) => {
+      if (msg.id === id) {
+        worker.off('message', handler);
+        worker.terminate();
+        if (msg.error) reject(new Error(msg.error));
+        else resolve(msg.hash!);
+      }
+    };
+    
+    worker.on('message', handler);
+    worker.postMessage({ id, type: 'hash', password, rounds });
+  });
 }
 
 // ---------- helpers ----------
@@ -164,11 +193,18 @@ function seedAccount(
   role: User['role'],
   tier: User['tier'],
   createdDaysAgo: number,
-): User {
+): Promise<User> {
   const existing = store.byId<User>('users', id);
-  if (existing) return existing;
-  const createdAt = new Date(Date.now() - createdDaysAgo * 24 * 3600 * 1000).toISOString();
-  const user: User = {
+  // The user doc alone does not make the account usable: the credentials doc
+  // is written after an async bcrypt hash in a worker. Short-circuiting on the
+  // user doc let a second seed call resolve while the first call's hash was
+  // still in flight, so login on the "seeded" account 401'd. Only skip when
+  // both halves exist; re-hashing while another hash is in flight is harmless
+  // (idempotent upserts, either hash verifies).
+  if (existing && store.byId('users', `cred-${id}`)) return Promise.resolve(existing);
+  const createdAt =
+    existing?.createdAt ?? new Date(Date.now() - createdDaysAgo * 24 * 3600 * 1000).toISOString();
+  const user: User = existing ?? {
     id,
     email,
     emailVerified: true,
@@ -178,25 +214,27 @@ function seedAccount(
     createdAt,
     deletionRequestedAt: null,
   };
-  store.upsert('users', user);
-  store.upsert('users', {
-    id: `cred-${id}`,
-    type: 'credentials',
-    userId: id,
-    passwordHash: bcrypt.hashSync(password, 10),
+  if (!existing) store.upsert('users', user);
+  return bcryptHashAsync(password, 10).then((hash) => {
+    store.upsert('users', {
+      id: `cred-${id}`,
+      type: 'credentials',
+      userId: id,
+      passwordHash: hash,
+    });
+    const consents: ConsentState & { id: string; type: 'consent'; userId: string } = {
+      id: `consent-${id}`,
+      type: 'consent',
+      userId: id,
+      wellnessDataProcessing: true,
+      aiPersonalisation: true,
+      anonymisedAnalytics: true,
+      reminders: true,
+      updatedAt: createdAt,
+    };
+    store.upsert('users', consents);
+    return user;
   });
-  const consents: ConsentState & { id: string; type: 'consent'; userId: string } = {
-    id: `consent-${id}`,
-    type: 'consent',
-    userId: id,
-    wellnessDataProcessing: true,
-    aiPersonalisation: true,
-    anonymisedAnalytics: true,
-    reminders: true,
-    updatedAt: createdAt,
-  };
-  store.upsert('users', consents);
-  return user;
 }
 
 function seedDemoHistory(store: JsonStore): Record<string, number> {
@@ -362,9 +400,12 @@ function seedDemoHistory(store: JsonStore): Record<string, number> {
 // ---------- entry points ----------
 
 let seededDirs = new Set<string>();
+export function resetSeededDirs(): void {
+  seededDirs.clear();
+}
 
 /** Called by the store bootstrap; safe to call repeatedly. */
-export function seedIfNeeded(store: JsonStore): void {
+export async function seedIfNeeded(store: JsonStore): Promise<void> {
   if (seededDirs.has(store.dataDir)) return;
   seededDirs.add(store.dataDir);
 
@@ -379,16 +420,16 @@ export function seedIfNeeded(store: JsonStore): void {
   const seedDemo = process.env.AZF_SEED_DEMO !== 'false' && !isProduction;
   let historyCounts: Record<string, number> = {};
   if (seedDemo) {
-    seedAccount(store, DEMO_USER_ID, DEMO_EMAIL, DEMO_PASSWORD, 'Alex Waters', 'user', 'premium', 15);
+    await seedAccount(store, DEMO_USER_ID, DEMO_EMAIL, DEMO_PASSWORD, 'Alex Waters', 'user', 'premium', 15);
     const adminPassword = adminPasswordForSeed(false);
     if (adminPassword) {
-      seedAccount(store, ADMIN_USER_ID, ADMIN_EMAIL, adminPassword, 'AquaZero Admin', 'admin', 'premium', 30);
+      await seedAccount(store, ADMIN_USER_ID, ADMIN_EMAIL, adminPassword, 'AquaZero Admin', 'admin', 'premium', 30);
     }
     historyCounts = seedDemoHistory(store);
   } else if (isProduction) {
     const adminPassword = adminPasswordForSeed(true);
     if (adminPassword) {
-      seedAccount(store, ADMIN_USER_ID, ADMIN_EMAIL, adminPassword, 'AquaZero Admin', 'admin', 'premium', 30);
+      await seedAccount(store, ADMIN_USER_ID, ADMIN_EMAIL, adminPassword, 'AquaZero Admin', 'admin', 'premium', 30);
     }
   }
 

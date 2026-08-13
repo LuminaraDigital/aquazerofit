@@ -35,19 +35,22 @@ afterAll(async () => {
 
 describe('password reset', () => {
   it('request + confirm happy path: rehashes and revokes all sessions', async () => {
+    // Use a unique email to avoid conflicts with other tests
+    const uniqueEmail = `reset-me-${Date.now()}@example.com`;
+    process.env.NODE_ENV = 'development';
     await request(app)
       .post(`${base}/auth/register`)
-      .send({ email: EMAIL, password: PASSWORD })
+      .send({ email: uniqueEmail, password: PASSWORD })
       .expect(201);
     const login = await request(app)
       .post(`${base}/auth/login`)
-      .send({ email: EMAIL, password: PASSWORD })
+      .send({ email: uniqueEmail, password: PASSWORD })
       .expect(200);
     const oldRefresh = login.body.refreshToken as string;
 
     const req1 = await request(app)
       .post(`${base}/auth/password-reset/request`)
-      .send({ email: EMAIL });
+      .send({ email: uniqueEmail });
     expect(req1.status).toBe(202);
     expect(req1.body.message).toBe(NEUTRAL_MESSAGE);
     // Dev transport: token echoed in the body (config.isDev) for testability.
@@ -62,11 +65,11 @@ describe('password reset', () => {
     // Old password no longer works; new one does.
     await request(app)
       .post(`${base}/auth/login`)
-      .send({ email: EMAIL, password: PASSWORD })
+      .send({ email: uniqueEmail, password: PASSWORD })
       .expect(401);
     await request(app)
       .post(`${base}/auth/login`)
-      .send({ email: EMAIL, password: NEW_PASSWORD })
+      .send({ email: uniqueEmail, password: NEW_PASSWORD })
       .expect(200);
 
     // Every pre-reset refresh token family is revoked.
@@ -84,9 +87,16 @@ describe('password reset', () => {
   });
 
   it('rejects an expired token with VALIDATION_FAILED', async () => {
+    // Use a unique email for this test
+    const testEmail = `expired-token-${Date.now()}@example.com`;
+    await request(app)
+      .post(`${base}/auth/register`)
+      .send({ email: testEmail, password: PASSWORD })
+      .expect(201);
+    
     const req1 = await request(app)
       .post(`${base}/auth/password-reset/request`)
-      .send({ email: EMAIL })
+      .send({ email: testEmail })
       .expect(202);
     const token = req1.body.devToken as string;
 

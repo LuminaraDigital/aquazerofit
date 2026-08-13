@@ -8,6 +8,7 @@ import type { Request, Response } from 'express';
 import type { MealLog, MealLogItem, MealType, WaterLog, WeightLog } from '@aquazerofit/shared';
 import { AppError } from '../../platform/errors';
 import { getStore, newId } from '../../platform/store';
+import { addDays } from '../../platform/dates';
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 
@@ -228,3 +229,33 @@ export function weightLogsInRange(userId: string, fromDate: string, toDate: stri
     )
     .sort((a, b) => a.localDate.localeCompare(b.localDate));
 }
+
+export function copyPreviousDayMealLogs(
+  userId: string,
+  targetDate: string,
+): { copiedCount: number; date: string; sourceDate: string; logs: MealLog[] } {
+  const sourceDate = addDays(targetDate, -1);
+  const previousLogs = mealLogsForDate(userId, sourceDate);
+  const copiedLogs: MealLog[] = [];
+
+  for (const log of previousLogs) {
+    const newLog = createMealLog(
+      userId,
+      {
+        mealType: log.mealType,
+        items: log.items.map((i) => ({ ...i })),
+        localDate: targetDate,
+      },
+      'manual',
+    );
+    copiedLogs.push(newLog);
+  }
+
+  return {
+    copiedCount: copiedLogs.length,
+    date: targetDate,
+    sourceDate,
+    logs: copiedLogs,
+  };
+}
+

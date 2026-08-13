@@ -20,6 +20,10 @@ export const ERROR_CODES = {
   SAFETY_OUTPUT: 422,
   RATE_LIMITED: 429,
   AI_UNAVAILABLE: 503,
+  // Distinct from AI_UNAVAILABLE so a client can tell "the coach can't answer
+  // right now" from "this deployment cannot take payments at all" — the first
+  // is worth retrying, the second is worth hiding the buy button for.
+  PAYMENT_UNAVAILABLE: 503,
   INTERNAL: 500,
 } as const;
 

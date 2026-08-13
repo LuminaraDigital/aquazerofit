@@ -31,6 +31,7 @@ import {
   type ContainerName,
   type StoredDoc,
 } from './store';
+import type { RefreshTokenRecord } from './auth';
 
 /**
  * Minimal slice of `pg.Pool` the store actually uses. Narrowing it here is
@@ -195,5 +196,35 @@ export class PostgresStore extends MemoryBackedStore {
   async close(): Promise<void> {
     await this.flush();
     await this.pool?.end();
+  }
+
+  /**
+   * Atomic compare-and-swap for refresh token rotation (PostgreSQL implementation).
+   * Uses UPDATE ... WHERE usedAt IS NULL AND revokedAt IS NULL with RETURNING
+   * to atomically mark the token as used only if still valid.
+   */
+  async compareAndSwapRefreshToken(
+    tokenId: string,
+    tokenHash: string,
+    usedAt: string
+  ): Promise<RefreshTokenRecord | undefined> {
+    const stmt = {
+      text: `
+        UPDATE documents
+        SET doc = jsonb_set(doc, '{usedAt}', $3::jsonb, true), updated_at = now()
+        WHERE container = $1 AND id = $2
+          AND (doc->>'usedAt') IS NULL
+          AND (doc->>'revokedAt') IS NULL
+        RETURNING doc
+      `,
+      values: ['users', tokenId, JSON.stringify(usedAt)],
+    };
+    const result = await this.exec.query(stmt.text, stmt.values);
+    if (result.rows.length === 0) return undefined;
+    const row = result.rows[0] as { doc: RefreshTokenRecord };
+    // Hydrate the updated document into memory
+    const updated = row.doc;
+    this.container('users').set(tokenId, updated);
+    return updated;
   }
 }

@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: aquazerofit-api:latest
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - AZF_DATA_DIR=/data
+      # Database (PostgreSQL via Cosmos DB or local)
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/aquazerofit
+      # Auth
+      - JWT_SECRET=${JWT_SECRET}
+      # Web hosting
+      - SERVE_WEB=false
+    volumes:
+      # Persistent data (JSON store + uploads)
+      - api_data:/data
+      - api_uploads:/repo/apps/api/uploads
+      # Read-only root filesystem with tmpfs for writable directories
+      # Distroless is effectively read-only; tmpfs provides writable paths
+    tmpfs:
+      - /tmp:size=100M,mode=1777
+      - /var/run:size=10M,mode=1777
+    security_opt:
+      # Apply minimal seccomp profile for Node.js
+      - seccomp:./apps/api/seccomp-profile.json
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      start_period: 15s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=aquazerofit
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  api_data:
+  api_uploads:
+  db_data:

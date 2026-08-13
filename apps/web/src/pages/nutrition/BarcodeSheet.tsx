@@ -1,12 +1,12 @@
-﻿/**
+/**
  * Barcode scan & log sheet (wger/OFF integration Phase 4).
  * Manual EAN entry + live camera scanning via getUserMedia + BarcodeDetector
  * when the platform supports it (Telegram Mini App webview and modern mobile
  * browsers); degrades gracefully to manual entry otherwise.
  * Looks up GET /foods/barcode/:code and renders the result card with a
  * nutriscore badge, vegan/vegetarian chips, OFF attribution and a
- * deterministic client-side ALLERGEN WARNING (food allergens âˆ© profile
- * allergies â€” mirrors the backend filter; never model-estimated).
+ * deterministic client-side ALLERGEN WARNING (food allergens ∩ profile
+ * allergies — mirrors the backend filter; never model-estimated).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
@@ -71,6 +71,8 @@ export function BarcodeSheet({
   const [mealType, setMealType] = useState<MealType>(mealTypeForNow());
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [torchOn, setTorchOn] = useState(false);
+  const [hasTorch, setHasTorch] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -81,10 +83,47 @@ export function BarcodeSheet({
     typeof window !== 'undefined' &&
     Boolean(window.BarcodeDetector);
 
+  const playScanBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+    } catch {
+      // Audio playback unavailable or suppressed
+    }
+  };
+
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setCameraOn(false);
+    setTorchOn(false);
+  };
+
+  const toggleTorch = async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      const nextState = !torchOn;
+      // TS type assertion for WebRTC Track applyConstraints with torch capability
+      await (track as MediaStreamTrack & { applyConstraints: (c: unknown) => Promise<void> }).applyConstraints({
+        advanced: [{ torch: nextState }],
+      });
+      setTorchOn(nextState);
+    } catch {
+      // Torch failure or constraint not supported
+    }
   };
 
   const lookup = useMutation({
@@ -106,9 +145,17 @@ export function BarcodeSheet({
       setNotFound(false);
       setResult(data);
       setGrams(data.food.commonServings[0]?.grams ?? 100);
+      playScanBeep();
       haptic('success');
     },
-    onError: () => show('Lookup failed â€” check your connection and try again'),
+    // VALIDATION_FAILED = not a real barcode (wrong length or check digit) —
+    // a user-input problem, not a connection failure.
+    onError: (e) =>
+      show(
+        e instanceof ApiError && e.code === 'VALIDATION_FAILED'
+          ? "That doesn't look like a valid barcode — check the digits and try again"
+          : 'Lookup failed — check your connection and try again',
+      ),
   });
 
   const submitCode = (raw: string) => {
@@ -135,6 +182,12 @@ export function BarcodeSheet({
           return;
         }
         streamRef.current = stream;
+        const track = stream.getVideoTracks()[0];
+        if (track && typeof track.getCapabilities === 'function') {
+          const caps = track.getCapabilities() as Record<string, unknown>;
+          setHasTorch(Boolean(caps.torch));
+        }
+
         const video = videoRef.current;
         if (!video) return;
         video.srcObject = stream;
@@ -152,12 +205,12 @@ export function BarcodeSheet({
               if (hit && !cancelled) submitCode(hit);
             })
             .catch(() => {
-              // Detection failures on individual frames are expected â€” keep scanning.
+              // Detection failures on individual frames are expected — keep scanning.
             });
         }, 500);
       } catch {
         if (!cancelled) {
-          setCameraError('Camera unavailable â€” type the barcode below instead.');
+          setCameraError('Camera unavailable — type the barcode below instead.');
           setCameraOn(false);
         }
       }
@@ -186,7 +239,7 @@ export function BarcodeSheet({
   }, [open]);
 
   // Deterministic allergen intersection (mirrors the backend filter):
-  // the endpoint's allergen list (OFF-derived, best-effort) âˆ© profile allergies.
+  // the endpoint's allergen list (OFF-derived, best-effort) ∩ profile allergies.
   const profileAllergies = useMemo(
     () => new Set<string>((profileQuery.data?.allergies ?? []) as Allergen[]),
     [profileQuery.data],
@@ -234,13 +287,37 @@ export function BarcodeSheet({
                   ref={videoRef}
                   muted
                   playsInline
-                  aria-label="Camera viewfinder â€” point at a product barcode"
+                  aria-label="Camera viewfinder — point at a product barcode"
                   className="aspect-[4/3] w-full object-cover"
                 />
+                {/* Torch Toggle Button */}
+                {hasTorch && (
+                  <button
+                    type="button"
+                    onClick={toggleTorch}
+                    aria-label={torchOn ? 'Turn off flashlight' : 'Turn on flashlight'}
+                    className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white flex items-center justify-center active:scale-95 transition-transform"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      {torchOn ? 'flashlight_on' : 'flashlight_off'}
+                    </span>
+                  </button>
+                )}
+                {/* Viewfinder Frame Reticle Overlay */}
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-10 top-1/2 h-0.5 -translate-y-1/2 bg-primary/80 shadow-[0_0_12px_rgba(47,217,244,0.6)]"
-                />
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center p-6"
+                >
+                  <div className="relative w-full h-3/4 max-w-[220px] border border-primary/30 rounded-xl shadow-[0_0_20px_rgba(47,217,244,0.15)]">
+                    {/* Reticle Corner Brackets */}
+                    <div className="absolute -top-0.5 -left-0.5 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl-sm shadow-[0_0_8px_#2fd9f4]" />
+                    <div className="absolute -top-0.5 -right-0.5 w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr-sm shadow-[0_0_8px_#2fd9f4]" />
+                    <div className="absolute -bottom-0.5 -left-0.5 w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl-sm shadow-[0_0_8px_#2fd9f4]" />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 border-b-2 border-r-2 border-primary rounded-br-sm shadow-[0_0_8px_#2fd9f4]" />
+                    {/* Scanning Laser Beam Line */}
+                    <div className="absolute inset-x-1 top-1/2 h-0.5 -translate-y-1/2 bg-primary/90 shadow-[0_0_12px_rgba(47,217,244,0.8)]" />
+                  </div>
+                </div>
               </div>
             )}
             {cameraError && (
@@ -285,7 +362,7 @@ export function BarcodeSheet({
                 disabled={code.replace(/[^0-9]/g, '').length < 8 || lookup.isPending}
                 className="cta-gradient h-12 w-full rounded-xl font-bold text-on-primary transition-transform active:scale-[0.98] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               >
-                {lookup.isPending ? 'Looking upâ€¦' : 'Look up product'}
+                {lookup.isPending ? 'Looking up…' : 'Look up product'}
               </button>
             </form>
 
@@ -298,8 +375,8 @@ export function BarcodeSheet({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Allergen warning â€” deterministic client-side check (food
-                allergens âˆ© profile allergies), mirroring the backend filter. */}
+            {/* Allergen warning — deterministic client-side check (food
+                allergens ∩ profile allergies), mirroring the backend filter. */}
             {allergyHits.length > 0 && (
               <div
                 role="alert"
@@ -320,7 +397,7 @@ export function BarcodeSheet({
                       ? ' may contain traces of'
                       : ' contains'}{' '}
                   {allergyHits.join(', ')}, which you listed as an allergy. Allergen data is
-                  best-effort â€” always check the label.
+                  best-effort — always check the label.
                 </p>
               </div>
             )}
@@ -331,15 +408,15 @@ export function BarcodeSheet({
                 <div className="min-w-0">
                   <p className="font-bold text-on-surface">{result.food.name}</p>
                   <p className="text-xs text-on-surface-variant">
-                    {result.food.brand ? `${result.food.brand} Â· ` : ''}
+                    {result.food.brand ? `${result.food.brand} · ` : ''}
                     {result.food.category}
                   </p>
                 </div>
                 {result.food.nutriscore && <NutriscoreBadge grade={result.food.nutriscore} />}
               </div>
               <p className="mt-2 text-xs tabular-nums text-on-surface-variant">
-                {Math.round(result.food.per100g.kcal)} kcal Â· P {round1(result.food.per100g.proteinG)}g
-                Â· C {round1(result.food.per100g.carbsG)}g Â· F {round1(result.food.per100g.fatG)}g per
+                {Math.round(result.food.per100g.kcal)} kcal · P {round1(result.food.per100g.proteinG)}g
+                · C {round1(result.food.per100g.carbsG)}g · F {round1(result.food.per100g.fatG)}g per
                 100g
               </p>
               {(result.food.isVegan || result.food.isVegetarian) && (
@@ -350,13 +427,13 @@ export function BarcodeSheet({
                   )}
                 </div>
               )}
-              {/* OFF attribution â€” never omitted for OFF-sourced records (ODbL). */}
+              {/* OFF attribution — never omitted for OFF-sourced records (ODbL). */}
               {result.origin === 'off-api' && (
                 <p className="mt-2 border-t border-outline-variant pt-2 text-[11px] text-on-surface-variant">
-                  Â© Open Food Facts contributors
+                  © Open Food Facts contributors
                   {result.food.sourceUrl && (
                     <>
-                      {' â€” '}
+                      {' — '}
                       <a
                         href={result.food.sourceUrl}
                         target="_blank"

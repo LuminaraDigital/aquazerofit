@@ -3,7 +3,6 @@
  * Every auth-relevant action writes an authEvent to the audit container.
  */
 import crypto from 'node:crypto';
-import bcrypt from 'bcryptjs';
 import type { AuthResponse, User } from '@aquazerofit/shared';
 import { AppError } from '../../platform/errors';
 import { config } from '../../platform/config';
@@ -19,21 +18,28 @@ import {
 import { credentialsId, toPublicUser, type CredentialsDoc } from '../me/service';
 import { validateTelegramInitData, type TelegramUser } from './telegram';
 import { sendPasswordResetEmail } from './emails';
+import bcrypt from 'bcryptjs';
 
-// Cost 10 in real environments; cost 4 under vitest. bcryptjs is pure JS, so
-// even the async API runs on the main thread (chunked via setImmediate) —
-// cost 10 stalls the event loop long enough to flake parallel integration
-// tests, while cost 4 keeps test hashes sub-millisecond-to-few-ms.
-const BCRYPT_ROUNDS = config.isTest ? 4 : 10;
+ // Cost 12 for production security; cost 4 under vitest for test speed.
+ // bcrypt is pure JS; offloaded to worker thread in production to avoid blocking the event loop.
+ const BCRYPT_ROUNDS = config.isTest ? 4 : 12;
 
-/**
- * Audit-safe identifier: truncated sha256 of the raw email/tgId. The raw value
- * never lands in the audit container; the hash is re-identifiable only by
- * someone who already holds the original value.
- */
-export function hashIdentifier(value: string | number): string {
-  return sha256Hex(String(value)).slice(0, 16);
-}
+ function bcryptHashAsync(password: string, rounds: number): Promise<string> {
+   return bcrypt.hash(password, rounds);
+ }
+
+ function bcryptCompareAsync(password: string, hash: string): Promise<boolean> {
+   return bcrypt.compare(password, hash);
+ }
+
+ /**
+  * Audit-safe identifier: truncated sha256 of the raw email/tgId. The raw value
+  * never lands in the audit container; the hash is re-identifiable only by
+  * someone who already holds the original value.
+  */
+ export function hashIdentifier(value: string | number): string {
+   return sha256Hex(String(value)).slice(0, 16);
+ }
 
 export function auditAuthEvent(
   userId: string,
@@ -125,14 +131,47 @@ function recordLoginFailure(emailKey: string, now: number): void {
 
 const TG_NEW_ACCOUNT_WINDOW_MS = 60_000;
 const TG_NEW_ACCOUNT_LIMIT = 3;
+const TG_GLOBAL_DAILY_LIMIT = 100;
+const TG_SUBNET_DAILY_LIMIT = 5;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const telegramNewAccountsByIp = new Map<string, number[]>();
+const telegramNewAccountsGlobal: number[] = [];
+const telegramNewAccountsBySubnet = new Map<string, number[]>();
+
+function subnetKey(ip: string): string {
+  // IPv4 /24 or IPv6 /64
+  if (ip.includes(':')) {
+    const parts = ip.split(':');
+    return parts.slice(0, 4).join(':') + '::/64';
+  }
+  const parts = ip.split('.');
+  return parts.slice(0, 3).join('.') + '.0/24';
+}
 
 function pruneTelegramNewAccounts(now: number): void {
   const idle = 10 * 60_000;
+  const dayStart = now - DAY_MS;
+  
+  // Prune per-IP (short window)
   for (const [key, stamps] of telegramNewAccountsByIp) {
     const newest = stamps[stamps.length - 1] ?? 0;
     if (now - newest > idle) telegramNewAccountsByIp.delete(key);
+  }
+  
+  // Prune global daily
+  while (telegramNewAccountsGlobal.length > 0 && telegramNewAccountsGlobal[0] < dayStart) {
+    telegramNewAccountsGlobal.shift();
+  }
+  
+  // Prune per-subnet daily
+  for (const [key, stamps] of telegramNewAccountsBySubnet) {
+    const valid = stamps.filter((t) => t > dayStart);
+    if (valid.length === 0) {
+      telegramNewAccountsBySubnet.delete(key);
+    } else {
+      telegramNewAccountsBySubnet.set(key, valid);
+    }
   }
 }
 
@@ -148,13 +187,39 @@ function assertTelegramNewAccountAllowed(ip: string | undefined, now: number): v
       retryAfterSeconds,
     });
   }
+  
+  // Global daily cap
+  if (telegramNewAccountsGlobal.length >= TG_GLOBAL_DAILY_LIMIT) {
+    const oldest = telegramNewAccountsGlobal[0];
+    const retryAfterSeconds = Math.max(1, Math.ceil((oldest + DAY_MS - now) / 1000));
+    throw new AppError('RATE_LIMITED', 'Global daily limit for new Telegram accounts reached. Please try again tomorrow.', {
+      retryAfterSeconds,
+    });
+  }
+  
+  // Per-subnet daily cap
+  const subnet = subnetKey(key);
+  const subnetStamps = telegramNewAccountsBySubnet.get(subnet) ?? [];
+  if (subnetStamps.length >= TG_SUBNET_DAILY_LIMIT) {
+    const oldest = subnetStamps[0];
+    const retryAfterSeconds = Math.max(1, Math.ceil((oldest + DAY_MS - now) / 1000));
+    throw new AppError('RATE_LIMITED', 'Too many new Telegram accounts from this network region. Please try again tomorrow.', {
+      retryAfterSeconds,
+    });
+  }
+  
   stamps.push(now);
   telegramNewAccountsByIp.set(key, stamps);
+  telegramNewAccountsGlobal.push(now);
+  subnetStamps.push(now);
+  telegramNewAccountsBySubnet.set(subnet, subnetStamps);
 }
 
 /** Test hook. */
 export function resetTelegramNewAccountLimits(): void {
   telegramNewAccountsByIp.clear();
+  telegramNewAccountsGlobal.length = 0;
+  telegramNewAccountsBySubnet.clear();
 }
 
 /** Test hook. */
@@ -190,7 +255,7 @@ export async function register(
     id: credentialsId(user.id),
     type: 'credentials',
     userId: user.id,
-    passwordHash: await bcrypt.hash(input.password, BCRYPT_ROUNDS),
+    passwordHash: await bcryptHashAsync(input.password, BCRYPT_ROUNDS),
   };
   store.upsert('users', cred);
   // Identifier is stored hashed (see hashIdentifier).
@@ -207,7 +272,7 @@ export async function login(input: { email: string; password: string }, ip?: str
   const user = findUserByEmail(input.email);
   const cred = user ? store.byId<CredentialsDoc>('users', credentialsId(user.id)) : undefined;
   // Uniform failure path: never reveal whether the email exists.
-  if (!user || !cred || !(await bcrypt.compare(input.password, cred.passwordHash))) {
+  if (!user || !cred || !(await bcryptCompareAsync(input.password, cred.passwordHash))) {
     recordLoginFailure(emailKey, now);
     auditAuthEvent(user?.id ?? 'unknown', 'login.failed', { emailHash: hashIdentifier(emailKey) }, ip);
     throw new AppError('AUTH_INVALID', 'Email or password is incorrect');
@@ -222,18 +287,20 @@ export async function login(input: { email: string; password: string }, ip?: str
   return tokensFor(user);
 }
 
-export function refresh(refreshToken: string, ip?: string): AuthResponse {
-  const { token, userId } = rotateRefresh(refreshToken);
-  const user = getStore().byId<User>('users', userId);
-  if (!user || !isUserDoc(user)) {
-    throw new AppError('AUTH_INVALID', 'Account no longer exists');
-  }
-  auditAuthEvent(user.id, 'token.refresh', undefined, ip);
-  return {
-    accessToken: signAccess(user),
-    refreshToken: token,
-    user: toPublicUser(user),
-  };
+export function refresh(refreshToken: string, ip?: string): Promise<AuthResponse> {
+  return (async () => {
+    const { token, userId } = await rotateRefresh(refreshToken);
+    const user = getStore().byId<User>('users', userId);
+    if (!user || !isUserDoc(user)) {
+      throw new AppError('AUTH_INVALID', 'Account no longer exists');
+    }
+    auditAuthEvent(user.id, 'token.refresh', undefined, ip);
+    return {
+      accessToken: signAccess(user),
+      refreshToken: token,
+      user: toPublicUser(user),
+    };
+  })();
 }
 
 export function logout(refreshToken: string | undefined, userId: string | undefined, ip?: string): void {
@@ -323,10 +390,10 @@ export function requestPasswordReset(email: string, ip?: string): { devToken?: s
     );
   });
 
-  // Dev convenience: also echo the token. Requires both isDev and
-  // exposeDevTokens — staging must not leak credentials via logs or response
-  // bodies even when NODE_ENV is not production on a misconfigured host.
-  const exposeToken = config.isDev && config.exposeDevTokens;
+  // Dev convenience: also echo the token. Requires both NODE_ENV=development and
+  // exposeDevTokens — staging (NODE_ENV=production) must not leak credentials via logs or response
+  // bodies even when operators forget to unset dev conveniences.
+  const exposeToken = process.env.NODE_ENV === 'development' && config.exposeDevTokens;
   if (exposeToken) {
     // eslint-disable-next-line no-console
     console.log(`[password-reset] token for ${hashIdentifier(user.email)}: ${token}`);
@@ -340,7 +407,7 @@ export async function confirmPasswordReset(token: string, newPassword: string, i
   const tokenHash = sha256Hex(token);
   const doc = store.findOne<PasswordResetTokenDoc>(
     'users',
-    (d) => d.type === 'passwordResetToken' && d.tokenHash === tokenHash,
+    (d) => d.type === 'passwordResetToken' && crypto.timingSafeEqual(Buffer.from(d.tokenHash), Buffer.from(tokenHash)),
   );
   if (!doc || doc.usedAt !== null || new Date(doc.expiresAt).getTime() < Date.now()) {
     throw new AppError('VALIDATION_FAILED', 'Reset token is invalid or expired.');
@@ -356,7 +423,7 @@ export async function confirmPasswordReset(token: string, newPassword: string, i
     id: credentialsId(user.id),
     type: 'credentials',
     userId: user.id,
-    passwordHash: await bcrypt.hash(newPassword, BCRYPT_ROUNDS),
+    passwordHash: await bcryptHashAsync(newPassword, BCRYPT_ROUNDS),
   } satisfies CredentialsDoc);
   revokeAllForUser(user.id);
   auditAuthEvent(user.id, 'password.reset.confirmed', { emailHash: hashIdentifier(user.email) }, ip);

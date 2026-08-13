@@ -6,6 +6,7 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import express from 'express';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** apps/api/.data by default, regardless of process cwd. */
@@ -63,14 +64,35 @@ export const config = {
    * to 1 in production (trust exactly the immediate hop, so clients cannot
    * spoof X-Forwarded-For) and 0 in dev, where there is no proxy.
    */
-  get trustProxy(): number {
-    const raw = process.env.TRUST_PROXY?.trim();
-    if (raw) {
-      const n = Number(raw);
-      if (Number.isInteger(n) && n >= 0) return n;
-    }
-    return isProduction() ? 1 : 0;
-  },
+    get trustProxy(): number {
+      const raw = process.env.TRUST_PROXY?.trim();
+      if (raw) {
+        const n = Number(raw);
+        if (Number.isInteger(n) && n >= 0) return n;
+      }
+      return isProduction() ? 1 : 0;
+    },
+
+    /**
+     * Validates that the X-Forwarded-For header matches the trustProxy setting.
+     * Call this from Express middleware after trust proxy is configured.
+     * Logs a warning if the header count doesn't match trustProxy (potential spoofing).
+     */
+    validateTrustProxy(req: express.Request): void {
+      const trustProxy = config.trustProxy;
+      if (trustProxy <= 0) return;
+    
+      const xff = req.headers['x-forwarded-for'];
+      if (!xff) {
+        console.warn(`[security] trustProxy=${trustProxy} but no X-Forwarded-For header present`);
+        return;
+      }
+    
+      const ips = (Array.isArray(xff) ? xff[0] : xff).split(',').map(s => s.trim());
+      if (ips.length !== trustProxy) {
+        console.warn(`[security] trustProxy=${trustProxy} but X-Forwarded-For has ${ips.length} hops: ${ips.join(', ')}`);
+      }
+    },
 
   /**
    * Where meal photographs are written while a vision job is in flight.
@@ -119,6 +141,19 @@ export const config = {
       throw new Error('TELEGRAM_BOT_TOKEN must be set in production');
     }
     return process.env.TELEGRAM_BOT_TOKEN ?? 'dev-bot-token';
+  },
+
+  /**
+   * Shared secret echoed by Telegram in `X-Telegram-Bot-Api-Secret-Token` on
+   * every webhook delivery (set with the `secret_token` parameter of
+   * setWebhook). The webhook URL is otherwise a public, unauthenticated
+   * endpoint that grants coach entitlements — without this, anyone who guesses
+   * the path can mint a `successful_payment` and take the paid roster for
+   * free. Empty means the webhook refuses every request rather than trusting
+   * them all, which is the correct default for an endpoint that moves money.
+   */
+  get telegramWebhookSecret(): string {
+    return process.env.TELEGRAM_WEBHOOK_SECRET?.trim() ?? '';
   },
 
   get isTest(): boolean {

@@ -7,6 +7,12 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { RingProgress } from '@/components/ui/RingProgress';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { CoachCard } from '@/components/coach/CoachCard';
+import { ConsistencyCard } from '@/components/progress/ConsistencyCard';
+import { ConsistencyChip } from '@/components/progress/ConsistencyChip';
+import { ReadinessChip } from '@/components/progress/ReadinessChip';
+import { WeeklyInsightCard } from '@/components/progress/WeeklyInsightCard';
+import { todayWorkoutQuery, useProgressInsight, useReadiness } from '@/lib/queries';
 import { MacroBar } from './MacroBar';
 import { WaterCard } from './WaterCard';
 import { Sparkline } from './Sparkline';
@@ -41,14 +47,15 @@ export default function Dashboard() {
     queryKey: ['progress'],
     queryFn: () => api<ProgressSummary>('/progress/summary'),
   });
-  const workoutQuery = useQuery({
-    queryKey: ['workout', 'today'],
-    queryFn: () => api<unknown>('/workouts/today'),
-  });
+  // Shared cache key ⇒ shared queryFn; the raw envelope is unwrapped at use
+  // (asWorkoutSession below), never cached pre-transformed.
+  const workoutQuery = useQuery(todayWorkoutQuery);
   const trendsQuery = useQuery({
     queryKey: ['nutrition', 'trends', '30d'],
     queryFn: () => api<TrendsResponse>('/analytics/nutrition/trends', { query: { range: '30d' } }),
   });
+  const insightQuery = useProgressInsight();
+  const readinessQuery = useReadiness();
 
   const user = asUser(profileQuery.data);
   const firstName = user?.displayName?.split(' ')[0] ?? '';
@@ -59,21 +66,10 @@ export default function Dashboard() {
 
   const headerRight = (
     <div className="flex items-center gap-2.5">
-      <div
-        className="flex items-center bg-surface-container/80 rounded-full px-2.5 py-1 border border-outline-variant/50"
-        aria-label={`${progress?.streakDays ?? 0} day streak`}
-      >
-        <span
-          className="material-symbols-outlined text-tertiary-container text-[16px] mr-0.5"
-          style={{ fontVariationSettings: "'FILL' 1" }}
-          aria-hidden="true"
-        >
-          local_fire_department
-        </span>
-        <span className="text-sm font-bold tabular-nums text-on-surface">
-          {progress?.streakDays ?? 0}
-        </span>
-      </div>
+      <ConsistencyChip
+        consistency={progress?.consistency}
+        loading={progressQuery.isPending}
+      />
       <button
         type="button"
         onClick={() => navigate('/settings')}
@@ -102,6 +98,11 @@ export default function Dashboard() {
               `Hey${firstName ? `, ${firstName}` : ''}`
             )}
           </h1>
+        </section>
+
+        {/* How hard the plan should push this week — supportive, never a warning */}
+        <section className="mb-5 reveal reveal-2" aria-label="This week's readiness">
+          <ReadinessChip readiness={readinessQuery.data} loading={readinessQuery.isPending} />
         </section>
 
         {dailyQuery.isError ? (
@@ -194,6 +195,26 @@ export default function Dashboard() {
             </section>
           </>
         )}
+
+        {/* Your coach, what they make of the week, and the XP ladder. Placed
+            above consistency because it is the surface people come back for —
+            the numbers below are the evidence behind what the coach just said. */}
+        <section className="mb-5 reveal reveal-3" aria-label="Your coach">
+          <CoachCard />
+        </section>
+
+        {/* Consistency — activeDays/windowDays, never a resettable streak */}
+        <section className="mb-5 reveal reveal-4" aria-label="Consistency">
+          <ConsistencyCard
+            consistency={progress?.consistency}
+            loading={progressQuery.isPending}
+          />
+        </section>
+
+        {/* Weekly insight */}
+        <section className="mb-5 reveal reveal-4" aria-label="Your week">
+          <WeeklyInsightCard insight={insightQuery.data} loading={insightQuery.isPending} />
+        </section>
 
         {/* Today's workout */}
         <section className="mb-5 reveal reveal-4" aria-label="Today's workout">

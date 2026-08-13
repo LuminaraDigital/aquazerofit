@@ -13,10 +13,18 @@ export function AppHeader({
   title,
   back = false,
   right,
+  onToggleStatusline,
+  onOpenCalendar,
+  showStatuslineToggle = false,
+  showCalendarTrigger = false,
 }: {
   title?: string;
   back?: boolean;
   right?: ReactNode;
+  onToggleStatusline?: () => void;
+  onOpenCalendar?: () => void;
+  showStatuslineToggle?: boolean;
+  showCalendarTrigger?: boolean;
 }) {
   const navigate = useNavigate();
 
@@ -55,19 +63,48 @@ export function AppHeader({
             </h1>
           </div>
         )}
-        {right ?? (
-          !back && (
-            <Link
-              to="/settings"
-              aria-label="Profile and settings"
-              className="w-9 h-9 rounded-full border border-primary/50 bg-surface-container-high/60 flex items-center justify-center text-primary hover:bg-surface-container-highest transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {(showStatuslineToggle || onToggleStatusline) && (
+            <button
+              type="button"
+              onClick={onToggleStatusline}
+              aria-label="Toggle diagnostics statusline"
+              className="w-9 h-9 rounded-full border border-outline-variant/60 bg-surface-container-high/60 flex items-center justify-center text-primary hover:bg-surface-container-highest transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
-              <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
-                person
+              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+                monitor_heart
               </span>
-            </Link>
-          )
-        )}
+            </button>
+          )}
+
+          {(showCalendarTrigger || onOpenCalendar) && (
+            <button
+              type="button"
+              onClick={onOpenCalendar}
+              aria-label="Open date calendar picker"
+              className="w-9 h-9 rounded-full border border-outline-variant/60 bg-surface-container-high/60 flex items-center justify-center text-primary hover:bg-surface-container-highest transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+                calendar_month
+              </span>
+            </button>
+          )}
+
+          {right ?? (
+            !back && (
+              <Link
+                to="/settings"
+                aria-label="Profile and settings"
+                className="w-9 h-9 rounded-full border border-primary/50 bg-surface-container-high/60 flex items-center justify-center text-primary hover:bg-surface-container-highest transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
+                  person
+                </span>
+              </Link>
+            )
+          )}
+        </div>
       </div>
     </header>
   );

@@ -146,7 +146,7 @@ function Section({
 
 export default function AquaCoachPage() {
   return (
-    <MarketingPage documentTitle="Aqua Coach — AquaZeroFit">
+    <MarketingPage path="/aqua-coach">
       <PageHero
         crumb="Aqua Coach"
         title={
@@ -232,7 +232,8 @@ export default function AquaCoachPage() {
                   Which plan is active, so suggestions fit the week you are actually in.
                 </Bullet>
                 <Bullet title="Your progress">
-                  Weight, the change since you started, streak and completed sessions.
+                  Weight, the change since you started, your consistency and completed
+                  sessions.
                 </Bullet>
                 <Bullet title="Only what you approved">
                   Remembered facts join that context if — and only if — you have turned

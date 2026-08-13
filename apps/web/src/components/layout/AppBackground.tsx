@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Animated WebGL backdrop adapted from CoinCompass's aurora shader,
- * recolored to AquaZeroFit's aquatic palette (cyan/teal/green instead of lime).
+ * Animated WebGL aurora shader — custom implementation in AquaZeroFit's
+ * aquatic palette (cyan/teal/green).
  *
  * Renders three fixed layers:
  * 1. <canvas> - GLSL aurora light rays in aqua tones

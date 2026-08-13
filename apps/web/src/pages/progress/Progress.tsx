@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import type { DerivedTargets, ProgressSummary, TrendPoint } from '@aquazerofit/shared';
+import type { ProgressSummary, TrendPoint } from '@aquazerofit/shared';
 import { AQUA_CHARACTER } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
 import { normalizeWorkoutStats, type WorkoutStatsResponse } from '@/lib/contracts';
@@ -23,8 +23,16 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
 import { ShareMoment } from '@/components/share/ShareMoment';
+import { ConsistencyCard } from '@/components/progress/ConsistencyCard';
+import { ReadinessChip } from '@/components/progress/ReadinessChip';
+import { WeeklyInsightCard } from '@/components/progress/WeeklyInsightCard';
+import {
+  consistencyHeadline,
+  consistencyShortHeadline,
+  CONSISTENCY_EMPTY_HEADLINE,
+} from '@/components/progress/consistencyCopy';
 import type { ShareCardPayload } from '@/lib/shareCard';
-import { useMe } from '@/lib/queries';
+import { useMe, useProgressInsight, useReadiness, useTargets } from '@/lib/queries';
 import { Sparkline } from '../dashboard/Sparkline';
 
 type Range = '7d' | '30d' | '90d';
@@ -167,21 +175,24 @@ function KcalBars({ series, target }: { series: TrendPoint[]; target: number | n
   return (
     <figure aria-label={`Daily calorie intake bars. Average ${avg} kilocalories${target !== null ? ` against a target of ${target}` : ''}.`}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-hidden="true">
-        {series.map((p, i) => {
-          const over = target !== null && p.value > target;
-          return (
-            <rect
-              key={p.date}
-              x={PAD + i * ((W - PAD * 2) / Math.max(1, series.length)) + 1}
-              y={y(p.value)}
-              width={bw}
-              height={Math.max(1, H - PAD - y(p.value))}
-              rx={Math.min(3, bw / 2)}
-              fill={over ? '#ffb2b9' : '#2fd9f4'}
-              opacity={over ? 0.85 : 0.7}
-            />
-          );
-        })}
+        {/* Every bar is the same aqua. Painting over-target days coral marked
+            them as errors, which is the calorie-target guilt this product is
+            required to design out (AQF-11 §6) — and it was redundant besides:
+            a bar that crosses the dashed target line has already said so, by
+            position rather than by alarm. Position also survives colour
+            blindness, which the red/blue split did not. */}
+        {series.map((p, i) => (
+          <rect
+            key={p.date}
+            x={PAD + i * ((W - PAD * 2) / Math.max(1, series.length)) + 1}
+            y={y(p.value)}
+            width={bw}
+            height={Math.max(1, H - PAD - y(p.value))}
+            rx={Math.min(3, bw / 2)}
+            fill="#2fd9f4"
+            opacity={0.7}
+          />
+        ))}
         {target !== null && (
           <>
             <line x1={PAD} x2={W - PAD} y1={y(target)} y2={y(target)} stroke="#45dfa4" strokeDasharray="4 4" strokeWidth="1.5" />
@@ -280,10 +291,11 @@ export default function Progress() {
     queryKey: ['nutrition', 'trends', range],
     queryFn: () => api<NutritionTrends>('/analytics/nutrition/trends', { query: { range } }),
   });
-  const targetsQuery = useQuery({
-    queryKey: ['targets'],
-    queryFn: () => api<DerivedTargets>('/me/targets'),
-  });
+  // Shared ['targets'] key: useTargets caches the unwrapped targets object;
+  // caching the raw { targets } envelope here made kcalTarget read undefined.
+  const targetsQuery = useTargets();
+  const insightQuery = useProgressInsight();
+  const readinessQuery = useReadiness();
   // Deterministic training stats (Brzycki e1RM + weekly volume). Optional
   // read model — the block stays hidden while the endpoint rolls out (404).
   const workoutStatsQuery = useQuery({
@@ -370,6 +382,21 @@ export default function Progress() {
         </div>
       ) : summary ? (
         <div className="mt-5 space-y-6">
+          {/* ---- readiness ---- */}
+          <section aria-label="This week's readiness">
+            <ReadinessChip readiness={readinessQuery.data} loading={readinessQuery.isPending} />
+          </section>
+
+          {/* ---- consistency (replaces the streak counter) ---- */}
+          <section aria-label="Consistency">
+            <ConsistencyCard consistency={summary.consistency} />
+          </section>
+
+          {/* ---- weekly insight ---- */}
+          <section aria-label="Your week">
+            <WeeklyInsightCard insight={insightQuery.data} loading={insightQuery.isPending} />
+          </section>
+
           {/* ---- weight hero ---- */}
           <section aria-label="Weight progress">
             <div className="grid grid-cols-2 gap-4">
@@ -384,16 +411,17 @@ export default function Progress() {
               </GlassCard>
               <GlassCard className="p-5">
                 <span className="text-sm text-on-surface-variant">Since start</span>
+                {/* Direction is reported, not judged: a gain is not rendered as
+                    a failure and a loss is not rendered as a reward. Same ink
+                    either way — the sign carries the information. */}
                 <div className="mt-2 flex items-center gap-1">
                   <span
-                    className={`material-symbols-outlined ${delta !== null && delta <= 0 ? 'text-secondary' : 'text-coral'}`}
+                    className="material-symbols-outlined text-on-surface-variant"
                     aria-hidden="true"
                   >
                     {delta !== null && delta <= 0 ? 'trending_down' : 'trending_up'}
                   </span>
-                  <span
-                    className={`text-sm font-bold tabular-nums ${delta !== null && delta <= 0 ? 'text-secondary' : 'text-coral'}`}
-                  >
+                  <span className="text-sm font-bold tabular-nums text-on-surface">
                     {delta !== null ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg` : '–'}
                   </span>
                 </div>
@@ -452,15 +480,9 @@ export default function Progress() {
           </section>
 
           {/* ---- stats row ---- */}
-          <section aria-label="Statistics" className="grid grid-cols-3 gap-3">
-            <MetricCard
-              label="Streak"
-              value={summary.streakDays}
-              unit="days"
-              tone="aqua"
-              icon="local_fire_department"
-              loading={progressQuery.isPending}
-            />
+          {/* Consistency is the card above; these are cumulative totals only —
+              nothing here can be reset by a missed day. */}
+          <section aria-label="Statistics" className="grid grid-cols-2 gap-3">
             <MetricCard
               label="Workouts"
               value={summary.workoutsCompleted}
@@ -634,13 +656,16 @@ export default function Progress() {
             </PrimaryButton>
             <SecondaryButton
               onClick={() => {
-                const days = summary.streakDays;
+                // Shares the window figure, never a run length: a shared card
+                // must not be able to say a run was lost.
+                const c = summary.consistency;
                 setSharePayload({
-                  kind: 'streak',
-                  headline: days > 0 ? `${days}-day streak` : 'Starting strong',
+                  kind: 'consistency',
+                  headline:
+                    c.activeDays > 0 ? consistencyHeadline(c) : CONSISTENCY_EMPTY_HEADLINE,
                   subline: `${summary.workoutsCompleted} workouts · ${summary.totalKcalBurned} kcal burned`,
                   stats: [
-                    { label: 'Streak', value: String(days) },
+                    { label: 'Active days', value: consistencyShortHeadline(c) },
                     { label: 'Workouts', value: String(summary.workoutsCompleted) },
                     {
                       label: 'Burned',

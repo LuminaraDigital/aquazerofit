@@ -20,7 +20,8 @@ export type PromptId =
   | 'P-08'
   | 'P-09'
   | 'P-10'
-  | 'P-11';
+  | 'P-11'
+  | 'P-12';
 
 const PROMPT_FILES: Record<PromptId, string> = {
   'P-01': 'P-01-meal-photo-analysis.md',
@@ -34,6 +35,7 @@ const PROMPT_FILES: Record<PromptId, string> = {
   'P-09': 'P-09-safety-classifier.md',
   'P-10': 'P-10-memory-extraction.md',
   'P-11': 'P-11-memory-summary.md',
+  'P-12': 'P-12-chat-meal-extraction.md',
 };
 
 /** Default prompt per logical lane; call sites may override. */

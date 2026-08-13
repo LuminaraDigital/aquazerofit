@@ -9,8 +9,14 @@
       content="AquaZeroFit — AI-powered wellness: log meals by photo, get adaptive training plans and personalised nutrition targets."
     />
     <title>AquaZeroFit</title>
-    <!-- Social/link-preview metadata for the landing page. Static because the
-         SPA has one shell; the landing route sets its own document.title. -->
+    <!-- Development defaults only.
+
+         `vite-plugins/seo.ts` strips the title, description, canonical and
+         social tags out of this shell at build time and substitutes the ones
+         belonging to each route, writing a separate HTML file per marketing
+         page. What ships is never these values — they exist so `npm run dev`
+         has something sensible in the tab. Editing them changes nothing that
+         a crawler sees; edit MARKETING_ROUTES in src/lib/site.ts instead. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="AquaZeroFit" />
     <meta property="og:title" content="AquaZeroFit — AI wellness with the maths in the open" />
@@ -36,9 +42,18 @@
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
       rel="stylesheet"
     />
-    <!-- Telegram WebApp SDK: SRI hash could not be verified (CDN fetch timed out).
-         crossorigin enables CORS-isolated loading; pin integrity when the script is fetchable. -->
-    <script src="https://telegram.org/js/telegram-web-app.js" crossorigin="anonymous"></script>
+    <!-- The Telegram WebApp SDK is NOT loaded here.
+
+         It used to be a blocking <script> from telegram.org on every page
+         load, including the landing page — whose entire job is converting
+         visitors who are not in Telegram yet. That put a render-blocking
+         third-party request in front of the marketing site for everyone, and
+         stalled it outright on the corporate networks that block telegram.org,
+         which is exactly the audience the browser fallback exists for.
+
+         src/lib/telegram.ts now detects a Mini App launch from the URL
+         fragment Telegram supplies (no SDK needed) and fetches the script only
+         then, with a timeout. On the web, telegram.org is never contacted. -->
   </head>
   <body>
     <div id="root"></div>

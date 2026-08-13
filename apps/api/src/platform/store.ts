@@ -46,6 +46,19 @@ export interface StoredDoc {
   id: string;
 }
 
+export interface RefreshTokenRecord {
+  id: string;
+  type: 'refreshToken';
+  /** sha256 hex of the opaque token. Only the hash is stored at rest. */
+  tokenHash: string;
+  userId: string;
+  familyId: string;
+  expiresAt: string;
+  usedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
 /**
  * Pending writes for one container, tracked per document id.
  *
@@ -189,6 +202,26 @@ export abstract class MemoryBackedStore {
       .catch((err) => {
         // eslint-disable-next-line no-console
         console.error('[store] flush failed', err);
+        // Re-mark the failed batch dirty so the next flush retries it —
+        // otherwise these ids are only re-persisted if they happen to change
+        // again, which under per-id backing (Postgres) loses them on restart.
+        // Merge UNDER any newer dirt: changes recorded since the failure are
+        // strictly newer and must win.
+        for (const [container, delta] of batch) {
+          const current =
+            this.dirty.get(container) ??
+            (() => {
+              const fresh = { changed: new Set<string>(), deleted: new Set<string>() };
+              this.dirty.set(container, fresh);
+              return fresh;
+            })();
+          for (const id of delta.changed) {
+            if (!current.deleted.has(id)) current.changed.add(id);
+          }
+          for (const id of delta.deleted) {
+            if (!current.changed.has(id)) current.deleted.add(id);
+          }
+        }
       });
   }
 
@@ -208,6 +241,26 @@ export abstract class MemoryBackedStore {
   async flush(): Promise<void> {
     if (this.dirty.size > 0) this.enqueueFlush();
     await this.writeQueue;
+  }
+
+  /**
+   * Atomic compare-and-swap for refresh token rotation.
+   * Marks a refresh token as used (sets usedAt) only if it's still unused and not revoked.
+   * Returns the updated record on success, undefined if the token was already consumed/revoked.
+   */
+  async compareAndSwapRefreshToken(
+    tokenId: string,
+    tokenHash: string,
+    usedAt: string
+  ): Promise<RefreshTokenRecord | undefined> {
+    const rec = this.container('users').get(tokenId) as RefreshTokenRecord | undefined;
+    if (!rec) return undefined;
+    if (rec.tokenHash !== tokenHash) return undefined;
+    if (rec.usedAt !== null || rec.revokedAt !== null) return undefined;
+    const updated = { ...rec, usedAt };
+    this.container('users').set(tokenId, updated);
+    this.markDirty('users', tokenId, 'write');
+    return updated;
   }
 }
 
@@ -277,6 +330,19 @@ export interface ContainerHandle {
   delete(id: string): boolean;
 }
 
+/**
+ * Atomic compare-and-swap for refresh token rotation.
+ * Marks a refresh token as used (sets usedAt) only if it's still unused and not revoked.
+ * Returns the updated record on success, undefined if the token was already consumed/revoked.
+ */
+export interface RefreshTokenCAS {
+  compareAndSwapRefreshToken(
+    tokenId: string,
+    tokenHash: string,
+    usedAt: string
+  ): Promise<RefreshTokenRecord | undefined>;
+}
+
 export const store = {
   container(name: string): ContainerHandle {
     const containerName = name as ContainerName;
@@ -320,6 +386,47 @@ export async function initStore(): Promise<MemoryBackedStore> {
   // are only meaningful once the existing rows are in memory.
   seedIfNeeded(pg);
   return pg;
+}
+
+/**
+ * Human-readable cause for a store bootstrap failure. When DATABASE_URL points
+ * at a server that is unreachable, refuses the credentials, or lacks the named
+ * database, the pg driver surfaces a bare code (ECONNREFUSED, 28P01, 3D000…)
+ * that tells an operator reading a crash log nothing actionable. index.ts
+ * prints this instead before exiting non-zero, so the boot failure identifies
+ * its own cause rather than dying on a cryptic stack trace.
+ */
+export function describeStoreInitFailure(err: unknown): string {
+  // pg (via Node's net) may wrap connection failures in an AggregateError
+  // whose own `code`/`message` are empty; the real cause is the first inner
+  // error, so unwrap before mapping.
+  if (err instanceof AggregateError && err.errors.length > 0) {
+    return describeStoreInitFailure(err.errors[0]);
+  }
+  const code =
+    typeof (err as { code?: unknown } | null)?.code === 'string'
+      ? (err as { code: string }).code
+      : '';
+  const message = err instanceof Error ? err.message : String(err);
+  switch (code) {
+    case 'ECONNREFUSED':
+      return `Postgres refused the connection (${message}). The server behind DATABASE_URL is not accepting connections — check that the database is running and the host and port are right.`;
+    case 'ENOTFOUND':
+    case 'EAI_AGAIN':
+      return `The Postgres host in DATABASE_URL could not be resolved (${message}). Check the hostname for typos and that DNS is reachable from this process.`;
+    case 'ETIMEDOUT':
+    case 'ECONNRESET':
+      return `The connection to Postgres timed out or was dropped (${message}). Check network access and firewall rules between this process and the database.`;
+    case '28P01':
+    case '28000':
+      return `Postgres rejected the credentials in DATABASE_URL (${message}). Check the username and password — authentication failed.`;
+    case '3D000':
+      return `The database named in DATABASE_URL does not exist (${message}). Create it, or fix the database name in the connection string.`;
+    case '57P03':
+      return `Postgres is starting up or shutting down and cannot accept connections yet (${message}). Retry once the database is ready.`;
+    default:
+      return `Store initialisation failed (${message}). DATABASE_URL is set, so Postgres hydration was attempted; fix the connection string, or unset DATABASE_URL to fall back to the file-backed store.`;
+  }
 }
 
 /**

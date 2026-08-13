@@ -171,6 +171,25 @@ describe('water and weight logs (no per-id endpoints: list scoping is the whole 
     expect(res.body.points).toEqual([]);
     expect(res.body.logs).toEqual([]);
   });
+
+  // The aggregated read model, asserted directly: everything above is scoped
+  // through the same service helpers, but the DTO is what the nutrition page
+  // actually renders, so it gets its own isolation check (TC-NUT-20). A third
+  // user with a profile is used because B (deliberately profile-less) 404s on
+  // the targets-dependent DTO before any aggregation runs.
+  it("another user's daily nutrition DTO shows zero consumption after A's logs", async () => {
+    const userC = await registerUser('isolation-c@example.com');
+    await enableConsents(userC);
+    await putProfile(userC);
+    const res = await request(app)
+      .get(`${base}/analytics/nutrition/daily?date=${DATE}`)
+      .set(auth(userC));
+    expect(res.status).toBe(200);
+    expect(res.body.kcalConsumed).toBe(0);
+    expect(res.body.kcalBurned).toBe(0);
+    expect(res.body.waterMl.consumed).toBe(0);
+    expect(res.body.proteinG.consumed).toBe(0);
+  });
 });
 
 describe('training plans (per-user /current; no by-id endpoint exists)', () => {

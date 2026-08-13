@@ -38,7 +38,7 @@ import { BottomSheet } from './BottomSheet';
 import { asList, estimateKcal, estimateMinutes, ExerciseImage, unwrapSession } from './WorkoutLibrary';
 import { ShareMoment } from '@/components/share/ShareMoment';
 import type { ShareCardPayload } from '@/lib/shareCard';
-import { useMe } from '@/lib/queries';
+import { todayWorkoutQuery, useMe } from '@/lib/queries';
 import { AQUA_CHARACTER } from '@aquazerofit/shared';
 
 type Phase = 'overview' | 'work' | 'rest' | 'summary';
@@ -48,14 +48,13 @@ interface TodayPayload {
   resolved: ResolvedToday | null;
 }
 
-async function fetchToday(): Promise<TodayPayload> {
-  try {
-    const data = await api<unknown>('/workouts/today');
-    return { session: unwrapSession(data), resolved: unwrapResolved(data) };
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return { session: null, resolved: null };
-    throw e;
-  }
+/**
+ * ['workout','today'] is shared with the dashboard and the library, so the
+ * cached value must stay the raw envelope — this page carves its slice with
+ * `select` (see todayWorkoutQuery in lib/queries).
+ */
+function selectToday(data: unknown): TodayPayload {
+  return { session: unwrapSession(data), resolved: unwrapResolved(data) };
 }
 
 function localDateToday(): string {
@@ -81,7 +80,7 @@ export default function WorkoutDetail() {
 
   // The :id route param is the session id; we always render today's session
   // (if the id mismatches we still show today's - noted deviation per brief).
-  const sessionQuery = useQuery({ queryKey: ['workout', 'today'], queryFn: fetchToday });
+  const sessionQuery = useQuery({ ...todayWorkoutQuery, select: selectToday });
   const session = sessionQuery.data?.session ?? null;
   const resolved = sessionQuery.data?.resolved ?? null;
   const sessionId = session?.id ?? id ?? '';

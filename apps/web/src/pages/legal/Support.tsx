@@ -95,7 +95,7 @@ const ANSWERS: Answer[] = [
 
 export default function SupportPage() {
   return (
-    <MarketingPage documentTitle="Support — AquaZeroFit">
+    <MarketingPage path="/support">
       <PageHero
         crumb="Support"
         title={

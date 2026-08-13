@@ -60,9 +60,11 @@ function WelcomeInner() {
     if (!initData) return;
     setTgLoading(true);
     try {
-      const res = await telegramLogin(initData);
+      await telegramLogin(initData);
       haptic('success');
-      navigate(res.user.hasProfile ? '/' : '/onboarding', { replace: true });
+      // The Mini App's whole point is arriving with nothing to fill in — a new
+      // account lands on the first-run home, not on a form.
+      navigate('/', { replace: true });
     } catch {
       haptic('error');
       toast.error('Telegram sign-in failed. Please try again.');

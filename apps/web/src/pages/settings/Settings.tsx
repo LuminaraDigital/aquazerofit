@@ -48,8 +48,17 @@ import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SecondaryButton } from '../../components/ui/SecondaryButton';
 import { useToast } from '../../components/ui/Toast';
 import { SegmentedOptions, Switch, UnitToggle } from '../../components/ui/fields';
+import { TargetsNotSetCard, setupHref } from '../auth/SetupPrompt';
+import { useHashTarget } from './useHashTarget';
 
 const APP_VERSION = 'v1.0.0';
+
+/**
+ * Deep-link target for the AI personalisation consent. Other surfaces link to
+ * `/settings#privacy-consents`; the string is exported so a rename cannot
+ * quietly break them.
+ */
+export const PRIVACY_CONSENTS_ANCHOR = 'privacy-consents';
 
 const DIETARY_LABELS: Record<DietaryPreference, string> = {
   vegetarian: 'Vegetarian',
@@ -125,16 +134,24 @@ export default function Settings() {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
 
+  // Before the early returns: the section this targets only renders once the
+  // profile query resolves, and the hook is built to wait for it.
+  useHashTarget(PRIVACY_CONSENTS_ANCHOR);
+
   if (isLoading) return <PageSpinner />;
-  if (isError || !profile) {
-    return (
-      <div className="max-w-md mx-auto min-h-screen flex items-center px-container-margin">
-        <div className="w-full">
-          <ErrorState message="We could not load your profile." retry={() => void refetch()} />
-        </div>
-      </div>
-    );
-  }
+
+  // Three states, and only one of them is a failure:
+  //   profile        — the full page
+  //   profile null   — a signed-in account that has not set targets up yet.
+  //                    Since the profile gate was removed this is a supported,
+  //                    first-class state, not an error.
+  //   isError        — the request actually failed.
+  // Neither of the latter two may short-circuit the page: sign-out, consents,
+  // data export and account deletion are the user's rights, and gating them
+  // behind "have you entered your height" would strand people with no way to
+  // leave or to exercise them. So the failure is scoped to the one section
+  // that genuinely depends on the profile, and everything else renders.
+  const profileUnavailable = isError && !profile;
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'AquaZeroFit member';
   const initial = displayName.charAt(0).toUpperCase();
@@ -323,16 +340,27 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* Wellness profile */}
+        {/* Wellness profile — the only section that needs the profile */}
         <section>
           <h3 className="font-heading font-semibold uppercase tracking-wide text-xl text-primary mb-3 px-2">
             Wellness Profile
           </h3>
-          <ProfileSummaryCard
-            profile={profile}
-            saving={updateProfile.isPending}
-            onSave={(patch) => void saveProfile(patch, 'Profile updated — targets recomputed.')}
-          />
+          {profile ? (
+            <ProfileSummaryCard
+              profile={profile}
+              saving={updateProfile.isPending}
+              onSave={(patch) => void saveProfile(patch, 'Profile updated — targets recomputed.')}
+            />
+          ) : profileUnavailable ? (
+            <ErrorState
+              message="We could not load your wellness profile."
+              retry={() => void refetch()}
+            />
+          ) : (
+            // Shared with the first-run home so both surfaces make the same
+            // promise about what is missing and how long it takes to supply.
+            <TargetsNotSetCard returnTo="/settings" />
+          )}
         </section>
 
         {/* Preferences */}
@@ -341,77 +369,27 @@ export default function Settings() {
             Preferences
           </h3>
           <div className="glass-card overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-outline-variant/50 gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="material-symbols-outlined text-on-surface-variant" aria-hidden="true">
-                  straighten
-                </span>
-                <span className="text-base">Units</span>
-              </div>
-              <UnitToggle
-                value={profile.unitPreference}
-                onChange={(unit) => void saveProfile({ unitPreference: unit }, 'Units updated.')}
-              />
-            </div>
-            <div className="p-4 border-b border-outline-variant/50 space-y-2">
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-on-surface-variant" aria-hidden="true">
-                  restaurant_menu
-                </span>
-                <span className="text-base">Dietary preferences</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {DIETARY_PREFERENCES.map((pref) => (
-                  <Chip
-                    key={pref}
-                    label={DIETARY_LABELS[pref]}
-                    tone="green"
-                    active={profile.dietaryPreferences.includes(pref)}
-                    onClick={() =>
-                      void saveProfile(
-                        {
-                          dietaryPreferences: profile.dietaryPreferences.includes(pref)
-                            ? profile.dietaryPreferences.filter((p) => p !== pref)
-                            : [...profile.dietaryPreferences, pref],
-                        },
-                        'Dietary preferences updated.',
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="p-4 border-b border-outline-variant/50 space-y-2">
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-on-surface-variant" aria-hidden="true">
-                  warning
-                </span>
-                <span className="text-base">Allergies</span>
-              </div>
-              <p className="text-xs text-on-surface-variant">
-                Selected allergens are strictly excluded from every suggestion.
+            {/*
+              Units, diet and allergies are stored *on* the wellness profile, so
+              without one there is nothing to write to. They are hidden rather
+              than shown broken — an allergen chip that silently fails to save
+              would be the worst kind of lie for this particular field. The
+              notifications link below is profile-independent and always shows.
+            */}
+            {profile ? (
+              <ProfilePreferenceRows profile={profile} onSave={saveProfile} />
+            ) : (
+              <p className="p-4 text-sm text-on-surface-variant border-b border-outline-variant/50">
+                Units, dietary preferences and allergies are part of your wellness profile.{' '}
+                <Link
+                  to={setupHref('/settings')}
+                  className="text-primary underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded"
+                >
+                  Set it up
+                </Link>{' '}
+                to choose them.
               </p>
-              <div className="flex flex-wrap gap-2">
-                {ALLERGENS.map((allergen) => (
-                  <Chip
-                    key={allergen}
-                    label={ALLERGEN_LABELS[allergen]}
-                    tone="coral"
-                    active={profile.allergies.includes(allergen)}
-                    onClick={() =>
-                      void saveProfile(
-                        {
-                          allergies: profile.allergies.includes(allergen)
-                            ? profile.allergies.filter((a) => a !== allergen)
-                            : [...profile.allergies, allergen],
-                        },
-                        'Allergies updated.',
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            </div>
+            )}
             <Link
               to="/settings/notifications"
               className="flex items-center justify-between p-4 hover:bg-surface-container-high transition-colors group focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
@@ -432,9 +410,22 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* Privacy & consents */}
-        <section>
-          <h3 className="font-heading font-semibold uppercase tracking-wide text-xl text-primary mb-3 px-2">
+        {/*
+          Privacy & consents — deep-link target. scroll-mt clears the sticky
+          AppHeader (56px + breathing room) so the heading is not parked under
+          it, and tabIndex makes the section a programmatic focus target so
+          the arrival is announced rather than only drawn.
+        */}
+        <section
+          id={PRIVACY_CONSENTS_ANCHOR}
+          tabIndex={-1}
+          aria-labelledby="privacy-consents-heading"
+          className="scroll-mt-24 rounded-card outline-none"
+        >
+          <h3
+            id="privacy-consents-heading"
+            className="font-heading font-semibold uppercase tracking-wide text-xl text-primary mb-3 px-2"
+          >
             Privacy & Consents
           </h3>
           <div className="glass-card overflow-hidden">
@@ -649,6 +640,100 @@ export default function Settings() {
 
       <BottomNav />
     </div>
+  );
+}
+
+// ---------- Preferences that live on the profile ----------
+
+/**
+ * Units, dietary preferences and allergies are fields *of* the wellness
+ * profile, so an account that has not set one up has nothing to write them to.
+ * They are split out here so the Preferences card can drop them wholesale
+ * rather than render controls whose saves cannot land — for allergens in
+ * particular, a chip that appears to stick but silently fails would be the
+ * worst possible failure mode.
+ */
+function ProfilePreferenceRows({
+  profile,
+  onSave,
+}: {
+  profile: WellnessProfile;
+  onSave: (patch: Partial<ProfileInput>, successMessage: string) => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between p-4 border-b border-outline-variant/50 gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="material-symbols-outlined text-on-surface-variant" aria-hidden="true">
+            straighten
+          </span>
+          <span className="text-base">Units</span>
+        </div>
+        <UnitToggle
+          value={profile.unitPreference}
+          onChange={(unit) => onSave({ unitPreference: unit }, 'Units updated.')}
+        />
+      </div>
+      <div className="p-4 border-b border-outline-variant/50 space-y-2">
+        <div className="flex items-center gap-3">
+          <span className="material-symbols-outlined text-on-surface-variant" aria-hidden="true">
+            restaurant_menu
+          </span>
+          <span className="text-base">Dietary preferences</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {DIETARY_PREFERENCES.map((pref) => (
+            <Chip
+              key={pref}
+              label={DIETARY_LABELS[pref]}
+              tone="green"
+              active={profile.dietaryPreferences.includes(pref)}
+              onClick={() =>
+                onSave(
+                  {
+                    dietaryPreferences: profile.dietaryPreferences.includes(pref)
+                      ? profile.dietaryPreferences.filter((p) => p !== pref)
+                      : [...profile.dietaryPreferences, pref],
+                  },
+                  'Dietary preferences updated.',
+                )
+              }
+            />
+          ))}
+        </div>
+      </div>
+      <div className="p-4 border-b border-outline-variant/50 space-y-2">
+        <div className="flex items-center gap-3">
+          <span className="material-symbols-outlined text-on-surface-variant" aria-hidden="true">
+            warning
+          </span>
+          <span className="text-base">Allergies</span>
+        </div>
+        <p className="text-xs text-on-surface-variant">
+          Selected allergens are strictly excluded from every suggestion.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {ALLERGENS.map((allergen) => (
+            <Chip
+              key={allergen}
+              label={ALLERGEN_LABELS[allergen]}
+              tone="coral"
+              active={profile.allergies.includes(allergen)}
+              onClick={() =>
+                onSave(
+                  {
+                    allergies: profile.allergies.includes(allergen)
+                      ? profile.allergies.filter((a) => a !== allergen)
+                      : [...profile.allergies, allergen],
+                  },
+                  'Allergies updated.',
+                )
+              }
+            />
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
 

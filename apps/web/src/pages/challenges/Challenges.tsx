@@ -26,8 +26,13 @@ import { trackGrowth } from '@/lib/growth';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { AppBackground } from '@/components/layout/AppBackground';
 
+/**
+ * Display labels for the buddy-challenge kinds. `logging_streak` is the wire
+ * enum, but nothing user-facing says "streak": a huddle counts show-up days,
+ * which only ever accumulate.
+ */
 const KIND_LABELS: Record<BuddyChallengeKind, string> = {
-  logging_streak: 'Show-up streak',
+  logging_streak: 'Show-up days',
   workouts: 'Workout days',
   meal_logs: 'Meal logging days',
 };

@@ -16,6 +16,11 @@ import {
 } from '@aquazerofit/shared';
 import { requireAuth, userIdOf, verifyAccess } from '../../platform/auth';
 import { getStore, newId } from '../../platform/store';
+import {
+  ANON_IP_EVENT_BUDGET_PER_HOUR,
+  EVENT_BUDGET_PER_HOUR,
+  consumeEventBudget,
+} from './eventBudget';
 import { lastNDates, rangeToDays, todayFor } from '../../platform/dates';
 import { getTargets } from '../me/service';
 import {
@@ -91,6 +96,17 @@ analyticsRouter.post('/events', (req, res, next) => {
         userId = null;
       }
     }
+    // Hourly storage budget (eventBudget.ts). Over-budget events are
+    // acknowledged but never persisted: the 202 is shaped identically to a
+    // stored write so the budget cannot be probed from outside, and the web
+    // client fires these without reading the body back.
+    const budgetKey = userId ? `user:${userId}` : `ip:${req.ip ?? 'unknown'}`;
+    const budgetLimit = userId ? EVENT_BUDGET_PER_HOUR : ANON_IP_EVENT_BUDGET_PER_HOUR;
+    if (!consumeEventBudget(budgetKey, budgetLimit)) {
+      res.status(202).json({ ok: true, id: newId('gev') });
+      return;
+    }
+
     const event: GrowthEvent = {
       type: 'growthEvent',
       id: newId('gev'),

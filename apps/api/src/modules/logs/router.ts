@@ -27,6 +27,8 @@ import {
   withIdempotency,
 } from './service';
 
+import { copyPreviousHandler } from './logs';
+
 export const logsRouter = Router();
 logsRouter.use(requireAuth);
 
@@ -37,6 +39,9 @@ function withLocalDate<T extends { localDate?: unknown }>(body: T, fallback: str
 }
 
 // ----- meal logs -----
+
+logsRouter.post('/logs/copy-previous', copyPreviousHandler);
+logsRouter.post('/meal-logs/copy-previous', copyPreviousHandler);
 
 logsRouter.post('/meal-logs', (req, res) => {
   const userId = userIdOf(req);

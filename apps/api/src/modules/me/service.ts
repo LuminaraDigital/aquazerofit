@@ -78,6 +78,17 @@ export function updateIdentity(
   return toPublicUser(updated);
 }
 
+/**
+ * Upsert the profile and recompute targets from it.
+ *
+ * The client collects this in two waves: the six fields the calculator reads
+ * (weight, height, age, sex, activity level, goal) up front, and the
+ * personalisation fields — training experience, equipment, dietary preferences,
+ * allergies — later, from Settings. Both waves arrive here as a whole profile,
+ * so there is no partial-profile shape to persist: an account either has a
+ * profile the calculator can run on or it has none at all, and `hasProfile` on
+ * PublicUser stays the single source of truth for which.
+ */
 export function saveProfile(userId: string, input: ProfileInput): { profile: ProfileDoc; targets: TargetsDoc } {
   const store = getStore();
   const now = new Date().toISOString();
@@ -99,13 +110,25 @@ export function saveProfile(userId: string, input: ProfileInput): { profile: Pro
   return { profile, targets };
 }
 
+/**
+ * Derived targets for the user, computed on demand if they are not stored yet.
+ *
+ * There is deliberately no fallback target. Every number the calculator returns
+ * is traceable to a value the user supplied, and a stand-in "typical" intake
+ * presented as someone's own target is a health claim about a person the system
+ * knows nothing about. Absent inputs are therefore a 404 the callers render as
+ * "not set up yet", never a default.
+ */
 export function getTargets(userId: string): TargetsDoc {
   const store = getStore();
   const existing = store.byId<TargetsDoc>('profiles', targetsId(userId));
   if (existing) return existing;
   const profile = getProfile(userId);
   if (!profile) {
-    throw new AppError('NOT_FOUND', 'No wellness profile yet; complete onboarding first');
+    throw new AppError(
+      'NOT_FOUND',
+      'Targets are calculated from your height, weight, age and activity — add those essentials to see them.',
+    );
   }
   const targets: TargetsDoc = {
     id: targetsId(userId),

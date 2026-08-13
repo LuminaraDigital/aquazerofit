@@ -41,7 +41,7 @@ export default function PrivacyPage() {
 
   return (
     <LegalPage
-      documentTitle="Privacy notice — AquaZeroFit"
+      path="/privacy"
       crumb="Privacy"
       title="Privacy notice"
       lead="What AquaZeroFit collects, why, who else can see it, and how to get rid of it. The service handles what you eat and what you weigh, so this is written to be read rather than to be survived."
@@ -156,7 +156,10 @@ export default function PrivacyPage() {
               The providers in use on this deployment are{' '}
               <Fact name="aiProviders" hint="configured AI providers" />. Their own terms govern
               what they do with data they receive, and that must be checked before this notice is
-              relied upon.
+              relied upon. The operator last verified those terms on{' '}
+              <Fact name="aiProvidersVerifiedOn" hint="date provider terms last verified" />;
+              provider terms change, so this date is re-checked whenever a provider is added,
+              removed or revises its terms.
             </>,
           ]}
         />

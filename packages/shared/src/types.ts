@@ -127,6 +127,25 @@ export interface FoodNutrients {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  fiberG?: number;
+  sugarG?: number;
+  sodiumMg?: number;
+  potassiumMg?: number;
+  calciumMg?: number;
+  ironMg?: number;
+}
+
+export interface NutritionSummary {
+  kcal: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  fiberG?: number;
+  sugarG?: number;
+  sodiumMg?: number;
+  potassiumMg?: number;
+  calciumMg?: number;
+  ironMg?: number;
 }
 
 export interface Food {
@@ -241,6 +260,12 @@ export interface MealLogItem {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  fiberG?: number;
+  sugarG?: number;
+  sodiumMg?: number;
+  potassiumMg?: number;
+  calciumMg?: number;
+  ironMg?: number;
 }
 
 export interface MealLog {
@@ -253,7 +278,14 @@ export interface MealLog {
   totalProteinG: number;
   totalCarbsG: number;
   totalFatG: number;
-  source: 'manual' | 'photo' | 'recommendation';
+  /**
+   * How the row got here. `chat` is a distinct provenance from `manual`:
+   * both end in a person confirming every line, but one of them had a model
+   * read the sentence first, and folding it into `manual` would make the
+   * extraction lane's real-world accuracy unmeasurable — the evaluation signal
+   * would be indistinguishable from hand typing.
+   */
+  source: 'manual' | 'photo' | 'recommendation' | 'chat';
   visionJobId?: string;
   loggedAt: string; // ISO UTC
   localDate: string; // YYYY-MM-DD in the user's timezone
@@ -562,15 +594,139 @@ export interface TrendPoint {
   value: number;
 }
 
+// ---------- consistency (recovery-aware streak) ----------
+
+/**
+ * Where the user currently sits in their logging habit. Deliberately has no
+ * "broken"/"failed" member: the research this design answers (UCL, 58,881
+ * posts) found streak loss to be a leading driver of shame and app
+ * abandonment, so the model has no state that describes the user as having
+ * lost something.
+ *
+ * - `resting`    no activity in the trailing window — neutral, not a failure
+ * - `building`   an active run shorter than CONSISTENCY_STEADY_DAYS
+ * - `steady`     an active run at or beyond CONSISTENCY_STEADY_DAYS
+ * - `recovering` active again after a gap that ended a previous run
+ */
+export type ConsistencyState = 'resting' | 'building' | 'recovering' | 'steady';
+
+/**
+ * Consistency expressed so that a single missed day cannot destroy it.
+ *
+ * Three independent defences against the streak-shame failure mode:
+ *  1. `graceRemaining` — a run tolerates CONSISTENCY_GRACE_DAYS missed days
+ *     before it ends, so one bad day is absorbed rather than punished.
+ *  2. `activeDays` / `windowDays` — the headline metric is "N of the last M
+ *     days", which is monotonic in effort and cannot be reset to zero.
+ *  3. `bestDays` — a high-water mark that never decreases, so past effort
+ *     stays visible even when the current run is short.
+ */
+export interface ConsistencyStatus {
+  /** Length of the current grace-tolerant run, in days. */
+  currentDays: number;
+  /** Longest run ever achieved. Never decreases. */
+  bestDays: number;
+  /** Distinct active days inside the trailing window. */
+  activeDays: number;
+  /** Width of the trailing window (CONSISTENCY_WINDOW_DAYS). */
+  windowDays: number;
+  /** Missed days the current run can still absorb before it ends. */
+  graceRemaining: number;
+  state: ConsistencyState;
+  /** Most recent local date with any logged activity. */
+  lastActiveDate: string | null;
+}
+
 export interface ProgressSummary {
   currentWeightKg: number | null;
   startWeightKg: number | null;
   targetWeightKg: number | null;
   weightSeries: TrendPoint[];
+  /**
+   * Raw consecutive-day count. Retained for the chat tool surface and the
+   * achievement rules; `consistency` is what the UI renders.
+   */
   streakDays: number;
+  consistency: ConsistencyStatus;
   workoutsCompleted: number;
   totalKcalBurned: number;
   achievements: { definition: AchievementDefinition; earnedAt: string | null }[];
+}
+
+// ---------- progress intelligence (P-08 insight lane) ----------
+
+/** Code-computed statistics. The exact contract P-08 is written against. */
+export interface ProgressInsightStats {
+  deltaKg: number | null;
+  weighInsCount: number;
+  streakDays: number;
+  workoutsCompleted: number;
+  /** Mean intake as a ratio of target, e.g. 1.05 = 5% over. */
+  avgKcalVsTarget: number | null;
+  waterAdherencePct: number | null;
+  periodDays: number;
+}
+
+export type InsightMetric = 'weight' | 'workouts' | 'intake' | 'hydration' | 'logging';
+
+/**
+ * One "what changed" line. Computed deterministically by comparing the current
+ * period against the one before it — never authored by a model, so the numbers
+ * a user reads are always the numbers the store holds.
+ */
+export interface ProgressInsightChange {
+  metric: InsightMetric;
+  direction: 'up' | 'down' | 'steady';
+  /** Signed change against the previous period, in the metric's own unit. */
+  delta: number | null;
+  /** Deterministic, weight-neutral sentence. */
+  label: string;
+}
+
+export interface ProgressInsight {
+  id: string;
+  userId: string;
+  type: 'progressInsight';
+  /** Local date of the Monday starting the period this insight describes. */
+  periodStart: string;
+  periodDays: number;
+  stats: ProgressInsightStats;
+  changes: ProgressInsightChange[];
+  /**
+   * 2–4 supportive sentences narrating `stats`. Model-authored, and therefore
+   * subject to the output guardrail before it can reach a user; falls back to
+   * a deterministic narration when blocked or unavailable.
+   */
+  narrative: string;
+  ai: AiMetadata;
+  createdAt: string;
+}
+
+// ---------- adaptive readiness (Protect / Maintain / Progress) ----------
+
+/**
+ * How hard the plan should push this week, derived in code from adherence.
+ * `protect` is explicitly not a demotion — it is the app absorbing a hard week
+ * on the user's behalf rather than letting them fail a plan built for a
+ * different week.
+ */
+export type ReadinessMode = 'protect' | 'maintain' | 'progress';
+
+export interface ReadinessSignal {
+  label: string;
+  detail: string;
+}
+
+export interface ReadinessAssessment {
+  mode: ReadinessMode;
+  /** 0–100, computed in code. */
+  score: number;
+  signals: ReadinessSignal[];
+  /** Deterministic, non-shaming one-liner. */
+  headline: string;
+  /** Multiplier the plan engine applies to prescribed working volume. */
+  volumeMultiplier: number;
+  periodDays: number;
 }
 
 // ---------- auth DTOs ----------
@@ -631,6 +787,107 @@ export interface BuddyChallenge {
   updatedAt: string;
 }
 
+// ---------- coach personas, progression and Stars entitlements ----------
+
+/**
+ * Which coach a user has selected, and the bond accrued with each one.
+ *
+ * Bond is *carried*, not recomputed: total XP is derived from activity (see
+ * `computeExperience`), but which coach was standing next to the user while
+ * that XP was earned is a historical fact no amount of folding can recover.
+ * So the selection records the XP total at the moment it was made, current
+ * bond is `accrued[coach] + (totalXp − baselineXp)`, and switching coaches
+ * flushes the open amount into `accrued`. Switching therefore never destroys a
+ * bond, and never transfers one either.
+ */
+export interface CoachState {
+  type: 'coachState';
+  /** Document id — equals the userId, so the record is a natural singleton. */
+  id: string;
+  userId: string;
+  activeCoachId: string;
+  /** Total XP when `activeCoachId` was selected. */
+  baselineXp: number;
+  /** Settled bond per coach id, excluding the open amount for the active one. */
+  accrued: Record<string, number>;
+  /** Coach ids bought with Stars — permanent, and independent of level. */
+  purchased: string[];
+  /**
+   * What the user has already been congratulated for. Reactions are one-shot:
+   * a level-up the user has seen must not greet them again tomorrow, or the
+   * coach reads as a broken toy rather than someone paying attention.
+   * Acknowledged explicitly by the client after display, never by the read
+   * itself — an unacknowledged reaction is one the user did not actually see.
+   */
+  seenLevel: number;
+  seenRankId: string;
+  seenAchievementIds: string[];
+  selectedAt: string;
+  updatedAt: string;
+}
+
+/** Append-only record of a Telegram Stars purchase (idempotent by charge id). */
+export interface StarsPurchase {
+  type: 'starsPurchase';
+  id: string;
+  userId: string;
+  coachId: string;
+  /** Price actually charged, in Stars (XTR). */
+  stars: number;
+  /** Telegram's charge id — the idempotency key for payment replay. */
+  telegramPaymentChargeId: string;
+  /** Provider-side id when Telegram supplies one. */
+  providerPaymentChargeId: string | null;
+  /** Our correlation id, echoed through the invoice payload. */
+  invoicePayload: string;
+  createdAt: string;
+}
+
+/** Why a coach is or is not currently available to a user. */
+export type CoachLockReason = 'free' | 'level' | 'purchased' | 'locked';
+
+export interface CoachEntitlement {
+  coachId: string;
+  unlocked: boolean;
+  /** How it was unlocked, or `locked` with the requirement still outstanding. */
+  reason: CoachLockReason;
+  /** Level needed when `reason` is `locked`; 0 otherwise. */
+  requiredLevel: number;
+  /** Stars price while locked, or null when the coach is not purchasable. */
+  starsPrice: number | null;
+  /** XP earned alongside this coach. Drives bond levels. */
+  bondXp: number;
+  bondLevel: number;
+}
+
+/** One authored coach line, already interpolated and ready to render. */
+export interface CoachReaction {
+  coachId: string;
+  kind: string;
+  text: string;
+  /** Art variant the UI should show with it. */
+  expression: 'neutral' | 'celebrate' | 'encourage';
+}
+
+/** GET /coaches — the character-select payload. */
+export interface CoachRosterResponse {
+  activeCoachId: string;
+  experience: import('./gamification').ExperienceStatus;
+  entitlements: CoachEntitlement[];
+  /** Whether Stars purchases can currently be completed on this deployment. */
+  starsAvailable: boolean;
+}
+
+/** Progression block returned with the progress summary and on the dashboard. */
+export interface ProgressionStatus {
+  experience: import('./gamification').ExperienceStatus;
+  activeCoachId: string;
+  bondXp: number;
+  bondLevel: number;
+  /** Newest first; what the coach says about the user's current position. */
+  reactions: CoachReaction[];
+}
+
 export const GROWTH_EVENT_NAMES = [
   'share_opened',
   'share_copied',
@@ -640,6 +897,16 @@ export const GROWTH_EVENT_NAMES = [
   'challenge_joined',
   'challenge_shared',
   'invite_captured',
+  /* Telegram-first landing conversion. The pair matters more than either
+     number alone: telegram_cta_clicked without web_fallback_clicked is a
+     healthy funnel, while a rising web_fallback_clicked is the corporate /
+     Telegram-blocked segment showing up in the data instead of bouncing
+     silently. `telegram_launch` closes the loop from the other side — it only
+     fires inside the Mini App, so web CTA clicks over Mini App launches is the
+     real cross-surface conversion rate. */
+  'telegram_cta_clicked',
+  'web_fallback_clicked',
+  'telegram_launch',
 ] as const;
 export type GrowthEventName = (typeof GROWTH_EVENT_NAMES)[number];
 
@@ -659,4 +926,37 @@ export interface GrowthEvent {
     challengeCode: string | null;
   };
   createdAt: string;
+}
+
+// ---------- deep links & export ----------
+
+export type DeepLinkAction =
+  | 'log_meal'
+  | 'view_date'
+  | 'join_challenge'
+  | 'coach_ask'
+  | 'export_data';
+
+export type ExportFormat = 'json' | 'csv';
+
+export interface DeepLinkPayload {
+  action: DeepLinkAction;
+  mealType?: MealType;
+  date?: string;
+  challengeCode?: string;
+  prompt?: string;
+  format?: ExportFormat;
+  params?: Record<string, string | number | boolean | null>;
+}
+
+export interface DiaryExportPayload {
+  userId?: string;
+  startDate?: string;
+  endDate?: string;
+  format: ExportFormat;
+  includeMeals?: boolean;
+  includeWater?: boolean;
+  includeWorkouts?: boolean;
+  includeWeight?: boolean;
+  exportedAt?: string;
 }

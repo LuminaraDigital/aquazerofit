@@ -12,7 +12,7 @@ dotenv.config({ path: path.resolve(here, '..', '..', '..', '.env') });
 
 import { createApp } from './app';
 import { config, assertProductionSecrets } from './platform/config';
-import { getStore, initStore } from './platform/store';
+import { describeStoreInitFailure, getStore, initStore } from './platform/store';
 import { sweepExpiredDeletions } from './modules/me/service';
 import { sweepVisionArtifacts } from './modules/vision/router';
 import { sweepGrowthEvents } from './modules/analytics/router';
@@ -25,7 +25,18 @@ assertProductionSecrets();
 // synchronous, so the singleton has to exist before the boot sweeps below and
 // before the first request is accepted — getStore() throws otherwise rather
 // than hand out an empty store that would look like a fresh database.
-await initStore();
+//
+// A store that cannot initialise is fatal, and the raw pg driver error names a
+// syscall, not a cause. Say what actually went wrong (connection refused, bad
+// credentials, missing database) and exit non-zero so the platform restarts
+// and alerts on a legible failure instead of a silent crash.
+try {
+  await initStore();
+} catch (err) {
+  console.error(`[fatal] store initialisation failed — ${describeStoreInitFailure(err)}`);
+  console.error(err);
+  process.exit(1);
+}
 
 const app = createApp();
 

@@ -148,8 +148,12 @@ describe('refresh rotation + family revocation', () => {
   });
 });
 
+const { seedIfNeeded, resetSeededDirs } = await import('../data/seed');
+
 describe('seeded demo account', () => {
   it('signs in with the documented demo credentials and has a full profile', async () => {
+    resetSeededDirs();
+    await seedIfNeeded(getStore());
     const res = await request(app)
       .post(`${base}/auth/login`)
       .send({ email: 'demo@aquazero.fit', password: 'AquaZeroDemo!2026' });

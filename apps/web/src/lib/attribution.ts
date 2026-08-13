@@ -85,6 +85,34 @@ export function captureAttributionFromUrl(search = window.location.search): Attr
   return merged;
 }
 
+/**
+ * Merge attribution that did not arrive through the URL — in practice, the
+ * payload decoded from a Telegram deep link's `start_param`.
+ *
+ * localStorage does not cross the web → Telegram boundary, so inside the Mini
+ * App the store starts empty and this is the only thing that fills it. Same
+ * first-touch rule as the URL path: a ref already recorded in *this* browser
+ * wins, so a returning user is not re-credited to whoever last shared a link.
+ */
+export function adoptAttribution(incoming: Partial<Attribution>): Attribution {
+  const existing = readStored();
+  const merged: Attribution = {
+    ref: existing?.ref ?? incoming.ref ?? null,
+    utmSource: existing?.utmSource ?? incoming.utmSource ?? null,
+    utmMedium: existing?.utmMedium ?? incoming.utmMedium ?? null,
+    utmCampaign: existing?.utmCampaign ?? incoming.utmCampaign ?? null,
+    /* Challenge codes are a live deep-link target rather than a first touch:
+       joining a second huddle must replace the first, or the join silently
+       applies to the wrong challenge. */
+    challengeCode: incoming.challengeCode ?? existing?.challengeCode ?? null,
+    capturedAt: existing?.capturedAt ?? incoming.capturedAt ?? new Date().toISOString(),
+  };
+  const hasAnything =
+    merged.ref || merged.utmSource || merged.utmMedium || merged.utmCampaign || merged.challengeCode;
+  if (hasAnything) writeStored(merged);
+  return merged;
+}
+
 export function getAttribution(): Attribution {
   return (
     readStored() ?? {

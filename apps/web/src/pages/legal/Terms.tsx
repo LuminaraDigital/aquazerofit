@@ -32,7 +32,7 @@ const CLAUSES: Clause[] = [
 export default function TermsPage() {
   return (
     <LegalPage
-      documentTitle="Terms of use — AquaZeroFit"
+      path="/terms"
       crumb="Terms"
       title="Terms of use"
       lead="The rules for using the hosted AquaZeroFit service. Short, and worth reading — particularly the parts about what the service is not."

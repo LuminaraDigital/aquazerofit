@@ -8,6 +8,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SOURCE_CODE_URL, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
+import { TelegramCta } from './Chrome';
 import { DeviceFrame } from './PhoneShowcase';
 import { Reveal, useCountUp, useInView, useTilt } from './motion';
 
@@ -793,15 +794,16 @@ export function Platform() {
           <div className="lp-card lp-card-hover lp-spot h-full overflow-hidden p-8">
             <Icon name="send" />
             <h3 className="mt-5 font-heading text-2xl font-semibold text-on-surface">
-              Also a Telegram Mini App
+              It lives in Telegram
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-on-surface-variant/75">
-              The same codebase renders inside Telegram, binding the client&apos;s theme and native
-              controls and signing you in from the launch data — no second account, no second app to
-              install, no divergent feature set.
+              AquaZeroFit is a Telegram Mini App. It opens inside the client you already have —
+              nothing to download, no new password, signed in from the launch data — and it binds
+              your Telegram theme and native controls so it behaves like part of the app rather
+              than a website wearing one.
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
-              {['Theme-bound', 'Silent sign-in', 'Haptics', 'Native controls'].map((tag) => (
+              {['No install', 'Silent sign-in', 'Theme-bound', 'Native controls'].map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 text-[11px] text-primary/90"
@@ -810,6 +812,24 @@ export function Platform() {
                 </span>
               ))}
             </div>
+            <div className="mt-6">
+              <TelegramCta placement="platform" />
+            </div>
+            {/* The corporate / restricted-network segment, answered on the page
+                rather than left to bounce. The claim is deliberately specific:
+                one codebase really does serve both, so "the same app" is a
+                statement about the build, not a marketing softener. */}
+            <p className="mt-5 border-t border-white/5 pt-5 text-[13px] leading-relaxed text-on-surface-variant/70">
+              Telegram blocked on your network?{' '}
+              <Link
+                to="/sign-in?mode=register"
+                className="font-semibold text-primary transition-colors hover:text-secondary"
+              >
+                Use it in your browser
+              </Link>{' '}
+              — one codebase builds both surfaces, so it is the same product and the same account,
+              not a cut-down version of it.
+            </p>
           </div>
         </Reveal>
 

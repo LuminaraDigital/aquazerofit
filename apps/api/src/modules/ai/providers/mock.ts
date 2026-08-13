@@ -10,7 +10,8 @@
  * Models identify/interpret/explain; CODE calculates: this engine never
  * invents numbers — every figure in its output comes from supplied context.
  */
-import type { ModelGroup } from '@aquazerofit/shared';
+import { CONSISTENCY_STEADY_DAYS, type ConsistencyState, type ModelGroup } from '@aquazerofit/shared';
+import { coachById } from '@aquazerofit/shared';
 import { personaHints } from '../prompts';
 import { classify } from '../guardrails';
 
@@ -63,7 +64,17 @@ export interface MockProgressContext {
   currentWeightKg: number | null;
   startWeightKg: number | null;
   deltaKg: number | null;
+  /** Raw consecutive-day run. Retained for context breadth, not for copy. */
   streakDays: number;
+  /**
+   * Recovery-aware consistency. The coach narrates these rather than
+   * `streakDays` so it cannot congratulate or console a user on a number the
+   * UI has stopped showing them.
+   */
+  activeDays: number;
+  windowDays: number;
+  bestDays: number;
+  consistencyState: ConsistencyState;
   workoutsCompleted: number;
 }
 
@@ -100,6 +111,10 @@ export interface MockVisionCandidate {
 export interface MockVisionContext {
   seedKey: string;
   candidates: MockVisionCandidate[];
+  /** AI-04: Optional image data acknowledgment for dev parity.
+   * Real providers receive image bytes; mock acknowledges the structure. */
+  imageBase64?: string;
+  imageHash?: string;
 }
 
 export interface MockRecCandidate {
@@ -135,14 +150,14 @@ const OPENERS = [
   'Here’s where you stand today:',
   'Quick look at your day so far:',
   'Let’s check the numbers:',
-  'Good question — here’s your snapshot:',
-  'Happy to help — this is what your data says:',
+  'Good question. Here’s your snapshot:',
+  'Happy to help. This is what your data says:',
 ] as const;
 
 const CLOSERS = [
-  'Small consistent steps win — you’re doing the work.',
+  'Small consistent steps win, and you’re doing the work.',
   'Keep it steady; consistency beats intensity.',
-  'Nice momentum — keep listening to your body.',
+  'Nice momentum. Keep listening to your body.',
   'You’ve got this. One meal, one session at a time.',
   'Proud of the effort you’re putting in.',
 ] as const;
@@ -155,7 +170,7 @@ function nutritionLines(n: MockNutritionContext, seed: number): string[] {
     lines.push(
       pick(
         [
-          `You’ve logged ${r(n.kcalConsumed)} kcal of your ${r(n.kcalTarget)} kcal target — ${r(n.kcalRemaining)} kcal remaining today.`,
+          `You’ve logged ${r(n.kcalConsumed)} kcal of your ${r(n.kcalTarget)} kcal target, with ${r(n.kcalRemaining)} kcal remaining today.`,
           `So far today: ${r(n.kcalConsumed)} kcal in, leaving about ${r(n.kcalRemaining)} kcal of your ${r(n.kcalTarget)} kcal budget.`,
         ],
         seed,
@@ -164,13 +179,13 @@ function nutritionLines(n: MockNutritionContext, seed: number): string[] {
     );
   } else {
     lines.push(
-      `You’re about ${r(Math.abs(n.kcalRemaining))} kcal over today’s ${r(n.kcalTarget)} kcal target — no drama, tomorrow is a clean slate. A lighter dinner or a walk can help balance things out.`,
+      `You’re about ${r(Math.abs(n.kcalRemaining))} kcal over today’s ${r(n.kcalTarget)} kcal target. No drama, tomorrow is a clean slate. A lighter dinner or a walk can help balance things out.`,
     );
   }
   const pGap = n.proteinG.target - n.proteinG.consumed;
   if (pGap > 15) {
     lines.push(
-      `Protein is at ${r(n.proteinG.consumed)} g of ${r(n.proteinG.target)} g — roughly ${r(pGap)} g to go, so something protein-forward would fit well next.`,
+      `Protein is at ${r(n.proteinG.consumed)} g of ${r(n.proteinG.target)} g, roughly ${r(pGap)} g to go, so something protein-forward would fit well next.`,
     );
   } else {
     lines.push(`Protein looks solid: ${r(n.proteinG.consumed)} g of your ${r(n.proteinG.target)} g goal.`);
@@ -178,19 +193,19 @@ function nutritionLines(n: MockNutritionContext, seed: number): string[] {
   const wPct = n.waterMl.target > 0 ? Math.round((n.waterMl.consumed / n.waterMl.target) * 100) : 0;
   lines.push(
     wPct >= 80
-      ? `Hydration is on point — ${n.waterMl.consumed} ml of ${n.waterMl.target} ml (${wPct}%).`
-      : `Hydration check: ${n.waterMl.consumed} ml of ${n.waterMl.target} ml (${wPct}%) — a glass now would help.`,
+      ? `Hydration is on point: ${n.waterMl.consumed} ml of ${n.waterMl.target} ml (${wPct}%).`
+      : `Hydration check: ${n.waterMl.consumed} ml of ${n.waterMl.target} ml (${wPct}%). A glass now would help.`,
   );
   return lines;
 }
 
 function workoutLines(w: MockWorkoutContext | null | undefined, seed: number): string[] {
-  if (!w) return ['You don’t have a training plan yet — generate one from the Workouts tab and I can walk you through it.'];
+  if (!w) return ['You don’t have a training plan yet. Generate one from the Workouts tab and I can walk you through it.'];
   if (w.isRest) {
     return [
       pick(
         [
-          'Today is a scheduled rest day — recovery is where the adaptation happens. A gentle walk or some stretching is plenty.',
+          'Today is a scheduled rest day, and recovery is where the adaptation happens. A gentle walk or some stretching is plenty.',
           'Rest day today. Let the muscles rebuild; light movement and good sleep are the workout.',
         ],
         seed,
@@ -204,7 +219,7 @@ function workoutLines(w: MockWorkoutContext | null | undefined, seed: number): s
     .join(', ');
   const status =
     w.status === 'completed'
-      ? 'Already completed — great work today!'
+      ? 'Already completed. Great work today!'
       : 'Warm up first, and stop if anything hurts.';
   return [`Today’s session is ${w.focus}: ${list}. ${status}`];
 }
@@ -218,23 +233,54 @@ function progressLines(p: MockProgressContext | null | undefined, seed: number):
       lines.push(`Your weight is holding steady at ${p.currentWeightKg.toFixed(1)} kg.`);
     } else {
       lines.push(
-        `You’re at ${p.currentWeightKg.toFixed(1)} kg — ${dir} ${Math.abs(p.deltaKg).toFixed(1)} kg over the recorded period. ${
+        `You’re at ${p.currentWeightKg.toFixed(1)} kg, ${dir} ${Math.abs(p.deltaKg).toFixed(1)} kg over the recorded period. ${
           p.deltaKg < 0 ? 'That’s a steady, sustainable trend.' : 'Trends wobble; the weekly average is what matters.'
         }`,
       );
     }
   }
-  if (p.streakDays > 1) {
-    lines.push(
-      pick(
-        [
-          `Your logging streak is ${p.streakDays} days — that consistency is the real engine of progress.`,
-          `${p.streakDays}-day streak and counting. Showing up daily is what moves the needle.`,
-        ],
-        seed,
-        17,
-      ),
-    );
+  // Consistency is narrated from the window count, never the consecutive run.
+  // The old copy fired only when the run exceeded one day, so a user who missed
+  // yesterday got silence at the exact moment encouragement matters most — and
+  // "showing up daily" framed anything short of perfect as falling short.
+  // Every state gets a line, and none of them describe a loss.
+  const window = `${p.activeDays} of the last ${p.windowDays} days`;
+  switch (p.consistencyState) {
+    case 'steady':
+      lines.push(
+        pick(
+          [
+            `You've logged ${window}, and that consistency is the real engine of progress.`,
+            `${window} logged. That's a habit, not a run of luck.`,
+          ],
+          seed,
+          17,
+        ),
+      );
+      break;
+    case 'recovering':
+      lines.push(
+        pick(
+          [
+            `You're back at it, and you've still got ${window} behind you. Picking it up again is the whole skill.`,
+            `Coming back counts. ${window} logged, and today adds to it.`,
+          ],
+          seed,
+          17,
+        ),
+      );
+      break;
+    case 'building':
+      lines.push(`${window} logged so far. That's the base to build on.`);
+      break;
+    case 'resting':
+      lines.push(
+        `Whenever you're ready to pick it back up, one log is all it takes to start again.`,
+      );
+      break;
+  }
+  if (p.bestDays >= CONSISTENCY_STEADY_DAYS && p.consistencyState !== 'steady') {
+    lines.push(`Your best run so far is ${p.bestDays} days. You've done this before.`);
   }
   if (p.workoutsCompleted > 0) {
     lines.push(`Workouts completed so far: ${p.workoutsCompleted}.`);
@@ -257,10 +303,21 @@ function detectIntent(message: string): Intent {
   return 'general';
 }
 
-function chatReply(messages: MockMessage[], ctx: MockChatContext): string {
+/**
+ * Who the offline engine speaks as. The selected coach when one is known,
+ * otherwise the P-07 hints — so a keyless demo still sounds like the character
+ * the user picked rather than like the default for everyone.
+ */
+function personaFor(coachId: string | undefined): { name: string; tone: string } {
+  const coach = coachById(coachId);
+  if (coach) return { name: coach.name.split(' ')[0]!, tone: coach.voice.word.toLowerCase() };
+  return personaHints();
+}
+
+function chatReply(messages: MockMessage[], ctx: MockChatContext, coachId?: string): string {
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
   const seed = fnv1a(lastUser + JSON.stringify([ctx.nutrition?.kcalConsumed, ctx.progress?.streakDays]));
-  const persona = personaHints();
+  const persona = personaFor(coachId);
   const intent = detectIntent(lastUser);
   const parts: string[] = [];
 
@@ -270,16 +327,16 @@ function chatReply(messages: MockMessage[], ctx: MockChatContext): string {
     case 'nutrition':
       parts.push(pick(OPENERS, seed, 3));
       if (ctx.nutrition) parts.push(...nutritionLines(ctx.nutrition, seed));
-      else parts.push('You haven’t logged anything yet today — once you do, I can track your budget in real time.');
+      else parts.push('You haven’t logged anything yet today. Once you do, I can track your budget in real time.');
       break;
     case 'water': {
       const w = ctx.nutrition?.waterMl;
       parts.push(
         w
           ? `You’ve had ${w.consumed} ml of your ${w.target} ml water target today${
-              w.consumed >= w.target ? ' — target hit, well done!' : ` — ${w.target - w.consumed} ml to go.`
+              w.consumed >= w.target ? '. Target hit, well done!' : `, with ${w.target - w.consumed} ml to go.`
             }`
-          : 'No water logged yet today — tap the water card on your dashboard to add a glass.',
+          : 'No water logged yet today. Tap the water card on your dashboard to add a glass.',
       );
       break;
     }
@@ -290,7 +347,7 @@ function chatReply(messages: MockMessage[], ctx: MockChatContext): string {
       parts.push(
         ctx.plan
           ? `You’re on “${ctx.plan.name}”, ${ctx.plan.daysPerWeek} training days a week.`
-          : 'You don’t have an active training plan yet — you can generate one from the Workouts tab.',
+          : 'You don’t have an active training plan yet. You can generate one from the Workouts tab.',
       );
       parts.push(...workoutLines(ctx.workout, seed));
       break;
@@ -336,7 +393,15 @@ interface MockVisionPrediction {
 function visionIdentify(ctx: MockVisionContext): { predictions: MockVisionPrediction[] } {
   const candidates = ctx.candidates;
   if (candidates.length === 0) return { predictions: [] };
-  const seed = fnv1a(ctx.seedKey);
+  
+  // AI-04: Acknowledge image parameter for dev parity
+  // In real providers, image bytes are sent; here we log receipt and use seed for determinism
+  const hasImage = !!(ctx.imageBase64 || ctx.imageHash);
+  const seedInput = hasImage 
+    ? `${ctx.seedKey}|img:${ctx.imageHash ?? 'b64'}${ctx.imageBase64?.slice(0, 32) ?? ''}`
+    : ctx.seedKey;
+  const seed = fnv1a(seedInput);
+  
   const count = Math.min(candidates.length, 2 + (seed % 3)); // 2–4 foods
   const predictions: MockVisionPrediction[] = [];
   const used = new Set<number>();
@@ -553,7 +618,7 @@ function insightSummary(context: Record<string, unknown>): string {
     bits.push(
       stats.deltaKg < 0
         ? `Weight is trending down ${Math.abs(stats.deltaKg as number).toFixed(1)} kg.`
-        : `Weight is up ${(stats.deltaKg as number).toFixed(1)} kg — averages matter more than single days.`,
+        : `Weight is up ${(stats.deltaKg as number).toFixed(1)} kg. Averages matter more than single days.`,
     );
   }
   if (typeof stats.streakDays === 'number' && (stats.streakDays as number) > 0) {
@@ -562,7 +627,7 @@ function insightSummary(context: Record<string, unknown>): string {
   if (typeof stats.workoutsCompleted === 'number') {
     bits.push(`${stats.workoutsCompleted} workouts completed.`);
   }
-  if (bits.length === 0) bits.push('Keep logging — insights appear once there is enough data.');
+  if (bits.length === 0) bits.push('Keep logging. Insights appear once there is enough data.');
   return bits.join(' ');
 }
 
@@ -616,6 +681,8 @@ export interface MockOptions {
   seed?: string;
   /** Lane-default override (e.g. P-10/P-11 ride the safetyCheap lane). */
   promptId?: string;
+  /** Selected coach persona; falls back to the P-07 hints when absent. */
+  coachId?: string;
 }
 
 export function mockComplete(task: ModelGroup, messages: MockMessage[], opts: MockOptions = {}): MockResult {
@@ -652,7 +719,7 @@ export function mockComplete(task: ModelGroup, messages: MockMessage[], opts: Mo
   }
   switch (task) {
     case 'chatFast': {
-      const text = chatReply(messages, context as unknown as MockChatContext);
+      const text = chatReply(messages, context as unknown as MockChatContext, opts.coachId);
       return { text };
     }
     case 'visionPrimary': {

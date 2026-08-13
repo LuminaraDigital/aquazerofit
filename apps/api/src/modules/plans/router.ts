@@ -7,6 +7,7 @@ import { generatePlanSchema } from '@aquazerofit/shared';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { AppError, asyncHandler } from '../../platform/errors';
 import { todayFor } from '../../platform/dates';
+import { assessReadiness } from './readiness';
 import { generatePlanForUser, getCurrentPlan } from './service';
 
 export const plansRouter = Router();
@@ -18,6 +19,15 @@ plansRouter.get('/current', (req, res) => {
     throw new AppError('NOT_FOUND', 'No active training plan yet — generate one to get started');
   }
   res.json({ plan });
+});
+
+/**
+ * Readiness for the caller's trailing week. No AI lane, no credit cost and no
+ * guardrail pass: nothing on this route is model-authored, so there is nothing
+ * for a guardrail to check. `requireAuth` is already applied router-wide.
+ */
+plansRouter.get('/readiness', (req, res) => {
+  res.json({ readiness: assessReadiness(userIdOf(req), todayFor(req)) });
 });
 
 plansRouter.post(

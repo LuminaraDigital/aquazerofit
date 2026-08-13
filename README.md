@@ -76,6 +76,60 @@ npm run test       # unit + integration suites (vitest)
 npm run seed       # re-run content/demo seeding
 ```
 
+No `.env` is required for local development: the API generates dev secrets,
+stores data as JSON under `apps/api/.data`, and the coach answers from a
+deterministic offline mock until an AI provider key is set (see
+`.env.example`).
+
+> **Windows note:** if `npm run dev` fails with `EACCES: permission denied
+> …:5173`, the port sits inside a Windows *excluded port range* (Hyper-V/WSL
+> reserves blocks of ports; `netsh interface ipv4 show excludedportrange
+> protocol=tcp` lists them). Start Vite on any free port instead:
+> `npm run dev --workspace apps/web -- --port 5300` (the `--` must come after
+> the workspace flag so the port reaches Vite rather than npm).
+
+## Two surfaces: web is marketing, Telegram is the product
+
+AquaZeroFit is delivered as a Telegram Mini App. The web build serves two
+distinct jobs from the same codebase, and the split is worth stating because
+several deliberate decisions only make sense in its light:
+
+- **The marketing site** (`/`, `/features`, `/how-it-works`, `/aqua-coach`,
+  `/safety`, plus the legal pages) is the only cold-traffic surface. Its
+  primary call to action leaves the origin for `t.me/<bot>/<app>`, carrying
+  whatever attribution brought the visitor in as a deep-link payload — the sole
+  channel by which a ref code, UTM campaign or huddle invite survives the hop
+  into Telegram, since `localStorage` does not cross it.
+- **The application** is the same React app, and it works completely in an
+  ordinary browser. That is not a fallback bolted on for completeness: it is
+  the answer to the segment whose employer or network blocks Telegram, and the
+  landing page says so next to the CTA rather than leaving them to bounce.
+
+Two consequences that are easy to undo by accident:
+
+1. **`/` serves marketing in place for signed-out browser visitors** — it is
+   not a redirect to `/landing` (that path survives only as an alias). Cold
+   traffic and crawlers land on the canonical URL directly. The decision lives
+   in `RequireAuth`, which still redirects every *other* guarded route.
+2. **The Telegram SDK is not in `index.html`.** It is fetched, with a timeout,
+   only when the URL fragment shows a real Mini App launch. A blocking
+   `telegram.org` script in `<head>` stalled the marketing page for exactly the
+   users the browser path exists to serve.
+
+Search visibility is generated at build time by `apps/web/vite-plugins/seo.ts`:
+one real HTML file per marketing route, each with its own title, description,
+canonical, Open Graph tags, JSON-LD and a `<noscript>` summary, plus
+`robots.txt` and `sitemap.xml`. Routes come from `MARKETING_ROUTES` in
+`apps/web/src/lib/site.ts` — **a marketing page missing from that list still
+renders perfectly and is simply invisible to search.**
+
+> **Hosting requirement.** The prerendered shells rely on the host resolving
+> `/features` to `features/index.html` *before* applying the SPA fallback.
+> Netlify, Vercel, Cloudflare Pages, S3+CloudFront and nginx `try_files` all do
+> this by default. A host configured to rewrite *everything* to `/index.html`
+> unconditionally will serve the generic shell again and silently undo the
+> per-route metadata — the app keeps working, the SEO does not.
+
 ## Architecture in one paragraph
 
 The frontend detects at bootstrap whether it is running inside Telegram (`isTMA()`): in the browser it renders the AquaZero design system directly; inside Telegram it additionally binds the client theme variables. The API is a stateless TypeScript service exposing the frozen `/api/v1` contract with JWT access tokens and single-use rotating refresh tokens (family revocation on reuse). Data is stored as documents in logical containers (`users`, `profiles`, `logs`, `plans`, `content`, `ai`, `ledger`, `audit`) behind a storage abstraction: a JSON file store by default, and Postgres when `DATABASE_URL` is set (a single `documents(container, id, doc jsonb)` table, write-through from an in-memory working set). Because each instance hydrates its own working set, the Postgres store is durable for **single-instance** deployments only — scale out requires moving reads off the local copy (AQF-04, AQF-22). All model access goes through a single AI gateway module with logical model groups (`visionPrimary`, `chatFast`, `planStructured`, `safetyCheap`, `insightBatch`); when no provider keys are configured the gateway falls back to a deterministic offline engine so every core journey works without external AI. Every model-calling endpoint enforces the admission sequence: authenticate → rate limit → tier/credit check → input guardrail → gateway → output guardrail and numeric rules → respond + telemetry (AQF-07 §4).
@@ -117,12 +171,32 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | `ENABLE_LLM_SAFETY` | Override LLM second stage for input guardrails (`true`/`false`; defaults on when any AI provider key is set) |
 | `CORS_ORIGINS` | Comma-separated allowed CORS origins |
 
+### Web delivery (build-time, `VITE_` prefixed)
+
+Vite inlines these into the bundle at build time, so they are public by
+definition and must never hold secrets. They are read by both the client and
+the build-time SEO plugin (`apps/web/vite-plugins/seo.ts`), which is why they
+are set for `npm run build --workspace apps/web` rather than for the API.
+
+**Set `VITE_TELEGRAM_BOT_USERNAME` before shipping.** It defaults to
+`AquaZeroFitBot`, and a deployment that leaves it alone points every "Open in
+Telegram" button on its own landing page at somebody else's bot.
+
+| Variable | Purpose |
+| --- | --- |
+| `VITE_TELEGRAM_BOT_USERNAME` | Bot hosting the Mini App, with or without the leading `@` (default `AquaZeroFitBot`) |
+| `VITE_TELEGRAM_MINI_APP_SHORT_NAME` | Mini App short name from BotFather's `/newapp` (default `app`). Set it to an empty string for a bot with no registered Mini App; links then fall back to `t.me/<bot>` |
+| `VITE_SITE_ORIGIN` | Public origin of the marketing site, e.g. `https://aquazero.fit`. Canonical tags, the sitemap and absolute OG image URLs are built from it — a stale value points every canonical at another domain while the site looks perfectly healthy |
+| `VITE_API_BASE_URL` | Origin of the API when it is served from a different host to the SPA. Unset means same origin |
+| `VITE_MEDIA_BASE_URL` | Origin serving exercise media under `/uploads`. Unset means same origin |
+
 ### Security (required in production)
 
 | Variable | Purpose |
 | --- | --- |
 | `JWT_ACCESS_SECRET` | Access-token signing secret (**required in production**; refresh tokens are opaque randoms and need no secret) |
-| `TELEGRAM_BOT_TOKEN` | Bot token for Mini App launch-data validation (dev default `dev-bot-token`; **required in production**) |
+| `TELEGRAM_BOT_TOKEN` | Bot token for Mini App launch-data validation *and* Stars payments (dev default `dev-bot-token`; **required in production**) |
+| `TELEGRAM_WEBHOOK_SECRET` | Shared secret Telegram echoes on every webhook delivery. **Required before coach purchases can complete** — the webhook grants entitlements and is otherwise unauthenticated, so it rejects everything while this is unset |
 
 ### Mail (required in production)
 
@@ -150,6 +224,67 @@ The gateway tries providers in order and falls back to a deterministic mock engi
 | `NVIDIA_BASE_URL` | NVIDIA NIM | Override endpoint (default `https://integrate.api.nvidia.com/v1`) |
 | `OLLAMA_API_KEY` | Ollama | Optional - local Ollama needs no auth |
 | `OLLAMA_BASE_URL` | Ollama | Override endpoint (default `http://localhost:11434/v1`) |
+
+## Coach personas and progression
+
+The nine fighters of the *Aqua Zero Heavens Tournament* ship as selectable
+coach personas. A persona is a **voice skin over the existing engine**, never a
+second engine: `packages/shared/src/coaches.ts` holds the roster, and
+`apps/api/src/modules/ai/persona.ts` prepends the selected coach's voice block
+as its own system message *ahead of* P-07.
+
+That ordering is the safety-relevant part. Instruction-following weakens toward
+the end of a prompt, so the rules go last and sit in the strongest position
+while the voice sits in the weaker one — if the two ever conflict, the
+arrangement resolves it the safe way before the persona's own subordination
+clause is consulted. Everything downstream is unchanged: the grounding block is
+still untrusted data, numbers still come only from tool results, and the full
+admission sequence still runs. `apps/api/src/__tests__/persona.test.ts` fails if
+anyone merges the two messages or flips them.
+
+**Progression** (`packages/shared/src/gamification.ts`) follows one rule, and it
+is a safety rule rather than a design preference: **XP is awarded for behaviour,
+never for outcomes.** Nothing can score a deficit, a rate of loss or a kilogram
+moved. Logging, training, hydrating, weighing in and *resting after work* earn;
+eating less does not. Every lane is capped per day and the total is capped again
+(`XP_MAX_PER_DAY`), so a frantic day cannot out-earn two ordinary ones — which
+removes the incentive to over-log, and with it the incentive to over-eat to have
+something to log. XP is derived by folding activity, never stored, so a level
+cannot drift from the behaviour that earned it or be granted by a client.
+
+Coaches unlock by level. **Every locked coach is reachable without paying** —
+`unlock.level` is the real door and the Telegram Stars price is a shortcut past
+it. A roster whose best-written character sits behind a paywall is a slot
+machine, not a wellness product.
+
+### Enabling Stars purchases
+
+Purchases stay off until a real bot token *and* a webhook secret are configured;
+until then the roster reports `starsAvailable: false` and no buy button renders.
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+  -d url="https://<host>/api/v1/telegram/webhook" \
+  -d secret_token="<TELEGRAM_WEBHOOK_SECRET>" \
+  -d allowed_updates='["message","pre_checkout_query"]'
+```
+
+Grants happen only when Telegram reports the payment cleared, are idempotent on
+the charge id (Telegram redelivers), and the price is always read from the
+roster rather than from the request.
+
+### Coach art
+
+```bash
+node tools/coaches/build-art.mjs <source-dir>
+```
+
+Generates `apps/web/public/coaches/<id>/{portrait,avatar}.webp` from the
+character renders — ~445 KB total, against ~15 MB of raw PNGs for a screen that
+displays them at 160 px. Optional `celebrate.webp` / `encourage.webp` variants
+are dropped in by hand. **Art is never required:** `CoachAvatar` degrades
+expression → avatar → tinted monogram, so the roster is fully usable with no
+art present and each file that lands upgrades one card silently.
 
 ## Documentation
 

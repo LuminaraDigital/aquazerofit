@@ -7,9 +7,29 @@ import {
   ALLERGENS,
   DIETARY_PREFERENCES,
   EQUIPMENT,
+  GROWTH_EVENT_NAMES,
   MEMORY_FACT_CATEGORIES,
 } from './types';
 import { MEMORY_FACT_MAX_CHARS, RANGES } from './constants';
+import { COACHES } from './coaches';
+
+// ---------- primitives ----------
+
+/**
+ * A real calendar date in YYYY-MM-DD. The regex alone let impossible dates
+ * (2026-13-40) through — round-tripping through Date proves the components
+ * describe a day that exists (UTC so no timezone can shift the day).
+ */
+export const localDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine(
+    (value) => {
+      const d = new Date(`${value}T00:00:00Z`);
+      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+    },
+    { message: 'Not a real calendar date' },
+  );
 
 // ---------- auth ----------
 
@@ -66,6 +86,34 @@ export type ProfileInput = z.infer<typeof profileSchema>;
 
 // ---------- logging ----------
 
+export const foodNutrientsSchema = z.object({
+  kcal: z.number().min(0).max(10000),
+  proteinG: z.number().min(0).max(1000),
+  carbsG: z.number().min(0).max(1000),
+  fatG: z.number().min(0).max(1000),
+  fiberG: z.number().min(0).max(1000).optional(),
+  sugarG: z.number().min(0).max(1000).optional(),
+  sodiumMg: z.number().min(0).max(50000).optional(),
+  potassiumMg: z.number().min(0).max(50000).optional(),
+  calciumMg: z.number().min(0).max(50000).optional(),
+  ironMg: z.number().min(0).max(5000).optional(),
+});
+export type FoodNutrientsInput = z.infer<typeof foodNutrientsSchema>;
+
+export const nutritionSummarySchema = z.object({
+  kcal: z.number().min(0),
+  proteinG: z.number().min(0),
+  carbsG: z.number().min(0),
+  fatG: z.number().min(0),
+  fiberG: z.number().min(0).optional(),
+  sugarG: z.number().min(0).optional(),
+  sodiumMg: z.number().min(0).optional(),
+  potassiumMg: z.number().min(0).optional(),
+  calciumMg: z.number().min(0).optional(),
+  ironMg: z.number().min(0).optional(),
+});
+export type NutritionSummaryInput = z.infer<typeof nutritionSummarySchema>;
+
 export const mealLogItemSchema = z.object({
   foodId: z.string().optional(),
   name: z.string().min(1).max(120),
@@ -74,13 +122,19 @@ export const mealLogItemSchema = z.object({
   proteinG: z.number().min(0).max(1000),
   carbsG: z.number().min(0).max(1000),
   fatG: z.number().min(0).max(1000),
+  fiberG: z.number().min(0).max(1000).optional(),
+  sugarG: z.number().min(0).max(1000).optional(),
+  sodiumMg: z.number().min(0).max(50000).optional(),
+  potassiumMg: z.number().min(0).max(50000).optional(),
+  calciumMg: z.number().min(0).max(50000).optional(),
+  ironMg: z.number().min(0).max(5000).optional(),
 });
 
 export const createMealLogSchema = z.object({
   mealType: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
   items: z.array(mealLogItemSchema).min(1).max(30),
   loggedAt: z.string().datetime({ offset: true }).optional(),
-  localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  localDate: localDateSchema,
 });
 export type CreateMealLogInput = z.infer<typeof createMealLogSchema>;
 
@@ -92,13 +146,13 @@ export const updateMealLogSchema = createMealLogSchema.partial({
 
 export const waterLogSchema = z.object({
   amountMl: z.number().int().min(1).max(3000),
-  localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  localDate: localDateSchema,
 });
 
 export const weightLogSchema = z.object({
   weightKg: z.number().min(RANGES.weightKg.min).max(RANGES.weightKg.max),
   note: z.string().max(300).optional(),
-  localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  localDate: localDateSchema,
 });
 
 // ---------- training load field schemas (Phase 2 hard caps, AQF-11) ----------
@@ -127,7 +181,7 @@ export type SetLogInput = z.infer<typeof setLogSchema>;
 
 export const confirmVisionSchema = z.object({
   mealType: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
-  localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  localDate: localDateSchema,
   items: z.array(mealLogItemSchema).min(1).max(30),
 });
 
@@ -135,7 +189,7 @@ export const confirmVisionSchema = z.object({
 
 export const mealRecommendationRequestSchema = z.object({
   mealType: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
-  localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  localDate: localDateSchema,
 });
 
 export const recommendationFeedbackSchema = z.object({
@@ -163,7 +217,7 @@ export const completeWorkoutSchema = z.object({
     )
     .min(1),
   durationMinutes: z.number().int().min(1).max(300),
-  localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  localDate: localDateSchema,
 });
 
 export const swapExerciseSchema = z.object({
@@ -248,7 +302,7 @@ export const consentsSchema = z.object({
 // ---------- query helpers ----------
 
 export const dateQuerySchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  date: localDateSchema,
 });
 
 export const rangeQuerySchema = z.object({
@@ -279,16 +333,13 @@ export const GROWTH_EVENT_MAX_KEY_CHARS = 40;
 export const GROWTH_EVENT_MAX_VALUE_CHARS = 200;
 
 export const growthEventSchema = z.object({
-  name: z.enum([
-    'share_opened',
-    'share_copied',
-    'share_native',
-    'share_telegram',
-    'challenge_created',
-    'challenge_joined',
-    'challenge_shared',
-    'invite_captured',
-  ]),
+  /**
+   * Derived from GROWTH_EVENT_NAMES rather than restated. The list used to be
+   * written out twice, which meant a new event name added to the type passed
+   * typecheck on the client and was then rejected at 400 by the server — a
+   * drift that only shows up in production telemetry going quiet.
+   */
+  name: z.enum(GROWTH_EVENT_NAMES),
   /**
    * Bounded on every axis. The endpoint that accepts this is unauthenticated,
    * so an uncapped record would let any caller persist megabytes per request
@@ -320,3 +371,57 @@ export const growthEventSchema = z.object({
     .default({}),
 });
 export type GrowthEventInput = z.infer<typeof growthEventSchema>;
+
+/**
+ * Coach selection. The id is validated against the live roster rather than a
+ * restated string union: a coach added to `COACHES` must become selectable
+ * without a second edit here, and an id that is not in the roster must never
+ * reach the store, where it would render as a user with no coach at all.
+ */
+export const selectCoachSchema = z.object({
+  coachId: z.string().refine((id) => COACHES.some((c) => c.id === id), {
+    message: 'Unknown coach',
+  }),
+});
+export type SelectCoachInput = z.infer<typeof selectCoachSchema>;
+
+// ---------- deep links & export ----------
+
+export const deepLinkActionSchema = z.enum([
+  'log_meal',
+  'view_date',
+  'join_challenge',
+  'coach_ask',
+  'export_data',
+]);
+
+export const exportFormatSchema = z.enum(['json', 'csv']);
+
+export const deepLinkPayloadSchema = z.object({
+  action: deepLinkActionSchema,
+  mealType: z.enum(['breakfast', 'lunch', 'dinner', 'snack']).optional(),
+  date: localDateSchema.optional(),
+  challengeCode: z.string().optional(),
+  prompt: z.string().optional(),
+  format: exportFormatSchema.optional(),
+  params: z
+    .record(
+      z.string(),
+      z.union([z.string(), z.number(), z.boolean(), z.null()]),
+    )
+    .optional(),
+});
+export type DeepLinkPayloadInput = z.infer<typeof deepLinkPayloadSchema>;
+
+export const diaryExportPayloadSchema = z.object({
+  userId: z.string().optional(),
+  startDate: localDateSchema.optional(),
+  endDate: localDateSchema.optional(),
+  format: exportFormatSchema.default('json'),
+  includeMeals: z.boolean().optional(),
+  includeWater: z.boolean().optional(),
+  includeWorkouts: z.boolean().optional(),
+  includeWeight: z.boolean().optional(),
+  exportedAt: z.string().datetime({ offset: true }).optional(),
+});
+export type DiaryExportPayloadInput = z.infer<typeof diaryExportPayloadSchema>;

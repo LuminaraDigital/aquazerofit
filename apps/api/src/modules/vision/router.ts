@@ -13,7 +13,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
 import crypto from 'node:crypto';
-import { createReadStream, existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, unlinkSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { config } from '../../platform/config';
 import { requireAuth } from '../../platform/auth';
@@ -203,12 +203,23 @@ async function processJob(jobId: string): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const foods = await whereDocs<Food>('content', (d: any) => d?.type === 'food');
     const seedKey = path.basename(job.imagePath);
+    
+    // AI-04: Compute image hash for mock engine acknowledgment (dev parity)
+    let imageHash: string | undefined;
+    if (existsSync(job.imagePath)) {
+      const imageBuffer = readFileSync(job.imagePath);
+      const hash = crypto.createHash('sha256').update(imageBuffer).digest('hex');
+      imageHash = hash.slice(0, 16); // Short hash for seed
+    }
+    
     const result = await complete('visionPrimary', [{ role: 'user', content: `Identify foods in photo ${seedKey}` }], {
       json: true,
       promptId: 'P-01',
       context: {
         seedKey,
         candidates: visionCandidates(foods),
+        // AI-04: Pass image hash for mock dev parity
+        imageHash,
       },
     });
 

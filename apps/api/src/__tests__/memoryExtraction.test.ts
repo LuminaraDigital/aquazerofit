@@ -5,14 +5,25 @@
  * rolling summary on the documented triggers. The gateway is mocked at the
  * module seam so responses are fully controlled.
  */
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MEMORY_SUMMARY_REFRESH_FACT_DELTA } from '@aquazerofit/shared';
+import {
+  bindIsolatedDataDir,
+  createIsolatedDataDir,
+  pinIsolatedDataDir,
+  teardownIsolatedDataDir,
+} from './helpers/integrationIsolation';
 
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'azf-extraction-'));
-process.env.AZF_DATA_DIR = dataDir;
+// Uses the shared isolation helpers rather than assigning AZF_DATA_DIR once at
+// module load. Vitest collects every file in a worker before any of them run,
+// so a single assignment is simply the last writer winning: alongside another
+// suite this file's store ends up bound to *that* suite's directory, and the
+// afterAll below then flushes and deletes across suites. That showed up as the
+// suite dying with a native abort (0xC0000409) in roughly one run in six —
+// never when this file ran alone, and never when it was excluded.
+const savedAzfDataDir = process.env.AZF_DATA_DIR;
+const dataDir = createIsolatedDataDir('azf-extraction-');
+bindIsolatedDataDir(dataDir);
 
 vi.mock('../modules/ai/gateway', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../modules/ai/gateway')>();
@@ -29,15 +40,12 @@ import type { UserMemory } from '@aquazerofit/shared';
 const completeMock = vi.mocked(complete);
 
 afterAll(async () => {
-  await getStore().flush();
-  try {
-    fs.rmSync(dataDir, { recursive: true, force: true });
-  } catch {
-    /* best-effort cleanup on Windows */
-  }
+  await teardownIsolatedDataDir(dataDir, savedAzfDataDir);
 });
 
 beforeEach(() => {
+  // Re-pin: another suite loaded into this worker may have taken the singleton.
+  pinIsolatedDataDir(dataDir);
   completeMock.mockReset();
 });
 

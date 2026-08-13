@@ -42,10 +42,10 @@ authRouter.post(
   }),
 );
 
-authRouter.post('/refresh', (req, res) => {
+authRouter.post('/refresh', asyncHandler(async (req, res) => {
   const { refreshToken } = refreshSchema.parse(req.body);
-  res.json(refresh(refreshToken, req.ip));
-});
+  res.json(await refresh(refreshToken, req.ip));
+}));
 
 const logoutSchema = z.object({ refreshToken: z.string().min(10).optional() });
 

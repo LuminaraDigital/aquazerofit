@@ -45,6 +45,19 @@ export interface OperatorFacts {
    * e.g. ['Groq', 'Google Gemini'].
    */
   aiProviders: string[] | null;
+  /**
+   * Date (ISO yyyy-mm-dd) the statements this notice makes about the providers
+   * above were last verified against each provider's then-current terms.
+   *
+   * Provider terms drift, and a claim like "provider X does not train on API
+   * data" silently becomes false with nobody noticing unless verification has
+   * a date attached. Re-verify and update this whenever a provider is added
+   * to or removed from the gateway (see the checklist in
+   * apps/api/src/modules/ai/gateway.ts), and whenever a provider revises its
+   * data-handling terms. isPublished() refuses to declare the documents
+   * finished while this is null, exactly like every other operator fact.
+   */
+  aiProvidersVerifiedOn: string | null;
   /** Date the current version of the documents takes effect, ISO yyyy-mm-dd. */
   effectiveDate: string | null;
 }
@@ -58,6 +71,7 @@ export const OPERATOR: OperatorFacts = {
   supportEmail: null,
   supportResponseTime: null,
   aiProviders: null,
+  aiProvidersVerifiedOn: null,
   effectiveDate: null,
 };
 

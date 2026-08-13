@@ -46,3 +46,19 @@ export function logAiCall(entry: AiCallLog): void {
   // eslint-disable-next-line no-console
   console.log(JSON.stringify({ t: new Date().toISOString(), kind: 'ai', ...entry }));
 }
+
+/**
+ * Structured domain event, for things that are neither an HTTP request nor a
+ * model call — money moving, chiefly.
+ *
+ * Payment outcomes are the one flow in this product with no user-visible audit
+ * trail of its own: a user whose Stars left their balance and whose coach did
+ * not unlock has nothing to show, so these lines are the only evidence an
+ * operator will have. Never pass anything user-identifying beyond an internal
+ * id — these land in whatever the host does with stdout.
+ */
+export function logEvent(name: string, fields: Record<string, unknown> = {}): void {
+  if (config.isTest) return;
+  // eslint-disable-next-line no-console
+  console.log(JSON.stringify({ t: new Date().toISOString(), kind: 'event', name, ...fields }));
+}

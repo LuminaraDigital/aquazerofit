@@ -8,11 +8,11 @@
  * coincidence, three is a pattern, and this is the point at which divergence
  * starts to look intentional to a reader when it is really just drift.
  */
-import { useEffect } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { isTMA } from '../../lib/telegram';
+import { useSeo } from '../../lib/seo';
 import { AppBackground } from '../../components/layout/AppBackground';
-import { CtaButton, Footer, TopBar } from './Chrome';
+import { CtaButton, Footer, TelegramCta, TopBar, WebFallbackLink } from './Chrome';
 import { Reveal, useHashScroll } from './motion';
 
 /**
@@ -20,24 +20,18 @@ import { Reveal, useHashScroll } from './motion';
  * sub-page needs. Signed-in visitors are allowed to read these — arriving here
  * is a deliberate navigation, not a landing — but the Telegram Mini App has no
  * use for a marketing page and goes to its own welcome instead.
+ *
+ * `path` is the route this page is mounted at, and it is the key into the
+ * marketing manifest in lib/site.ts — the same entry that produced this page's
+ * prerendered shell at build time. Passing the path rather than a title is
+ * what keeps the two in step: a page whose `<title>` was written out here by
+ * hand would drift from the one baked into the file crawlers actually fetch,
+ * and nothing would report the disagreement.
  */
-export function MarketingPage({
-  documentTitle,
-  children,
-}: {
-  documentTitle: string;
-  children: React.ReactNode;
-}) {
+export function MarketingPage({ path, children }: { path: string; children: React.ReactNode }) {
   const telegram = isTMA();
 
-  useEffect(() => {
-    if (telegram) return;
-    const previous = document.title;
-    document.title = documentTitle;
-    return () => {
-      document.title = previous;
-    };
-  }, [documentTitle, telegram]);
+  useSeo(path);
 
   /* Honours an incoming fragment such as /features#targets. */
   useHashScroll();
@@ -86,7 +80,7 @@ export function PageHero({
       <div className="relative mx-auto max-w-6xl px-5">
         <Reveal>
           <nav aria-label="Breadcrumb" className="text-[12px] text-on-surface-variant/70">
-            <Link to="/landing" className="transition-colors hover:text-primary">
+            <Link to="/" className="transition-colors hover:text-primary">
               Home
             </Link>
             <span className="px-2" aria-hidden="true">
@@ -110,12 +104,7 @@ export function PageHero({
 
         <Reveal delay={220}>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <CtaButton to="/sign-in?mode=register">
-              Start free
-              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                arrow_forward
-              </span>
-            </CtaButton>
+            <TelegramCta placement="subpage-hero" />
             <CtaButton to={secondary.to} variant="ghost">
               {secondary.label}
             </CtaButton>
@@ -190,10 +179,8 @@ export function PageCta({
           {lead}
         </p>
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-          <CtaButton to="/sign-in?mode=register">Create your account</CtaButton>
-          <CtaButton to="/sign-in" variant="ghost">
-            Sign in
-          </CtaButton>
+          <TelegramCta placement="subpage-final" />
+          <WebFallbackLink placement="subpage-final" />
         </div>
         <p className="mx-auto mt-8 max-w-xl text-[12px] leading-relaxed text-on-surface-variant/70">
           {disclaimer}

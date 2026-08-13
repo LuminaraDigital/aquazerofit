@@ -13,6 +13,7 @@ import type {
   AuthResponse,
   ConsentState,
   CreateMealLogInput,
+  CreditTask,
   DailyNutrition,
   DerivedTargets,
   Food,
@@ -20,12 +21,20 @@ import type {
   MemoryFact,
   MemoryFactCategory,
   MemoryFactStatus,
+  ModelGroup,
   ProfileInput,
+  CoachArt,
+  CoachRosterResponse,
+  CoachUnlock,
+  ProgressInsight,
+  ProgressionStatus,
   ProgressSummary,
   PublicUser,
+  ReadinessAssessment,
   TrainingPlan,
   TrendPoint,
   UserMemory,
+  UserTier,
   WaterLog,
   WeightLog,
   WellnessProfile,
@@ -45,8 +54,25 @@ export interface NutritionTrends {
   };
 }
 
+/**
+ * What this account can currently do (GET /me/entitlements).
+ *
+ * `costs` is the per-task credit price list and `premiumLanes` the model lanes
+ * the free tier cannot reach — both are the server's own constants, so the plan
+ * surface can describe the tier difference from data instead of restating it in
+ * copy that silently goes stale.
+ */
+export interface Entitlements {
+  tier: UserTier;
+  dailyCredits: number;
+  creditsRemaining: number;
+  costs: Record<CreditTask, number>;
+  premiumLanes: ModelGroup[];
+}
+
 export const queryKeys = {
   me: ['me'] as const,
+  entitlements: ['entitlements'] as const,
   profile: ['profile'] as const,
   targets: ['targets'] as const,
   consents: ['consents'] as const,
@@ -54,9 +80,13 @@ export const queryKeys = {
   nutritionDaily: (date: string) => ['nutrition', 'daily', date] as const,
   nutritionTrends: (range: TrendRange) => ['nutrition', 'trends', range] as const,
   progress: ['progress'] as const,
+  progressInsight: ['progress', 'insight'] as const,
   plan: ['plan'] as const,
+  readiness: ['plan', 'readiness'] as const,
   workoutToday: ['workout', 'today'] as const,
   foods: (term: string) => ['foods', term] as const,
+  coaches: ['coaches'] as const,
+  progression: ['progression'] as const,
   weight: (range: TrendRange) => ['weight', range] as const,
 };
 
@@ -137,6 +167,24 @@ export function useUpdateMe() {
   });
 }
 
+/**
+ * GET /me/entitlements — read-only. There is deliberately no companion
+ * mutation: nothing client-side may change `tier`, because with no payment
+ * provider behind it a self-serve tier flip is an entitlement any caller could
+ * grant themselves.
+ *
+ * Answers a bare object today; `unwrap` keeps the hook stable if it is ever
+ * moved into the house `{ entitlements }` envelope.
+ */
+export function useEntitlements(): UseQueryResult<Entitlements | null> {
+  return useQuery({
+    queryKey: queryKeys.entitlements,
+    queryFn: async () =>
+      unwrap<Entitlements>(await orNull(() => api<unknown>('/me/entitlements')), 'entitlements'),
+    enabled: tokenStore.isAuthenticated,
+  });
+}
+
 export function useUpdateProfile() {
   const qc = useQueryClient();
   return useMutation({
@@ -204,18 +252,84 @@ export function useProgressSummary(): UseQueryResult<ProgressSummary> {
   });
 }
 
-export function useCurrentPlan(): UseQueryResult<TrainingPlan | null> {
+/**
+ * GET /progress/insight — the weekly narrative + deterministic "what changed"
+ * lines. Answers `{ insight, cached }` (house envelope, as in the
+ * recommendations lane); `cached` is diagnostic only, so the hook hands the
+ * UI the insight itself.
+ *
+ * The endpoint is 200 on every path — new user, free tier, consent off,
+ * guardrail block, credits exhausted, AI outage — so there is no failure state
+ * to render beyond an ordinary network error. `insight.ai.model` says *why* a
+ * deterministic narrative was served; the card reads it (see
+ * components/progress/WeeklyInsightCard).
+ *
+ * Keyed under ['progress', …] so every log mutation that invalidates
+ * ['progress'] refreshes the insight with it.
+ */
+export function useProgressInsight(): UseQueryResult<ProgressInsight | null> {
   return useQuery({
-    queryKey: queryKeys.plan,
-    queryFn: () => orNull(() => api<TrainingPlan>('/plans/current')),
+    queryKey: queryKeys.progressInsight,
+    queryFn: async () =>
+      unwrap<ProgressInsight>(await orNull(() => api<unknown>('/progress/insight')), 'insight'),
     enabled: tokenStore.isAuthenticated,
   });
 }
 
+export function useCurrentPlan(): UseQueryResult<TrainingPlan | null> {
+  return useQuery({
+    queryKey: queryKeys.plan,
+    queryFn: async () =>
+      unwrap<TrainingPlan>(await orNull(() => api<unknown>('/plans/current')), 'plan'),
+    enabled: tokenStore.isAuthenticated,
+  });
+}
+
+/**
+ * GET /plans/readiness — Protect / Maintain / Progress for the current week.
+ * Answers the `{ readiness }` house envelope. Keyed under ['plan', …] so plan
+ * generation and workout completion refresh it.
+ */
+export function useReadiness(): UseQueryResult<ReadinessAssessment | null> {
+  return useQuery({
+    queryKey: queryKeys.readiness,
+    queryFn: async () =>
+      unwrap<ReadinessAssessment>(await orNull(() => api<unknown>('/plans/readiness')), 'readiness'),
+    enabled: tokenStore.isAuthenticated,
+  });
+}
+
+/**
+ * GET /workouts/today answers a rich envelope — { rest, focus, session,
+ * exercises: Record<exerciseId, Exercise>, resolved, … } — where `session` is
+ * null on rest days and `exercises` is a *detail map*, not the session's
+ * exercise array.
+ *
+ * INVARIANT: every consumer of the ['workout','today'] cache key must spread
+ * these options and carve its slice with `select`. React Query keeps ONE
+ * cached value per key, so caching a *transformed* value here hands every
+ * other consumer the wrong shape depending on mount order — that is exactly
+ * what white-screened /workouts (dashboard cached the raw envelope, the
+ * library then called .reduce on the envelope's Record).
+ */
+export const todayWorkoutQuery = {
+  queryKey: queryKeys.workoutToday,
+  queryFn: () => orNull(() => api<unknown>('/workouts/today')),
+} as const;
+
+/** Today's session (or null on rest days / before a plan exists). */
+export function unwrapWorkoutSession(data: unknown): WorkoutSession | null {
+  if (!data || typeof data !== 'object') return null;
+  const maybe = (data as { session?: unknown }).session ?? data;
+  return maybe && typeof maybe === 'object' && Array.isArray((maybe as WorkoutSession).exercises)
+    ? (maybe as WorkoutSession)
+    : null;
+}
+
 export function useTodayWorkout(): UseQueryResult<WorkoutSession | null> {
   return useQuery({
-    queryKey: queryKeys.workoutToday,
-    queryFn: () => orNull(() => api<WorkoutSession>('/workouts/today')),
+    ...todayWorkoutQuery,
+    select: unwrapWorkoutSession,
     enabled: tokenStore.isAuthenticated,
   });
 }
@@ -542,5 +656,93 @@ export function useClearMemory() {
       qc.setQueryData(queryKeys.memory, null);
       void qc.invalidateQueries({ queryKey: queryKeys.memory });
     },
+  });
+}
+
+// ---------- coach personas & progression ----------
+
+/**
+ * One roster entry as the API serves it. Deliberately not `CoachPersona`: the
+ * server strips `voice.block` before it leaves the process (it is prompt
+ * material), so reusing the full type here would type-check against a field
+ * that is never actually present.
+ */
+export interface CoachCardData {
+  id: string;
+  name: string;
+  ringName: string;
+  tagline: string;
+  discipline: string;
+  domain: string;
+  colour: string;
+  art: CoachArt;
+  voiceWord: string;
+  unlock: CoachUnlock;
+}
+
+export interface CoachRoster extends CoachRosterResponse {
+  roster: CoachCardData[];
+}
+
+export function useCoachRoster(): UseQueryResult<CoachRoster> {
+  return useQuery({
+    queryKey: queryKeys.coaches,
+    queryFn: () => api<CoachRoster>('/coaches'),
+  });
+}
+
+/**
+ * Progression + the coach's current reactions.
+ *
+ * `staleTime: 0` on purpose: this is the surface that says "level up", and a
+ * cached answer after the user has just logged a meal is precisely the moment
+ * the feature has to be right.
+ */
+export function useProgression(): UseQueryResult<ProgressionStatus> {
+  return useQuery({
+    queryKey: queryKeys.progression,
+    queryFn: () => api<ProgressionStatus>('/coaches/progression'),
+    staleTime: 0,
+  });
+}
+
+export function useSelectCoach() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (coachId: string) =>
+      api<{ activeCoachId: string }>('/coaches/select', {
+        method: 'POST',
+        body: { coachId },
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['coaches'] });
+      void qc.invalidateQueries({ queryKey: ['progression'] });
+      // The chat header shows the coach, and existing sessions keep their
+      // history — only the voice ahead changes.
+      void qc.invalidateQueries({ queryKey: ['chat'] });
+    },
+  });
+}
+
+/**
+ * Tell the server the user has actually seen the current reactions. Fired
+ * after render rather than on fetch, so a card that never made it onto screen
+ * (navigation away mid-request, a crash) is shown again next time.
+ */
+export function useAcknowledgeReactions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<void>('/coaches/reactions/ack', { method: 'POST' }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['progression'] }),
+  });
+}
+
+/** Start a Stars checkout. Returns the invoice link for `openInvoice`. */
+export function usePurchaseCoach() {
+  return useMutation({
+    mutationFn: (coachId: string) =>
+      api<{ invoiceLink: string; stars: number }>(`/coaches/${coachId}/purchase`, {
+        method: 'POST',
+      }),
   });
 }

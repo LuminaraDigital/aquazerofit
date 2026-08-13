@@ -10,41 +10,54 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      /**
+       * Every palette entry resolves through an `--azf-*` custom property
+       * declared in src/styles/index.css rather than a literal hex.
+       *
+       * Why the indirection: the Telegram Mini App has to be able to adopt the
+       * host client's colours, and the only way to do that without every
+       * component opting in one by one is to make the token layer itself the
+       * binding point. The channel-triplet form (`14 20 22`) is deliberate —
+       * it is the only shape that keeps Tailwind's alpha modifiers
+       * (`border-outline-variant/50`) working through a variable, so nothing
+       * downstream had to change. Defaults live in CSS and are the exact
+       * values this palette shipped with; see styles/tokens.test.ts.
+       */
       colors: {
-        surface: '#0e1416',
-        'surface-dim': '#0e1416',
-        'surface-bright': '#343a3c',
-        'surface-container-lowest': '#090f11',
-        'surface-container-low': '#161d1e',
-        'surface-container': '#1a2122',
-        'surface-container-high': '#242b2d',
-        'surface-container-highest': '#2f3638',
-        'on-surface': '#dde4e5',
-        'on-surface-variant': '#bbc9cd',
-        outline: '#859397',
-        'outline-variant': '#3c494c',
-        'surface-tint': '#2fd9f4',
-        primary: '#8aebff',
-        'on-primary': '#00363e',
-        'primary-container': '#22d3ee',
-        'on-primary-container': '#005763',
-        secondary: '#45dfa4',
-        'on-secondary': '#003825',
-        'secondary-container': '#00bd85',
-        'on-secondary-container': '#00452e',
-        tertiary: '#ffd2d5',
-        'on-tertiary': '#67001f',
-        'tertiary-container': '#ffaab2',
-        'on-tertiary-container': '#94223a',
-        error: '#ffb4ab',
-        'on-error': '#690005',
-        'error-container': '#93000a',
-        'on-error-container': '#ffdad6',
-        'primary-fixed-dim': '#2fd9f4',
-        'secondary-fixed-dim': '#45dfa4',
-        'tertiary-fixed-dim': '#ffb2b9',
-        'border-aqua': '#1E4C74',
-        coral: '#ffb2b9',
+        surface: 'rgb(var(--azf-surface) / <alpha-value>)',
+        'surface-dim': 'rgb(var(--azf-surface-dim) / <alpha-value>)',
+        'surface-bright': 'rgb(var(--azf-surface-bright) / <alpha-value>)',
+        'surface-container-lowest': 'rgb(var(--azf-surface-container-lowest) / <alpha-value>)',
+        'surface-container-low': 'rgb(var(--azf-surface-container-low) / <alpha-value>)',
+        'surface-container': 'rgb(var(--azf-surface-container) / <alpha-value>)',
+        'surface-container-high': 'rgb(var(--azf-surface-container-high) / <alpha-value>)',
+        'surface-container-highest': 'rgb(var(--azf-surface-container-highest) / <alpha-value>)',
+        'on-surface': 'rgb(var(--azf-on-surface) / <alpha-value>)',
+        'on-surface-variant': 'rgb(var(--azf-on-surface-variant) / <alpha-value>)',
+        outline: 'rgb(var(--azf-outline) / <alpha-value>)',
+        'outline-variant': 'rgb(var(--azf-outline-variant) / <alpha-value>)',
+        'surface-tint': 'rgb(var(--azf-surface-tint) / <alpha-value>)',
+        primary: 'rgb(var(--azf-primary) / <alpha-value>)',
+        'on-primary': 'rgb(var(--azf-on-primary) / <alpha-value>)',
+        'primary-container': 'rgb(var(--azf-primary-container) / <alpha-value>)',
+        'on-primary-container': 'rgb(var(--azf-on-primary-container) / <alpha-value>)',
+        secondary: 'rgb(var(--azf-secondary) / <alpha-value>)',
+        'on-secondary': 'rgb(var(--azf-on-secondary) / <alpha-value>)',
+        'secondary-container': 'rgb(var(--azf-secondary-container) / <alpha-value>)',
+        'on-secondary-container': 'rgb(var(--azf-on-secondary-container) / <alpha-value>)',
+        tertiary: 'rgb(var(--azf-tertiary) / <alpha-value>)',
+        'on-tertiary': 'rgb(var(--azf-on-tertiary) / <alpha-value>)',
+        'tertiary-container': 'rgb(var(--azf-tertiary-container) / <alpha-value>)',
+        'on-tertiary-container': 'rgb(var(--azf-on-tertiary-container) / <alpha-value>)',
+        error: 'rgb(var(--azf-error) / <alpha-value>)',
+        'on-error': 'rgb(var(--azf-on-error) / <alpha-value>)',
+        'error-container': 'rgb(var(--azf-error-container) / <alpha-value>)',
+        'on-error-container': 'rgb(var(--azf-on-error-container) / <alpha-value>)',
+        'primary-fixed-dim': 'rgb(var(--azf-primary-fixed-dim) / <alpha-value>)',
+        'secondary-fixed-dim': 'rgb(var(--azf-secondary-fixed-dim) / <alpha-value>)',
+        'tertiary-fixed-dim': 'rgb(var(--azf-tertiary-fixed-dim) / <alpha-value>)',
+        'border-aqua': 'rgb(var(--azf-border-aqua) / <alpha-value>)',
+        coral: 'rgb(var(--azf-coral) / <alpha-value>)',
       },
       fontFamily: {
         heading: ['"Barlow Condensed"', 'sans-serif'],

@@ -227,7 +227,14 @@ export function useHashScroll(): void {
     let raf = requestAnimationFrame(function seek() {
       const target = document.getElementById(id);
       if (target) {
-        target.scrollIntoView();
+        /* 'instant', not the inherited smooth. The stylesheet sets
+           scroll-behavior: smooth for in-page nav clicks, and a smooth scroll
+           is an animation the browser abandons the moment layout shifts under
+           it — which is exactly what a landing page does while its fonts,
+           images and lazy chunks arrive. A deep link that lands on `#safety`
+           on first load would silently stay at the top of the page. It should
+           land anyway, and arriving instantly is what a deep link means. */
+        target.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
         return;
       }
       if (attempts++ < 60) raf = requestAnimationFrame(seek);

@@ -1,35 +1,63 @@
 version: '3.8'
 
+# AquaZeroFit - hardened local/dev Compose stack.
+#
+# Credentials come from .env (loaded automatically next to this file) or the
+# shell environment. The stack REFUSES to start without them: POSTGRES_PASSWORD
+# and JWT_ACCESS_SECRET have no defaults. See .env.example.
+#
+# Deploy-time manual steps:
+#   1. Verify the pinned postgres digest below still matches what you intend to
+#      deploy (rotate with: docker buildx imagetools inspect postgres:16-alpine).
+#   2. Inject real secrets via your secret manager, not a committed .env.
+
 services:
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     image: aquazerofit-api:latest
+    # Do not commit a mutable 'latest' to a registry; tag by commit SHA at deploy.
     ports:
       - "4000:4000"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=4000
       - AZF_DATA_DIR=/data
-      # Database (PostgreSQL via Cosmos DB or local)
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/aquazerofit
-      # Auth
-      - JWT_SECRET=${JWT_SECRET}
+      # DATABASE_URL is assembled from the POSTGRES_* vars below; the password
+      # never appears inline in this file. Compose fails fast if any are unset.
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required - set it in .env}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required - set it in .env}
+      - POSTGRES_DB=${POSTGRES_DB:-aquazerofit}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-aquazerofit}
+      # Auth (name matches platform/config.ts; no default, required)
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required - set it in .env}
       # Web hosting
       - SERVE_WEB=false
     volumes:
       # Persistent data (JSON store + uploads)
       - api_data:/data
       - api_uploads:/repo/apps/api/uploads
-      # Read-only root filesystem with tmpfs for writable directories
-      # Distroless is effectively read-only; tmpfs provides writable paths
+    # Read-only root filesystem. Writable paths are provided by the named
+    # volumes above plus the tmpfs mounts below. The named volumes are mounted
+    # read/write exceptions on top of the read-only root.
+    read_only: true
     tmpfs:
       - /tmp:size=100M,mode=1777
       - /var/run:size=10M,mode=1777
     security_opt:
+      # Prevent any process from gaining more privileges (setuid, file caps).
+      - no-new-privileges:true
       # Apply minimal seccomp profile for Node.js
       - seccomp:./apps/api/seccomp-profile.json
+    # Drop the full capability set; the API binds port 4000 (>1024) and writes
+    # only to mounted volumes, so no capability needs to be added back.
+    cap_drop:
+      - ALL
+    # Fork-bomb guard; matches the 512M memory limit below.
+    pids_limit: 256
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -45,19 +73,43 @@ services:
           cpus: '0.5'
           memory: 256M
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
 
   db:
-    image: postgres:16-alpine
+    # Pinned by digest (postgres:16-alpine, resolved 2026-08-17).
+    # Rotate at deploy: docker buildx imagetools inspect postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    env_file:
+      - .env
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=aquazerofit
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required - set it in .env}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required - set it in .env}
+      - POSTGRES_DB=${POSTGRES_DB:-aquazerofit}
     volumes:
       - db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # HOST EXPOSURE DISABLED INTENTIONALLY.
+    # Postgres is reachable only inside the compose network (service name 'db').
+    # If you need host access for local tooling (psql, a GUI client), enable it
+    # in docker-compose.override.yml, NOT here:
+    #   db:
+    #     ports:
+    #       - "127.0.0.1:5432:5432"
+    # Never publish 5432 on 0.0.0.0 - the container would accept connections
+    # from any host that can reach the machine.
+    cap_drop:
+      - ALL
+    # NOTE: security_opt no-new-privileges is deliberately NOT applied here.
+    # The official postgres entrypoint starts as root and drops to UID 70 via
+    # gosu's setuid transition; no-new-privileges would block that and the
+    # container would exit immediately. cap_drop: ALL plus a pgdata volume and
+    # no published host port still give a reasonable posture for a dev DB.
+    # In a hardened production deployment, prefer a rootless-compatible image
+    # (e.g. postgres running as non-root UID) so no-new-privileges can be set.
+    pids_limit: 256
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5

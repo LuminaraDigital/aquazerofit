@@ -14,3 +14,10 @@ services:
     # volumes:
     #   - ./apps/api:/repo/apps/api:ro
     #   - ./packages/shared:/repo/packages/shared:ro
+
+  # db port 5432 is deliberately NOT published to the host in
+  # docker-compose.yml. To reach the dev DB with psql or a GUI client, enable
+  # it here on the loopback interface only:
+  # db:
+  #   ports:
+  #     - "127.0.0.1:5432:5432"

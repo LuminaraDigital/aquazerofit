@@ -1,0 +1,52 @@
+# Build context excludes for the AquaZeroFit API image.
+# The build context is the monorepo root (see apps/api/Dockerfile), so without
+# this file every local artifact would be shipped to the daemon.
+
+# Secrets - never enter the build context
+.env
+.env.*
+!.env.example
+
+# Dependencies - installed fresh by npm ci inside the image
+node_modules
+**/node_modules
+
+# VCS and CI metadata
+.git
+.gitignore
+.gitattributes
+.github
+.claude
+.replit
+
+# Runtime content - mounted via volumes at runtime, never baked in
+data/
+apps/api/uploads/
+apps/api/.data/
+uploads/
+
+# Test and coverage output
+coverage/
+**/coverage/
+*.lcov
+
+# Built assets (web is built separately; API image does not serve it by default)
+apps/web/dist/
+
+# Documentation and design assets - not needed at runtime
+docs/
+design/
+content/
+prompts/
+evals/
+tools/
+
+# Reports and planning artifacts
+*.md
+!README.md
+!LICENSE
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log

@@ -379,7 +379,22 @@ export async function initStore(): Promise<MemoryBackedStore> {
   // Imported lazily so `pg` is never loaded — nor required to be installed —
   // in the file-backed dev/test path.
   const { PostgresStore } = await import('./pgStore');
-  const pg = await PostgresStore.connect(process.env.DATABASE_URL!.trim(), config.dataDir);
+  // DATABASE_URL_ALLOW_INSECURE_SSL opts out of TLS enforcement for hosts that
+  // are not loopback but ARE trusted private networks: the canonical case is a
+  // docker-compose stack whose api and db share an isolated bridge network
+  // (hostname 'db', no host port published). It must never be set when
+  // DATABASE_URL points off this machine.
+  const allowInsecureSsl = process.env.DATABASE_URL_ALLOW_INSECURE_SSL === 'true';
+  if (allowInsecureSsl) {
+    console.warn(
+      '[store] DATABASE_URL_ALLOW_INSECURE_SSL=true: plaintext Postgres accepted. ' +
+        'Set this only on an isolated private network (e.g. a docker-compose bridge); ' +
+        'never for a database reachable from the public internet.',
+    );
+  }
+  const pg = await PostgresStore.connect(process.env.DATABASE_URL!.trim(), config.dataDir, {
+    allowInsecureSsl,
+  });
   await pg.hydrate();
   singleton = pg;
   // Seed after hydration, never before: seedIfNeeded's own emptiness checks

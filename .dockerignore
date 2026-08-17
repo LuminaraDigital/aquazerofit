@@ -37,9 +37,9 @@ apps/web/dist/
 docs/
 design/
 content/
-prompts/
 evals/
 tools/
+# prompts/ is NOT excluded: the API loads the P-*.md prompt files at boot.
 
 # Reports and planning artifacts
 *.md

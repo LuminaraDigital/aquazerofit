@@ -56,7 +56,10 @@ services:
     # only to mounted volumes, so no capability needs to be added back.
     cap_drop:
       - ALL
-    # Fork-bomb guard; matches the 512M memory limit below.
+    # Fork-bomb guard. Kept as a native compose limit rather than
+    # deploy.resources.limits.pids: compose rejects a service that sets both,
+    # and deploy is Swarm-only metadata outside Docker Swarm anyway, so the
+    # enforcement would silently vanish on a plain docker compose up.
     pids_limit: 256
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -64,14 +67,6 @@ services:
       timeout: 3s
       start_period: 15s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 256M
     restart: unless-stopped
     depends_on:
       db:
@@ -98,8 +93,19 @@ services:
     #       - "127.0.0.1:5432:5432"
     # Never publish 5432 on 0.0.0.0 - the container would accept connections
     # from any host that can reach the machine.
+    #
+    # The official entrypoint starts as root and demotes to UID 70 via gosu:
+    # that transition requires SETUID/SETGID (cap_drop ALL without them makes
+    # the container exit with "failed switching to 'postgres'"), and the
+    # bootstrap chowns the data volume before demoting. Everything else stays
+    # dropped; after demotion the server process itself holds no extra caps.
     cap_drop:
       - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
     # NOTE: security_opt no-new-privileges is deliberately NOT applied here.
     # The official postgres entrypoint starts as root and drops to UID 70 via
     # gosu's setuid transition; no-new-privileges would block that and the

@@ -200,7 +200,11 @@ export class PostgresStore extends MemoryBackedStore {
       // `ssl: true` alone would skip certificate verification; the secure-url
       // check above is what makes this safe. When the URL is loopback the
       // driver talks plaintext on the local interface and `ssl` is moot.
-      ssl: options.ssl ?? (!isLoopbackConnectionString(connectionString) ? true : undefined),
+      ssl:
+        options.ssl ??
+        (options.allowInsecureSsl || isLoopbackConnectionString(connectionString)
+          ? undefined
+          : true),
     });
     // Probe the pool now: pg connects lazily, so without this a bad URL or
     // unreachable server would surface only inside hydrate() as a bare driver

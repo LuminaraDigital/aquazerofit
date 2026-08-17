@@ -24,9 +24,25 @@ COPY packages/shared/package.json packages/shared/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 
-RUN npm ci --workspaces --include-workspace-root
+# npm ci honours the host lockfile's os/cpu-tagged optional entries, so a
+# lockfile generated on Windows arrives without sharp's linux-x64 libvips
+# binding and the vision suite dies on dlopen. npm cannot re-resolve a single
+# package from the monorepo root (Invalid Version on the workspace), so fetch
+# just the platform packages into a scratch dir and drop them into the tree.
+RUN npm ci --workspaces --include-workspace-root \
+ && mkdir -p /tmp/sharpfix \
+ && cd /tmp/sharpfix \
+ && npm init -y >/dev/null \
+ && npm install --no-save --os=linux --cpu=x64 @img/sharp-linux-x64 @img/sharp-libvips-linux-x64 \
+ && mkdir -p /repo/node_modules/sharp/node_modules/@img \
+ && cp -r node_modules/@img/sharp-linux-x64 node_modules/@img/sharp-libvips-linux-x64 /repo/node_modules/sharp/node_modules/@img/ \
+ && cp -r node_modules/@img /repo/node_modules/@img-linux || true \
+ && cd /repo \
+ && node -e "require('sharp'); console.log('[sharp] linux-x64 native binding OK')"
 
 COPY tsconfig.base.json ./
+# prompts/ holds the .md prompt files loadPrompt reads at boot and in tests.
+COPY prompts prompts
 COPY packages/shared packages/shared
 COPY apps/api apps/api
 
@@ -54,12 +70,10 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/api/package.json apps/api/
 
-# Install production dependencies only (from builder stage via layer caching)
-# Using npm from the builder stage's node_modules/.bin is not possible in distroless,
-# so we copy the built node_modules from builder stage instead.
+# Everything is hoisted to the root node_modules under npm workspaces, so a
+# single copy is correct and sufficient; per-workspace node_modules do not
+# exist in this install layout.
 COPY --from=build --chown=nonroot:nonroot /repo/node_modules /repo/node_modules
-COPY --from=build --chown=nonroot:nonroot /repo/packages/shared/node_modules /repo/packages/shared/node_modules
-COPY --from=build --chown=nonroot:nonroot /repo/apps/api/node_modules /repo/apps/api/node_modules
 
 # Copy source code
 COPY --chown=nonroot:nonroot tsconfig.base.json ./
@@ -85,6 +99,7 @@ ENV PORT=4000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
-# Distroless entrypoint is "node" by default; we run tsx directly (no npm, no dumb-init)
-# tsx is copied from builder stage's node_modules
-CMD ["tsx", "apps/api/src/index.ts"]
+# Distroless entrypoint is `node`, so the CMD must be a JS file path: the
+# .bin/tsx shim is a shell script this image does not have. Resolve the real
+# CLI entry instead (tsx/dist/cli.mjs lives inside node_modules/tsx).
+CMD ["node_modules/tsx/dist/cli.mjs", "apps/api/src/index.ts"]

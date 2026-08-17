@@ -47,3 +47,4 @@ node_modules/.cache/
 # Generated documents at root — regenerate with tools/docgen.
 # Anchored so the deliverable set in docs/specs/ is still tracked.
 /*.docx
+docker-compose.override.yml

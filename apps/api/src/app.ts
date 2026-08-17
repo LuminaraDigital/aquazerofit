@@ -6,10 +6,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './platform/config';
 import { errorHandler, notFoundHandler } from './platform/errors';
-import { requestLogger } from './platform/telemetry';
+import { assertTrustProxyHeaders, enforceHttps } from './platform/https';
+import { requestLogger, metrics } from './platform/telemetry';
 import { rateLimiter } from './platform/rateLimiter';
 import { getStore } from './platform/store';
 import { buildRouter } from './modules';
+
+/** Cloudflare Turnstile's script + iframe origin (see platform/botProtection.ts). */
+const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
 
 export function createApp() {
   const app = express();
@@ -19,6 +23,13 @@ export function createApp() {
   app.set('trust proxy', config.trustProxy);
 
   app.disable('x-powered-by');
+
+  // Transport security runs before everything else: a plaintext request should
+  // be turned away without this process parsing a body or touching the store.
+  // The trust-proxy check sits first because enforceHttps reads `req.secure`,
+  // which is only trustworthy when TRUST_PROXY matches the real topology.
+  app.use(assertTrustProxyHeaders);
+  app.use(enforceHttps);
 
   // Is a built SPA present and enabled? This changes the security posture:
   // an API-only process never emits HTML and can lock everything down, whereas
@@ -32,12 +43,32 @@ export function createApp() {
         directives: spaDir
           ? {
               defaultSrc: ["'self'"],
-              // telegram.org serves the Mini App SDK loaded by index.html.
-              scriptSrc: ["'self'", 'https://telegram.org', 'https://*.telegram.org'],
+              // telegram.org serves the Mini App SDK loaded by index.html;
+              // challenges.cloudflare.com serves the Turnstile widget on the
+              // register and password-reset forms. Both are only requested
+              // when the corresponding key is configured, but the directive
+              // must be present unconditionally — a CSP cannot be varied per
+              // response without also varying the cache.
+              scriptSrc: [
+                "'self'",
+                'https://telegram.org',
+                'https://*.telegram.org',
+                TURNSTILE_ORIGIN,
+              ],
               styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
               fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
               imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+              // Turnstile runs its challenge inside an iframe it serves itself,
+              // so frame-src must allow the origin — but connect-src must NOT:
+              // the widget's XHR is issued from inside that iframe, which is a
+              // separate browsing context governed by Cloudflare's own policy,
+              // not this one. Adding it here would widen the page's egress
+              // allowance for no benefit.
+              frameSrc: ["'self'", TURNSTILE_ORIGIN],
               connectSrc: ["'self'"],
+              // Coach/exercise media is played from object URLs built in the
+              // client; without this, default-src 'self' blocks blob: playback.
+              mediaSrc: ["'self'", 'blob:'],
               // Telegram renders Mini Apps inside an iframe on web.telegram.org,
               // so 'none' here would break the Mini App entirely. X-Frame-Options
               // cannot express a multi-origin allowlist; frame-ancestors can.
@@ -59,8 +90,11 @@ export function createApp() {
             },
       },
       // frameguard sends X-Frame-Options, which would override the multi-origin
-      // frame-ancestors above in browsers that honour both. Off when serving the SPA.
-      frameguard: spaDir ? false : undefined,
+      // frame-ancestors above in browsers that honour both. Off when serving the
+      // SPA. In API-only mode it stays on but says DENY rather than helmet's
+      // default SAMEORIGIN, so the legacy header agrees with frame-ancestors
+      // 'none' instead of being quietly the weaker of the two.
+      frameguard: spaDir ? false : { action: 'deny' },
       hsts: { maxAge: 31_536_000, includeSubDomains: true, preload: true },
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       // The SPA needs referrer info for same-origin navigation analytics later;
@@ -79,10 +113,17 @@ export function createApp() {
     res.json({ status: 'ok', service: 'aquazerofit-api', version: config.version });
   });
 
-  // Readiness — safe to route traffic here: the data store has loaded.
-  app.get('/ready', (_req, res) => {
+  // Readiness — safe to route traffic here: the data store has loaded AND,
+  // under the Postgres backing, a live round-trip succeeds. Hydration alone
+  // says the snapshot was readable at boot; the pin checks the pool still
+  // answers, which is what the first routed request will need.
+  app.get('/ready', async (_req, res) => {
     try {
-      getStore();
+      const store = getStore();
+      // SELECT 1 against the pool when Postgres-backed; a no-op resolution
+      // under the file backing where the store itself is the health signal.
+      const maybePing = (store as { ping?: () => Promise<void> }).ping;
+      if (typeof maybePing === 'function') await maybePing.call(store);
       res.json({ status: 'ready', service: 'aquazerofit-api', version: config.version });
     } catch (err) {
       res.status(503).json({
@@ -91,6 +132,14 @@ export function createApp() {
         details: { reason: err instanceof Error ? err.message : 'unknown' },
       });
     }
+  });
+
+  // Operator snapshot: the in-process counters as JSON. Registered before
+  // the limiter and unauthenticated for the same reason as /health — a
+  // platform scraper cannot present credentials, and the payload carries no
+  // user data (counts and timestamps only).
+  app.get('/metrics', (_req, res) => {
+    res.json({ service: 'aquazerofit-api', version: config.version, metrics });
   });
 
   app.use(rateLimiter);

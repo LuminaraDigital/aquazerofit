@@ -5,6 +5,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { ZodError } from 'zod';
 import { ERROR_CODES, type ApiErrorBody, type ErrorCode } from '@aquazerofit/shared';
+import { logError } from './telemetry';
 
 export class AppError extends Error {
   readonly code: ErrorCode;
@@ -66,8 +67,8 @@ export function errorHandler(
     return;
   }
   // Unknown failure: never leak internals to the client.
-  // eslint-disable-next-line no-console
-  console.error('[internal-error]', err);
+  const requestId = (_req as { requestId?: string }).requestId;
+  logError(err, { requestId, route: _req.originalUrl ? _req.baseUrl + _req.path : undefined });
   res
     .status(ERROR_CODES.INTERNAL)
     .json({ code: 'INTERNAL', message: 'Internal server error' } satisfies ApiErrorBody);

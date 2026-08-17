@@ -26,6 +26,7 @@
 import { Router } from 'express';
 import { coachById, starsPriceOf } from '@aquazerofit/shared';
 import { config } from '../../platform/config';
+import { secureEquals } from '../../platform/auth';
 import { logEvent } from '../../platform/telemetry';
 import { answerPreCheckoutQuery } from './telegramBot';
 import { completePayment, findPendingInvoice } from './stars';
@@ -53,8 +54,11 @@ interface TelegramUpdate {
 
 function secretMatches(header: unknown): boolean {
   const expected = config.telegramWebhookSecret;
+  // Fail closed: an unset secret means the route trusts nobody rather than
+  // everybody. Checked before the compare so an empty header can never match
+  // an empty expectation.
   if (!expected) return false;
-  return typeof header === 'string' && header === expected;
+  return secureEquals(header, expected);
 }
 
 telegramWebhookRouter.post('/webhook', (req, res) => {

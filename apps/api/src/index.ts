@@ -12,6 +12,7 @@ dotenv.config({ path: path.resolve(here, '..', '..', '..', '.env') });
 
 import { createApp } from './app';
 import { config, assertProductionSecrets } from './platform/config';
+import { warnIfBotProtectionUnconfigured } from './platform/botProtection';
 import { describeStoreInitFailure, getStore, initStore } from './platform/store';
 import { sweepExpiredDeletions } from './modules/me/service';
 import { sweepVisionArtifacts } from './modules/vision/router';
@@ -19,6 +20,9 @@ import { sweepGrowthEvents } from './modules/analytics/router';
 
 // Fail fast: never boot a production process on dev fallback secrets.
 assertProductionSecrets();
+// Advisory rather than fatal: an unprotected signup form is a real weakness,
+// but killing a deploy over incomplete Cloudflare onboarding is a worse one.
+warnIfBotProtectionUnconfigured();
 
 // Build the store before anything reads it. Under the Postgres backing
 // (DATABASE_URL set, e.g. Replit) hydration is async while getStore() stays

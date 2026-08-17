@@ -48,6 +48,8 @@ export function toPublicUser(user: User): PublicUser {
     emailVerified: user.emailVerified,
     hasProfile: getProfile(user.id) !== undefined,
     telegramLinked: user.tgId !== undefined && user.tgId !== null,
+    hasPassword:
+      getStore().byId<CredentialsDoc>('users', credentialsId(user.id)) !== undefined,
     timezone: user.timezone,
     createdAt: user.createdAt,
   };

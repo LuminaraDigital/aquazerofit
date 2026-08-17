@@ -45,8 +45,14 @@ vi.mock('../../lib/api', () => ({
   tokenStore: { isAuthenticated: true },
   ApiError: class ApiError extends Error {},
 }));
-vi.mock('../../lib/telegram', () => ({ haptic: vi.fn(), isTMA: () => false }));
+vi.mock('../../lib/telegram', () => ({
+  haptic: vi.fn(),
+  isTMA: () => false,
+  getTelegramInitData: () => null,
+}));
 vi.mock('../../lib/queries', () => ({
+  useSetCredentials: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useLinkTelegram: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useProfile: () => ({
     data: mocks.profile.state === 'loaded' ? mocks.profile.data : null,
     isLoading: false,

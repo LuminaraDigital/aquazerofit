@@ -168,6 +168,49 @@ export function useUpdateMe() {
 }
 
 /**
+ * POST /me/credentials — first-time email + password for a Telegram-provisioned
+ * account, so it can sign in on the web. The server rejects the call once a
+ * password exists (change goes through the reset flow), so the Settings surface
+ * gates on `user.hasPassword === false`.
+ */
+export function useSetCredentials() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { email: string; password: string }) =>
+      api<{ user: PublicUser }>('/me/credentials', { method: 'POST', body: input }),
+    onSuccess: (res) => {
+      const user = unwrap<PublicUser>(res, 'user');
+      if (user) {
+        storeUser(user);
+        qc.setQueryData(queryKeys.me, user);
+      }
+      void qc.invalidateQueries({ queryKey: queryKeys.me });
+    },
+  });
+}
+
+/**
+ * POST /me/link-telegram — attach the current Telegram identity (signed launch
+ * data) to the signed-in account. Only callable inside the Mini App, where
+ * initData exists; the server re-validates the HMAC before linking.
+ */
+export function useLinkTelegram() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (initData: string) =>
+      api<{ user: PublicUser }>('/me/link-telegram', { method: 'POST', body: { initData } }),
+    onSuccess: (res) => {
+      const user = unwrap<PublicUser>(res, 'user');
+      if (user) {
+        storeUser(user);
+        qc.setQueryData(queryKeys.me, user);
+      }
+      void qc.invalidateQueries({ queryKey: queryKeys.me });
+    },
+  });
+}
+
+/**
  * GET /me/entitlements — read-only. There is deliberately no companion
  * mutation: nothing client-side may change `tier`, because with no payment
  * provider behind it a self-serve tier flip is an entitlement any caller could

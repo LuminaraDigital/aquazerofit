@@ -7,6 +7,7 @@ import {
   FREE_TIER_DAILY_CREDITS,
   consentsSchema,
   profileSchema,
+  setCredentialsSchema,
   telegramAuthSchema,
   updateIdentitySchema,
   type User,
@@ -17,6 +18,7 @@ import { asyncHandler } from '../ai/util';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { AppError } from '../../platform/errors';
 import { getStore } from '../../platform/store';
+import { setCredentials } from '../auth/service';
 import { validateTelegramInitData } from '../auth/telegram';
 import { memoryRouter } from '../memory/router';
 import {
@@ -97,6 +99,17 @@ meRouter.post('/link-telegram', (req, res) => {
   const user = linkTelegram(userIdOf(req), tgUser.id, tgUser.username);
   res.json({ user });
 });
+
+// First-time email + password for a Telegram-provisioned account, so it can
+// sign in on the web (mirror of link-telegram; one-shot, see setCredentials).
+meRouter.post(
+  '/credentials',
+  asyncHandler(async (req, res) => {
+    const input = setCredentialsSchema.parse(req.body);
+    const user = await setCredentials(userIdOf(req), input, req.ip);
+    res.json({ user });
+  }),
+);
 
 meRouter.get('/consents', (req, res) => {
   res.json({ consents: getConsents(userIdOf(req)) });

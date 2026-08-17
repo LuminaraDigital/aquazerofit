@@ -749,6 +749,12 @@ export interface PublicUser {
   emailVerified: boolean;
   hasProfile: boolean;
   telegramLinked: boolean;
+  /**
+   * Whether the account can sign in with email + password. False for
+   * Telegram-provisioned accounts until they set credentials via
+   * POST /me/credentials — the client uses this to offer that flow.
+   */
+  hasPassword: boolean;
   timezone?: string; // IANA name; optional, set via PATCH /me
   createdAt: string;
 }

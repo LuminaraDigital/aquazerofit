@@ -428,3 +428,50 @@ export async function confirmPasswordReset(token: string, newPassword: string, i
   revokeAllForUser(user.id);
   auditAuthEvent(user.id, 'password.reset.confirmed', { emailHash: hashIdentifier(user.email) }, ip);
 }
+
+/**
+ * First-time credentials for a Telegram-provisioned account (AQF-09 §2.3):
+ * replace the synthetic tg-…@ placeholder email with one the user owns and
+ * create the credentials record that `login` requires. One-shot by design —
+ * an account that already has a password changes it via the reset flow, which
+ * proves control of the mailbox; this endpoint only proves a valid session.
+ */
+export async function setCredentials(
+  userId: string,
+  input: { email: string; password: string },
+  ip?: string,
+): Promise<AuthResponse['user']> {
+  const store = getStore();
+  const user = store.byId<User>('users', userId);
+  if (!user || !isUserDoc(user)) throw new AppError('NOT_FOUND', 'Account not found');
+
+  if (store.byId<CredentialsDoc>('users', credentialsId(userId))) {
+    throw new AppError(
+      'CONFLICT',
+      'This account already has a password. Use "Forgot password" to change it.',
+    );
+  }
+
+  const email = input.email.trim().toLowerCase();
+  const existing = findUserByEmail(email);
+  if (existing && existing.id !== userId) {
+    throw new AppError('CONFLICT', 'An account already exists for this email address');
+  }
+
+  const updated: User = {
+    ...user,
+    email,
+    // Same stance as register(): dev auto-verifies for convenience; production
+    // records the truth until a verification transport exists.
+    emailVerified: config.isDev,
+  };
+  store.upsert('users', updated);
+  store.upsert('users', {
+    id: credentialsId(userId),
+    type: 'credentials',
+    userId,
+    passwordHash: await bcryptHashAsync(input.password, BCRYPT_ROUNDS),
+  } satisfies CredentialsDoc);
+  auditAuthEvent(userId, 'credentials.set', { emailHash: hashIdentifier(email) }, ip);
+  return toPublicUser(updated);
+}

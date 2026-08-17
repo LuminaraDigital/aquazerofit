@@ -62,6 +62,16 @@ export const passwordResetConfirmSchema = z.object({
 
 export const telegramAuthSchema = z.object({ initData: z.string().min(10) });
 
+/**
+ * POST /me/credentials — a Telegram-provisioned account (no credentials record)
+ * sets a real email + password so it can sign in on the web. Same password
+ * policy as registration; the email replaces the synthetic tg-…@ placeholder.
+ */
+export const setCredentialsSchema = z.object({
+  email: z.string().email(),
+  password: passwordSchema,
+});
+
 // ---------- profile ----------
 
 export const profileSchema = z.object({

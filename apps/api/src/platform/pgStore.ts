@@ -16,6 +16,11 @@
  *   level will silently drop the other instance's version of a document. Run
  *   this on a single Reserved VM (or max-instances=1), or finish the async
  *   getStore() refactor and read through to Postgres before scaling out.
+ *   The one exception is refresh-token rotation: compareAndSwapRefreshToken
+ *   executes a genuine atomic UPDATE against the database itself (not the
+ *   local copy), so two instances rotating the same token concurrently still
+ *   produce exactly one success — the loser sees zero rows and revokes the
+ *   family. Session anti-theft is multi-instance safe; app data reads are not.
  *
  * Driver: the plain `pg` package, not @neondatabase/serverless — Replit
  * migrated its managed database off Neon, so the serverless HTTP driver is the
@@ -102,6 +107,37 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
 
 const KNOWN_CONTAINERS = new Set<string>(CONTAINERS);
 
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+/** True when the URL's host is this machine, where plaintext is acceptable. */
+export function isLoopbackConnectionString(connectionString: string): boolean {
+  try {
+    return LOOPBACK_HOSTS.has(new URL(connectionString).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True when the URL either targets loopback or negotiates TLS with the
+ * server. Non-loopback URLs must carry an sslmode that is not `disable` /
+ * `allow` / `prefer` (those all permit plaintext fallback), or `ssl=true`,
+ * which managed offerings (Replit, Cosmos) use when their certificates are
+ * not publicly anchored and `verify-full` would fail validation.
+ */
+export function isSecureConnectionString(connectionString: string): boolean {
+  if (isLoopbackConnectionString(connectionString)) return true;
+  try {
+    const params = new URL(connectionString).searchParams;
+    const sslmode = params.get('sslmode')?.toLowerCase();
+    if (sslmode) return !['disable', 'allow', 'prefer'].includes(sslmode);
+    const ssl = params.get('ssl')?.toLowerCase();
+    return ssl === 'true' || ssl === '1';
+  } catch {
+    return false;
+  }
+}
+
 interface DocumentRow {
   container: string;
   id: string;
@@ -128,10 +164,49 @@ export class PostgresStore extends MemoryBackedStore {
    * Open a pool against `connectionString`. `pg` is imported here rather than
    * at module scope so the driver is only ever loaded by a process that has a
    * database — the file-backed dev/test path never reaches this module.
+   *
+   * Pool shape is deliberately conservative: max 5 connections (one instance
+   * flushes through a single serialized queue and never needs more, and
+   * Replit's database has a modest cap), idle clients reaped after 30s, and a
+   * 15s statement timeout so a wedged query fails a request instead of
+   * pinning a pooled connection forever.
+   *
+   * TLS is enforced at the connection-string level: a plain `postgres://` URL
+   * to a non-loopback host is accepted only when it carries an sslmode that
+   * verifies (`verify-ca` / `verify-full`), or `ssl=true` for managed
+   * offerings (Replit, Cosmos) whose certs are not publicly anchored. An
+   * off-host URL with no SSL is rejected outright — credentials and refresh
+   * tokens must never cross the network in cleartext.
    */
-  static async connect(connectionString: string, dataDir: string): Promise<PostgresStore> {
+  static async connect(
+    connectionString: string,
+    dataDir: string,
+    options: { ssl?: boolean; allowInsecureSsl?: boolean } = {},
+  ): Promise<PostgresStore> {
+    const secure = isSecureConnectionString(connectionString);
+    if (!secure && !options.allowInsecureSsl) {
+      throw new Error(
+        'DATABASE_URL must use TLS for a non-loopback host: use a postgres:// URL with ' +
+          'sslmode=verify-full (or ssl=true for managed databases that require it). ' +
+          'Plaintext connections are allowed only to localhost.',
+      );
+    }
     const { default: pg } = await import('pg');
-    const pool = new pg.Pool({ connectionString, max: 5 });
+    const pool = new pg.Pool({
+      connectionString,
+      max: 5,
+      idleTimeoutMillis: 30_000,
+      statement_timeout: 15_000,
+      // `ssl: true` alone would skip certificate verification; the secure-url
+      // check above is what makes this safe. When the URL is loopback the
+      // driver talks plaintext on the local interface and `ssl` is moot.
+      ssl: options.ssl ?? (!isLoopbackConnectionString(connectionString) ? true : undefined),
+    });
+    // Probe the pool now: pg connects lazily, so without this a bad URL or
+    // unreachable server would surface only inside hydrate() as a bare driver
+    // code, not as the actionable boot failure index.ts prints.
+    const client = await pool.connect();
+    client.release();
     return new PostgresStore(dataDir, pool, pool);
   }
 
@@ -199,9 +274,25 @@ export class PostgresStore extends MemoryBackedStore {
   }
 
   /**
+   * Round-trip health check for GET /ready: proves the pool still answers,
+   * not merely that hydration succeeded at boot. Under the file backing
+   * this method does not exist and the probe degrades to store presence.
+   */
+  async ping(): Promise<void> {
+    await this.exec.query('SELECT 1');
+  }
+
+  /**
    * Atomic compare-and-swap for refresh token rotation (PostgreSQL implementation).
    * Uses UPDATE ... WHERE usedAt IS NULL AND revokedAt IS NULL with RETURNING
    * to atomically mark the token as used only if still valid.
+   *
+   * The tokenHash is part of the WHERE clause as defense in depth: the caller
+   * resolves the id from the hash in memory first, but the database re-checks
+   * it so a race between hydration and rotation can never mark the wrong row.
+   * The row lock taken by UPDATE serializes concurrent rotations of the same
+   * token: the loser sees usedAt already set and matches zero rows, which is
+   * what triggers family revocation in rotateRefresh().
    */
   async compareAndSwapRefreshToken(
     tokenId: string,
@@ -211,13 +302,14 @@ export class PostgresStore extends MemoryBackedStore {
     const stmt = {
       text: `
         UPDATE documents
-        SET doc = jsonb_set(doc, '{usedAt}', $3::jsonb, true), updated_at = now()
+        SET doc = jsonb_set(doc, '{usedAt}', $4::jsonb, true), updated_at = now()
         WHERE container = $1 AND id = $2
+          AND doc->>'tokenHash' = $3
           AND (doc->>'usedAt') IS NULL
           AND (doc->>'revokedAt') IS NULL
         RETURNING doc
       `,
-      values: ['users', tokenId, JSON.stringify(usedAt)],
+      values: ['users', tokenId, tokenHash, JSON.stringify(usedAt)],
     };
     const result = await this.exec.query(stmt.text, stmt.values);
     if (result.rows.length === 0) return undefined;

@@ -1,7 +1,7 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import type { WellnessProfile } from '@aquazerofit/shared';
-import { tokenStore } from '../../lib/api';
+import { restoreSession, tokenStore } from '../../lib/api';
 import { isTMA } from '../../lib/telegram';
 import { useProfile } from '../../lib/queries';
 import { PageSpinner } from '../ui/PageSpinner';
@@ -60,8 +60,26 @@ export function useProfileGate(): ProfileGate {
  */
 export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
   const location = useLocation();
+  // FE-01: the access token lives in memory, so a reload starts unauthenticated
+  // even with a valid session. Attempt one cookie-backed refresh on mount.
+  const [restoring, setRestoring] = useState(!tokenStore.isAuthenticated);
+  useEffect(() => {
+    let alive = true;
+    if (!tokenStore.isAuthenticated) {
+      void restoreSession().then((ok) => {
+        if (alive) setRestoring(false);
+      });
+    } else {
+      setRestoring(false);
+    }
+    return () => {
+      alive = false;
+    };
+  }, []);
   const isAuthed = tokenStore.isAuthenticated;
-  const { data: profile, isLoading, isError, refetch } = useProfile(isAuthed);
+  const { data: profile, isLoading, isError, refetch } = useProfile(isAuthed && !restoring);
+
+  if (restoring) return <PageSpinner />;
 
   if (!isAuthed) {
     if (publicIndex && location.pathname === '/' && !isTMA()) return <>{publicIndex}</>;

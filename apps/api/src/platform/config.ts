@@ -6,7 +6,6 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import express from 'express';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** apps/api/.data by default, regardless of process cwd. */
@@ -64,35 +63,30 @@ export const config = {
    * to 1 in production (trust exactly the immediate hop, so clients cannot
    * spoof X-Forwarded-For) and 0 in dev, where there is no proxy.
    */
-    get trustProxy(): number {
-      const raw = process.env.TRUST_PROXY?.trim();
-      if (raw) {
-        const n = Number(raw);
-        if (Number.isInteger(n) && n >= 0) return n;
-      }
-      return isProduction() ? 1 : 0;
-    },
+  get trustProxy(): number {
+    const raw = process.env.TRUST_PROXY?.trim();
+    if (raw) {
+      const n = Number(raw);
+      if (Number.isInteger(n) && n >= 0) return n;
+    }
+    return isProduction() ? 1 : 0;
+  },
 
-    /**
-     * Validates that the X-Forwarded-For header matches the trustProxy setting.
-     * Call this from Express middleware after trust proxy is configured.
-     * Logs a warning if the header count doesn't match trustProxy (potential spoofing).
-     */
-    validateTrustProxy(req: express.Request): void {
-      const trustProxy = config.trustProxy;
-      if (trustProxy <= 0) return;
-    
-      const xff = req.headers['x-forwarded-for'];
-      if (!xff) {
-        console.warn(`[security] trustProxy=${trustProxy} but no X-Forwarded-For header present`);
-        return;
-      }
-    
-      const ips = (Array.isArray(xff) ? xff[0] : xff).split(',').map(s => s.trim());
-      if (ips.length !== trustProxy) {
-        console.warn(`[security] trustProxy=${trustProxy} but X-Forwarded-For has ${ips.length} hops: ${ips.join(', ')}`);
-      }
-    },
+  /**
+   * Refuse plaintext http and redirect it to https (see platform/https.ts).
+   *
+   * On by default in production, where TLS always terminates at an ingress in
+   * front of this process. FORCE_HTTPS=false is the escape hatch for the one
+   * shape where plaintext is correct: a sidecar that has already terminated
+   * TLS and talks to this container over a private network, where a redirect
+   * to https would point at an origin that does not listen.
+   */
+  get forceHttps(): boolean {
+    const raw = process.env.FORCE_HTTPS?.trim().toLowerCase();
+    if (raw === 'true' || raw === '1') return true;
+    if (raw === 'false' || raw === '0') return false;
+    return isProduction();
+  },
 
   /**
    * Where meal photographs are written while a vision job is in flight.
@@ -154,6 +148,41 @@ export const config = {
    */
   get telegramWebhookSecret(): string {
     return process.env.TELEGRAM_WEBHOOK_SECRET?.trim() ?? '';
+  },
+
+  /**
+   * Cloudflare Turnstile secret, used server-side to verify a solved token.
+   * Unset disables the check entirely, which is what dev, the test suite and
+   * the keyless offline demo need.
+   */
+  get turnstileSecretKey(): string {
+    return process.env.TURNSTILE_SECRET_KEY?.trim() ?? '';
+  },
+
+  /**
+   * Turnstile site key. Public by design — it is handed to any caller of
+   * GET /auth/captcha.
+   *
+   * Served at runtime rather than baked into the web bundle as a VITE_ var on
+   * purpose: a build-time key is missed silently (the widget just never
+   * renders) and cannot be rotated without a rebuild, and on a host where the
+   * build and the runtime are separate steps that is a trap rather than a
+   * theoretical risk.
+   */
+  get turnstileSiteKey(): string {
+    return process.env.TURNSTILE_SITE_KEY?.trim() ?? '';
+  },
+
+  /**
+   * True only when BOTH keys are present.
+   *
+   * Requiring both is what stops the worst configuration: a secret with no
+   * site key would have the server demand a token that the client — told
+   * `enabled: false` — never renders a widget to produce, locking every real
+   * person out of registration while looking correctly configured.
+   */
+  get botProtectionEnabled(): boolean {
+    return this.turnstileSecretKey !== '' && this.turnstileSiteKey !== '';
   },
 
   get isTest(): boolean {
@@ -266,6 +295,19 @@ export function assertProductionSecrets(): void {
   }
   if (!process.env.APP_PUBLIC_URL?.trim()) {
     throw new Error('APP_PUBLIC_URL must be set in production (reset links are built from it)');
+  }
+
+  // Durable persistence. Without DATABASE_URL the store falls back to JSON
+  // files under AZF_DATA_DIR, which is correct for local dev but not for a
+  // production deployment: containers restart with empty stores and user
+  // accounts, refresh tokens and entitlements silently vanish. Refuse to
+  // boot rather than serving a production API whose state evaporates on the
+  // next deploy.
+  if (!process.env.DATABASE_URL?.trim()) {
+    throw new Error(
+      'DATABASE_URL must be set in production so the store persists to Postgres; ' +
+        'the JSON file backing is a local-development store and is not durable across deploys.',
+    );
   }
 }
 

@@ -502,7 +502,12 @@ const USER_KEY = 'azf.user';
 export function getStoredUser(): PublicUser | null {
   try {
     const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as PublicUser) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PublicUser> | null;
+    // Shape-check (FE-03/04): corrupt or legacy payloads are ignored, not trusted.
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (typeof parsed.id !== 'string' || typeof parsed.email !== 'string') return null;
+    return parsed as PublicUser;
   } catch {
     return null;
   }
@@ -540,10 +545,15 @@ export function useAuthActions() {
     email: string;
     password: string;
     displayName?: string;
+    /** Turnstile token when the deployment is challenged; omitted otherwise. */
+    captchaToken?: string;
   }): Promise<AuthResponse> {
     const res = await api<Partial<AuthResponse>>('/auth/register', {
       method: 'POST',
-      body: input,
+      // captchaToken rides in the body (the API reads it before the zod parse,
+      // which strips unknown keys). Omitted rather than sent empty so an
+      // unchallenged deployment sends exactly what it always did.
+      body: { ...input, captchaToken: input.captchaToken || undefined },
       auth: false,
     });
     if (res && res.accessToken && res.refreshToken && res.user) {
@@ -570,14 +580,13 @@ export function useAuthActions() {
   }
 
   async function logout(): Promise<void> {
-    // Send the stored refresh token so the server can revoke the whole
-    // refresh-token family — without it the session stays revocable-only
-    // client-side. Revocation is still best-effort (offline-safe).
-    const refreshToken = tokenStore.refresh;
+    // The server clears the httpOnly refresh cookie and revokes the family
+    // via the cookie itself — no body is needed (FE-01). Revocation is still
+    // best-effort (offline-safe).
     try {
       await api<void>('/auth/logout', {
         method: 'POST',
-        body: refreshToken ? { refreshToken } : {},
+        body: {},
         retryOn401: false,
       });
     } catch {

@@ -51,7 +51,8 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-export const refreshSchema = z.object({ refreshToken: z.string().min(10) });
+// refreshToken optional in body: cookie-backed refresh (FE-01) sends no body.
+export const refreshSchema = z.object({ refreshToken: z.string().min(10).optional() });
 
 export const passwordResetRequestSchema = z.object({ email: z.string().email() });
 

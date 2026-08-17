@@ -29,6 +29,7 @@ const KEYS = [
   'RESEND_API_KEY',
   'MAIL_FROM',
   'APP_PUBLIC_URL',
+  'DATABASE_URL',
 ] as const;
 
 const ORIGINAL = Object.fromEntries(KEYS.map((k) => [k, process.env[k]])) as Record<
@@ -46,6 +47,8 @@ function setProductionEnv(overrides: Partial<Record<(typeof KEYS)[number], strin
   process.env.RESEND_API_KEY = 're_test_key';
   process.env.MAIL_FROM = 'AquaZeroFit <no-reply@aquazero.fit>';
   process.env.APP_PUBLIC_URL = 'https://app.aquazero.fit';
+  // Durable persistence: the JSON file store is dev-only, see config.ts.
+  process.env.DATABASE_URL = 'postgres://u:p@localhost:5432/azf';
   delete process.env.MAIL_PROVIDER;
   for (const [k, v] of Object.entries(overrides)) process.env[k] = v;
 }
@@ -80,6 +83,12 @@ describe('assertProductionSecrets', () => {
     setProductionEnv();
     delete process.env.JWT_ACCESS_SECRET;
     expect(() => assertProductionSecrets()).toThrow(/JWT_ACCESS_SECRET/);
+  });
+
+  it('refuses to boot in production without DATABASE_URL (JSON store is dev-only)', () => {
+    setProductionEnv();
+    delete process.env.DATABASE_URL;
+    expect(() => assertProductionSecrets()).toThrow(/DATABASE_URL/);
   });
 
   it('rejects a wildcard CORS origin in production', () => {

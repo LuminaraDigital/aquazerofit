@@ -9,11 +9,14 @@
  * the guard governed every other one.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const mocks = vi.hoisted(() => ({
   tokenStore: { isAuthenticated: false },
+  // Resolved restore: no refresh cookie in these tests, so session restore
+  // settles to false and the guard renders unauthenticated.
+  restoreSession: vi.fn(async () => false),
   isTMA: vi.fn(() => false),
   useProfile: vi.fn(() => ({
     data: { id: 'p1' },
@@ -23,7 +26,10 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('../../lib/api', () => ({ tokenStore: mocks.tokenStore }));
+vi.mock('../../lib/api', () => ({
+  tokenStore: mocks.tokenStore,
+  restoreSession: mocks.restoreSession,
+}));
 vi.mock('../../lib/telegram', () => ({ isTMA: mocks.isTMA }));
 vi.mock('../../lib/queries', () => ({ useProfile: mocks.useProfile }));
 
@@ -54,10 +60,11 @@ afterEach(() => {
 });
 
 describe('RequireAuth front door', () => {
-  it('serves the marketing page in place at / — no redirect for cold traffic', () => {
+  it('serves the marketing page in place at / — no redirect for cold traffic', async () => {
     renderAt('/');
 
-    expect(screen.getByText('marketing landing')).toBeTruthy();
+    // Session restore (restoreSession) settles first, then the marketing page.
+    await waitFor(() => expect(screen.getByText('marketing landing')).toBeTruthy());
   });
 
   it('sends a signed-in visitor to the app at the same URL', () => {
@@ -68,20 +75,20 @@ describe('RequireAuth front door', () => {
     expect(screen.queryByText('marketing landing')).toBeNull();
   });
 
-  it('sends a Telegram Mini App visitor to the welcome carousel, not to marketing', () => {
+  it('sends a Telegram Mini App visitor to the welcome carousel, not to marketing', async () => {
     mocks.isTMA.mockReturnValue(true);
     renderAt('/');
 
-    expect(screen.getByText('mini app welcome')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('mini app welcome')).toBeTruthy());
     expect(screen.queryByText('marketing landing')).toBeNull();
   });
 
-  it('still redirects a guarded route rather than rendering marketing under its URL', () => {
+  it('still redirects a guarded route rather than rendering marketing under its URL', async () => {
     renderAt('/settings');
 
     // Redirected to `/`, which then renders marketing — one hop, and the
     // address bar never claims /settings is a marketing page.
-    expect(screen.getByText('marketing landing')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('marketing landing')).toBeTruthy());
     expect(screen.queryByText('app settings')).toBeNull();
   });
 });

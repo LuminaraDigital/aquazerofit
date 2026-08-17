@@ -17,6 +17,8 @@ import {
   buildUpsert,
   CREATE_TABLE_SQL,
   UPSERT_CHUNK_SIZE,
+  isLoopbackConnectionString,
+  isSecureConnectionString,
   type QueryExecutor,
 } from '../platform/pgStore';
 import type { StoredDoc } from '../platform/store';
@@ -256,5 +258,135 @@ describe('dirty tracking', () => {
     await store.flush();
 
     expect(exec.writes).toHaveLength(1);
+  });
+});
+
+describe('compareAndSwapRefreshToken', () => {
+  const tokenDoc = {
+    id: 'rt-1',
+    type: 'refreshToken',
+    tokenHash: 'hash-abc',
+    userId: 'u1',
+    familyId: 'fam-1',
+    expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+    usedAt: null,
+    revokedAt: null,
+    createdAt: new Date().toISOString(),
+  };
+
+  /** Fake executor that emulates the UPDATE...WHERE row-lock semantics. */
+  class CasExecutor implements QueryExecutor {
+    private readonly docs = new Map<string, Record<string, unknown>>();
+    readonly updates: Call[] = [];
+
+    seed(id: string, doc: Record<string, unknown>): void {
+      this.docs.set(id, { ...doc });
+    }
+
+    async query(text: string, values?: unknown[]): Promise<{ rows: unknown[] }> {
+      if (text.includes('UPDATE documents')) {
+        this.updates.push({ text, values: values ?? [] });
+        const [, id, tokenHash] = values as [string, string, string, string];
+        const usedAtJson = (values as unknown[])[3] as string;
+        const row = this.docs.get(id);
+        // Mirror the WHERE clause: no row matched when the hash differs or
+        // the token is already consumed/revoked — that is the loser branch
+        // a second concurrent UPDATE takes once the row lock is released.
+        if (
+          !row ||
+          row['tokenHash'] !== tokenHash ||
+          row['usedAt'] != null ||
+          row['revokedAt'] != null
+        ) {
+          return { rows: [] };
+        }
+        row['usedAt'] = JSON.parse(usedAtJson);
+        return { rows: [{ doc: { ...row } }] };
+      }
+      return { rows: [] };
+    }
+  }
+
+  function casStore(): { store: PostgresStore; exec: CasExecutor } {
+    const casExec = new CasExecutor();
+    casExec.seed(tokenDoc.id, tokenDoc);
+    return { store: new PostgresStore(dataDir, casExec), exec: casExec };
+  }
+
+  it('emits one atomic UPDATE guarded by id, hash, usedAt and revokedAt', async () => {
+    const { store, exec: casExec } = casStore();
+    const marked = await store.compareAndSwapRefreshToken(tokenDoc.id, 'hash-abc', '2026-08-17T00:00:00.000Z');
+
+    expect(exec.writes).toHaveLength(0);
+    const stmt = casExec.updates[0]!;
+    expect(stmt.text).toContain('UPDATE documents');
+    expect(stmt.text).toContain("doc->>'tokenHash' = $3");
+    expect(stmt.text).toContain("(doc->>'usedAt') IS NULL");
+    expect(stmt.text).toContain("(doc->>'revokedAt') IS NULL");
+    expect(stmt.text).toContain('RETURNING doc');
+    expect(stmt.values).toEqual(['users', tokenDoc.id, 'hash-abc', '"2026-08-17T00:00:00.000Z"']);
+    expect(marked?.usedAt).toBe('2026-08-17T00:00:00.000Z');
+    // The returned row is hydrated into memory so the next read sees usedAt.
+    expect(store.byId('users', tokenDoc.id)).toMatchObject({ usedAt: '2026-08-17T00:00:00.000Z' });
+  });
+
+  it('rejects a wrong tokenHash even when the id matches', async () => {
+    const { store } = casStore();
+    await expect(
+      store.compareAndSwapRefreshToken(tokenDoc.id, 'hash-WRONG', '2026-08-17T00:00:00.000Z'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('two concurrent rotations on one token: exactly one succeeds, loser gets undefined', async () => {
+    const { store } = casStore();
+    // Concurrent calls — the fake serializes on the emulated row lock, same
+    // as Postgres serializes the second UPDATE behind the first's lock.
+    const [first, second] = await Promise.all([
+      store.compareAndSwapRefreshToken(tokenDoc.id, 'hash-abc', '2026-08-17T00:00:00.000Z'),
+      store.compareAndSwapRefreshToken(tokenDoc.id, 'hash-abc', '2026-08-17T00:00:01.000Z'),
+    ]);
+    const outcomes = [first, second];
+    expect(outcomes.filter((r) => r !== undefined)).toHaveLength(1);
+    expect(outcomes.filter((r) => r === undefined)).toHaveLength(1);
+  });
+
+  it('a revoked token can never be consumed', async () => {
+    const { store, exec: casExec } = casStore();
+    const row = (casExec as unknown as { docs: Map<string, Record<string, unknown>> }).docs;
+    row.get(tokenDoc.id)!['revokedAt'] = '2026-08-16T00:00:00.000Z';
+    await expect(
+      store.compareAndSwapRefreshToken(tokenDoc.id, 'hash-abc', '2026-08-17T00:00:00.000Z'),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('connection string safety', () => {
+  it('accepts loopback URLs without sslmode', () => {
+    expect(isLoopbackConnectionString('postgres://u:p@localhost:5432/azf')).toBe(true);
+    expect(isSecureConnectionString('postgres://u:p@127.0.0.1/azf')).toBe(true);
+    expect(isSecureConnectionString('postgres://u:p@[::1]/azf')).toBe(true);
+  });
+
+  it('accepts off-host URLs that negotiate TLS', () => {
+    expect(isSecureConnectionString('postgres://u:p@db.example.com/azf?sslmode=verify-full')).toBe(true);
+    expect(isSecureConnectionString('postgres://u:p@db.example.com/azf?sslmode=require')).toBe(true);
+    expect(isSecureConnectionString('postgres://u:p@db.example.com/azf?ssl=true')).toBe(true);
+  });
+
+  it('rejects off-host URLs that allow plaintext', () => {
+    expect(isSecureConnectionString('postgres://u:p@db.example.com/azf')).toBe(false);
+    expect(isSecureConnectionString('postgres://u:p@db.example.com/azf?sslmode=disable')).toBe(false);
+    expect(isSecureConnectionString('postgres://u:p@db.example.com/azf?sslmode=prefer')).toBe(false);
+    expect(isSecureConnectionString('postgres://u:p@db.example.com:5432/azf?sslmode=allow')).toBe(false);
+  });
+
+  it('rejects malformed URLs as insecure', () => {
+    expect(isSecureConnectionString('not-a-url')).toBe(false);
+  });
+
+  it('connect() refuses an insecure off-host URL before touching the network', async () => {
+    await expect(
+      PostgresStore.connect('postgres://u:p@db.example.com/azf', dataDir),
+    ).rejects.toThrow(/must use TLS/i);
   });
 });

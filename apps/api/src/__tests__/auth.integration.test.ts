@@ -167,3 +167,112 @@ describe('seeded demo account', () => {
     expect(targets.body.targets.kcalTarget).toBeGreaterThan(1500);
   });
 });
+
+/**
+ * FE-01: refresh-token cookie behaviour. Login/register set the httpOnly
+ * cookie, refresh rotates it from the cookie alone, logout clears it, and
+ * an explicit body token still works for non-browser clients.
+ */
+describe('refresh-token cookie (FE-01)', () => {
+  const COOKIE_EMAIL = 'cookie@example.com';
+  const COOKIE_PASSWORD = 'CorrectHorse9Battery';
+
+  function refreshSetCookie(res: request.Response): string[] {
+    const set = res.headers['set-cookie'];
+    const arr: string[] = Array.isArray(set) ? set : set ? [set] : [];
+    return arr.filter((c) => c.startsWith('azf_rt='));
+  }
+
+  it('login sets the azf_rt httpOnly cookie, SameSite=Lax, scoped path', async () => {
+    await request(app)
+      .post(`${base}/auth/register`)
+      .send({ email: COOKIE_EMAIL, password: COOKIE_PASSWORD });
+    const res = await request(app)
+      .post(`${base}/auth/login`)
+      .send({ email: COOKIE_EMAIL, password: COOKIE_PASSWORD });
+    expect(res.status).toBe(200);
+    const [cookie] = refreshSetCookie(res);
+    expect(cookie).toBeDefined();
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('SameSite=Lax');
+    expect(cookie).toContain('Path=/api/v1/auth');
+    expect(cookie).toMatch(/azf_rt=[^;]+/);
+    // Non-production test env: Secure must be absent so http dev works.
+    expect(cookie).not.toContain('Secure');
+  });
+
+  it('register sets the cookie too', async () => {
+    const res = await request(app)
+      .post(`${base}/auth/register`)
+      .send({ email: 'cookie-register@example.com', password: COOKIE_PASSWORD });
+    expect(res.status).toBe(201);
+    expect(refreshSetCookie(res).length).toBe(1);
+  });
+
+  it('refresh works from the cookie alone (no body)', async () => {
+    const loginRes = await request(app)
+      .post(`${base}/auth/login`)
+      .send({ email: COOKIE_EMAIL, password: COOKIE_PASSWORD });
+    const [cookie] = refreshSetCookie(loginRes);
+    const cookieHeader = cookie.split(';')[0];
+
+    const res = await request(app)
+      .post(`${base}/auth/refresh`)
+      .set('Cookie', cookieHeader);
+    expect(res.status).toBe(200);
+    expect(res.body.accessToken).toBeTypeOf('string');
+    expect(res.body.refreshToken).toBeTypeOf('string');
+    // Rotation sets a fresh cookie with the new token.
+    const [rotated] = refreshSetCookie(res);
+    expect(rotated).toBeDefined();
+    expect(rotated).toContain(res.body.refreshToken);
+  });
+
+  it('refresh with a body token still works (back-compat)', async () => {
+    const loginRes = await request(app)
+      .post(`${base}/auth/login`)
+      .send({ email: COOKIE_EMAIL, password: COOKIE_PASSWORD });
+    const res = await request(app)
+      .post(`${base}/auth/refresh`)
+      .send({ refreshToken: loginRes.body.refreshToken });
+    expect(res.status).toBe(200);
+    expect(res.body.accessToken).toBeTypeOf('string');
+  });
+
+  it('refresh with neither body nor cookie is rejected', async () => {
+    const res = await request(app).post(`${base}/auth/refresh`).send({});
+    expect(res.status).toBe(401);
+  });
+
+  it('logout clears the cookie (expired date / Max-Age=0)', async () => {
+    const loginRes = await request(app)
+      .post(`${base}/auth/login`)
+      .send({ email: COOKIE_EMAIL, password: COOKIE_PASSWORD });
+    const [cookie] = refreshSetCookie(loginRes);
+    const cookieHeader = cookie.split(';')[0];
+
+    const res = await request(app)
+      .post(`${base}/auth/logout`)
+      .set('Cookie', cookieHeader)
+      .send({});
+    expect(res.status).toBe(204);
+    const cleared = refreshSetCookie(res);
+    expect(cleared.length).toBe(1);
+    // Clearing uses Max-Age=0 or an Expires date in the past.
+    expect(cleared[0]).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/);
+  });
+
+  it('logout with the cookie revokes the refresh token', async () => {
+    const loginRes = await request(app)
+      .post(`${base}/auth/login`)
+      .send({ email: COOKIE_EMAIL, password: COOKIE_PASSWORD });
+    const [cookie] = refreshSetCookie(loginRes);
+    const cookieHeader = cookie.split(';')[0];
+
+    await request(app).post(`${base}/auth/logout`).set('Cookie', cookieHeader).send({});
+    const res = await request(app)
+      .post(`${base}/auth/refresh`)
+      .set('Cookie', cookieHeader);
+    expect(res.status).toBe(401);
+  });
+});

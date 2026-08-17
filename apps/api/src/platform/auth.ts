@@ -83,6 +83,26 @@ export function sha256Hex(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
+/**
+ * Constant-time string equality that cannot throw.
+ *
+ * `crypto.timingSafeEqual` raises a RangeError when the two buffers differ in
+ * length, which turns "the caller sent a short token" — the single most likely
+ * thing an attacker probing a token endpoint will do — into an unhandled 500.
+ * Comparing lengths first is not a leak: length is observable from the
+ * ciphertext-free request anyway, and every value compared here is a
+ * fixed-width digest, so a mismatch means malformed input rather than a near
+ * miss. Non-string input (a malformed stored document, a JSON body with the
+ * wrong shape) is rejected the same way instead of crashing Buffer.from.
+ */
+export function secureEquals(a: unknown, b: unknown): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const left = Buffer.from(a, 'utf8');
+  const right = Buffer.from(b, 'utf8');
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
 export interface IssuedRefresh {
   record: RefreshTokenRecord;
   /** Raw token for the client; never persisted. */

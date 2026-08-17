@@ -1,6 +1,11 @@
 /**
  * Typed API client for /api/v1 (AQF-07). Handles the bearer token, transparent
  * refresh-token rotation, the error envelope, and SSE streaming for chat.
+ *
+ * FE-01: the refresh token lives in an httpOnly cookie scoped to
+ * /api/v1/auth — it is never written to web storage. The access token is
+ * kept in a module-level variable (memory only); a page reload restores the
+ * session by calling /auth/refresh, whose cookie carries the credential.
  */
 import { isApiErrorBody, type ApiErrorBody, type AuthResponse } from '@aquazerofit/shared';
 
@@ -23,9 +28,6 @@ export function mediaUrl(pathOrUrl: string): string {
   return `${MEDIA_BASE}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
 }
 
-const ACCESS_KEY = 'azf.accessToken';
-const REFRESH_KEY = 'azf.refreshToken';
-
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -39,25 +41,26 @@ export class ApiError extends Error {
   }
 }
 
+// In-memory access token only — never localStorage/sessionStorage (FE-01).
+let accessToken: string | null = null;
+
 export const tokenStore = {
   get access() {
-    return sessionStorage.getItem(ACCESS_KEY) ?? localStorage.getItem(ACCESS_KEY);
+    return accessToken;
   },
-  get refresh() {
-    return sessionStorage.getItem(REFRESH_KEY) ?? localStorage.getItem(REFRESH_KEY);
+  /** Refresh token stays in the httpOnly cookie; exposed values are null. */
+  get refresh(): string | null {
+    return null;
   },
-  set(tokens: { accessToken: string; refreshToken: string }) {
-    localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-    localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+  /** Accepts the AuthResponse shape; only the access token is retained. */
+  set(tokens: { accessToken: string }) {
+    accessToken = tokens.accessToken;
   },
   clear() {
-    for (const store of [localStorage, sessionStorage]) {
-      store.removeItem(ACCESS_KEY);
-      store.removeItem(REFRESH_KEY);
-    }
+    accessToken = null;
   },
   get isAuthenticated() {
-    return Boolean(this.access);
+    return Boolean(accessToken);
   },
 };
 
@@ -71,17 +74,20 @@ function isJwtLike(token: string): boolean {
   return parts.every((part) => part.length > 0 && base64url.test(part));
 }
 
+/**
+ * Rotate the session via the httpOnly refresh cookie. Empty body — the
+ * cookie carries the credential. Used on 401 retry, app boot, and SSE.
+ */
 async function tryRefresh(): Promise<boolean> {
-  if (!tokenStore.refresh) return false;
   refreshPromise ??= (async () => {
     try {
       const res = await fetch(`${BASE}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: tokenStore.refresh }),
+        body: '{}',
       });
       if (!res.ok) {
-        tokenStore.clear();
+        accessToken = null;
         return false;
       }
       const data = (await res.json()) as AuthResponse;
@@ -94,6 +100,17 @@ async function tryRefresh(): Promise<boolean> {
     }
   })();
   return refreshPromise;
+}
+
+/**
+ * Restore a session after a page reload: the in-memory access token is gone
+ * but the refresh cookie survives. Returns true when a fresh access token
+ * was minted. Safe to call unconditionally on boot — it is a no-op when
+ * already authenticated and deduplicates concurrent callers.
+ */
+export async function restoreSession(): Promise<boolean> {
+  if (accessToken) return true;
+  return tryRefresh();
 }
 
 export interface RequestOptions {
@@ -127,7 +144,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 
   const headers: Record<string, string> = {};
   if (!formData) headers['Content-Type'] = 'application/json';
-  if (auth && tokenStore.access) headers.Authorization = `Bearer ${tokenStore.access}`;
+  if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   headers['X-Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -175,7 +192,7 @@ export async function streamChat(
   signal?: AbortSignal,
 ): Promise<unknown> {
   const doFetch = () => {
-    const access = tokenStore.access;
+    const access = accessToken;
     if (access && !isJwtLike(access)) {
       throw new ApiError(401, { code: 'AUTH_INVALID', message: 'Invalid access token' });
     }

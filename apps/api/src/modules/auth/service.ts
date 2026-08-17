@@ -12,6 +12,7 @@ import {
   revokeAllForUser,
   revokeFamilyByToken,
   rotateRefresh,
+  secureEquals,
   sha256Hex,
   signAccess,
 } from '../../platform/auth';
@@ -407,7 +408,7 @@ export async function confirmPasswordReset(token: string, newPassword: string, i
   const tokenHash = sha256Hex(token);
   const doc = store.findOne<PasswordResetTokenDoc>(
     'users',
-    (d) => d.type === 'passwordResetToken' && crypto.timingSafeEqual(Buffer.from(d.tokenHash), Buffer.from(tokenHash)),
+    (d) => d.type === 'passwordResetToken' && secureEquals(d.tokenHash, tokenHash),
   );
   if (!doc || doc.usedAt !== null || new Date(doc.expiresAt).getTime() < Date.now()) {
     throw new AppError('VALIDATION_FAILED', 'Reset token is invalid or expired.');

@@ -32,6 +32,18 @@
       content="Photograph a meal and see it counted. Targets you could recompute by hand, adaptive home training, and a coach that knows its limits."
     />
     <meta name="twitter:image" content="/logo.png" />
+    <!-- Icons and the Apple banner are NOT part of the per-route block that
+         vite-plugins/seo.ts rewrites (it only touches title, description,
+         canonical and the social tags), so unlike everything above these do
+         ship exactly as written here. -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <!-- Apple Smart App Banner — directs iOS Safari visitors to install
+         Telegram, which then opens the AquaZeroFit Mini App. The app-id is
+         Telegram's own App Store ID, not ours. -->
+    <meta name="apple-itunes-app" content="app-id=686449807, app-argument=https://t.me/aquazerofitbot/app" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

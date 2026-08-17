@@ -2,13 +2,15 @@
  * Sign in / create account — pixel reference:
  * Figma_aquazerofit_wellness_platform/sign_in_to_aquazerofit.
  */
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { loginSchema, passwordSchema, registerSchema } from '@aquazerofit/shared';
 import { api, ApiError, tokenStore } from '../../lib/api';
 import { getTelegramInitData, haptic, isTMA } from '../../lib/telegram';
 import { useAuthActions } from '../../lib/queries';
 import { useTelegramAutoLogin } from '../../lib/useTelegramAutoLogin';
+import { Turnstile } from '../../components/auth/Turnstile';
+import { fetchCaptchaConfig } from '../../lib/turnstile';
 import { Chip } from '../../components/ui/Chip';
 import { Input } from '../../components/ui/Input';
 import { PageSpinner } from '../../components/ui/PageSpinner';
@@ -25,6 +27,21 @@ const PASSWORD_RULES = [
 ];
 
 type FieldErrors = Partial<Record<'email' | 'password' | 'displayName', string>>;
+
+/**
+ * Did this VALIDATION_FAILED come from the bot-protection challenge?
+ *
+ * The API reports a missing or rejected Turnstile token the same way it
+ * reports a malformed field — VALIDATION_FAILED with `details.fieldErrors` —
+ * so the `captchaToken` key is the only thing distinguishing "solve the
+ * challenge again" from "fix your email". Read structurally rather than by
+ * stringifying the whole envelope, so an unrelated field that merely mentions
+ * the word cannot be mistaken for a challenge failure.
+ */
+function isCaptchaError(err: ApiError): boolean {
+  const details = err.body.details as { fieldErrors?: Record<string, unknown> } | undefined;
+  return typeof details?.fieldErrors?.captchaToken === 'string';
+}
 
 /** Allow only same-origin relative paths after sign-in (blocks open redirects). */
 function safeInternalPath(path: string | undefined): string {
@@ -122,6 +139,31 @@ function SignInInner() {
   const [resetNote, setResetNote] = useState('');
   const [resetBusy, setResetBusy] = useState(false);
 
+  // ---- bot protection ----
+  // Two independent widgets: the register form and the reset-request form are
+  // never on screen at the same time, but each owns its own token because a
+  // Turnstile token is single-use and scoped to the action it was solved for.
+  //
+  // `captchaOn` comes from GET /auth/captcha at runtime, so it starts false and
+  // flips true only on a challenged deployment. Starting false is the right
+  // default for the gate below: a submit button must never be disabled by a
+  // config lookup that has not answered yet.
+  const [captchaOn, setCaptchaOn] = useState(false);
+  const [registerCaptcha, setRegisterCaptcha] = useState('');
+  const [resetCaptcha, setResetCaptcha] = useState('');
+  const [registerCaptchaReset, setRegisterCaptchaReset] = useState(0);
+  const [resetCaptchaReset, setResetCaptchaReset] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCaptchaConfig().then((cfg) => {
+      if (!cancelled) setCaptchaOn(cfg.enabled);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const from = (location.state as { from?: string } | null)?.from;
   const isRegister = mode === 'register';
 
@@ -141,10 +183,15 @@ function SignInInner() {
     setNewPasswordError(undefined);
     setShowNewPassword(false);
     setResetNote('');
+    // Drop any token from a previous visit to this form. The widget unmounts
+    // when the panel closes, so a held-over value would enable submit with a
+    // token Cloudflare has already retired.
+    setResetCaptcha('');
   }
 
   function closeReset() {
     setResetOpen(false);
+    setResetCaptcha('');
   }
 
   async function onRequestReset(e: FormEvent) {
@@ -159,7 +206,9 @@ function SignInInner() {
     try {
       const res = await api<{ devToken?: string } | undefined>('/auth/password-reset/request', {
         method: 'POST',
-        body: { email: parsedEmail.data },
+        // Omitted rather than sent empty on an unchallenged deployment, so the
+        // request body is byte-identical to what it was before bot protection.
+        body: { email: parsedEmail.data, captchaToken: resetCaptcha || undefined },
         auth: false,
       });
       // Anti-enumeration copy — shown regardless of whether the account exists.
@@ -174,7 +223,17 @@ function SignInInner() {
       if (err instanceof ApiError && err.code === 'RATE_LIMITED') {
         toast.error('Too many attempts. Please wait a moment and try again.');
       } else if (err instanceof ApiError && err.code === 'VALIDATION_FAILED') {
-        setResetEmailError('Enter a valid email address.');
+        // The API returns both a bad email and a bad challenge as
+        // VALIDATION_FAILED; the captchaToken field error is what separates
+        // them. The spent token has to go either way — Cloudflare will not
+        // accept it a second time even when the failure was its own outage.
+        if (isCaptchaError(err)) {
+          setResetCaptchaReset((n) => n + 1);
+          setResetCaptcha('');
+          toast.error(err.message);
+        } else {
+          setResetEmailError('Enter a valid email address.');
+        }
       } else {
         toast.error('Network error. Please check your connection.');
       }
@@ -228,6 +287,9 @@ function SignInInner() {
     setMode(isRegister ? 'signIn' : 'register');
     setErrors({});
     setResetOpen(false);
+    // Same reason as openReset: leaving register unmounts the widget, so the
+    // token must not outlive it.
+    setRegisterCaptcha('');
   }
 
   function validate(): boolean {
@@ -257,7 +319,12 @@ function SignInInner() {
     setSubmitting(true);
     try {
       const res = isRegister
-        ? await register({ email, password, displayName: displayName.trim() || undefined })
+        ? await register({
+            email,
+            password,
+            displayName: displayName.trim() || undefined,
+            captchaToken: registerCaptcha,
+          })
         : await login(email, password);
       haptic('success');
       // Straight into the app whether or not a wellness profile exists — the
@@ -266,7 +333,11 @@ function SignInInner() {
     } catch (err) {
       haptic('error');
       if (err instanceof ApiError) {
-        if (err.code === 'VALIDATION_FAILED') {
+        if (err.code === 'VALIDATION_FAILED' && isCaptchaError(err)) {
+          setRegisterCaptchaReset((n) => n + 1);
+          setRegisterCaptcha('');
+          toast.error(err.message);
+        } else if (err.code === 'VALIDATION_FAILED') {
           const fieldErrors = extractServerFieldErrors(err.body.details);
           if (Object.keys(fieldErrors).length > 0) setErrors(fieldErrors);
           else toast.error(err.message);
@@ -360,7 +431,16 @@ function SignInInner() {
                       }}
                       error={resetEmailError}
                     />
-                    <PrimaryButton type="submit" loading={resetBusy}>
+                    <Turnstile
+                      action="password-reset"
+                      onToken={setResetCaptcha}
+                      resetSignal={resetCaptchaReset}
+                    />
+                    <PrimaryButton
+                      type="submit"
+                      loading={resetBusy}
+                      disabled={captchaOn && resetCaptcha === ''}
+                    >
                       Send reset instructions
                     </PrimaryButton>
                   </form>
@@ -522,7 +602,23 @@ function SignInInner() {
                 )}
               </div>
 
-              <PrimaryButton type="submit" loading={submitting}>
+              {/* Registration only. Sign-in is deliberately unchallenged: it is
+                  already defended by the per-email lockout and the per-IP auth
+                  lane, and a challenge on every return visit is friction paid
+                  by real users on the path they walk most. */}
+              {isRegister && (
+                <Turnstile
+                  action="register"
+                  onToken={setRegisterCaptcha}
+                  resetSignal={registerCaptchaReset}
+                />
+              )}
+
+              <PrimaryButton
+                type="submit"
+                loading={submitting}
+                disabled={captchaOn && isRegister && registerCaptcha === ''}
+              >
                 {isRegister ? 'Create Account' : 'Sign In'}
               </PrimaryButton>
             </form>

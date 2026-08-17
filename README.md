@@ -158,7 +158,7 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | Variable | Purpose |
 | --- | --- |
 | `PORT` | API port (default 4000) |
-| `DATABASE_URL` | Postgres connection string. When set, the store switches from JSON files to Postgres; leave unset for local development |
+| `DATABASE_URL` | Postgres connection string. When set, the store switches from JSON files to Postgres; leave unset for local development. **Required in production** — see below |
 | `AZF_DATA_DIR` | Data directory for the local JSON store (default `apps/api/.data`; used only when `DATABASE_URL` is unset) |
 | `SERVE_WEB` | Set to `false` for an API-only deployment. By default the API also serves the built SPA from `apps/web/dist`, so one process serves the whole product on one origin |
 | `WEB_DIST_DIR` | Override where the built SPA is found |
@@ -170,6 +170,15 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | `UPLOADS_DIR` | Where in-flight meal photographs are written (default `apps/api/uploads`). Point this at a persistent volume on hosts with an ephemeral filesystem, or a redeploy loses photos mid-analysis |
 | `ENABLE_LLM_SAFETY` | Override LLM second stage for input guardrails (`true`/`false`; defaults on when any AI provider key is set) |
 | `CORS_ORIGINS` | Comma-separated allowed CORS origins |
+
+### Production database (`DATABASE_URL`)
+
+Production boot fails fast without `DATABASE_URL`; the JSON file store is dev-only. Point it at managed Postgres (Azure Cosmos DB for PostgreSQL, Azure Database for PostgreSQL, Replit Postgres): the schema (`documents` table) is created idempotently at boot, no separate migration step. Requirements:
+
+- TLS: use `sslmode=verify-full` (public CA) or `ssl=true` for managed offerings without publicly anchored certs. Plaintext `postgres://` to a non-loopback host is rejected at boot. Loopback/plaintext stays allowed for local dev only.
+- Least-privilege role: the runtime role needs only CONNECT plus SELECT/INSERT/UPDATE/DELETE on the `documents` table; it does not need superuser, replication, or DDL beyond `CREATE TABLE IF NOT EXISTS` in its own schema.
+- Pooling: the app holds at most 5 connections with a 30s idle reap and a 15s statement timeout, so a small managed tier is sufficient. Boot probes the connection and exits 1 with an actionable message when the database is unreachable, credentials fail, or the database does not exist.
+- One write path: refresh-token rotation is an atomic CAS against the database itself (safe across instances); all other reads are served from the per-instance working set, so run one instance until the read-path refactor lands (AQF-04, AQF-22).
 
 ### Web delivery (build-time, `VITE_` prefixed)
 

@@ -53,5 +53,37 @@ export default defineConfig({
         maxThreads: 6,
       },
     },
+    /**
+     * Coverage thresholds are a ratchet, not a target.
+     *
+     * They sit a couple of points under the measured figure at the time they
+     * were set (statements 80.6%, branches 77.9%, functions 86.4%) so that
+     * `npm run test:coverage` fails when a change removes coverage, while
+     * ordinary work that happens to shave a fraction off does not turn the
+     * build red for no reason. Raise them when the real number moves up; the
+     * one thing not to do is lower them to make a red build green.
+     *
+     * Enabled only on the coverage script, so the default `npm test` stays
+     * fast — v8 instrumentation roughly doubles this suite's wall-clock.
+     */
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'lcov'],
+      // Seeds and fixtures are data, and the entrypoint is boot wiring that
+      // only executes in a real process; counting them measures nothing.
+      exclude: [
+        'src/__tests__/**',
+        'src/data/seeds/**',
+        'src/index.ts',
+        '**/*.d.ts',
+        'dist/**',
+      ],
+      thresholds: {
+        statements: 78,
+        branches: 75,
+        functions: 84,
+        lines: 78,
+      },
+    },
   },
 });

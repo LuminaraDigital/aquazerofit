@@ -29,8 +29,23 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm run test
+      # Coverage rather than a bare test run: the thresholds in each workspace's
+      # vitest.config.ts are a ratchet, so a change that deletes tests or adds
+      # a large untested surface fails here instead of merging quietly.
+      - name: Test (with coverage thresholds)
+        run: npm run test:coverage
+
+      # Anything that ships to users. Dev-only advisories (vite/esbuild/vitest)
+      # are reported by the next step but do not block: they are reachable
+      # only by someone who can already run this repo's dev server, and
+      # gating releases on them means a build that goes red on a Saturday for
+      # a tool no user ever touches. Anything high-or-worse in the runtime
+      # dependency tree does block.
+      - name: Dependency scan (production tree)
+        run: npm run audit:prod
+
+      - name: Dependency scan (full tree, advisory)
+        run: npm audit || true
 
       # Zero critical safety misses, zero allergen violations, zero plan-safety
       # failures. Blocks the build on any regression.

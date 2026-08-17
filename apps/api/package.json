@@ -14,7 +14,8 @@
     "seed": "tsx src/data/seed.ts",
     "audit:exercise-media": "tsx scripts/auditExerciseMedia.ts",
     "import:wger": "tsx scripts/wgerImport.ts",
-    "import:off": "tsx scripts/offImport.ts"
+    "import:off": "tsx scripts/offImport.ts",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@aquazerofit/shared": "*",
@@ -39,6 +40,7 @@
     "@types/node": "^20.14.0",
     "@types/pg": "^8.11.10",
     "@types/supertest": "^6.0.2",
+    "@vitest/coverage-v8": "^2.1.9",
     "supertest": "^7.0.0",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"

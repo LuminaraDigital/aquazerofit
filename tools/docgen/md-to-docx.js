@@ -5,8 +5,16 @@
  *
  * Supports: an optional front-matter cover page (brand mark, wordmark, title
  * block and details table), # / ## / ### headings, pipe tables, fenced code
- * blocks, bullets, "- [ ]" checklists, numbered lists, and inline **bold** /
- * *italic* / `code`.
+ * blocks, bullets, "- [ ]" checklists, numbered lists, inline **bold** /
+ * *italic* / `code`, "> " callout boxes, and figures.
+ *
+ * Figures use ordinary markdown image syntax, `![Caption](path)`. Put two or
+ * three on one line and they are laid out side by side in a borderless table,
+ * which is the only way tall phone screenshots fit on a page at a readable
+ * size. Captions are numbered automatically, so inserting a figure halfway
+ * through a document does not mean renumbering every reference after it.
+ * Pixel dimensions are read out of the file itself rather than guessed, so a
+ * screenshot re-captured at a different resolution keeps its aspect ratio.
  *
  * House rule enforced here: no em dashes or en dashes. Word autocorrect and
  * pasted text reintroduce them constantly, and they are banned in this document
@@ -50,8 +58,19 @@ const BANNED = [
   { ch: "—", name: "em dash" },
   { ch: "–", name: "en dash" },
 ];
+// Fenced code blocks are exempt. The rule exists to keep *prose* consistent,
+// and a document that quotes source verbatim must quote it verbatim: silently
+// rewriting a dash inside a snippet would make the document disagree with the
+// repository it is documenting, which is a worse failure than an inconsistent
+// dash. Everything outside a fence is still checked.
 const offences = [];
+let inFence = false;
 raw.split(/\r?\n/).forEach((line, i) => {
+  if (line.trimStart().startsWith("```")) {
+    inFence = !inFence;
+    return;
+  }
+  if (inFence) return;
   for (const b of BANNED) {
     if (line.includes(b.ch)) {
       offences.push(`  line ${i + 1}: ${b.name}  in:  ${line.trim().slice(0, 88)}`);
@@ -147,6 +166,159 @@ function tableFromRows(rows) {
           children: Array.from({ length: colCount }, (_, i) => mkCell(r[i] ?? "", ri === 0, i)),
         }),
     ),
+  });
+}
+
+// ---------- figures ----------
+/**
+ * Intrinsic pixel size, read from the file header. PNG carries it in the IHDR
+ * chunk at a fixed offset; JPEG hides it in whichever SOF marker the encoder
+ * happened to use, so the marker chain has to be walked.
+ */
+function imageSize(buf) {
+  if (buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47) {
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20), type: "png" };
+  }
+  if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+    let o = 2;
+    while (o + 9 < buf.length) {
+      if (buf[o] !== 0xff) {
+        o++;
+        continue;
+      }
+      const marker = buf[o + 1];
+      // SOF0..SOF15, skipping the four that are not frame headers.
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc, 0xd8].includes(marker)) {
+        return { height: buf.readUInt16BE(o + 5), width: buf.readUInt16BE(o + 7), type: "jpg" };
+      }
+      o += 2 + buf.readUInt16BE(o + 2);
+    }
+  }
+  throw new Error("Unsupported image: expected PNG or JPEG");
+}
+
+function resolveAsset(rel) {
+  const candidates = [
+    path.resolve(path.dirname(inputPath), rel),
+    path.resolve(path.dirname(inputPath), "..", "..", rel),
+    path.resolve(rel),
+  ];
+  const hit = candidates.find((p) => fs.existsSync(p));
+  if (!hit) throw new Error(`Image not found: ${rel}`);
+  return hit;
+}
+
+let figureCount = 0;
+
+/**
+ * One row of figures. Widths are in inches and are chosen by how many share
+ * the row, because a 780x1688 phone capture at full text width would be over a
+ * foot tall. A trailing `{w=2.4}` on the path overrides the default.
+ */
+function figureRow(items) {
+  // 3 x 2.0in plus cell margins comes to 6.375in, just inside the 6.5in table.
+  // Anything narrower and the UI text inside a phone capture stops being legible,
+  // which defeats the point of printing the screenshot at all.
+  const defaultWidth = items.length >= 3 ? 2.0 : items.length === 2 ? 2.45 : 2.6;
+  const cells = items.map(({ caption, file, widthIn }) => {
+    const abs = resolveAsset(file);
+    const data = fs.readFileSync(abs);
+    const { width: pw, height: ph, type } = imageSize(data);
+    const w = widthIn || defaultWidth;
+    const h = (w * ph) / pw;
+    figureCount += 1;
+    const label = `Figure ${figureCount}.`;
+    return new TableCell({
+      width: { size: Math.floor(9360 / items.length), type: WidthType.DXA },
+      margins: { top: 60, bottom: 60, left: 90, right: 90 },
+      borders: {
+        top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+        bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+        left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+        right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      },
+      children: [
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 70 },
+          children: [
+            new ImageRun({
+              data,
+              type,
+              transformation: { width: Math.round(w * 96), height: Math.round(h * 96) },
+            }),
+          ],
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 0, line: 250 },
+          children: [
+            run(`${label} `, { bold: true, size: 17, color: palette.brand }),
+            run(caption, { size: 17, color: palette.muted }),
+          ],
+        }),
+      ],
+    });
+  });
+  return new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: cells.map(() => Math.floor(9360 / items.length)),
+    borders: {
+      top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+    },
+    // A figure split across a page break leaves a caption orphaned under
+    // nothing, so the row is kept whole even at the cost of a short page.
+    rows: [new TableRow({ cantSplit: true, children: cells })],
+  });
+}
+
+/** A tinted note box with a brand-coloured left rule. */
+function calloutBox(label, bodyLines) {
+  const children = [];
+  if (label) {
+    children.push(
+      new Paragraph({
+        spacing: { after: 60, line: 275 },
+        children: [run(label.toUpperCase(), { bold: true, size: 18, color: palette.brand, characterSpacing: 40 })],
+      }),
+    );
+  }
+  bodyLines.forEach((l, idx) => {
+    children.push(
+      new Paragraph({
+        spacing: { after: idx === bodyLines.length - 1 ? 0 : 80, line: 285 },
+        children: inlineRuns(l),
+      }),
+    );
+  });
+  return new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: [9360],
+    rows: [
+      new TableRow({
+        // Otherwise a break can land between the "NOTE" label and its body.
+        cantSplit: true,
+        children: [
+          new TableCell({
+            width: { size: 9360, type: WidthType.DXA },
+            margins: { top: 140, bottom: 140, left: 200, right: 180 },
+            shading: { type: ShadingType.CLEAR, fill: palette.fill, color: "auto" },
+            borders: {
+              top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              left: { style: BorderStyle.SINGLE, size: 18, color: palette.brand },
+              right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            },
+            children,
+          }),
+        ],
+      }),
+    ],
   });
 }
 
@@ -391,6 +563,39 @@ while (i < lines.length) {
     }
     children.push(tableFromRows(rows));
     children.push(para(run(""), { spacing: { after: 140 } }));
+    continue;
+  }
+
+  // A line made up only of image tokens becomes one figure row.
+  const imageToken = /!\[([^\]]*)\]\(([^)\s]+)\)(?:\{w=([\d.]+)\})?/g;
+  if (line.trim().startsWith("![") && line.trim().replace(imageToken, "").trim() === "") {
+    const items = [];
+    let im;
+    imageToken.lastIndex = 0;
+    while ((im = imageToken.exec(line)) !== null) {
+      items.push({ caption: im[1], file: im[2], widthIn: im[3] ? Number(im[3]) : null });
+    }
+    children.push(figureRow(items));
+    children.push(para(run(""), { spacing: { after: 160 } }));
+    i++;
+    continue;
+  }
+
+  // "> [!Note] ..." or a plain "> " run becomes a callout box.
+  if (/^>\s?/.test(line)) {
+    const buf = [];
+    while (i < lines.length && /^>\s?/.test(lines[i])) {
+      buf.push(lines[i].replace(/^>\s?/, ""));
+      i++;
+    }
+    let label = null;
+    const lm = /^\[!([^\]]+)\]\s*(.*)$/.exec(buf[0] ?? "");
+    if (lm) {
+      label = lm[1];
+      buf[0] = lm[2];
+    }
+    children.push(calloutBox(label, buf.filter((l) => l.trim() !== "")));
+    children.push(para(run(""), { spacing: { after: 160 } }));
     continue;
   }
 

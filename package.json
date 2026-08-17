@@ -13,6 +13,8 @@
     "api": "npm run dev --workspace apps/api",
     "build": "npm run build --workspace packages/shared && npm run build --workspace apps/api && npm run build --workspace apps/web",
     "test": "npm run test --workspace packages/shared --if-present && npm run test --workspace apps/api --if-present && npm run test --workspace apps/web --if-present",
+    "test:coverage": "npm run test:coverage --workspace apps/api && npm run test:coverage --workspace apps/web",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
     "seed": "npm run seed --workspace apps/api",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "eval": "tsx evals/runner.ts",

@@ -75,8 +75,17 @@ export function resolveSiteConfig(env: EnvBag = {}): SiteConfig {
  */
 export const TELEGRAM_START_PARAM_MAX_CHARS = 64;
 
-/** Social preview image, resolved against the site origin for OG/Twitter. */
-export const SOCIAL_IMAGE_PATH = '/preview-akin-landing.png';
+/**
+ * Social preview image, resolved against the site origin for OG/Twitter.
+ *
+ * Must be 1200x630 — the ratio every major crawler crops to. The previous
+ * value here was a 1280x900 screenshot, which is close enough to look fine
+ * locally and wrong everywhere it actually matters: Twitter and Facebook trim
+ * a 1.42:1 image to 1.91:1 by cutting the top and bottom off, which is exactly
+ * where a screenshot keeps its heading. This file matches what production
+ * serves.
+ */
+export const SOCIAL_IMAGE_PATH = '/og-image.jpg';
 
 export interface MarketingRoute {
   /** Route path, always rooted, never with a trailing slash (except `/`). */

@@ -169,7 +169,7 @@ private fun BankedPill() {
 }
 
 /** Thousands separator without dragging in a locale-formatting dependency. */
-internal fun Int.grouped(): String = toString()
+fun Int.grouped(): String = toString()
     .reversed()
     .chunked(3)
     .joinToString(",")

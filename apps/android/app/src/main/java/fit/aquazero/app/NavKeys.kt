@@ -60,6 +60,13 @@ sealed interface TabKey : NavKey
 /** Vision analysis results for a submitted photo job. */
 @Serializable data class AnalysisResultsKey(val jobId: String) : NavKey
 
+/**
+ * Barcode scanner. A full-screen destination that hosts a modal sheet, so the
+ * scanner survives process death with the rest of the back stack and the
+ * system back gesture dismisses it like any other screen.
+ */
+@Serializable data object BarcodeKey : NavKey
+
 /** AI meal plan surface. */
 @Serializable data object MealPlanKey : NavKey
 

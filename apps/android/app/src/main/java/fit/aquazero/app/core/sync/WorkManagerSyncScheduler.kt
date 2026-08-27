@@ -8,6 +8,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import fit.aquazero.app.core.data.SyncScheduler
 import java.time.Duration
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,13 +22,13 @@ import kotlinx.coroutines.launch
  * 429 `Retry-After` re-schedules with an explicit delay.
  */
 @Singleton
-class SyncScheduler @Inject constructor(
+class WorkManagerSyncScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val connectivityMonitor: ConnectivityMonitor,
-) {
+) : SyncScheduler {
 
     /** Ask for a drain now (called after every offline write). */
-    fun requestSync(initialDelaySeconds: Long = 0L) {
+    override fun requestSync(initialDelaySeconds: Long) {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(
                 Constraints.Builder()

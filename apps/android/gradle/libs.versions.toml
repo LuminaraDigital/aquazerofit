@@ -26,6 +26,7 @@ work = "2.11.2"
 camerax = "1.6.2"
 mlkitBarcode = "17.3.0"
 splashscreen = "1.2.0"
+browser = "1.9.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -77,6 +78,8 @@ coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version
 
 # Storage / background
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+# Chrome Custom Tabs — legal/support/source links open in-app (plan §1, §13).
+androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 
 # Camera / ML

@@ -19,8 +19,6 @@ import fit.aquazero.app.core.model.CreateWaterLogRequest
 import fit.aquazero.app.core.model.CreateWeightLogRequest
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.core.sync.OutboxRepository
-import fit.aquazero.app.core.sync.SyncScheduler
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject

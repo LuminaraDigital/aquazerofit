@@ -55,6 +55,9 @@ android {
     debug {
       buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api/v1\"")
       buildConfigField("String", "MEDIA_BASE_URL", "\"http://10.0.2.2:4000\"")
+      // Legal/support pages are always the published ones: a debug build must
+      // not show a privacy policy served off a dev laptop.
+      buildConfigField("String", "WEB_BASE_URL", "\"https://app.aquazero.fit\"")
     }
     release {
       isMinifyEnabled = true
@@ -65,6 +68,7 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       buildConfigField("String", "API_BASE_URL", "\"https://app.aquazero.fit/api/v1\"")
       buildConfigField("String", "MEDIA_BASE_URL", "\"https://app.aquazero.fit\"")
+      buildConfigField("String", "WEB_BASE_URL", "\"https://app.aquazero.fit\"")
     }
   }
   compileOptions {
@@ -142,6 +146,9 @@ dependencies {
   // Images
   implementation(libs.coil.compose)
   implementation(libs.coil.network.okhttp)
+
+  // Legal / support / source links (Chrome Custom Tabs)
+  implementation(libs.androidx.browser)
 
   // Storage / background
   implementation(libs.androidx.datastore.preferences)

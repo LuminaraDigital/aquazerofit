@@ -1,4 +1,4 @@
-﻿package fit.aquazero.app.core.network.api
+package fit.aquazero.app.core.network.api
 
 import fit.aquazero.app.core.model.AuthResponseDto
 import fit.aquazero.app.core.model.AuthTokensDto

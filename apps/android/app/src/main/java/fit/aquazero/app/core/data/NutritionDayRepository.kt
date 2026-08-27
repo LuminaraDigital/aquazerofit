@@ -18,8 +18,6 @@ import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.UpdateMealLogRequest
 import fit.aquazero.app.core.model.map
 import fit.aquazero.app.core.network.safeCall
-import fit.aquazero.app.core.sync.OutboxRepository
-import fit.aquazero.app.core.sync.SyncScheduler
 import javax.inject.Inject
 import javax.inject.Singleton
 

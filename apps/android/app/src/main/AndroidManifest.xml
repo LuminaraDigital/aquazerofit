@@ -34,6 +34,20 @@
             </intent-filter>
         </activity>
 
+        <!-- Data export: the only path by which any file leaves this app, and
+             only when the user picks a destination in the share sheet. Not
+             exported; each share grants a read-only URI permission for one
+             file under cache/exports. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- WorkManager: on-demand initialization via the Hilt-provided factory. -->
         <provider
             android:name="androidx.startup.InitializationProvider"

@@ -6,6 +6,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import fit.aquazero.app.core.data.OutboxRepository
+import fit.aquazero.app.core.data.SyncScheduler
 import fit.aquazero.app.core.database.LogsDao
 import fit.aquazero.app.core.database.OutboxEntity
 import fit.aquazero.app.core.database.OutboxEntityTypes

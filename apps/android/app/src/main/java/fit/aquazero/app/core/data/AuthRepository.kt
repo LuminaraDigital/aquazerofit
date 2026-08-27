@@ -7,7 +7,6 @@ import fit.aquazero.app.core.network.api.AuthApi
 import fit.aquazero.app.core.model.PasswordResetRequest
 import fit.aquazero.app.core.model.PublicUserDto
 import fit.aquazero.app.core.network.safeCall
-import fit.aquazero.app.core.sync.OutboxRepository
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton

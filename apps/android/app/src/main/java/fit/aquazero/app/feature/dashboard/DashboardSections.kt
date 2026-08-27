@@ -212,91 +212,7 @@ internal fun CalorieHeroCard(
     }
 }
 
-/** One macro bar with a spoken progress description. */
-@Composable
-internal fun MacroRow(
-    label: String,
-    consumed: Double,
-    target: Double,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    val description = stringResource(
-        R.string.macro_progress_cd,
-        label,
-        consumed.toInt(),
-        target.toInt(),
-    )
-    MacroBar(
-        label = label.uppercase(),
-        consumed = consumed,
-        target = target,
-        color = color,
-        modifier = modifier.semantics { contentDescription = description },
-    )
-}
 
-/**
- * Hydration: eight droplet segments and one-tap +250 ml. The tap is
- * optimistic — the Room write lands before the network is consulted.
- */
-@Composable
-internal fun HydrationCard(
-    consumedMl: Int,
-    targetMl: Int,
-    pending: Boolean,
-    onLogWater: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    AzfCard(modifier = modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Outlined.WaterDrop,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                text = stringResource(R.string.hydration_title).uppercase(),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .padding(start = 8.dp)
-                    .weight(1f),
-            )
-            Text(
-                text = stringResource(
-                    R.string.hydration_litres,
-                    NutritionFormat.fmtLitres(consumedMl),
-                    NutritionFormat.fmtLitres(targetMl),
-                ),
-                style = DataSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-
-        Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
-
-        val dropletDescription =
-            stringResource(R.string.hydration_droplets_cd, consumedMl, targetMl)
-        WaterDroplets(
-            filled = NutritionFormat.dropletsFilled(consumedMl, targetMl),
-            total = DROPLET_SEGMENTS,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = dropletDescription },
-        )
-
-        Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
-
-        val actionLabel = stringResource(R.string.hydration_log_cd)
-        SecondaryButton(
-            text = stringResource(R.string.hydration_log_increment),
-            onClick = onLogWater,
-            enabled = !pending,
-            modifier = Modifier.semantics { contentDescription = actionLabel },
-        )
-    }
-}
 
 /** Today's session, or the calm rest-day card when there is nothing planned. */
 @Composable
@@ -744,19 +660,8 @@ private fun MetricChip(
     }
 }
 
-/** Card-shaped skeleton used while the first day loads. */
-@Composable
-internal fun CardSkeleton(height: Dp, modifier: Modifier = Modifier) {
-    Skeleton(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(height),
-        shape = RoundedCornerShape(20.dp),
-    )
-}
 
 private const val LOCKED_ALPHA = 0.35f
-private const val DROPLET_SEGMENTS = 8
 
 // ----------------------------------------------------------------- previews
 

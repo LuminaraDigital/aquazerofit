@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
-import fit.aquazero.app.core.sync.SyncScheduler
+import fit.aquazero.app.core.sync.WorkManagerSyncScheduler
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +24,7 @@ class AzfApplication : Application(), Configuration.Provider {
     lateinit var workerFactory: HiltWorkerFactory
 
     @Inject
-    lateinit var syncScheduler: SyncScheduler
+    lateinit var syncScheduler: WorkManagerSyncScheduler
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 

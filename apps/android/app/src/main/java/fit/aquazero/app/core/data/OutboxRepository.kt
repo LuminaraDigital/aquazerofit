@@ -1,4 +1,4 @@
-package fit.aquazero.app.core.sync
+package fit.aquazero.app.core.data
 
 import fit.aquazero.app.core.database.OutboxDao
 import fit.aquazero.app.core.database.OutboxEntity

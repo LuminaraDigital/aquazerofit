@@ -48,3 +48,16 @@ node_modules/.cache/
 # Anchored so the deliverable set in docs/specs/ is still tracked.
 /*.docx
 docker-compose.override.yml
+
+# Android (apps/android) — Gradle build outputs and local machine state.
+# Source, wrapper and exported Room schemas stay tracked.
+apps/android/.gradle/
+apps/android/build/
+apps/android/app/build/
+apps/android/local.properties
+apps/android/.kotlin/
+apps/android/captures/
+*.apk
+*.aab
+*.jks
+*.keystore

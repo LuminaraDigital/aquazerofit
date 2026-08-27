@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 31+ backup & device-transfer rules. The auth DataStore (encrypted
+     refresh token + IV) never leaves the device: the AES key lives in the
+     hardware Keystore and cannot be backed up, so the ciphertext is useless
+     off-device and a credential should not travel anyway. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="datastore/azf_auth.preferences_pb" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/azf_auth.preferences_pb" />
+    </device-transfer>
+</data-extraction-rules>

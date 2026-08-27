@@ -160,8 +160,106 @@ export const WELLNESS_DISCLAIMER =
  */
 export const SOURCE_CODE_URL = 'https://github.com/LuminaraDigital/aquazerofit';
 
-export const CRISIS_SIGNPOST =
-  'It sounds like you may be going through something serious. AquaZeroFit is not able to help with this, but you deserve real support: please reach out to a healthcare professional, or contact Lifeline on 13 11 14 (Australia) or your local crisis service.';
+/**
+ * Crisis signposting (AQF-11 §4).
+ *
+ * The refusal itself is the same everywhere — what changes is the number at
+ * the end of it. A person in Manchester told to ring an Australian landline
+ * has been given a refusal dressed as help, which is worse than a refusal, and
+ * Play's health-content policy reads it the same way.
+ *
+ * The map is deliberately small and factual: national, free, staffed lines
+ * only. Anything not listed gets the directory rather than a guess, because a
+ * wrong number is the one failure mode this feature exists to prevent.
+ */
+const CRISIS_LEAD =
+  'It sounds like you may be going through something serious. AquaZeroFit is not able to help with this, but you deserve real support: please reach out to a healthcare professional, or ';
+
+export interface CrisisHelpline {
+  /** How the service is named to the user. */
+  name: string;
+  /** The number to dial, formatted as that country writes it. */
+  phone: string;
+  /** Country label shown in parentheses. */
+  region: string;
+}
+
+/** ISO 3166-1 alpha-2 region → national crisis line. */
+export const CRISIS_HELPLINES: Readonly<Record<string, CrisisHelpline>> = {
+  AU: { name: 'Lifeline', phone: '13 11 14', region: 'Australia' },
+  US: { name: 'the 988 Suicide & Crisis Lifeline', phone: '988', region: 'United States' },
+  CA: { name: 'the 988 Suicide & Crisis Helpline', phone: '988', region: 'Canada' },
+  GB: { name: 'Samaritans', phone: '116 123', region: 'United Kingdom' },
+  IE: { name: 'Samaritans', phone: '116 123', region: 'Ireland' },
+  NZ: { name: 'Need to talk?', phone: '1737', region: 'New Zealand' },
+  IN: { name: 'Tele-MANAS', phone: '14416', region: 'India' },
+} as const;
+
+/** Where an unmapped region is sent: a maintained, country-aware directory. */
+export const CRISIS_HELPLINE_DIRECTORY_URL = 'https://findahelpline.com';
+
+/** Region used when the caller told us nothing — the product's home market. */
+export const CRISIS_DEFAULT_REGION = 'AU';
+
+/**
+ * Pull the ISO 3166-1 alpha-2 region out of a locale-ish string.
+ *
+ * Accepts everything a client might actually send: a BCP 47 tag (`en-AU`), a
+ * POSIX-flavoured one (`en_GB`), a tag carrying a script subtag
+ * (`zh-Hant-TW`), and a whole Accept-Language header with quality values
+ * (`en-GB,en;q=0.9`). Case and separator are irrelevant.
+ *
+ * Tags are scanned in the order sent — browsers order Accept-Language by
+ * descending preference — and the first region subtag found wins. Returns null
+ * when there is no region to find, which is a different answer from "a region
+ * we have no line for": the first falls back to AU, the second to the
+ * directory.
+ */
+export function regionFromLocale(locale: string | null | undefined): string | null {
+  if (typeof locale !== 'string' || locale.trim() === '') return null;
+
+  for (const entry of locale.split(',')) {
+    // Drop the q-value, normalise the POSIX underscore.
+    const tag = entry.split(';')[0]!.trim().replace(/_/g, '-');
+    if (tag === '' || tag === '*') continue;
+
+    // subtags[0] is the language; a 2-alpha subtag after it is the region.
+    // 4-alpha is a script (Hant), 3-alpha an extlang, 5+ a variant.
+    const subtags = tag.split('-').slice(1);
+    for (const subtag of subtags) {
+      if (/^[A-Za-z]{2}$/.test(subtag)) return subtag.toUpperCase();
+    }
+  }
+  return null;
+}
+
+/** The helpline for a locale, or null when its region is not one we map. */
+export function crisisHelplineFor(locale: string | null | undefined): CrisisHelpline | null {
+  const region = regionFromLocale(locale) ?? CRISIS_DEFAULT_REGION;
+  return CRISIS_HELPLINES[region] ?? null;
+}
+
+/**
+ * The crisis refusal, pointed at the caller's own country.
+ *
+ * No region (or an unparseable locale) yields the AU wording byte-for-byte —
+ * `CRISIS_SIGNPOST` below is defined as this function's output for exactly
+ * that reason, so the two can never drift.
+ */
+export function crisisSignpostFor(locale: string | null | undefined): string {
+  const helpline = crisisHelplineFor(locale);
+  if (!helpline) {
+    return `${CRISIS_LEAD}find a crisis line in your country at ${CRISIS_HELPLINE_DIRECTORY_URL}.`;
+  }
+  return `${CRISIS_LEAD}contact ${helpline.name} on ${helpline.phone} (${helpline.region}) or your local crisis service.`;
+}
+
+/**
+ * Unlocalised signpost, kept for back-compat with call sites that have no
+ * locale to hand (the marketing and support pages, which are served from an
+ * AU-registered product). Identical to `crisisSignpostFor(undefined)`.
+ */
+export const CRISIS_SIGNPOST = crisisSignpostFor(undefined);
 
 /**
  * Aqua character kit (growth P0). The hero character is Akin with interactive

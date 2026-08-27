@@ -30,6 +30,7 @@ const KEYS = [
   'MAIL_FROM',
   'APP_PUBLIC_URL',
   'DATABASE_URL',
+  'AUTH_ALLOW_CAPTCHALESS_MOBILE',
 ] as const;
 
 const ORIGINAL = Object.fromEntries(KEYS.map((k) => [k, process.env[k]])) as Record<
@@ -50,6 +51,8 @@ function setProductionEnv(overrides: Partial<Record<(typeof KEYS)[number], strin
   // Durable persistence: the JSON file store is dev-only, see config.ts.
   process.env.DATABASE_URL = 'postgres://u:p@localhost:5432/azf';
   delete process.env.MAIL_PROVIDER;
+  // The captcha-less mobile bypass is closed-testing only and boot-fatal here.
+  delete process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE;
   for (const [k, v] of Object.entries(overrides)) process.env[k] = v;
 }
 
@@ -89,6 +92,38 @@ describe('assertProductionSecrets', () => {
     setProductionEnv();
     delete process.env.DATABASE_URL;
     expect(() => assertProductionSecrets()).toThrow(/DATABASE_URL/);
+  });
+
+  /**
+   * The Android client cannot render a Turnstile widget, so closed testing may
+   * waive the challenge for a caller sending `X-Client: android`. That header
+   * is typed, not proven, which makes the waiver a global bypass of the signup
+   * challenge — acceptable for a known set of testers, never for production.
+   * An operator convention would not survive being forgotten; a boot failure
+   * does.
+   */
+  it('refuses to boot in production with the captcha-less mobile bypass set', () => {
+    setProductionEnv({ AUTH_ALLOW_CAPTCHALESS_MOBILE: 'true' });
+    expect(() => assertProductionSecrets()).toThrow(/AUTH_ALLOW_CAPTCHALESS_MOBILE/);
+
+    process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = '1';
+    expect(() => assertProductionSecrets()).toThrow(/AUTH_ALLOW_CAPTCHALESS_MOBILE/);
+  });
+
+  it('boots in production when the bypass is explicitly off or absent', () => {
+    setProductionEnv({ AUTH_ALLOW_CAPTCHALESS_MOBILE: 'false' });
+    expect(() => assertProductionSecrets()).not.toThrow();
+
+    delete process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE;
+    expect(() => assertProductionSecrets()).not.toThrow();
+  });
+
+  it('leaves the bypass usable outside production', () => {
+    // It exists to make closed testing possible; the guard is about where.
+    process.env.NODE_ENV = 'development';
+    process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = 'true';
+    expect(() => assertProductionSecrets()).not.toThrow();
+    expect(config.authAllowCaptchalessMobile).toBe(true);
   });
 
   it('rejects a wildcard CORS origin in production', () => {

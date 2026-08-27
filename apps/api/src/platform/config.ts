@@ -185,6 +185,41 @@ export const config = {
     return this.turnstileSecretKey !== '' && this.turnstileSiteKey !== '';
   },
 
+  /**
+   * Interim escape hatch for the native Android client, which cannot render a
+   * Turnstile widget: with this set, a request announcing itself as
+   * `X-Client: android` and carrying no captcha token is let through.
+   *
+   * Read what that actually is before enabling it. `X-Client` is a header any
+   * caller can type, so this is not "trust the app" — it is a GLOBAL bypass of
+   * the registration and password-reset challenge, available to anyone who
+   * sends four bytes. It exists for closed testing, where the tester count is
+   * known and the alternative is no Android signup at all.
+   *
+   * Therefore it is boot-fatal in production (assertProductionSecrets below),
+   * not merely discouraged. The durable answer is the Play Integrity path,
+   * seamed in at platform/botProtection.ts.
+   */
+  get authAllowCaptchalessMobile(): boolean {
+    const raw = process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE?.trim().toLowerCase();
+    return raw === 'true' || raw === '1';
+  },
+
+  /**
+   * Play Integrity verification of the Android client's attestation token.
+   * Off until BOTH the flag and the package name are set — a verdict checked
+   * against the wrong package is not a check.
+   */
+  get playIntegrityEnabled(): boolean {
+    const raw = process.env.PLAY_INTEGRITY_ENABLED?.trim().toLowerCase();
+    return (raw === 'true' || raw === '1') && this.playIntegrityPackageName !== '';
+  },
+
+  /** Application id the integrity verdict must name, e.g. fit.aquazero.app. */
+  get playIntegrityPackageName(): string {
+    return process.env.PLAY_INTEGRITY_PACKAGE_NAME?.trim() ?? '';
+  },
+
   get isTest(): boolean {
     return process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
   },
@@ -295,6 +330,18 @@ export function assertProductionSecrets(): void {
   }
   if (!process.env.APP_PUBLIC_URL?.trim()) {
     throw new Error('APP_PUBLIC_URL must be set in production (reset links are built from it)');
+  }
+
+  // The captcha-less mobile path is a global bypass of the registration
+  // challenge (see config.authAllowCaptchalessMobile), so it must be
+  // impossible to leave switched on by accident after a closed test. A boot
+  // failure is the only enforcement that survives an operator forgetting.
+  if (config.authAllowCaptchalessMobile) {
+    throw new Error(
+      'AUTH_ALLOW_CAPTCHALESS_MOBILE must not be set in production: it lets any caller sending ' +
+        'the X-Client: android header register without solving the bot challenge. It is a ' +
+        'closed-testing measure only; use the Play Integrity path in production.',
+    );
   }
 
   // Durable persistence. Without DATABASE_URL the store falls back to JSON

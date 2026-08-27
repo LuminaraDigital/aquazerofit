@@ -81,6 +81,76 @@ export function captchaTokenOf(req: Request): string {
   return typeof header === 'string' ? header.trim() : '';
 }
 
+// ---------------------------------------------------------------------------
+// Native client path
+// ---------------------------------------------------------------------------
+//
+// A Turnstile widget needs a browser to render it, and the Android app has no
+// WebView in its signup flow. Two answers live below, and only the second one
+// is a real check:
+//
+//   1. `AUTH_ALLOW_CAPTCHALESS_MOBILE` — an operator flag that waives the
+//      challenge for a caller announcing `X-Client: android`. The header is
+//      typed, not proven, so this is a global bypass wearing a mobile costume.
+//      Boot-fatal in production (platform/config.ts); closed testing only.
+//
+//   2. Play Integrity — the durable path, seamed in here and OFF until
+//      configured. Google signs a verdict about the app, the device and the
+//      account; the server decodes it and decides. Until that decode is wired,
+//      verifyPlayIntegrity reports `not-configured` and the caller falls
+//      through to Turnstile, so adding the seam cannot weaken today's gate.
+
+/** Header the Android client stamps on every request. Advisory, never proof. */
+const CLIENT_HEADER = 'x-client';
+const ANDROID_CLIENT = 'android';
+
+/** True when the caller claims to be the Android app. Trivially spoofable. */
+export function isAndroidClient(req: Request): boolean {
+  return req.get(CLIENT_HEADER)?.trim().toLowerCase() === ANDROID_CLIENT;
+}
+
+/**
+ * Pull the Play Integrity token off the request body, alongside captchaToken.
+ * Same carrier as the captcha token and for the same reason: the auth request
+ * schemas strip unknown keys, so this is read before parsing.
+ */
+export function integrityTokenOf(req: Request): string {
+  const body = req.body as { integrityToken?: unknown } | undefined;
+  return typeof body?.integrityToken === 'string' ? body.integrityToken.trim() : '';
+}
+
+export type PlayIntegrityResult =
+  | { ok: true; packageName: string }
+  | { ok: false; reason: 'not-configured' | 'missing-token' | 'decode-failed' | 'verdict-rejected' };
+
+/**
+ * Verify one Play Integrity token.
+ *
+ * Currently a seam: it reports `not-configured` unless PLAY_INTEGRITY_ENABLED
+ * and PLAY_INTEGRITY_PACKAGE_NAME are both set, and even then has no decoder
+ * behind it yet. The shape is the one Google's flow produces — decode the
+ * token with `androidcheck`/Play Integrity `decodeIntegrityToken`, then assert
+ * `appIntegrity.appRecognitionVerdict === 'PLAY_RECOGNIZED'`,
+ * `appIntegrity.packageName === config.playIntegrityPackageName` and
+ * `deviceIntegrity.deviceRecognitionVerdict` contains `MEETS_DEVICE_INTEGRITY`
+ * — so dropping the real call in replaces the body of one function.
+ *
+ * Every non-ok result is a FALL-THROUGH, not a rejection: the caller then
+ * applies the normal Turnstile requirement. An unconfigured or failing
+ * integrity check must never be able to make the gate weaker than it is
+ * without it.
+ */
+export async function verifyPlayIntegrity(token: string): Promise<PlayIntegrityResult> {
+  if (!config.playIntegrityEnabled) return { ok: false, reason: 'not-configured' };
+  if (token === '') return { ok: false, reason: 'missing-token' };
+
+  // TODO(play-integrity): decode `token` with Google's Play Integrity API and
+  // assert the app / device verdicts described above. Until then a configured
+  // deployment still falls through to Turnstile rather than trusting a token
+  // nothing has checked.
+  return { ok: false, reason: 'not-configured' };
+}
+
 /** Build the rejection in the shape the web client keys on. */
 function captchaError(message: string, fieldMessage: string): AppError {
   return new AppError('VALIDATION_FAILED', message, {
@@ -148,6 +218,28 @@ export async function assertHuman(req: Request, action: string): Promise<void> {
   if (!config.botProtectionEnabled) return;
 
   const token = captchaTokenOf(req);
+
+  // Play Integrity first, because it is the only one of the three paths that
+  // proves anything. Anything short of a pass falls through to Turnstile.
+  const integrityToken = integrityTokenOf(req);
+  if (integrityToken !== '') {
+    const verdict = await verifyPlayIntegrity(integrityToken);
+    if (verdict.ok) {
+      logEvent('play_integrity_verified', { action, packageName: verdict.packageName });
+      return;
+    }
+    logEvent('play_integrity_unmet', { action, reason: verdict.reason });
+  }
+
+  // Interim closed-testing path. Audited on every use: the flag is a global
+  // bypass, so an operator who left it on needs to be able to count what came
+  // through it. Only when no captcha token was supplied — a native client that
+  // *can* produce one is held to it like anyone else.
+  if (token === '' && isAndroidClient(req) && config.authAllowCaptchalessMobile) {
+    logEvent('captcha_bypassed_mobile', { action, reason: 'auth-allow-captchaless-mobile' });
+    return;
+  }
+
   if (token === '') {
     logEvent('captcha_rejected', { action, reason: 'missing-input-response' });
     throw captchaError(

@@ -14,6 +14,7 @@
 import { Router, type Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../platform/auth';
+import { localeOf } from '../../platform/locale';
 import { AppError } from '../../platform/errors';
 import { chatMessageSchema, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
 import type { Allergen, ChatMessage, ChatSession, Food, MealLogItem, MealType, User } from '@aquazerofit/shared';
@@ -189,7 +190,10 @@ chatRouter.post(
     const reservationId = await creditLedger.reserve(user.id, 'chatTurn');
 
     // Persist the user message regardless of guardrail outcome (audit trail).
-    const decision = await preAsync(content, { userId: user.id });
+    // The locale rides along so a crisis refusal names a line the user can
+    // actually ring (Accept-Language; see platform/locale.ts).
+    const locale = localeOf(req);
+    const decision = await preAsync(content, { userId: user.id, locale });
     const userMessage: ChatMessage = {
       id: newId('cm'),
       sessionId,
@@ -225,7 +229,7 @@ chatRouter.post(
         userId: user.id,
         type: 'chatMessage',
         role: 'assistant',
-        content: decision.message ?? refusalMessageFor(decision.category),
+        content: decision.message ?? refusalMessageFor(decision.category, locale),
         guardrail: { blocked: true, category: decision.category },
         createdAt: nowIso(),
       };
@@ -310,7 +314,7 @@ chatRouter.post(
       const outCheck = postGuardrail(result.text, { userId: user.id });
       if (outCheck.blocked) {
         await creditLedger.release(reservationId);
-        const safeText = refusalMessageFor(outCheck.category);
+        const safeText = refusalMessageFor(outCheck.category, locale);
         const blockedMessage: ChatMessage = {
           id: newId('cm'),
           sessionId,
@@ -495,9 +499,10 @@ chatRouter.post(
 
     try {
       // --- Input guardrail. A meal description is user text like any other.
-      const decision = await preAsync(text, { userId: user.id });
+      const locale = localeOf(req);
+      const decision = await preAsync(text, { userId: user.id, locale });
       if (decision.blocked) {
-        throw new AppError('SAFETY_INPUT', decision.message ?? refusalMessageFor(decision.category), {
+        throw new AppError('SAFETY_INPUT', decision.message ?? refusalMessageFor(decision.category, locale), {
           category: decision.category,
         });
       }

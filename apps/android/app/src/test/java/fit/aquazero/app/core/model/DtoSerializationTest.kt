@@ -1,6 +1,5 @@
-package fit.aquazero.app.core.network.dto
+package fit.aquazero.app.core.model
 
-import fit.aquazero.app.core.model.AzfJson
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

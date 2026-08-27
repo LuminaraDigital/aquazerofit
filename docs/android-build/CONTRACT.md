@@ -119,3 +119,20 @@ and `Authorization: Bearer <access>` when signed in (`HeaderInterceptor`).
 The three log POST creates additionally carry `Idempotency-Key` — the server
 dedupes on `sha256(userId:method:path:key)` for 24h WITHOUT fingerprinting
 the body, so a key is never reused with a different payload.
+
+## Contract corrections found during the feature build
+
+These four were caught by reading `apps/api` rather than trusting the Kotlin
+side, and are fixed in the client. Each would have failed only at runtime.
+
+| Call | Was | Server actually wants |
+| --- | --- | --- |
+| `POST /chat/meal-drafts/:id/confirm` | body field `selections` | field **`items`** — the Kotlin property keeps the clearer name and carries `@SerialName("items")` (`confirmMealDraftSchema`, `chat/router.ts`) |
+| same | `MealDraftSelection.foodId: String?` | **non-null** `z.string().min(1)` — an unresolved line must be omitted, never sent with a null id |
+| `POST /chat/meal-drafts` and its confirm | no `localDate` | optional but **must be sent**: omitted, the server keys the draft to *its* local day, so a late-evening draft can land on the wrong date |
+| `POST /coaches/reactions/ack` | declared `ProgressionStatusDto` | route replies **`204 No Content`** — declaring a body type fails to decode; returns `Unit` |
+
+The pattern worth carrying forward: the frozen `/api/v1` contract is defined by
+the zod schemas in `apps/api/src/modules/**/router.ts`, not by the TypeScript
+types in `packages/shared`. A request DTO that mirrors the shared *type* can
+still be rejected by the *schema* that validates it.

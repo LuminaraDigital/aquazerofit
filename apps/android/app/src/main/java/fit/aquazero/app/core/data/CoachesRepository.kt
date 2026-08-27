@@ -46,7 +46,7 @@ class CoachesRepository @Inject constructor(
      * Acknowledge DISPLAYED reactions — always after composition so a
      * celebration is never burned unseen (plan §5).
      */
-    suspend fun ackReactions(ack: ReactionAckRequest): ApiResult<ProgressionStatusDto> =
+    suspend fun ackReactions(ack: ReactionAckRequest): ApiResult<Unit> =
         safeCall { coachesApi.ackReactions(ack) }
 
     private suspend fun cacheRoster(roster: CoachRosterDto) {

@@ -24,7 +24,12 @@ interface CoachesApi {
     @GET("coaches/progression")
     suspend fun progression(): ProgressionStatusDto
 
-    /** Ack displayed reactions — after composition, never before (plan §5). */
+    /**
+     * Ack displayed reactions — after composition, never before (plan §5).
+     *
+     * The route replies `204 No Content`, so this returns [Unit]; declaring a
+     * body type here fails to decode.
+     */
     @POST("coaches/reactions/ack")
-    suspend fun ackReactions(@Body body: ReactionAckRequest): ProgressionStatusDto
+    suspend fun ackReactions(@Body body: ReactionAckRequest)
 }

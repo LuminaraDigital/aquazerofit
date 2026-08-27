@@ -1,7 +1,5 @@
 package fit.aquazero.app.core.network
 
-import fit.aquazero.app.core.auth.RefreshCoordinator
-import fit.aquazero.app.core.auth.RefreshOutcome
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.runBlocking
@@ -11,7 +9,7 @@ import okhttp3.Response
 import okhttp3.Route
 
 /**
- * OkHttp 401 handler. Delegates to [RefreshCoordinator] (single-flight via
+ * OkHttp 401 handler. Delegates to a [TokenRefresher] (single-flight via
  * Mutex, body-transport `POST /auth/refresh`, atomic rotation through the
  * vault) and retries the failed request exactly once with the new token.
  * A refresh rejection (family revocation) has already triggered forced
@@ -19,7 +17,7 @@ import okhttp3.Route
  */
 @Singleton
 class TokenAuthenticator @Inject constructor(
-    private val refreshCoordinator: RefreshCoordinator,
+    private val refreshCoordinator: TokenRefresher,
 ) : Authenticator {
 
     override fun authenticate(route: Route?, response: Response): Request? {

@@ -1,5 +1,6 @@
 package fit.aquazero.app.core.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** Mirrors TS `VisionPrediction`. */
@@ -44,6 +45,8 @@ data class VisionJobEnvelopeDto(
  */
 @Serializable
 data class VisionConfirmResponseDto(
-    val log: MealLogDto? = null,
+    /** Wire name is `mealLog`; without this the id never decodes and the
+     *  confirm costs an extra day-log fetch to recover it. */
+    @SerialName("mealLog") val log: MealLogDto? = null,
     val job: VisionJobDto? = null,
 )

@@ -1,6 +1,7 @@
 package fit.aquazero.app.core.auth
 
 import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.network.RefreshOutcome
 import fit.aquazero.app.core.network.api.AuthApi
 import fit.aquazero.app.core.model.LoginRequest
 import fit.aquazero.app.core.model.LogoutRequest

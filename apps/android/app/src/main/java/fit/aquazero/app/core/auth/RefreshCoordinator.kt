@@ -1,6 +1,8 @@
 package fit.aquazero.app.core.auth
 
 import fit.aquazero.app.core.model.RefreshRequest
+import fit.aquazero.app.core.network.RefreshOutcome
+import fit.aquazero.app.core.network.TokenRefresher
 import fit.aquazero.app.core.network.api.AuthApi
 import java.io.IOException
 import javax.inject.Inject
@@ -12,18 +14,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
-
-/** Outcome of a refresh attempt. */
-sealed interface RefreshOutcome {
-    /** New pair installed; [accessToken] is ready to use. */
-    data class Rotated(val accessToken: String) : RefreshOutcome
-
-    /** The refresh token is dead (401/family revocation) — session is over. */
-    data object InvalidGrant : RefreshOutcome
-
-    /** Transient failure (network/5xx) — session state unknown, retry later. */
-    data object Transient : RefreshOutcome
-}
 
 /** One-shot auth signals; the shell reacts to [ForcedLogout]. */
 sealed interface AuthEvent {
@@ -46,7 +36,7 @@ class RefreshCoordinator @Inject constructor(
     @Named("authless") private val authApi: AuthApi,
     private val tokenStore: AuthTokenStore,
     private val vault: RefreshTokenVault,
-) {
+) : TokenRefresher {
     private val mutex = Mutex()
 
     private val _events = MutableSharedFlow<AuthEvent>(extraBufferCapacity = 4)
@@ -59,7 +49,7 @@ class RefreshCoordinator @Inject constructor(
      * failed with; if another caller already rotated past it, the fresh token
      * is returned without a network call.
      */
-    suspend fun refresh(staleAccessToken: String?): RefreshOutcome = mutex.withLock {
+    override suspend fun refresh(staleAccessToken: String?): RefreshOutcome = mutex.withLock {
         val current = tokenStore.current()
         if (current != null && current != staleAccessToken) {
             // Another caller rotated while we waited on the lock.

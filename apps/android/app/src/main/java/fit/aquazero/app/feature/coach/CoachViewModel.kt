@@ -363,6 +363,7 @@ class CoachViewModel @Inject constructor(
                     )
                 },
                 mealType = confirmation.mealType,
+                localDate = LocalDates.today(),
                 acknowledgeAllergens = confirmation.acknowledgeAllergens,
             )
             when (chatRepository.confirmMealDraft(draft.id, body)) {

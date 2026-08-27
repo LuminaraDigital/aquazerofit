@@ -1,6 +1,5 @@
 package fit.aquazero.app.core.network
 
-import fit.aquazero.app.core.auth.AuthTokenStore
 import java.util.Locale
 import java.util.TimeZone
 import javax.inject.Inject
@@ -18,7 +17,7 @@ import okhttp3.Response
  */
 @Singleton
 class HeaderInterceptor @Inject constructor(
-    private val tokenStore: AuthTokenStore,
+    private val tokenStore: AccessTokenProvider,
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {

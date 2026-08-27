@@ -1,5 +1,6 @@
 package fit.aquazero.app.core.auth
 
+import fit.aquazero.app.core.network.AccessTokenProvider
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Process death simply forces a refresh via the vaulted refresh token.
  */
 @Singleton
-class AuthTokenStore @Inject constructor() {
+class AuthTokenStore @Inject constructor() : AccessTokenProvider {
 
     private val _accessToken = MutableStateFlow<String?>(null)
 
@@ -19,7 +20,7 @@ class AuthTokenStore @Inject constructor() {
     val accessToken: StateFlow<String?> = _accessToken.asStateFlow()
 
     /** Snapshot read for interceptors. */
-    fun current(): String? = _accessToken.value
+    override fun current(): String? = _accessToken.value
 
     /** Replace the in-memory access token. */
     fun set(token: String?) {

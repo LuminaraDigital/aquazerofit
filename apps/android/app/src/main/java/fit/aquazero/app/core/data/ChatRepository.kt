@@ -8,6 +8,7 @@ import fit.aquazero.app.core.network.ChatStreamClient
 import fit.aquazero.app.core.network.ChatStreamEvent
 import fit.aquazero.app.core.network.api.ChatApi
 import fit.aquazero.app.core.network.api.CreateMealDraftRequest
+import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.network.api.ConfirmMealDraftRequest
 import fit.aquazero.app.core.model.ChatMessageDto
 import fit.aquazero.app.core.model.ChatSessionCreatedDto
@@ -98,7 +99,14 @@ class ChatRepository @Inject constructor(
     suspend fun createMealDraft(text: String, mealType: MealType?, sessionId: String?) =
         safeCall {
             chatApi.createMealDraft(
-                CreateMealDraftRequest(text = text, mealType = mealType, sessionId = sessionId),
+                CreateMealDraftRequest(
+                    text = text,
+                    mealType = mealType,
+                    sessionId = sessionId,
+                    // Sent explicitly: without it the server keys the draft to
+                    // its own local day, not the user's.
+                    localDate = LocalDates.today(),
+                ),
             )
         }
 

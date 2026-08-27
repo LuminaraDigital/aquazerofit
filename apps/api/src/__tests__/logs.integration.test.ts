@@ -16,7 +16,16 @@ const { createApp } = await import('../app');
 const { getStore } = await import('../platform/store');
 const app = createApp();
 const base = '/api/v1';
-const DATE = '2026-07-20';
+/**
+ * Anchored to today rather than a literal, so the range queries below keep
+ * matching. A fixed date silently falls out of a `30d` window once the
+ * calendar passes it, and the suite starts failing on a day nobody touched it.
+ */
+const isoDaysAgo = (days: number): string =>
+  new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+
+const DATE = isoDaysAgo(2);
+const NEXT_DATE = isoDaysAgo(1);
 
 let token = '';
 
@@ -211,14 +220,14 @@ describe('weight logs', () => {
     await request(app)
       .post(`${base}/weight-logs`)
       .set(auth())
-      .send({ weightKg: 82.0, localDate: '2026-07-21' });
+      .send({ weightKg: 82.0, localDate: NEXT_DATE });
     const res = await request(app)
       .get(`${base}/weight-logs?range=30d`)
       .set({ ...auth(), 'X-Timezone': 'UTC' });
     expect(res.status).toBe(200);
     const dates = res.body.points.map((p: { date: string }) => p.date);
     expect(dates).toContain(DATE);
-    expect(dates).toContain('2026-07-21');
+    expect(dates).toContain(NEXT_DATE);
   });
 });
 

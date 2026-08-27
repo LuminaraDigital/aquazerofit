@@ -65,6 +65,12 @@
     <string name="screen_first_run">Welcome aboard</string>
     <string name="screen_setup">Set up your profile</string>
 
+    <!-- Meal types -->
+    <string name="meal_breakfast">Breakfast</string>
+    <string name="meal_lunch">Lunch</string>
+    <string name="meal_dinner">Dinner</string>
+    <string name="meal_snack">Snack</string>
+
     <!-- Wave 2 placeholders -->
     <string name="wave2_title">Coming online in Wave 2</string>
     <string name="wave2_message">This surface is being built. The foundation underneath it is already live.</string>

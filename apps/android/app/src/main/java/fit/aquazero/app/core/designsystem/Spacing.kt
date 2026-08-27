@@ -11,6 +11,9 @@ object AzfSpacing {
     /** Side margin of the primary content container. */
     val ContainerMargin: Dp = 20.dp
 
+    /** Consistent padding for screen containers. */
+    val ContainerPadding: Dp = 20.dp
+
     /** Gap between cards within a section. */
     val Gutter: Dp = 16.dp
 

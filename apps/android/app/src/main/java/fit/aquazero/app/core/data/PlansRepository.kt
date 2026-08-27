@@ -5,11 +5,14 @@ import fit.aquazero.app.core.database.TrainingPlanEntity
 import fit.aquazero.app.core.database.WorkoutSessionEntity
 import fit.aquazero.app.core.network.ApiResult
 import fit.aquazero.app.core.network.AzfJson
+import fit.aquazero.app.core.network.api.CompleteWorkoutRequest
 import fit.aquazero.app.core.network.api.GeneratePlanRequest
 import fit.aquazero.app.core.network.api.PlansApi
+import fit.aquazero.app.core.network.api.SwapExerciseRequest
 import fit.aquazero.app.core.network.api.WorkoutsApi
 import fit.aquazero.app.core.network.dto.TodayWorkoutEnvelopeDto
 import fit.aquazero.app.core.network.dto.TrainingPlanDto
+import fit.aquazero.app.core.network.dto.WorkoutSessionDto
 import fit.aquazero.app.core.network.safeCall
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -84,12 +87,74 @@ class PlansRepository @Inject constructor(
             is ApiResult.Failure -> result
         }
 
+    /** One cached session by id, including its persisted draft columns. */
+    suspend fun session(sessionId: String): WorkoutSessionEntity? = trainingDao.sessionById(sessionId)
+
+    /**
+     * Finish a session (online-only). On success the returned session replaces
+     * the cached copy and the in-session draft is cleared — a completed
+     * workout must never resurrect a half-finished draft.
+     */
+    suspend fun completeWorkout(
+        sessionId: String,
+        request: CompleteWorkoutRequest,
+    ): ApiResult<WorkoutSessionDto> =
+        when (val result = safeCall { workoutsApi.complete(sessionId, request) }) {
+            is ApiResult.Success -> {
+                cacheSession(result.data.session)
+                trainingDao.clearDraft(sessionId)
+                ApiResult.Success(result.data.session)
+            }
+            is ApiResult.Failure -> result
+        }
+
+    /** Swap one exercise for a same-muscle alternative; returns today's fresh envelope. */
+    suspend fun swapExercise(
+        sessionId: String,
+        exerciseId: String,
+        reason: String? = null,
+    ): ApiResult<TodayWorkoutEnvelopeDto> =
+        when (
+            val result = safeCall {
+                workoutsApi.swapExercise(sessionId, SwapExerciseRequest(exerciseId, reason))
+            }
+        ) {
+            is ApiResult.Success -> {
+                result.data.session?.let { cacheSession(it) }
+                result
+            }
+            is ApiResult.Failure -> result
+        }
+
     /** Persist mid-session draft state (survives process death). */
     suspend fun saveSessionDraft(sessionId: String, exerciseIndex: Int, setLogsJson: String?) =
         trainingDao.saveDraft(sessionId, exerciseIndex, setLogsJson, System.currentTimeMillis())
 
     /** Clear the draft after completion or abandonment. */
     suspend fun clearSessionDraft(sessionId: String) = trainingDao.clearDraft(sessionId)
+
+    /**
+     * Upsert a session document while preserving any in-session draft columns:
+     * `@Upsert` replaces the whole row, and a background refresh must never
+     * silently discard the sets the user has already tapped through.
+     */
+    private suspend fun cacheSession(session: WorkoutSessionDto) {
+        val existing = trainingDao.sessionById(session.id)
+        trainingDao.upsertSession(
+            WorkoutSessionEntity(
+                id = session.id,
+                planId = session.planId,
+                focus = session.focus,
+                status = session.status.name.lowercase(),
+                localDate = session.localDate,
+                docJson = AzfJson.encodeToString(WorkoutSessionDto.serializer(), session),
+                draftExerciseIndex = existing?.draftExerciseIndex ?: -1,
+                draftSetLogsJson = existing?.draftSetLogsJson,
+                draftUpdatedAtMs = existing?.draftUpdatedAtMs ?: 0L,
+                cachedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
 
     private suspend fun cachePlan(plan: TrainingPlanDto) {
         trainingDao.clearCurrentPlan()

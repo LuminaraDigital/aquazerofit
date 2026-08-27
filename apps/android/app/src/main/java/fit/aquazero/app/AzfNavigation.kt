@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -21,6 +23,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.core.auth.AuthState
 import fit.aquazero.app.core.data.AuthRepository
 import fit.aquazero.app.core.designsystem.AzfBottomNav
+import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfTab
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.ToastHost
@@ -71,9 +74,9 @@ class RootViewModel @Inject constructor(
 @Composable
 fun AzfNavigation(rootViewModel: RootViewModel = hiltViewModel()) {
     val authState by rootViewModel.authState.collectAsStateWithLifecycle()
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when (authState) {
-            is AuthState.Unknown -> Box(modifier = Modifier.fillMaxSize())
+            is AuthState.Unknown -> CircularProgressIndicator(color = AzfColors.PrimaryFixedDim)
             is AuthState.SignedOut -> PreAuthFlow()
             is AuthState.SignedIn -> MainShell()
         }
@@ -159,7 +162,11 @@ private fun MainShell() {
                 entryProvider = entryProvider {
                     // ----- tab roots -----
                     entry<DashboardKey> { DashboardScreen() }
-                    entry<NutritionKey> { NutritionScreen() }
+                    entry<NutritionKey> {
+                        NutritionScreen(
+                            onNavigateToCapture = { backStack.add(CaptureMealKey) }
+                        )
+                    }
                     entry<WorkoutLibraryKey> { WorkoutLibraryScreen() }
                     entry<ProgressKey> { ProgressScreen() }
                     entry<CoachKey> { CoachScreen() }
@@ -169,7 +176,15 @@ private fun MainShell() {
                     entry<SetupKey> { SetupScreen(onBack = ::pop) }
 
                     // ----- full-screen destinations above the tabs -----
-                    entry<CaptureMealKey> { CaptureMealScreen(onBack = ::pop) }
+                    entry<CaptureMealKey> {
+                        CaptureMealScreen(
+                            onBack = ::pop,
+                            onNavigateToAnalysis = { jobId ->
+                                backStack.removeLastOrNull() // remove capture
+                                backStack.add(AnalysisResultsKey(jobId))
+                            }
+                        )
+                    }
                     entry<AnalysisResultsKey> { key ->
                         AnalysisResultsScreen(jobId = key.jobId, onBack = ::pop)
                     }

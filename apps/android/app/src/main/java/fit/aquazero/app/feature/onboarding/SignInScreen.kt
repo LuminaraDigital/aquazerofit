@@ -5,7 +5,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import fit.aquazero.app.core.designsystem.AssetImage
+import fit.aquazero.app.core.designsystem.BrandAssets
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -152,7 +155,18 @@ fun SignInScreen(
             ),
             onBack = onBack,
         )
-        Column(modifier = Modifier.padding(horizontal = AzfSpacing.ContainerMargin)) {
+        Column(
+            modifier = Modifier.padding(horizontal = AzfSpacing.ContainerMargin),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AssetImage(
+                assetPath = BrandAssets.LOGO,
+                contentDescription = stringResource(R.string.welcome_logo),
+                modifier = Modifier
+                    .padding(vertical = 16.dp)
+                    .size(56.dp)
+                    .revealOnEnter(0),
+            )
             AzfTextField(
                 value = state.email,
                 onValueChange = viewModel::onEmail,

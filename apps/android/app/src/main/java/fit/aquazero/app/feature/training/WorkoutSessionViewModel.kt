@@ -324,6 +324,13 @@ class WorkoutSessionViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(completing = false)
                     _events.send(WorkoutSessionEvent.CompleteFailed(result.message))
                 }
+
+                // The draft is deliberately kept: the session may not have been
+                // recorded, and losing the sets would be worse than a retry.
+                is ApiResult.Failure.Malformed -> {
+                    _uiState.value = _uiState.value.copy(completing = false)
+                    _events.send(WorkoutSessionEvent.CompleteFailed(null))
+                }
             }
         }
     }

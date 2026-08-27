@@ -115,6 +115,9 @@ class SignInViewModel @Inject constructor(
                 is ApiResult.Failure.Network -> _state.update {
                     it.copy(loading = false, submitError = offlineError)
                 }
+                is ApiResult.Failure.Malformed -> _state.update {
+                    it.copy(loading = false, submitError = genericError)
+                }
             }
         }
     }

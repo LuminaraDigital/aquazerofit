@@ -248,6 +248,13 @@ class SyncWorker @AssistedInject constructor(
         markRowFailed: suspend () -> Unit,
     ): OpOutcome = when (failure) {
         is ApiResult.Failure.Network -> OpOutcome.Transient
+        // A response we cannot decode will decode the same way next time, so
+        // retrying only keeps the op queued forever. Fail it and surface it.
+        is ApiResult.Failure.Malformed -> {
+            markRowFailed()
+            outboxRepository.markFailed(op.id, MALFORMED_RESPONSE_CODE)
+            OpOutcome.Done
+        }
         is ApiResult.Failure.Api -> when {
             failure.httpStatus == 429 -> OpOutcome.RetryLater(failure.retryAfterSeconds)
             failure.httpStatus >= 500 -> OpOutcome.Transient
@@ -273,5 +280,8 @@ class SyncWorker @AssistedInject constructor(
     private companion object {
         /** 20h — inside the server's 24h replay window, with margin. */
         const val STALE_IN_FLIGHT_MS: Long = 20L * 60 * 60 * 1000
+
+        /** Recorded against an op whose 2xx body did not match its type. */
+        const val MALFORMED_RESPONSE_CODE = "MALFORMED_RESPONSE"
     }
 }

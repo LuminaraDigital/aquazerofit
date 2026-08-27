@@ -26,7 +26,9 @@ data class MealRecommendationDto(
 /** Body for `POST /recommendations/meals`. */
 @Serializable
 data class MealRecommendationRequest(
-    val mealType: MealType? = null,
+    /** Required by the route: it rejects the call without both of these. */
+    val mealType: MealType,
+    val localDate: String,
 )
 
 /** Body for `POST /recommendations/:id/feedback`. */

@@ -41,6 +41,28 @@ data class ChallengeEnvelopeDto(
     val challenge: BuddyChallengeDto,
 )
 
+/**
+ * What `GET /challenges/peek/:code` returns: enough to show an invite before
+ * joining, and deliberately no `id` or member identities, since the caller is
+ * not a member yet.
+ */
+@Serializable
+data class ChallengePeekDto(
+    val code: String,
+    val kind: BuddyChallengeKind,
+    val targetDays: Int,
+    val durationDays: Int,
+    val memberCount: Int,
+    val endsAt: String,
+    val status: String,
+)
+
+/** Envelope of the public peek — `{challenge}`. */
+@Serializable
+data class ChallengePeekEnvelopeDto(
+    val challenge: ChallengePeekDto,
+)
+
 /** Body for `POST /challenges`. */
 @Serializable
 data class CreateChallengeRequest(

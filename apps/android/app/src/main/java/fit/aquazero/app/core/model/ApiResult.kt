@@ -30,13 +30,29 @@ sealed interface ApiResult<out T> {
 
         /** Transport failure - no HTTP response at all. */
         data class Network(val cause: IOException) : Failure
+
+        /**
+         * A 2xx body that did not match the declared shape.
+         *
+         * This is a client/server contract disagreement, not a user-visible
+         * fault, but it must surface as a [Failure] rather than escaping as a
+         * thrown exception: an uncaught decode error kills the calling
+         * coroutine and leaves a screen spinning forever.
+         */
+        data class Malformed(val cause: Throwable) : Failure
     }
 }
 
-/** True for failures worth retrying automatically (network or 5xx or 429). */
+/**
+ * True for failures worth retrying automatically (network or 5xx or 429).
+ *
+ * [ApiResult.Failure.Malformed] is deliberately not retryable: the same
+ * request would decode the same way, so retrying only delays the error.
+ */
 fun ApiResult.Failure.isRetryable(): Boolean = when (this) {
     is ApiResult.Failure.Network -> true
     is ApiResult.Failure.Api -> httpStatus >= 500 || httpStatus == 429
+    is ApiResult.Failure.Malformed -> false
 }
 
 /** Map a successful result, passing failures through. */

@@ -344,6 +344,8 @@ class VisionRepository @Inject constructor(
             }
 
             is ApiResult.Failure.Network -> result
+
+            is ApiResult.Failure.Malformed -> result
         }
     }
 

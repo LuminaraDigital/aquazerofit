@@ -1,5 +1,6 @@
 package fit.aquazero.app.core.data
 
+import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.common.DailyNutritionCalculator
 import fit.aquazero.app.core.database.LogsDao
 import fit.aquazero.app.core.database.MealLogEntity
@@ -98,9 +99,18 @@ class NutritionDayRepository @Inject constructor(
     suspend fun mealLogsOnce(localDate: String): List<MealLogEntity> =
         logsDao.mealLogsForDateOnce(localDate)
 
-    /** On-demand meal suggestion — online-only, calmly degraded on failure. */
-    suspend fun suggestMeal(mealType: MealType): ApiResult<MealRecommendationDto> =
-        safeCall { recommendationsApi.suggestMeal(MealRecommendationRequest(mealType)) }
+    /**
+     * On-demand meal suggestion — online-only, calmly degraded on failure.
+     *
+     * [localDate] is not optional to the route: it rejects the call without
+     * both fields, and it needs the client's day to know what has already been
+     * eaten.
+     */
+    suspend fun suggestMeal(
+        mealType: MealType,
+        localDate: String = LocalDates.today(),
+    ): ApiResult<MealRecommendationDto> =
+        safeCall { recommendationsApi.suggestMeal(MealRecommendationRequest(mealType, localDate)) }
             .map { it.recommendation }
 
     /**
@@ -109,7 +119,7 @@ class NutritionDayRepository @Inject constructor(
      * nothing to queue offline.
      */
     suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto> =
-        safeCall { recommendationsApi.logRecommendation(recommendationId) }.map { it.log }
+        safeCall { recommendationsApi.logRecommendation(recommendationId) }.map { it.mealLog }
 
     // ----- reconciliation -----
 

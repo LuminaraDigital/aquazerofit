@@ -199,6 +199,15 @@ class BarcodeScannerViewModel @Inject constructor(
                         banner = BarcodeBanner(messageRes = R.string.barcode_lookup_offline),
                     )
                 }
+
+                is ApiResult.Failure.Malformed -> {
+                    lastHandledCode = null
+                    _state.value = _state.value.copy(
+                        looking = false,
+                        scanning = true,
+                        banner = BarcodeBanner(messageRes = R.string.barcode_lookup_unreadable),
+                    )
+                }
             }
         }
     }

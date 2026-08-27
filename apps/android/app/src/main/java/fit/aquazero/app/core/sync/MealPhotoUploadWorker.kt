@@ -78,6 +78,13 @@ class MealPhotoUploadWorker @AssistedInject constructor(
 
             is ApiResult.Failure.Network -> Result.retry()
 
+            // Undecodable body: retrying re-runs the same decode, so stop and
+            // let the screen say the upload failed rather than spin.
+            is ApiResult.Failure.Malformed -> {
+                visionRepository.discardStaged(stagedPath)
+                Result.failure(errorData("MALFORMED_RESPONSE", null))
+            }
+
             is ApiResult.Failure.Api -> when {
                 result.httpStatus == HTTP_TOO_MANY_REQUESTS -> {
                     // Re-enqueue under the same unique name so the observing

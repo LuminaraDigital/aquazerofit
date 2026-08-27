@@ -4,6 +4,7 @@ import fit.aquazero.app.core.model.ApiErrorEnvelope
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
 import java.io.IOException
+import kotlinx.serialization.SerializationException
 import retrofit2.HttpException
 
 /**
@@ -34,4 +35,13 @@ suspend fun <T> safeCall(block: suspend () -> T): ApiResult<T> = try {
     )
 } catch (e: IOException) {
     ApiResult.Failure.Network(e)
+} catch (e: SerializationException) {
+    // A 2xx whose body does not match the declared type. Without this the
+    // exception escapes and kills the calling coroutine, so the screen never
+    // leaves its loading state and nothing explains why.
+    ApiResult.Failure.Malformed(e)
+} catch (e: IllegalArgumentException) {
+    // kotlinx.serialization also raises this for a body that decodes but
+    // violates the type - a missing non-null field, an unknown enum value.
+    ApiResult.Failure.Malformed(e)
 }

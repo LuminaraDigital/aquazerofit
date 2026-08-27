@@ -501,6 +501,13 @@ class AnalysisResultsViewModel @Inject constructor(
                     confirming = false,
                     banner = AnalysisBanner(messageRes = R.string.analysis_confirm_offline),
                 )
+
+                // A reply we could not read. The meal may or may not have been
+                // logged, so say so plainly rather than guessing either way.
+                is ApiResult.Failure.Malformed -> _state.value = _state.value.copy(
+                    confirming = false,
+                    banner = AnalysisBanner(messageRes = R.string.analysis_confirm_unreadable),
+                )
             }
         }
     }

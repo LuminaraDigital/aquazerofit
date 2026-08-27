@@ -257,6 +257,8 @@ class WorkoutLibraryViewModel @Inject constructor(
                     _events.send(WorkoutLibraryEvent.PlanGenerationOffline)
                 is ApiResult.Failure.Api ->
                     _events.send(WorkoutLibraryEvent.PlanGenerationFailed(result.message))
+                is ApiResult.Failure.Malformed ->
+                    _events.send(WorkoutLibraryEvent.PlanGenerationFailed(null))
             }
         }
     }

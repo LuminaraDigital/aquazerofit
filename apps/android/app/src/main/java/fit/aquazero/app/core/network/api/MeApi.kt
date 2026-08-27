@@ -28,33 +28,40 @@ data class UpdateMeRequest(
     val timezone: String? = null,
 )
 
+/*
+ * The `/me` routes wrap every payload in a single-key envelope. Declaring the
+ * inner type directly compiles fine and then throws at runtime on the first
+ * call. The envelopes live in AccountEnvelopes.kt in this package and are
+ * shared with AccountApi.
+ */
+
 /** `/me/...` - account, profile, targets, consents, entitlements, deletion. */
 interface MeApi {
 
     @GET("me")
-    suspend fun me(): PublicUserDto
+    suspend fun me(): UserEnvelopeDto
 
     @PATCH("me")
-    suspend fun updateMe(@Body body: UpdateMeRequest): PublicUserDto
+    suspend fun updateMe(@Body body: UpdateMeRequest): UserEnvelopeDto
 
     /** Two-step account deletion (30-day grace). */
     @DELETE("me")
     suspend fun requestDeletion()
 
     @GET("me/profile")
-    suspend fun profile(): WellnessProfileDto
+    suspend fun profile(): ProfileEnvelopeDto
 
     @PUT("me/profile")
     suspend fun saveProfile(@Body body: ProfileInputDto): ProfileSavedDto
 
     @GET("me/targets")
-    suspend fun targets(): DerivedTargetsDto
+    suspend fun targets(): TargetsEnvelopeDto
 
     @GET("me/consents")
-    suspend fun consents(): ConsentStateDto
+    suspend fun consents(): ConsentsEnvelopeDto
 
     @PUT("me/consents")
-    suspend fun saveConsents(@Body body: ConsentUpdateRequest): ConsentStateDto
+    suspend fun saveConsents(@Body body: ConsentUpdateRequest): ConsentsEnvelopeDto
 
     @GET("me/entitlements")
     suspend fun entitlements(): EntitlementsDto

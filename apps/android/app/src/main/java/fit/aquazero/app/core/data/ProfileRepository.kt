@@ -43,15 +43,19 @@ class ProfileRepository @Inject constructor(
 
     /** Refresh `/me` into Room. */
     suspend fun refreshMe(): ApiResult<PublicUserDto> =
-        safeCall { meApi.me() }.also { result ->
+        safeCall { meApi.me().user }.also { result ->
             if (result is ApiResult.Success) userDao.upsertUser(result.data.toEntity())
         }
 
     /** Refresh profile + targets into Room. */
     suspend fun refreshProfileAndTargets(): ApiResult<Unit> {
-        val profile = safeCall { meApi.profile() }
-        if (profile is ApiResult.Success) userDao.upsertProfile(profile.data.toEntity())
-        val targets = safeCall { meApi.targets() }
+        // `profile` is null until the essentials form is submitted. That is the
+        // first-run state, not a failure, so cache it only when it exists.
+        val profile = safeCall { meApi.profile().profile }
+        if (profile is ApiResult.Success) {
+            profile.data?.let { userDao.upsertProfile(it.toEntity()) }
+        }
+        val targets = safeCall { meApi.targets().targets }
         if (targets is ApiResult.Success) userDao.upsertTargets(targets.data.toEntity())
         return when {
             profile is ApiResult.Failure -> profile
@@ -73,13 +77,13 @@ class ProfileRepository @Inject constructor(
 
     /** Refresh consents into Room. */
     suspend fun refreshConsents(): ApiResult<ConsentStateDto> =
-        safeCall { meApi.consents() }.also { result ->
+        safeCall { meApi.consents().consents }.also { result ->
             if (result is ApiResult.Success) userDao.upsertConsents(result.data.toEntity())
         }
 
     /** Save consents (low-frequency online write; simple retry UI, no outbox). */
     suspend fun saveConsents(update: ConsentUpdateRequest): ApiResult<ConsentStateDto> =
-        safeCall { meApi.saveConsents(update) }.also { result ->
+        safeCall { meApi.saveConsents(update).consents }.also { result ->
             if (result is ApiResult.Success) userDao.upsertConsents(result.data.toEntity())
         }
 

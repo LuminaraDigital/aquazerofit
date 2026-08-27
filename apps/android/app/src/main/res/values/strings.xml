@@ -1229,4 +1229,8 @@
     <string name="settings_sign_out_pending_title">Sign out with unsynced entries?</string>
     <string name="settings_sign_out_pending_body">%1$d entries have not reached the server yet. Signing out now loses them. Staying signed in with a connection lets them finish sending.</string>
     <string name="settings_sign_out_pending_confirm">Sign out anyway</string>
+
+    <!-- Undecodable server replies (contract mismatch, not user error). -->
+    <string name="analysis_confirm_unreadable">We could not read the reply. Check your day before logging this again.</string>
+    <string name="barcode_lookup_unreadable">We could not read that product. Try again, or enter it manually.</string>
 </resources>

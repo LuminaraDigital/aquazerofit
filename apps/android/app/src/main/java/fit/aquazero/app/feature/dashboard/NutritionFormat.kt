@@ -65,9 +65,34 @@ object NutritionFormat {
         else -> MealType.DINNER
     }
 
+    /** Meal type from the entity's stored lowercase name. */
+    fun mealTypeOf(name: String): MealType = when (name.lowercase(Locale.ROOT)) {
+        "breakfast" -> MealType.BREAKFAST
+        "lunch" -> MealType.LUNCH
+        "dinner" -> MealType.DINNER
+        else -> MealType.SNACK
+    }
+
     /** Integer with thousands separators for kcal-style displays. */
     fun fmtInt(value: Double, locale: Locale = Locale.getDefault()): String =
         String.format(locale, "%,d", value.roundToInt())
+
+    /** One-decimal display value (weights, macro grams). */
+    fun fmt1(value: Double, locale: Locale = Locale.getDefault()): String =
+        String.format(locale, "%.1f", round1(value))
+
+    /** "1.3L" style litre label for hydration. */
+    fun fmtLitres(millilitres: Int, locale: Locale = Locale.getDefault()): String =
+        String.format(locale, "%.1fL", millilitres / 1000.0)
+
+    /**
+     * Droplet segments to fill, out of [segments]. Clamped so an over-target
+     * day never overflows the row (and never reads as a failure).
+     */
+    fun dropletsFilled(consumedMl: Int, targetMl: Int, segments: Int = 8): Int {
+        if (targetMl <= 0) return 0
+        return ((consumedMl.toDouble() / targetMl) * segments).roundToInt().coerceIn(0, segments)
+    }
 
     /** One-decimal rounding, matching the API's `round1`. */
     fun round1(value: Double): Double = (value * 10.0).roundToInt() / 10.0

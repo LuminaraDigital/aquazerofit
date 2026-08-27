@@ -74,4 +74,459 @@
     <!-- Wave 2 placeholders -->
     <string name="wave2_title">Coming online in Wave 2</string>
     <string name="wave2_message">This surface is being built. The foundation underneath it is already live.</string>
+
+    <!-- ===================== Training: workout library ===================== -->
+    <string name="training_this_week">This week</string>
+    <string name="training_training_days">%1$d training days</string>
+    <string name="training_week_strip">This week\'s plan</string>
+    <string name="training_day_cd">%1$s, %2$s</string>
+    <string name="training_day_today">today</string>
+    <string name="training_day_completed">completed</string>
+    <string name="training_day_rest">rest day</string>
+    <string name="training_plan_empty_title">No training plan yet</string>
+    <string name="training_plan_empty_body">Generate a weekly plan matched to your equipment and experience.</string>
+    <string name="training_generate_plan">Generate my plan</string>
+    <string name="training_generate_title">Generate plan</string>
+    <string name="training_generate_days">Days per week</string>
+    <string name="training_generate_focus">Focus</string>
+    <string name="training_focus_general">General fitness</string>
+    <string name="training_focus_weight_loss">Weight loss</string>
+    <string name="training_focus_strength">Strength</string>
+    <string name="training_generating">Generating…</string>
+    <string name="training_generate_offline">Plan generation needs a connection. Your current plan stays available offline.</string>
+    <string name="training_generate_done">Your new training plan is ready</string>
+    <string name="training_generate_failed">Plan generation did not finish. Nothing changed — try again.</string>
+    <string name="training_plan_error_title">Plan unavailable</string>
+    <string name="training_plan_error_body">The plan could not be refreshed. Anything already cached still shows.</string>
+    <string name="training_rest_day_title">Rest day</string>
+    <string name="training_rest_day_body">Recovery is part of the plan. See you tomorrow.</string>
+    <string name="training_today">Today</string>
+    <string name="training_todays_workout">Today\'s workout</string>
+    <string name="training_minutes">%1$d min</string>
+    <string name="training_exercise_count">%1$d exercises</string>
+    <string name="training_kcal_estimate">~%1$d kcal</string>
+    <string name="training_start_workout">Start workout</string>
+    <string name="training_library">Library</string>
+    <string name="training_library_count">%1$d exercises</string>
+    <string name="training_search_hint">Search exercises</string>
+    <string name="training_filter_category">Exercise category</string>
+    <string name="training_filter_muscle">Muscle group</string>
+    <string name="training_filter_equipment">Equipment</string>
+    <string name="training_no_results_title">No exercises found</string>
+    <string name="training_no_results_body">Try a different search term or filter.</string>
+    <string name="training_catalog_empty_title">Library not downloaded yet</string>
+    <string name="training_catalog_empty_body">Connect once and the whole exercise library caches for offline browsing.</string>
+    <string name="training_load_more">Load more (%1$d of %2$d)</string>
+    <string name="training_open_exercise">Open %1$s</string>
+    <string name="training_muscles">Muscles</string>
+    <string name="training_equipment">Equipment</string>
+    <string name="training_difficulty">Difficulty: %1$s</string>
+    <string name="training_refresh">Refresh</string>
+
+    <!-- Exercise category filters -->
+    <string name="category_all">All</string>
+    <string name="category_strength">Strength</string>
+    <string name="category_cardio">Cardio</string>
+    <string name="category_core">Core</string>
+    <string name="category_mobility">Mobility</string>
+
+    <!-- Muscle filters -->
+    <string name="muscle_all">All muscles</string>
+    <string name="muscle_chest">Chest</string>
+    <string name="muscle_back">Back</string>
+    <string name="muscle_shoulders">Shoulders</string>
+    <string name="muscle_biceps">Biceps</string>
+    <string name="muscle_triceps">Triceps</string>
+    <string name="muscle_core">Core</string>
+    <string name="muscle_glutes">Glutes</string>
+    <string name="muscle_quadriceps">Quadriceps</string>
+    <string name="muscle_hamstrings">Hamstrings</string>
+    <string name="muscle_calves">Calves</string>
+
+    <!-- Equipment filters -->
+    <string name="equipment_all">All equipment</string>
+    <string name="equipment_none">Bodyweight</string>
+    <string name="equipment_dumbbells">Dumbbells</string>
+    <string name="equipment_resistance_bands">Resistance bands</string>
+    <string name="equipment_kettlebell">Kettlebell</string>
+    <string name="equipment_pull_up_bar">Pull-up bar</string>
+    <string name="equipment_bench">Bench</string>
+    <string name="equipment_yoga_mat">Yoga mat</string>
+    <string name="equipment_jump_rope">Jump rope</string>
+    <string name="equipment_barbell">Barbell</string>
+    <string name="equipment_ez_bar">EZ bar</string>
+    <string name="equipment_cable_machine">Cable machine</string>
+    <string name="equipment_smith_machine">Smith machine</string>
+    <string name="equipment_swiss_ball">Swiss ball</string>
+    <string name="equipment_incline_bench">Incline bench</string>
+
+    <!-- Attribution (CC-BY-SA — legally required on every exercise surface) -->
+    <string name="attribution_label">Attribution</string>
+    <string name="attribution_exercise_data">Exercise data: © %1$s, %2$s</string>
+    <string name="attribution_exercise_data_via">Exercise data: © %1$s, %2$s, via wger.de</string>
+    <string name="attribution_image">Image: %1$s</string>
+    <string name="attribution_image_via">Image: %1$s, via %2$s</string>
+    <string name="attribution_ai_media">Workout image generated with AI</string>
+    <string name="attribution_demonstration">%1$s demonstration</string>
+
+    <!-- ===================== Training: guided session ===================== -->
+    <string name="session_overview">Session overview</string>
+    <string name="session_guided">Guided workout session</string>
+    <string name="session_empty_title">No session today</string>
+    <string name="session_empty_body">Today is a rest day, or there is no active plan yet.</string>
+    <string name="session_back_to_training">Back to training</string>
+    <string name="session_error_title">Session unavailable</string>
+    <string name="session_error_body">The session could not be loaded. Anything already cached still shows.</string>
+    <string name="session_total_sets">Total sets</string>
+    <string name="session_duration_label">Duration</string>
+    <string name="session_kcal_label">kcal</string>
+    <string name="session_circuit">Workout circuit</string>
+    <string name="session_start">Start workout</string>
+    <string name="session_resume">Resume session</string>
+    <string name="session_resumed">Picked up exactly where you left off.</string>
+    <string name="session_progress_exercise">Exercise %1$d/%2$d</string>
+    <string name="session_progress_sets">%1$d/%2$d sets</string>
+    <string name="session_progress_label">Workout progress</string>
+    <string name="session_current_exercise">Current exercise</string>
+    <string name="session_target">Target: %1$s</string>
+    <string name="session_rir_chip">RiR %1$s</string>
+    <string name="session_tap_when_done">Tap when done</string>
+    <string name="session_set_counter">%1$d/%2$d</string>
+    <string name="session_complete_set_cd">Complete set %1$d of %2$d of %3$s</string>
+    <string name="session_skip_exercise">Skip exercise</string>
+    <string name="session_rest">Rest</string>
+    <string name="session_rest_body">Breathe. Next set of %1$s.</string>
+    <string name="session_rest_remaining_cd">%1$d seconds of rest remaining</string>
+    <string name="session_skip_rest">Skip rest</string>
+    <string name="session_next_up">Next up</string>
+    <string name="session_actuals_legend">Log actuals for set %1$d</string>
+    <string name="session_weight_kg">Weight kg</string>
+    <string name="session_weight_cd">Weight in kilograms for set %1$d of %2$s</string>
+    <string name="session_reps">Reps</string>
+    <string name="session_reps_cd">Reps for set %1$d of %2$s</string>
+    <string name="session_rir">RiR</string>
+    <string name="session_rir_cd">Reps in reserve for set %1$d of %2$s</string>
+    <string name="session_bodyweight_hint">BW</string>
+    <string name="session_summary_title">Session summary</string>
+    <string name="session_sets_completed">Sets completed</string>
+    <string name="session_sets_of">%1$d of %2$d sets</string>
+    <string name="session_skipped">Skipped</string>
+    <string name="session_logged_line">%1$s · %2$d logged</string>
+    <string name="session_bodyweight">Bodyweight</string>
+    <string name="session_decrease_cd">Decrease sets completed for %1$s</string>
+    <string name="session_increase_cd">Increase sets completed for %1$s</string>
+    <string name="session_finish_save">Finish &amp; save</string>
+    <string name="session_saving">Saving…</string>
+    <string name="session_back_to_workout">Back to workout</string>
+    <string name="session_saved">Workout complete — great session.</string>
+    <string name="session_save_failed">Could not save the workout. Your session is still here — try again.</string>
+    <string name="session_save_offline">Finishing a workout needs a connection. Your session stays saved on this device.</string>
+    <string name="session_announce_started">Workout started. First exercise: %1$s.</string>
+    <string name="session_announce_next">Next exercise: %1$s.</string>
+    <string name="session_announce_set_done">Set %1$d of %2$d done. Rest %3$d seconds.</string>
+    <string name="session_announce_rest_complete">Rest complete. Next set.</string>
+    <string name="session_announce_rest_skipped">Rest skipped.</string>
+    <string name="session_announce_finished">Workout finished. Review your summary.</string>
+    <string name="session_announce_restored">Session restored. Exercise %1$d of %2$d.</string>
+
+    <!-- ===================== Progress ===================== -->
+    <string name="progress_title">Your progress</string>
+    <string name="progress_range_label">Time range</string>
+    <string name="progress_range_7d">7d</string>
+    <string name="progress_range_30d">30d</string>
+    <string name="progress_range_90d">90d</string>
+    <string name="progress_error_title">Progress unavailable</string>
+    <string name="progress_error_body">Your progress could not be refreshed. Cached figures still show.</string>
+    <string name="progress_current_weight">Current weight</string>
+    <string name="progress_since_start">Since start</string>
+    <string name="progress_weight_journey">Weight journey</string>
+    <string name="progress_goal_kg">Goal %1$s kg</string>
+    <string name="progress_goal_chart_label">Goal %1$s kg</string>
+    <string name="progress_no_weighins_title">No weigh-ins yet</string>
+    <string name="progress_no_weighins_body">Log your first weight to start your journey chart.</string>
+    <string name="progress_weight_chart_cd">Weight chart from %1$s to %2$s. Latest %3$s kilograms.</string>
+    <string name="progress_weight_chart_cd_goal">Weight chart from %1$s to %2$s. Latest %3$s kilograms, goal %4$s kilograms.</string>
+    <string name="progress_calorie_trend">Calorie trend</string>
+    <string name="progress_kcal_bars_cd">Daily calorie intake bars. Average %1$d kilocalories.</string>
+    <string name="progress_kcal_bars_cd_target">Daily calorie intake bars. Average %1$d kilocalories against a target of %2$d.</string>
+    <string name="progress_kcal_avg">Avg %1$d kcal / day</string>
+    <string name="progress_kcal_target">Target %1$d</string>
+    <string name="progress_no_meals_title">No meals logged</string>
+    <string name="progress_no_meals_body">Log meals to see your calorie trend against your target.</string>
+    <string name="progress_stat_workouts">Workouts</string>
+    <string name="progress_stat_burned">Burned</string>
+    <string name="progress_unit_kcal">kcal</string>
+    <string name="progress_macro_split">Avg macro split</string>
+    <string name="progress_macro_empty">Log some meals and your average macro split will appear here.</string>
+    <string name="progress_macro_protein">Protein</string>
+    <string name="progress_macro_carbs">Carbs</string>
+    <string name="progress_macro_fat">Fat</string>
+    <string name="progress_macro_entry">%1$d g · %2$d%%</string>
+    <string name="progress_macro_cd">Average macro split: protein %1$d percent, carbs %2$d percent, fat %3$d percent of calories.</string>
+    <string name="progress_achievements">Milestones &amp; badges</string>
+    <string name="progress_no_badges_title">No badges yet</string>
+    <string name="progress_no_badges_body">Keep logging and training — your first badge is close.</string>
+    <string name="progress_badge_earned">%1$s, earned %2$s</string>
+    <string name="progress_badge_locked">%1$s, not earned yet</string>
+    <string name="progress_log_weight">Log weight</string>
+    <string name="progress_export">Export my data</string>
+    <string name="progress_export_title">AquaZeroFit progress export</string>
+    <string name="progress_export_chooser">Share your export</string>
+    <string name="progress_export_empty">There is nothing to export yet.</string>
+    <string name="progress_insight_title">Your week</string>
+    <string name="progress_insight_period">Last %1$d days</string>
+    <string name="progress_insight_changes">What changed</string>
+    <string name="progress_insight_up">Up:</string>
+    <string name="progress_insight_down">Down:</string>
+    <string name="progress_insight_steady">Unchanged:</string>
+    <string name="progress_insight_premium_note">This summary is written from your own numbers. A coach-written note comes with premium.</string>
+    <string name="progress_insight_consent_note">This summary is written from your own numbers. Turn on AI personalisation for a coach-written note.</string>
+
+    <!-- Consistency (never a breakable streak) -->
+    <string name="consistency_title">Consistency</string>
+    <string name="consistency_window">Rolling %1$d-day window</string>
+    <string name="consistency_headline">%1$d of the last %2$d days</string>
+    <string name="consistency_of_last">of the last %1$d days</string>
+    <string name="consistency_empty_headline">Ready when you are</string>
+    <string name="consistency_state_resting">Resting</string>
+    <string name="consistency_state_recovering">Back at it</string>
+    <string name="consistency_state_building">Building</string>
+    <string name="consistency_state_steady">Steady</string>
+    <string name="consistency_body_resting">Rest is part of it. Whenever you log something next, it lands right here.</string>
+    <string name="consistency_body_recovering">Good to see you back — coming back is the hard part, and today already counts.</string>
+    <string name="consistency_body_building">Days are adding up at your own pace.</string>
+    <string name="consistency_body_steady">A steady rhythm across the last few weeks.</string>
+    <string name="consistency_body_grace">A day off is already covered — you\'re still going.</string>
+    <string name="consistency_current_run">Current run %1$s</string>
+    <string name="consistency_best">Best so far %1$s</string>
+
+    <!-- ===================== Log weight ===================== -->
+    <string name="log_weight_entry">Weight entry</string>
+    <string name="log_weight_input_cd">Weight in %1$s</string>
+    <string name="log_weight_kilograms">kilograms</string>
+    <string name="log_weight_pounds">pounds</string>
+    <string name="log_weight_placeholder">00.0</string>
+    <string name="log_weight_unit_group">Unit</string>
+    <string name="log_weight_unit_kg">kg</string>
+    <string name="log_weight_unit_lb">lb</string>
+    <string name="log_weight_delta_down">%1$s %2$s down since last entry</string>
+    <string name="log_weight_delta_up">%1$s %2$s up since last entry</string>
+    <string name="log_weight_date">Date</string>
+    <string name="log_weight_date_earlier">Earlier day</string>
+    <string name="log_weight_date_later">Later day</string>
+    <string name="log_weight_today">Today</string>
+    <string name="log_weight_notes">Notes (optional)</string>
+    <string name="log_weight_notes_hint">How are you feeling today?</string>
+    <string name="log_weight_quick_morning">Morning fasted</string>
+    <string name="log_weight_quick_post_workout">Post-workout</string>
+    <string name="log_weight_quick_after_meal">After meal</string>
+    <string name="log_weight_save">Save entry</string>
+    <string name="log_weight_saving">Saving…</string>
+    <string name="log_weight_error_empty">Enter your weight first</string>
+    <string name="log_weight_error_range_kg">Weight must be between 30 and 300 kg</string>
+    <string name="log_weight_error_range_lb">Weight must be between 66 and 661 lb</string>
+    <string name="log_weight_error_future">Date cannot be in the future</string>
+    <string name="log_weight_saved">Weight saved — your daily targets recompute on sync.</string>
+    <string name="log_weight_saved_offline">Weight saved on this device. It syncs as soon as you\'re back online.</string>
+    <string name="log_weight_recent">Recent entries</string>
+    <string name="log_weight_recent_empty_title">No entries yet</string>
+    <string name="log_weight_recent_empty_body">Your last 30 days of weigh-ins will appear here.</string>
+    <string name="log_weight_value">%1$s %2$s</string>
+    <string name="log_weight_delta_badge">%1$s %2$s</string>
+    <string name="log_weight_pending">Waiting to sync</string>
+
+    <plurals name="days_count">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <plurals name="sets_logged">
+        <item quantity="one">%1$d set</item>
+        <item quantity="other">%1$d sets</item>
+    </plurals>
+
+    <!-- ===================== Dashboard ===================== -->
+    <string name="dashboard_greeting">Hey</string>
+    <string name="dashboard_greeting_named">Hey, %1$s</string>
+    <string name="dashboard_nutrition_title">Nutrition</string>
+    <string name="dashboard_daily_goal">Daily goal</string>
+    <string name="dashboard_consumed">Consumed</string>
+    <string name="dashboard_kcal_left">kcal left</string>
+    <string name="dashboard_error_title">Today didn\'t load</string>
+    <string name="dashboard_error_message">Everything you log is safe on this device and syncs when you\'re back online.</string>
+    <string name="dashboard_calories_cd">Daily calories: %1$s of %2$s kilocalories consumed</string>
+    <string name="dashboard_mascot">Akin, your training companion</string>
+    <string name="fab_capture_meal">Scan a meal with your camera</string>
+
+    <!-- Macro semantics are fixed: protein green, carbs aqua, fat coral -->
+    <string name="macro_protein">Protein</string>
+    <string name="macro_carbs">Carbs</string>
+    <string name="macro_fat">Fat</string>
+    <string name="macro_progress_cd">%1$s: %2$d of %3$d grams</string>
+
+    <!-- Hydration -->
+    <string name="hydration_title">Hydration</string>
+    <string name="hydration_litres">%1$s / %2$s</string>
+    <string name="hydration_log_increment">Log 250ml</string>
+    <string name="hydration_log_cd">Log 250 millilitres of water</string>
+    <string name="hydration_droplets_cd">Water intake %1$d of %2$d millilitres</string>
+    <string name="water_logged">250 ml added</string>
+    <string name="water_log_failed">Could not log water — please try again</string>
+
+    <!-- Today\'s workout card -->
+    <string name="workout_today_title">Today\'s workout</string>
+    <string name="workout_status_done">Done</string>
+    <string name="workout_status_planned">Planned</string>
+    <string name="workout_start">Start workout</string>
+    <string name="workout_view">View workout</string>
+    <string name="workout_rest_title">Rest &amp; recover</string>
+    <string name="workout_rest_body">No workout scheduled. Browse the library.</string>
+    <string name="workout_explore">Explore</string>
+    <string name="workout_exercises_cd">%1$d exercises</string>
+    <string name="workout_duration">~%1$d min</string>
+    <string name="workout_duration_cd">About %1$d minutes</string>
+    <string name="workout_kcal_cd">%1$s kilocalories</string>
+
+    <!-- Suggest-meal card -->
+    <string name="suggest_title">AI meal suggestion</string>
+    <string name="suggest_subtitle">Tuned to what you have left today.</string>
+    <string name="suggest_action">Suggest a meal</string>
+    <string name="suggest_another">Suggest another</string>
+    <string name="suggest_thinking">Thinking…</string>
+    <string name="suggest_add">Add to log</string>
+    <string name="suggest_logging">Logging…</string>
+    <string name="suggest_logged_label">Logged</string>
+    <string name="suggest_offline">Suggestions need a connection. Everything else on this screen keeps working.</string>
+    <string name="suggest_ai_disclaimer">AI estimate — nothing is logged until you tap add.</string>
+    <string name="suggestion_unavailable">Suggestions are offline right now</string>
+    <string name="suggestion_logged">Added to your log</string>
+    <string name="suggestion_log_failed">Could not log that meal — please try again</string>
+
+    <!-- Weight trend -->
+    <string name="weight_trend_title">Weight trend</string>
+    <string name="weight_view_all">View all</string>
+    <string name="weight_empty">Log a few weigh-ins to see your trend.</string>
+    <string name="weight_unit_kg">kg</string>
+    <string name="weight_sparkline_cd">Weight trend from %1$s to %2$s kilograms</string>
+
+    <!-- Achievements strip -->
+    <string name="achievements_title">Achievements</string>
+    <string name="achievement_earned">Earned</string>
+    <string name="achievement_locked">Locked</string>
+    <string name="achievements_empty">Keep logging to unlock achievements.</string>
+    <string name="achievement_cd_earned">%1$s, earned</string>
+    <string name="achievement_cd_locked">%1$s, not earned yet</string>
+
+    <!-- ===================== Nutrition day view ===================== -->
+    <string name="nutrition_today">Today</string>
+    <string name="nutrition_back_to_today">Back to today</string>
+    <string name="nutrition_prev_day">Previous day</string>
+    <string name="nutrition_next_day">Next day</string>
+    <string name="nutrition_open_calendar">Open the calendar</string>
+    <string name="nutrition_error_title">This day didn\'t load</string>
+    <string name="nutrition_error_message">Anything you log stays on this device until you\'re back online.</string>
+    <string name="nutrition_calories_remaining">Calories remaining</string>
+    <string name="nutrition_goal">Goal</string>
+    <string name="nutrition_food">Food</string>
+    <string name="nutrition_exercise">Exercise</string>
+    <string name="nutrition_remaining">Remaining</string>
+    <string name="nutrition_formula_cd">Goal %1$s minus food %2$s plus exercise %3$s equals %4$s remaining</string>
+    <string name="nutrition_macros">Macros</string>
+
+    <string name="nutrition_micros">Micronutrients</string>
+    <string name="nutrition_micros_expand">Show micronutrients</string>
+    <string name="nutrition_micros_collapse">Hide micronutrients</string>
+    <string name="micro_fiber">Dietary fibre</string>
+    <string name="micro_sugar">Sugars</string>
+    <string name="micro_sodium">Sodium</string>
+    <string name="micro_potassium">Potassium</string>
+    <string name="micro_calcium">Calcium</string>
+    <string name="micro_iron">Iron</string>
+    <string name="unit_grams">%1$s g</string>
+    <string name="unit_milligrams">%1$s mg</string>
+
+    <string name="quick_scan_title">Scan your meal</string>
+    <string name="quick_scan_sub">Smart Scan AI</string>
+    <string name="quick_barcode_title">Scan barcode</string>
+    <string name="quick_barcode_sub">Packaged foods</string>
+    <string name="quick_barcode_unavailable">Scanner arriving soon</string>
+    <string name="quick_copy_title">Copy yesterday\'s</string>
+    <string name="quick_copy_sub">Duplicate meals</string>
+    <string name="quick_copy_busy">Copying…</string>
+    <string name="quick_meal_plan_title">AI meal plan</string>
+    <string name="quick_meal_plan_sub">Suggestions for target</string>
+
+    <string name="timeline_title">Meal timeline</string>
+    <string name="timeline_empty_title">Nothing logged yet</string>
+    <string name="timeline_empty_today">Log your first meal by searching foods or scanning your plate.</string>
+    <string name="timeline_empty_past">No meals were logged on this day.</string>
+    <string name="timeline_add_meal">Add a meal</string>
+    <string name="timeline_not_logged">Not logged</string>
+    <string name="timeline_tap_to_add">Tap to add your %1$s</string>
+    <string name="timeline_add_to">Add food to %1$s</string>
+    <string name="timeline_edit">Edit %1$s entry</string>
+    <string name="timeline_delete">Delete %1$s entry</string>
+    <string name="timeline_from_photo">from photo</string>
+    <string name="timeline_pending">Waiting to sync</string>
+    <string name="timeline_failed">Sync failed — open to retry</string>
+    <string name="kcal_value">%1$s kcal</string>
+    <string name="macro_line">P %1$s g · C %2$s g · F %3$s g</string>
+    <string name="item_grams">%1$s %2$d g</string>
+
+    <string name="weekly_title">Weekly calorie trend</string>
+    <string name="weekly_avg">Avg %1$s</string>
+    <string name="weekly_empty">Log meals for a few days to see your trend.</string>
+    <string name="weekly_chart_cd">Calories per day for the last week</string>
+
+    <!-- Food search sheet -->
+    <string name="food_sheet_title">Add food</string>
+    <string name="food_sheet_title_meal">Add to %1$s</string>
+    <string name="food_search_label">Search foods</string>
+    <string name="food_search_min">Type at least two letters to search the food library.</string>
+    <string name="food_search_none_title">No foods found</string>
+    <string name="food_search_none_body">Try a shorter or different name.</string>
+    <string name="food_recent_title">Recently used</string>
+    <string name="food_offline_note">Offline — showing foods you\'ve logged before.</string>
+    <string name="food_back_to_search">Back to search</string>
+    <string name="food_per_100g">%1$s kcal · P %2$s g · C %3$s g · F %4$s g per 100 g</string>
+    <string name="food_kcal_per_100g">%1$s kcal/100g</string>
+    <string name="food_portion">Portion</string>
+    <string name="food_add_grams">Add %1$d g</string>
+    <string name="food_serving_label">%1$s (%2$d g)</string>
+    <string name="food_preview_calories">Calories</string>
+    <string name="food_allergens">Contains: %1$s</string>
+    <string name="sheet_close">Close</string>
+
+    <!-- Allergen names — deterministic mirror of the shared ALLERGENS union -->
+    <string name="allergen_peanuts">peanuts</string>
+    <string name="allergen_tree_nuts">tree nuts</string>
+    <string name="allergen_milk">milk</string>
+    <string name="allergen_eggs">eggs</string>
+    <string name="allergen_fish">fish</string>
+    <string name="allergen_shellfish">shellfish</string>
+    <string name="allergen_soy">soy</string>
+    <string name="allergen_wheat">wheat</string>
+    <string name="allergen_sesame">sesame</string>
+
+    <!-- Edit-meal sheet -->
+    <string name="edit_meal_title">Edit %1$s</string>
+    <string name="edit_remove_item">Remove %1$s</string>
+    <string name="edit_save">Save changes</string>
+    <string name="edit_saving">Saving…</string>
+    <string name="meal_logged">Meal logged</string>
+    <string name="meal_log_failed">Could not log that food — please try again</string>
+    <string name="meal_updated">Meal updated</string>
+    <string name="meal_removed">Entry removed</string>
+    <string name="copy_success">Copied yesterday\'s meals</string>
+    <string name="copy_empty">No meals were logged yesterday to copy.</string>
+
+    <!-- Calendar picker -->
+    <string name="calendar_title">Pick a day</string>
+    <string name="calendar_prev_month">Previous month</string>
+    <string name="calendar_next_month">Next month</string>
+    <string name="calendar_day_cd">%1$s, %2$s</string>
+    <string name="calendar_day_logged">logged</string>
+    <string name="calendar_day_empty">nothing logged</string>
+
+    <!-- Shared -->
+    <string name="action_retry">Try again</string>
 </resources>

@@ -11,10 +11,11 @@ import fit.aquazero.app.core.network.dto.FoodNutrientsDto
 import fit.aquazero.app.core.network.dto.FoodServingDto
 import fit.aquazero.app.core.network.dto.MealLogItemDto
 import fit.aquazero.app.core.network.dto.MealType
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -320,7 +321,7 @@ class NutritionViewModelTest {
         val data = FakeNutritionData()
         val viewModel = NutritionViewModel(data)
         advanceUntilIdle()
-        val events = viewModel.collectEvents(backgroundScope)
+        val events = viewModel.collectEvents(this)
         advanceUntilIdle()
 
         viewModel.deleteMeal("m1")
@@ -335,7 +336,7 @@ class NutritionViewModelTest {
         val data = FakeNutritionData().apply { copyCount = 3 }
         val viewModel = NutritionViewModel(data)
         advanceUntilIdle()
-        val events = viewModel.collectEvents(backgroundScope)
+        val events = viewModel.collectEvents(this)
         advanceUntilIdle()
 
         viewModel.copyPreviousDay()
@@ -351,7 +352,7 @@ class NutritionViewModelTest {
         val data = FakeNutritionData().apply { copyCount = 0 }
         val viewModel = NutritionViewModel(data)
         advanceUntilIdle()
-        val events = viewModel.collectEvents(backgroundScope)
+        val events = viewModel.collectEvents(this)
         advanceUntilIdle()
 
         viewModel.copyPreviousDay()
@@ -454,9 +455,14 @@ class NutritionViewModelTest {
     )
 }
 
-/** Subscribe before acting: the event flow has no replay, by design. */
-private fun NutritionViewModel.collectEvents(scope: CoroutineScope): List<NutritionEvent> {
+/**
+ * Subscribe before acting: the event flow has no replay, by design, so the
+ * collector is started undispatched to guarantee it is registered first.
+ */
+private fun NutritionViewModel.collectEvents(scope: TestScope): List<NutritionEvent> {
     val received = mutableListOf<NutritionEvent>()
-    scope.launch { events.collect { received += it } }
+    scope.backgroundScope.launch(UnconfinedTestDispatcher(scope.testScheduler)) {
+        events.collect { received += it }
+    }
     return received
 }

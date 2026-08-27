@@ -1,281 +1,512 @@
 package fit.aquazero.app.feature.nutrition
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddAPhoto
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
-import fit.aquazero.app.core.database.MealLogEntity
 import fit.aquazero.app.core.designsystem.AzfAppHeader
-import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.DataSmall
-import fit.aquazero.app.core.designsystem.RingProgress
+import fit.aquazero.app.core.designsystem.EmptyState
+import fit.aquazero.app.core.designsystem.ErrorState
+import fit.aquazero.app.core.designsystem.LocalAzfExtended
+import fit.aquazero.app.core.designsystem.revealOnEnter
+import fit.aquazero.app.core.network.dto.FoodDto
+import fit.aquazero.app.core.network.dto.MealType
+import fit.aquazero.app.feature.dashboard.CardSkeleton
+import fit.aquazero.app.feature.dashboard.HydrationCard
+import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.feature.dashboard.rememberToastSink
 
+/**
+ * The nutrition day view — a port of `apps/web/src/pages/nutrition/Nutrition.tsx`.
+ *
+ * Mobile deviations, all deliberate:
+ *  - the web's concentric/single macro-ring toggle is dropped in favour of a
+ *    single ring plus full-width macro bars (one less control on a phone,
+ *    same information);
+ *  - the add-food and edit sheets are real `ModalBottomSheet`s;
+ *  - "copy yesterday's" replays the source day's logs through the offline
+ *    outbox rather than firing N parallel POSTs, so it works on a plane.
+ */
 @Composable
 fun NutritionScreen(
     onNavigateToCapture: () -> Unit,
     modifier: Modifier = Modifier,
+    onNavigateToMealPlan: () -> Unit = {},
+    onNavigateToBarcode: (() -> Unit)? = null,
     viewModel: NutritionViewModel = hiltViewModel(),
 ) {
-    val meals by viewModel.mealLogs.collectAsState()
-    val dailyNutrition by viewModel.dailyNutrition.collectAsState()
-    val selectedDate by viewModel.selectedDate.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val toasts = rememberToastSink()
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is NutritionEvent.Message -> toasts.show(
+                    context.getString(event.messageRes),
+                    event.kind,
+                )
+            }
+        }
+    }
 
     NutritionContent(
-        meals = meals,
-        dailyNutrition = dailyNutrition,
-        selectedDate = selectedDate,
-        onNavigateToCapture = onNavigateToCapture,
+        state = state,
+        onRetry = viewModel::refresh,
+        onShiftDay = viewModel::shiftDay,
+        onSelectDate = viewModel::selectDate,
+        onOpenCalendar = { viewModel.setCalendarOpen(true) },
+        onCloseCalendar = { viewModel.setCalendarOpen(false) },
+        onToggleMicros = viewModel::toggleMicros,
+        onLogWater = { viewModel.logWater() },
+        onCopyPrevious = viewModel::copyPreviousDay,
+        onAddFood = viewModel::openFoodSearch,
+        onCloseFoodSearch = viewModel::closeFoodSearch,
+        onSearchTermChange = viewModel::onSearchTermChange,
+        onSelectFood = viewModel::selectFood,
+        onClearSelectedFood = viewModel::clearSelectedFood,
+        onGramsChange = viewModel::setGrams,
+        onConfirmAddFood = viewModel::confirmAddFood,
+        onStartEditing = viewModel::startEditing,
+        onCancelEditing = viewModel::cancelEditing,
+        onEditRowGrams = viewModel::setEditRowGrams,
+        onRemoveEditRow = viewModel::removeEditRow,
+        onSaveEdit = viewModel::saveEdit,
         onDeleteMeal = viewModel::deleteMeal,
-        modifier = modifier
+        onCaptureMeal = onNavigateToCapture,
+        onMealPlan = onNavigateToMealPlan,
+        onScanBarcode = onNavigateToBarcode,
+        modifier = modifier,
     )
 }
 
+/** Stateless nutrition body. */
 @Composable
 fun NutritionContent(
-    meals: List<MealLogEntity>,
-    dailyNutrition: LocalDailyNutrition?,
-    selectedDate: String,
-    onNavigateToCapture: () -> Unit,
+    state: NutritionUiState,
+    onRetry: () -> Unit,
+    onShiftDay: (Long) -> Unit,
+    onSelectDate: (String) -> Unit,
+    onOpenCalendar: () -> Unit,
+    onCloseCalendar: () -> Unit,
+    onToggleMicros: () -> Unit,
+    onLogWater: () -> Unit,
+    onCopyPrevious: () -> Unit,
+    onAddFood: (MealType) -> Unit,
+    onCloseFoodSearch: () -> Unit,
+    onSearchTermChange: (String) -> Unit,
+    onSelectFood: (FoodDto) -> Unit,
+    onClearSelectedFood: () -> Unit,
+    onGramsChange: (Int) -> Unit,
+    onConfirmAddFood: () -> Unit,
+    onStartEditing: (String) -> Unit,
+    onCancelEditing: () -> Unit,
+    onEditRowGrams: (Int, Int) -> Unit,
+    onRemoveEditRow: (Int) -> Unit,
+    onSaveEdit: () -> Unit,
     onDeleteMeal: (String) -> Unit,
+    onCaptureMeal: () -> Unit,
+    onMealPlan: () -> Unit,
+    onScanBarcode: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            AzfAppHeader(
-                title = stringResource(R.string.screen_nutrition).uppercase(),
-                onBack = null
-            )
+            AzfAppHeader(title = stringResource(R.string.screen_nutrition).uppercase())
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onNavigateToCapture,
-                containerColor = AzfColors.PrimaryFixedDim,
-                contentColor = AzfColors.Background
+                onClick = onCaptureMeal,
+                containerColor = LocalAzfExtended.current.primaryFixedDim,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(56.dp),
             ) {
-                Icon(Icons.Default.AddAPhoto, contentDescription = "Capture meal")
+                Icon(
+                    imageVector = Icons.Outlined.PhotoCamera,
+                    contentDescription = stringResource(R.string.fab_capture_meal),
+                )
             }
-        }
+        },
     ) { innerPadding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .padding(innerPadding)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(AzfSpacing.ContainerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    PaddingValues(
+                        start = AzfSpacing.ContainerMargin,
+                        end = AzfSpacing.ContainerMargin,
+                        top = AzfSpacing.ElementGapMedium,
+                        bottom = AzfSpacing.SectionGap,
+                    ),
+                ),
         ) {
-            item {
-                dailyNutrition?.let { data ->
-                    AzfCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            NutrientRing(
-                                label = "KCAL",
-                                consumed = data.kcalConsumed,
-                                target = data.kcalTarget,
-                                color = AzfColors.PrimaryFixedDim
-                            )
-                            NutrientRing(
-                                label = "PRO",
-                                consumed = data.proteinConsumed,
-                                target = data.proteinTarget,
-                                color = AzfColors.SecondaryFixedDim
-                            )
-                            NutrientRing(
-                                label = "CARB",
-                                consumed = data.carbsConsumed,
-                                target = data.carbsTarget,
-                                color = AzfColors.PrimaryFixedDim
-                            )
-                            NutrientRing(
-                                label = "FAT",
-                                consumed = data.fatConsumed,
-                                target = data.fatTarget,
-                                color = AzfColors.Coral
-                            )
-                        }
-                    }
+            DaySwitcher(
+                selectedDate = state.selectedDate,
+                isToday = state.isToday,
+                onShiftDay = onShiftDay,
+                onOpenCalendar = onOpenCalendar,
+                onBackToToday = { onSelectDate(state.today) },
+                modifier = Modifier.revealOnEnter(0),
+            )
+
+            Spacer(Modifier.height(AzfSpacing.Gutter))
+
+            when {
+                state.phase == NutritionPhase.Error && !state.hasContent -> {
+                    ErrorState(
+                        title = stringResource(R.string.nutrition_error_title),
+                        message = stringResource(R.string.nutrition_error_message),
+                        retryLabel = stringResource(R.string.action_retry),
+                        onRetry = onRetry,
+                    )
                 }
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = "TODAY'S LOGS",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+
+                state.nutrition == null -> {
+                    CardSkeleton(height = 280.dp, modifier = Modifier.revealOnEnter(1))
+                    Spacer(Modifier.height(AzfSpacing.Gutter))
+                    CardSkeleton(height = 180.dp, modifier = Modifier.revealOnEnter(2))
+                    Spacer(Modifier.height(AzfSpacing.Gutter))
+                    CardSkeleton(height = 180.dp, modifier = Modifier.revealOnEnter(3))
+                }
+
+                else -> {
+                    CaloriesRemainingCard(
+                        nutrition = state.nutrition,
+                        kcalBurned = state.kcalBurned,
+                        modifier = Modifier.revealOnEnter(1),
+                    )
+                    Spacer(Modifier.height(AzfSpacing.Gutter))
+
+                    MacroCard(
+                        nutrition = state.nutrition,
+                        modifier = Modifier.revealOnEnter(2),
+                    )
+                    Spacer(Modifier.height(AzfSpacing.Gutter))
+
+                    HydrationCard(
+                        consumedMl = state.waterConsumedMl,
+                        targetMl = state.nutrition.waterTargetMl,
+                        pending = state.waterPending,
+                        onLogWater = onLogWater,
+                        modifier = Modifier.revealOnEnter(3),
+                    )
+                    Spacer(Modifier.height(AzfSpacing.Gutter))
+
+                    MicronutrientCard(
+                        micros = state.micronutrients,
+                        expanded = state.microsExpanded,
+                        onToggle = onToggleMicros,
+                        modifier = Modifier.revealOnEnter(4),
+                    )
+                    Spacer(Modifier.height(AzfSpacing.Gutter))
+
+                    QuickActions(
+                        copying = state.copying,
+                        barcodeEnabled = onScanBarcode != null,
+                        onCaptureMeal = onCaptureMeal,
+                        onScanBarcode = { onScanBarcode?.invoke() },
+                        onCopyPrevious = onCopyPrevious,
+                        onMealPlan = onMealPlan,
+                        modifier = Modifier.revealOnEnter(5),
+                    )
+                    Spacer(Modifier.height(AzfSpacing.SectionGap))
+
+                    MealTimeline(
+                        state = state,
+                        onAddFood = onAddFood,
+                        onStartEditing = onStartEditing,
+                        onDeleteMeal = onDeleteMeal,
+                    )
+                    Spacer(Modifier.height(AzfSpacing.SectionGap))
+
+                    WeeklyKcalBars(
+                        trend = state.kcalTrend,
+                        selectedDate = state.selectedDate,
+                        loading = state.trendLoading,
+                    )
+                }
             }
 
-            if (meals.isEmpty()) {
-                item {
-                    Text(
-                        text = "No meals logged yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(vertical = 32.dp)
-                    )
-                }
-            } else {
-                items(meals, key = { it.localId }) { meal ->
-                    MealItem(
-                        meal = meal,
-                        onDelete = { onDeleteMeal(meal.localId) }
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            }
+            // Clears the FAB and the bottom bar.
+            Spacer(Modifier.height(96.dp))
         }
     }
-}
 
-@Preview(showBackground = true, backgroundColor = 0xFF0E1416)
-@Composable
-private fun NutritionPreview() {
-    AzfTheme {
-        NutritionContent(
-            meals = listOf(
-                MealLogEntity(
-                    localId = "1",
-                    mealType = "breakfast",
-                    items = emptyList(),
-                    totalKcal = 450.0,
-                    totalProteinG = 24.0,
-                    totalCarbsG = 45.0,
-                    totalFatG = 12.0,
-                    source = "manual",
-                    loggedAt = "",
-                    localDate = "2026-08-27",
-                    syncState = fit.aquazero.app.core.database.SyncState.SYNCED,
-                    idempotencyKey = ""
-                ),
-                MealLogEntity(
-                    localId = "2",
-                    mealType = "lunch",
-                    items = emptyList(),
-                    totalKcal = 650.0,
-                    totalProteinG = 38.0,
-                    totalCarbsG = 62.0,
-                    totalFatG = 18.0,
-                    source = "manual",
-                    loggedAt = "",
-                    localDate = "2026-08-27",
-                    syncState = fit.aquazero.app.core.database.SyncState.SYNCED,
-                    idempotencyKey = ""
-                )
-            ),
-            dailyNutrition = LocalDailyNutrition(
-                kcalTarget = 2400.0,
-                kcalConsumed = 1100.0,
-                kcalRemaining = 1300.0,
-                proteinConsumed = 62.0,
-                proteinTarget = 140.0,
-                carbsConsumed = 107.0,
-                carbsTarget = 220.0,
-                fatConsumed = 30.0,
-                fatTarget = 70.0,
-                waterConsumedMl = 1250,
-                waterTargetMl = 2000,
-            ),
-            selectedDate = "2026-08-27",
-            onNavigateToCapture = {},
-            onDeleteMeal = {}
+    state.foodSearch?.let { sheet ->
+        FoodSearchSheet(
+            state = sheet,
+            onDismiss = onCloseFoodSearch,
+            onTermChange = onSearchTermChange,
+            onSelectFood = onSelectFood,
+            onClearSelection = onClearSelectedFood,
+            onGramsChange = onGramsChange,
+            onConfirm = onConfirmAddFood,
+        )
+    }
+
+    state.editing?.let { editing ->
+        EditMealSheet(
+            state = editing,
+            onDismiss = onCancelEditing,
+            onGramsChange = onEditRowGrams,
+            onRemoveRow = onRemoveEditRow,
+            onSave = onSaveEdit,
+        )
+    }
+
+    if (state.calendarOpen) {
+        AquaCalendarPicker(
+            selectedDate = state.selectedDate,
+            today = state.today,
+            loggedDates = state.kcalTrend.filter { it.value > 0 }.mapTo(mutableSetOf()) { it.date },
+            onSelectDate = onSelectDate,
+            onDismiss = onCloseCalendar,
         )
     }
 }
 
-
+/** Meal timeline: one block per meal type, with the day-level empty state. */
 @Composable
-private fun NutrientRing(
-    label: String,
-    consumed: Double,
-    target: Double,
-    color: androidx.compose.ui.graphics.Color
+private fun MealTimeline(
+    state: NutritionUiState,
+    onAddFood: (MealType) -> Unit,
+    onStartEditing: (String) -> Unit,
+    onDeleteMeal: (String) -> Unit,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        RingProgress(
-            progress = if (target > 0) (consumed / target).toFloat() else 0f,
-            size = 60.dp,
-            strokeWidth = 5.dp,
-            color = color
-        ) {
-            Text(
-                text = consumed.toInt().toString(),
-                style = DataSmall,
-                color = MaterialTheme.colorScheme.onSurface
+    Column(modifier = Modifier.revealOnEnter(6)) {
+        Text(
+            text = stringResource(R.string.timeline_title).uppercase(),
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
+
+        if (state.loggedCount == 0) {
+            EmptyState(
+                title = stringResource(R.string.timeline_empty_title),
+                message = stringResource(
+                    if (state.isToday) R.string.timeline_empty_today else R.string.timeline_empty_past,
+                ),
+                actionLabel = if (state.isToday) {
+                    stringResource(R.string.timeline_add_meal)
+                } else {
+                    null
+                },
+                onAction = if (state.isToday) {
+                    { onAddFood(NutritionFormat.mealTypeForNow()) }
+                } else {
+                    null
+                },
+            )
+            Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
+        }
+
+        NutritionFormat.MEAL_TYPES.forEachIndexed { index, mealType ->
+            if (index > 0) Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
+            MealSection(
+                mealType = mealType,
+                logs = state.meals[mealType].orEmpty(),
+                onAdd = { onAddFood(mealType) },
+                onEdit = onStartEditing,
+                onDelete = onDeleteMeal,
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+// ----------------------------------------------------------------- previews
+
+private val previewState = NutritionUiState(
+    today = "2026-08-27",
+    selectedDate = "2026-08-27",
+    phase = NutritionPhase.Ready,
+    nutrition = LocalDailyNutrition(
+        kcalTarget = 2400.0,
+        kcalConsumed = 1100.0,
+        kcalRemaining = 1300.0,
+        proteinConsumed = 62.0,
+        proteinTarget = 140.0,
+        carbsConsumed = 107.0,
+        carbsTarget = 220.0,
+        fatConsumed = 30.0,
+        fatTarget = 70.0,
+        waterConsumedMl = 1250,
+        waterTargetMl = 2000,
+    ),
+    kcalBurned = 320.0,
+    micronutrients = Micronutrients(21.4, 38.0, 1450, 2100, 610, 9.2),
+    trendLoading = false,
+    kcalTrend = listOf(
+        DayValue("2026-08-25", 1990.0),
+        DayValue("2026-08-26", 2210.0),
+        DayValue("2026-08-27", 1100.0),
+    ),
+    meals = mapOf(
+        MealType.BREAKFAST to listOf(
+            MealLogUi(
+                localId = "1",
+                mealType = MealType.BREAKFAST,
+                title = "Porridge, blueberries",
+                itemsLine = "Porridge 80g · Blueberries 60g",
+                kcal = 430.0,
+                proteinG = 14.0,
+                carbsG = 68.0,
+                fatG = 9.0,
+                fromPhoto = false,
+                badge = MealSyncBadge.None,
+                items = emptyList(),
+            ),
+        ),
+        MealType.LUNCH to listOf(
+            MealLogUi(
+                localId = "2",
+                mealType = MealType.LUNCH,
+                title = "Chicken salad",
+                itemsLine = "Chicken breast 150g · Salad 120g",
+                kcal = 670.0,
+                proteinG = 48.0,
+                carbsG = 39.0,
+                fatG = 21.0,
+                fromPhoto = true,
+                badge = MealSyncBadge.Pending,
+                items = emptyList(),
+            ),
+        ),
+    ),
+)
+
+@Preview(showBackground = true, backgroundColor = 0xFF0E1416, heightDp = 2200)
+@Composable
+private fun NutritionContentPreview() {
+    AzfTheme {
+        NutritionContent(
+            state = previewState,
+            onRetry = {},
+            onShiftDay = {},
+            onSelectDate = {},
+            onOpenCalendar = {},
+            onCloseCalendar = {},
+            onToggleMicros = {},
+            onLogWater = {},
+            onCopyPrevious = {},
+            onAddFood = {},
+            onCloseFoodSearch = {},
+            onSearchTermChange = {},
+            onSelectFood = {},
+            onClearSelectedFood = {},
+            onGramsChange = {},
+            onConfirmAddFood = {},
+            onStartEditing = {},
+            onCancelEditing = {},
+            onEditRowGrams = { _, _ -> },
+            onRemoveEditRow = {},
+            onSaveEdit = {},
+            onDeleteMeal = {},
+            onCaptureMeal = {},
+            onMealPlan = {},
+            onScanBarcode = {},
         )
     }
 }
 
+@Preview(showBackground = true, backgroundColor = 0xFF0E1416, heightDp = 900)
 @Composable
-private fun MealItem(
-    meal: MealLogEntity,
-    onDelete: () -> Unit
-) {
-    AzfCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = meal.mealType.uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = AzfColors.SecondaryFixedDim
-                )
-                Text(
-                    text = "${meal.totalKcal.toInt()} kcal",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "P: ${meal.totalProteinG.toInt()}g  C: ${meal.totalCarbsG.toInt()}g  F: ${meal.totalFatG.toInt()}g",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete meal",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
-                )
-            }
-        }
+private fun NutritionSkeletonPreview() {
+    AzfTheme {
+        NutritionContent(
+            state = NutritionUiState(today = "2026-08-27", selectedDate = "2026-08-27"),
+            onRetry = {},
+            onShiftDay = {},
+            onSelectDate = {},
+            onOpenCalendar = {},
+            onCloseCalendar = {},
+            onToggleMicros = {},
+            onLogWater = {},
+            onCopyPrevious = {},
+            onAddFood = {},
+            onCloseFoodSearch = {},
+            onSearchTermChange = {},
+            onSelectFood = {},
+            onClearSelectedFood = {},
+            onGramsChange = {},
+            onConfirmAddFood = {},
+            onStartEditing = {},
+            onCancelEditing = {},
+            onEditRowGrams = { _, _ -> },
+            onRemoveEditRow = {},
+            onSaveEdit = {},
+            onDeleteMeal = {},
+            onCaptureMeal = {},
+            onMealPlan = {},
+            onScanBarcode = null,
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0E1416, heightDp = 900)
+@Composable
+private fun NutritionErrorPreview() {
+    AzfTheme {
+        NutritionContent(
+            state = NutritionUiState(
+                today = "2026-08-27",
+                selectedDate = "2026-08-20",
+                phase = NutritionPhase.Error,
+            ),
+            onRetry = {},
+            onShiftDay = {},
+            onSelectDate = {},
+            onOpenCalendar = {},
+            onCloseCalendar = {},
+            onToggleMicros = {},
+            onLogWater = {},
+            onCopyPrevious = {},
+            onAddFood = {},
+            onCloseFoodSearch = {},
+            onSearchTermChange = {},
+            onSelectFood = {},
+            onClearSelectedFood = {},
+            onGramsChange = {},
+            onConfirmAddFood = {},
+            onStartEditing = {},
+            onCancelEditing = {},
+            onEditRowGrams = { _, _ -> },
+            onRemoveEditRow = {},
+            onSaveEdit = {},
+            onDeleteMeal = {},
+            onCaptureMeal = {},
+            onMealPlan = {},
+            onScanBarcode = null,
+        )
     }
 }

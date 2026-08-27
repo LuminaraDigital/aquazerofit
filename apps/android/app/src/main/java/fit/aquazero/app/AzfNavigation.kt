@@ -78,7 +78,7 @@ fun AzfNavigation(rootViewModel: RootViewModel = hiltViewModel()) {
         when (authState) {
             is AuthState.Unknown -> CircularProgressIndicator(color = AzfColors.PrimaryFixedDim)
             is AuthState.SignedOut -> PreAuthFlow()
-            is AuthState.SignedIn -> MainShell()
+            is AuthState.SignedIn -> MainShell(toastController = rootViewModel.toastController)
         }
         ToastHost(controller = rootViewModel.toastController)
     }
@@ -114,7 +114,7 @@ private fun PreAuthFlow() {
  * the bottom bar, exactly as the web renders them outside `AppLayout`.
  */
 @Composable
-private fun MainShell() {
+private fun MainShell(toastController: ToastController? = null) {
     val backStack = rememberNavBackStack(DashboardKey)
     val currentKey = backStack.lastOrNull()
     val onTab = currentKey is TabKey
@@ -161,14 +161,43 @@ private fun MainShell() {
                 onBack = { backStack.removeLastOrNull() },
                 entryProvider = entryProvider {
                     // ----- tab roots -----
-                    entry<DashboardKey> { DashboardScreen() }
-                    entry<NutritionKey> {
-                        NutritionScreen(
-                            onNavigateToCapture = { backStack.add(CaptureMealKey) }
+                    entry<DashboardKey> {
+                        DashboardScreen(
+                            onCaptureMeal = { backStack.add(CaptureMealKey) },
+                            onOpenWorkout = { sessionId ->
+                                if (sessionId != null) {
+                                    backStack.add(WorkoutSessionKey(sessionId))
+                                } else {
+                                    switchTab(AzfTab.Workouts)
+                                }
+                            },
+                            onOpenProgress = { switchTab(AzfTab.Progress) },
                         )
                     }
-                    entry<WorkoutLibraryKey> { WorkoutLibraryScreen() }
-                    entry<ProgressKey> { ProgressScreen() }
+                    entry<NutritionKey> {
+                        NutritionScreen(
+                            onNavigateToCapture = { backStack.add(CaptureMealKey) },
+                            onNavigateToMealPlan = { backStack.add(MealPlanKey) },
+                            // The barcode destination is owned by the camera
+                            // lane; until its key exists the quick action
+                            // renders disabled rather than dead-ending.
+                            onNavigateToBarcode = null,
+                        )
+                    }
+                    entry<WorkoutLibraryKey> {
+                        WorkoutLibraryScreen(
+                            onStartSession = { sessionId ->
+                                backStack.add(WorkoutSessionKey(sessionId))
+                            },
+                            toastController = toastController,
+                        )
+                    }
+                    entry<ProgressKey> {
+                        ProgressScreen(
+                            onLogWeight = { backStack.add(LogWeightKey) },
+                            toastController = toastController,
+                        )
+                    }
                     entry<CoachKey> { CoachScreen() }
 
                     // ----- onboarding interstitials -----
@@ -193,9 +222,15 @@ private fun MainShell() {
                         RecipeDetailScreen(recipeId = key.recipeId, onBack = ::pop)
                     }
                     entry<WorkoutSessionKey> { key ->
-                        WorkoutSessionScreen(sessionId = key.sessionId, onBack = ::pop)
+                        WorkoutSessionScreen(
+                            sessionId = key.sessionId,
+                            onBack = ::pop,
+                            toastController = toastController,
+                        )
                     }
-                    entry<LogWeightKey> { LogWeightScreen(onBack = ::pop) }
+                    entry<LogWeightKey> {
+                        LogWeightScreen(onBack = ::pop, toastController = toastController)
+                    }
                     entry<CoachSelectKey> { CoachSelectScreen(onBack = ::pop) }
                     entry<ChallengesKey> { ChallengesScreen(onBack = ::pop) }
                     entry<SettingsKey> { SettingsScreen(onBack = ::pop) }

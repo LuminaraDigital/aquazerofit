@@ -15,11 +15,11 @@ import fit.aquazero.app.core.network.dto.ProgressSummaryDto
 import fit.aquazero.app.core.network.dto.TodayWorkoutEnvelopeDto
 import fit.aquazero.app.core.network.dto.WorkoutSessionDto
 import fit.aquazero.app.core.network.dto.WorkoutSessionStatus
-import java.io.IOException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -95,7 +95,7 @@ class DashboardViewModelTest {
         val data = FakeDashboardData()
         val viewModel = DashboardViewModel(data)
         advanceUntilIdle()
-        val events = viewModel.collectEvents(backgroundScope)
+        val events = viewModel.collectEvents(this)
         advanceUntilIdle()
 
         viewModel.logWater()
@@ -120,7 +120,7 @@ class DashboardViewModelTest {
         }
         val viewModel = DashboardViewModel(data)
         advanceUntilIdle()
-        val events = viewModel.collectEvents(backgroundScope)
+        val events = viewModel.collectEvents(this)
         advanceUntilIdle()
 
         viewModel.logWater()
@@ -136,7 +136,7 @@ class DashboardViewModelTest {
         val data = FakeDashboardData()
         val viewModel = DashboardViewModel(data)
         advanceUntilIdle()
-        val events = viewModel.collectEvents(backgroundScope)
+        val events = viewModel.collectEvents(this)
         advanceUntilIdle()
 
         viewModel.suggestMeal()
@@ -283,10 +283,15 @@ class DashboardViewModelTest {
     }
 }
 
-/** Subscribe before acting: the event flow has no replay, by design. */
-private fun DashboardViewModel.collectEvents(scope: CoroutineScope): List<DashboardEvent> {
+/**
+ * Subscribe before acting: the event flow has no replay, by design, so the
+ * collector is started undispatched to guarantee it is registered first.
+ */
+private fun DashboardViewModel.collectEvents(scope: TestScope): List<DashboardEvent> {
     val received = mutableListOf<DashboardEvent>()
-    scope.launch { events.collect { received += it } }
+    scope.backgroundScope.launch(UnconfinedTestDispatcher(scope.testScheduler)) {
+        events.collect { received += it }
+    }
     return received
 }
 

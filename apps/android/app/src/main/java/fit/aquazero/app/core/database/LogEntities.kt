@@ -3,7 +3,7 @@ package fit.aquazero.app.core.database
 import androidx.room3.Entity
 import androidx.room3.Index
 import androidx.room3.PrimaryKey
-import fit.aquazero.app.core.network.dto.MealLogItemDto
+import fit.aquazero.app.core.model.MealLogItemDto
 
 /**
  * Offline-writable meal log. [localId] is the device-generated identity;

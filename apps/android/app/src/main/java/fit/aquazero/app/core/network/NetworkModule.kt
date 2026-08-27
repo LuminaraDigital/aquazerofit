@@ -5,6 +5,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import fit.aquazero.app.BuildConfig
+import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.network.api.AuthApi
 import fit.aquazero.app.core.network.api.ChallengesApi
 import fit.aquazero.app.core.network.api.ChatApi

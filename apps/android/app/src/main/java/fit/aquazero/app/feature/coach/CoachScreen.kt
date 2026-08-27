@@ -1,6 +1,7 @@
 package fit.aquazero.app.feature.coach
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -8,207 +9,679 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.database.ChatMessageEntity
+import fit.aquazero.app.core.designsystem.AkinStage
 import fit.aquazero.app.core.designsystem.AzfAppHeader
-import fit.aquazero.app.core.designsystem.AzfColors
+import fit.aquazero.app.core.designsystem.AzfCard
+import fit.aquazero.app.core.designsystem.AzfCardTier
+import fit.aquazero.app.core.designsystem.AzfChip
+import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.ErrorState
+import fit.aquazero.app.core.designsystem.LocalAzfExtended
+import fit.aquazero.app.core.designsystem.Skeleton
+import fit.aquazero.app.core.designsystem.ToastKind
+import fit.aquazero.app.core.model.ChatMealDraftDto
+import fit.aquazero.app.feature.dashboard.rememberToastSink
+import fit.aquazero.app.feature.gamification.CelebrationHost
 
+/**
+ * The coach conversation.
+ *
+ * Structure, top to bottom: header (coach avatar → character select), the
+ * **persistent** wellness disclaimer, the message list, and a composer with
+ * two buttons — send, and "log this as a meal". The second one is the whole
+ * reason the first can stay dumb: logging is an explicit act, never something
+ * inferred from what the user happened to type.
+ *
+ * The celebration layer is hosted here as well as on the dashboard, because
+ * logging a meal from chat can be the thing that levels someone up, and the
+ * moment should land where the action happened.
+ */
 @Composable
 fun CoachScreen(
     modifier: Modifier = Modifier,
+    onOpenCoachSelect: () -> Unit = {},
+    onOpenManualLogging: () -> Unit = {},
     viewModel: CoachViewModel = hiltViewModel(),
 ) {
-    val messages by viewModel.messages.collectAsState()
-    val isStreaming by viewModel.isStreaming.collectAsState()
-    val streamingText by viewModel.streamingText.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val toasts = rememberToastSink()
 
-    CoachContent(
-        messages = messages,
-        isStreaming = isStreaming,
-        streamingText = streamingText,
-        onSendMessage = viewModel::sendMessage,
-        modifier = modifier
-    )
+    val reportDone = stringResource(R.string.coach_report_done)
+    val reportFailed = stringResource(R.string.coach_report_failed)
+    val draftFailed = stringResource(R.string.draft_failed)
+    val proposeFailed = stringResource(R.string.draft_propose_failed)
+    val mealLogged = stringResource(R.string.meal_logged)
+    val draftRestored = stringResource(R.string.draft_restored)
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is CoachEvent.Toast -> {
+                    val message = when (event.message) {
+                        CoachToast.ReportDone -> reportDone
+                        CoachToast.ReportFailed -> reportFailed
+                        CoachToast.DraftFailed -> draftFailed
+                        CoachToast.ProposeFailed -> proposeFailed
+                        CoachToast.MealLogged -> mealLogged
+                        CoachToast.DraftRestored -> draftRestored
+                    }
+                    val kind = when (event.message) {
+                        CoachToast.ReportFailed,
+                        CoachToast.DraftFailed,
+                        CoachToast.ProposeFailed,
+                        -> ToastKind.Error
+                        CoachToast.DraftRestored -> ToastKind.Info
+                        else -> ToastKind.Success
+                    }
+                    toasts.show(message, kind)
+                }
+                CoachEvent.MealLogged -> Unit
+                CoachEvent.OpenManualLogging -> onOpenManualLogging()
+            }
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        CoachContent(
+            state = state,
+            onSend = viewModel::send,
+            onProposeMeal = viewModel::proposeMeal,
+            onConfirmDraft = viewModel::confirmDraft,
+            onDismissDraft = viewModel::dismissDraft,
+            onReport = viewModel::report,
+            onRetry = viewModel::retryLast,
+            onDismissFailure = viewModel::dismissTurnFailure,
+            onOpenCoachSelect = onOpenCoachSelect,
+            onLogManually = onOpenManualLogging,
+        )
+        // Placed last so a level-up sits above the conversation, not under it.
+        CelebrationHost()
+    }
 }
 
 @Composable
 fun CoachContent(
-    messages: List<ChatMessageEntity>,
-    isStreaming: Boolean,
-    streamingText: String,
-    onSendMessage: (String) -> Unit,
+    state: CoachUiState,
+    onSend: (String) -> Unit,
+    onProposeMeal: (String) -> Unit,
+    onConfirmDraft: (MealDraftConfirmation) -> Unit,
+    onDismissDraft: () -> Unit,
+    onReport: (String) -> Unit,
+    onRetry: () -> Unit,
+    onDismissFailure: () -> Unit,
+    onOpenCoachSelect: () -> Unit,
+    onLogManually: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var inputText by remember { mutableStateOf("") }
+    var input by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+
+    // Keep the newest turn in view as tokens arrive.
+    LaunchedEffect(
+        state.messages.size,
+        state.streamingText,
+        state.pendingUserMessage,
+        state.draft?.id,
+    ) {
+        listState.animateScrollToItem(0)
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            AzfAppHeader(title = stringResource(R.string.screen_coach).uppercase(), onBack = null)
-        }
+            AzfAppHeader(
+                title = stringResource(R.string.coach_title, state.persona.firstName),
+                onBack = null,
+                trailing = {
+                    val changeLabel =
+                        stringResource(R.string.coach_change_cd, state.persona.name)
+                    IconButton(onClick = onOpenCoachSelect) {
+                        CoachAvatar(
+                            persona = state.persona,
+                            size = 32.dp,
+                            contentDescription = changeLabel,
+                        )
+                    }
+                },
+            )
+        },
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
-                .fillMaxSize()
+                .fillMaxSize(),
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(AzfSpacing.ContainerPadding),
-                reverseLayout = true
-            ) {
-                if (isStreaming && streamingText.isNotEmpty()) {
-                    item {
-                        ChatBubble(
-                            content = streamingText,
-                            isAssistant = true,
-                            isStreaming = true
-                        )
-                    }
-                }
-                items(messages.reversed(), key = { it.id }) { message ->
-                    ChatBubble(
-                        content = message.content,
-                        isAssistant = message.role == "assistant"
+            WellnessDisclaimerBar(
+                modifier = Modifier.padding(
+                    horizontal = AzfSpacing.ContainerMargin,
+                    vertical = 8.dp,
+                ),
+            )
+
+            LiveRegion(state)
+
+            Box(modifier = Modifier.weight(1f)) {
+                when {
+                    state.loading -> LoadingConversation()
+                    state.bootstrapFailed && state.messages.isEmpty() -> ErrorState(
+                        title = stringResource(R.string.coach_load_failed),
+                        message = stringResource(R.string.coach_load_failed_body),
+                    )
+                    else -> Conversation(
+                        state = state,
+                        listState = listState,
+                        onSend = onSend,
+                        onReport = onReport,
+                        onConfirmDraft = onConfirmDraft,
+                        onDismissDraft = onDismissDraft,
+                        onRetry = onRetry,
+                        onDismissFailure = onDismissFailure,
+                        onLogManually = onLogManually,
                     )
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(AzfSpacing.ContainerPadding),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AzfTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    label = "Ask Akin...",
-                    modifier = Modifier.weight(1f),
-                    enabled = !isStreaming
+            Composer(
+                value = input,
+                onValueChange = { input = it },
+                state = state,
+                onSend = {
+                    val text = input
+                    input = ""
+                    onSend(text)
+                },
+                onProposeMeal = {
+                    val text = input
+                    input = ""
+                    onProposeMeal(text)
+                },
+            )
+        }
+    }
+}
+
+/** Polite announcements for streaming state, invisible to sighted users. */
+@Composable
+private fun LiveRegion(state: CoachUiState) {
+    val note = when {
+        state.streaming -> stringResource(R.string.coach_replying, state.persona.firstName)
+        state.turnFailure == TurnFailure.Unavailable ->
+            stringResource(R.string.coach_error_unavailable)
+        state.turnFailure == TurnFailure.Dropped -> stringResource(R.string.coach_error_dropped)
+        else -> ""
+    }
+    Box(
+        modifier = Modifier
+            .size(1.dp)
+            .semantics {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = note
+            },
+    )
+}
+
+@Composable
+private fun LoadingConversation() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(AzfSpacing.ContainerMargin),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Skeleton(modifier = Modifier.fillMaxWidth(0.75f).height(78.dp), shape = AzfShapes.Card)
+        Skeleton(modifier = Modifier.fillMaxWidth(0.6f).height(52.dp), shape = AzfShapes.Card)
+        Skeleton(modifier = Modifier.fillMaxWidth(0.8f).height(96.dp), shape = AzfShapes.Card)
+    }
+}
+
+/**
+ * Reversed list: index 0 is the newest turn, so a growing conversation stays
+ * pinned to the bottom without measuring anything.
+ */
+@Composable
+private fun Conversation(
+    state: CoachUiState,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onSend: (String) -> Unit,
+    onReport: (String) -> Unit,
+    onConfirmDraft: (MealDraftConfirmation) -> Unit,
+    onDismissDraft: () -> Unit,
+    onRetry: () -> Unit,
+    onDismissFailure: () -> Unit,
+    onLogManually: () -> Unit,
+) {
+    val conversationLabel = stringResource(R.string.coach_conversation_cd)
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .semantics { contentDescription = conversationLabel },
+        contentPadding = PaddingValues(
+            horizontal = AzfSpacing.ContainerMargin,
+            vertical = 12.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        reverseLayout = true,
+    ) {
+        state.draft?.let { draft ->
+            item(key = "draft-${draft.id}") {
+                DraftBlock(
+                    draft = draft,
+                    persona = state.persona,
+                    pending = state.draftPending,
+                    onConfirm = onConfirmDraft,
+                    onDismiss = onDismissDraft,
+                    onLogManually = onLogManually,
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
-                    onClick = {
-                        if (inputText.isNotBlank()) {
-                            onSendMessage(inputText)
-                            inputText = ""
-                        }
-                    },
-                    enabled = !isStreaming && inputText.isNotBlank()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Send,
-                        contentDescription = "Send",
-                        tint = if (isStreaming) MaterialTheme.colorScheme.outline else AzfColors.PrimaryFixedDim
+            }
+        }
+
+        if (state.proposingDraft) {
+            item(key = "proposing") {
+                Column {
+                    CoachByline(state.persona)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = stringResource(R.string.draft_reading),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+        }
+
+        state.turnFailure?.let { failure ->
+            item(key = "failure") {
+                TurnFailureFrame(
+                    failure = failure,
+                    persona = state.persona,
+                    onRetry = onRetry,
+                    onDismiss = onDismissFailure,
+                )
+            }
+        }
+
+        if (state.streaming) {
+            item(key = "streaming") {
+                if (state.streamingText.isEmpty()) {
+                    Column {
+                        CoachByline(state.persona)
+                        Spacer(Modifier.height(8.dp))
+                        TypingDots(
+                            label = stringResource(
+                                R.string.coach_typing,
+                                state.persona.firstName,
+                            ),
+                        )
+                    }
+                } else {
+                    AssistantBubble(
+                        content = state.streamingText,
+                        persona = state.persona,
+                    )
+                }
+            }
+        }
+
+        state.pendingUserMessage?.let { pending ->
+            item(key = "pending") { UserBubble(content = pending) }
+        }
+
+        items(
+            count = state.messages.size,
+            key = { index -> state.messages[state.messages.lastIndex - index].id },
+        ) { index ->
+            val message = state.messages[state.messages.lastIndex - index]
+            if (message.role == "user") {
+                UserBubble(content = message.content, timestamp = message.createdAt.timeOfDay())
+            } else {
+                AssistantBubble(
+                    content = message.content,
+                    persona = state.persona,
+                    guardrailBlocked = message.guardrailBlocked,
+                    reported = message.reported,
+                    timestamp = message.createdAt.timeOfDay(),
+                    onReport = { onReport(message.id) },
+                )
+            }
+        }
+
+        if (state.isEmptyConversation) {
+            item(key = "empty") {
+                EmptyConversation(state = state, onPrompt = onSend)
             }
         }
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0E1416)
 @Composable
-private fun CoachPreview() {
-    AzfTheme {
-        CoachContent(
-            messages = listOf(
-                ChatMessageEntity(
-                    id = "1",
-                    sessionId = "s1",
-                    role = "user",
-                    content = "How much water should I drink today?",
-                    createdAt = ""
-                ),
-                ChatMessageEntity(
-                    id = "2",
-                    sessionId = "s1",
-                    role = "assistant",
-                    content = "Based on your activity level and the current temperature, I recommend drinking 2.5 liters today.",
-                    createdAt = ""
-                )
-            ),
-            isStreaming = false,
-            streamingText = "",
-            onSendMessage = {}
+private fun DraftBlock(
+    draft: ChatMealDraftDto,
+    persona: CoachPersona,
+    pending: Boolean,
+    onConfirm: (MealDraftConfirmation) -> Unit,
+    onDismiss: () -> Unit,
+    onLogManually: () -> Unit,
+) {
+    Column {
+        CoachByline(persona)
+        Spacer(Modifier.height(6.dp))
+        MealDraftCard(
+            draft = draft,
+            pending = pending,
+            onConfirm = onConfirm,
+            onDismiss = onDismiss,
+            onLogManually = onLogManually,
         )
     }
 }
 
-
+/**
+ * Failure frames use the same calm treatment as guardrails. A stream that
+ * dropped is not the user's fault and must not read like an error dialog.
+ */
 @Composable
-private fun ChatBubble(
-    content: String,
-    isAssistant: Boolean,
-    isStreaming: Boolean = false,
+private fun TurnFailureFrame(
+    failure: TurnFailure,
+    persona: CoachPersona,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Box(
+    Column {
+        CoachByline(persona)
+        Spacer(Modifier.height(6.dp))
+        SafetyFrame(
+            content = when (failure) {
+                TurnFailure.Unavailable -> stringResource(R.string.coach_error_unavailable)
+                TurnFailure.Dropped -> stringResource(R.string.coach_error_dropped)
+            },
+            modifier = Modifier.fillMaxWidth(0.92f),
+        )
+        Row(modifier = Modifier.padding(top = 8.dp)) {
+            AzfChip(
+                text = stringResource(R.string.coach_error_send_retry),
+                selected = true,
+                onClick = onRetry,
+            )
+            Spacer(Modifier.width(8.dp))
+            AzfChip(
+                text = stringResource(R.string.action_retry),
+                selected = false,
+                onClick = onDismiss,
+            )
+        }
+    }
+}
+
+/** First run of a conversation: mascot, greeting, prompts, and the meal hint. */
+@Composable
+private fun EmptyConversation(state: CoachUiState, onPrompt: (String) -> Unit) {
+    val prompts = state.suggestedPrompts.ifEmpty {
+        listOf(
+            stringResource(R.string.coach_prompt_1),
+            stringResource(R.string.coach_prompt_2),
+            stringResource(R.string.coach_prompt_3),
+            stringResource(R.string.coach_prompt_4),
+        )
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (state.persona.id == CoachRoster.DEFAULT_ID) {
+            AkinStage(size = 180.dp)
+        } else {
+            CoachPortrait(
+                persona = state.persona,
+                modifier = Modifier.size(width = 140.dp, height = 180.dp),
+                contentDescription = stringResource(
+                    R.string.coach_portrait_cd,
+                    state.persona.name,
+                ),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.coach_greeting_title, state.persona.firstName),
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = stringResource(
+                R.string.coach_greeting_body,
+                stringResource(state.persona.taglineRes),
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Spacer(Modifier.height(16.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            prompts.forEach { prompt ->
+                AzfChip(text = prompt, selected = false, onClick = { onPrompt(prompt) })
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        AzfCard(tier = AzfCardTier.Compact, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.coach_meal_hint),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/**
+ * Send and "log this as a meal", side by side.
+ *
+ * Two buttons, zero ambiguity about what each one does. The meal button is the
+ * app's second confirmation gate opening, not a shortcut past it — it proposes
+ * a draft, and the draft still has to be confirmed line by line.
+ */
+@Composable
+private fun Composer(
+    value: String,
+    onValueChange: (String) -> Unit,
+    state: CoachUiState,
+    onSend: () -> Unit,
+    onProposeMeal: () -> Unit,
+) {
+    val hasText = value.isNotBlank()
+    val enabled = state.canSend
+    val accent = LocalAzfExtended.current.primaryFixedDim
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        contentAlignment = if (isAssistant) Alignment.CenterStart else Alignment.CenterEnd
+            .background(MaterialTheme.colorScheme.surface)
+            .imePadding()
+            .navigationBarsPadding()
+            .padding(horizontal = AzfSpacing.ContainerMargin, vertical = 10.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomStart = if (isAssistant) 4.dp else 16.dp,
-                        bottomEnd = if (isAssistant) 16.dp else 4.dp
-                    )
-                )
-                .background(
-                    if (isAssistant) MaterialTheme.colorScheme.surfaceContainer
-                    else AzfColors.PrimaryFixedDim.copy(alpha = 0.2f)
-                )
-                .padding(12.dp)
-        ) {
+        if (state.sessionId == null && !state.loading) {
             Text(
-                text = content,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                text = stringResource(R.string.coach_offline),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
             )
-            if (isStreaming) {
-                Text(
-                    text = "Akin is typing...",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AzfColors.PrimaryFixedDim,
-                    modifier = Modifier.padding(top = 4.dp)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AzfTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = stringResource(R.string.coach_input_placeholder, state.persona.firstName),
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            )
+            Spacer(Modifier.width(6.dp))
+            IconButton(onClick = onProposeMeal, enabled = enabled && hasText) {
+                Icon(
+                    imageVector = Icons.Outlined.Restaurant,
+                    contentDescription = stringResource(R.string.coach_log_meal),
+                    tint = if (enabled && hasText) {
+                        accent
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    },
+                )
+            }
+            IconButton(onClick = onSend, enabled = enabled && hasText) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.Send,
+                    contentDescription = stringResource(R.string.coach_send),
+                    tint = if (enabled && hasText) {
+                        accent
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    },
                 )
             }
         }
+    }
+}
+
+/** `2026-08-27T18:42:03.000Z` → `18:42`, without a formatter dependency. */
+internal fun String.timeOfDay(): String {
+    val timePart = substringAfter('T', "").takeIf { it.length >= 5 } ?: return ""
+    return timePart.take(5)
+}
+
+// ---------------------------------------------------------------------------
+// Previews
+// ---------------------------------------------------------------------------
+
+private fun previewMessages(): List<ChatMessageEntity> = listOf(
+    ChatMessageEntity(
+        id = "1",
+        sessionId = "s1",
+        role = "user",
+        content = "What should I eat tonight?",
+        createdAt = "2026-08-27T18:42:00.000Z",
+    ),
+    ChatMessageEntity(
+        id = "2",
+        sessionId = "s1",
+        role = "assistant",
+        content = "You have banked **1,480 kcal** today.\n\n- a palm of protein\n- something green\n- water alongside it",
+        createdAt = "2026-08-27T18:42:06.000Z",
+    ),
+)
+
+@Preview(showBackground = true, backgroundColor = 0xFF0E1416, widthDp = 400, heightDp = 860)
+@Composable
+private fun CoachContentPreview() {
+    AzfTheme {
+        CoachContent(
+            state = CoachUiState(
+                loading = false,
+                sessionId = "s1",
+                messages = previewMessages(),
+            ),
+            onSend = {},
+            onProposeMeal = {},
+            onConfirmDraft = {},
+            onDismissDraft = {},
+            onReport = {},
+            onRetry = {},
+            onDismissFailure = {},
+            onOpenCoachSelect = {},
+            onLogManually = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0E1416, widthDp = 400, heightDp = 860)
+@Composable
+private fun CoachContentEmptyPreview() {
+    AzfTheme {
+        CoachContent(
+            state = CoachUiState(loading = false, sessionId = "s1"),
+            onSend = {},
+            onProposeMeal = {},
+            onConfirmDraft = {},
+            onDismissDraft = {},
+            onReport = {},
+            onRetry = {},
+            onDismissFailure = {},
+            onOpenCoachSelect = {},
+            onLogManually = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0E1416, widthDp = 400, heightDp = 860)
+@Composable
+private fun CoachContentStreamingPreview() {
+    AzfTheme {
+        CoachContent(
+            state = CoachUiState(
+                loading = false,
+                sessionId = "s1",
+                messages = previewMessages(),
+                streaming = true,
+                streamingText = "Looking at today first — you have ",
+                pendingUserMessage = "How is my week going?",
+            ),
+            onSend = {},
+            onProposeMeal = {},
+            onConfirmDraft = {},
+            onDismissDraft = {},
+            onReport = {},
+            onRetry = {},
+            onDismissFailure = {},
+            onOpenCoachSelect = {},
+            onLogManually = {},
+        )
     }
 }

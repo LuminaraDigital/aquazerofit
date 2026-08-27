@@ -1,7 +1,8 @@
 package fit.aquazero.app.core.network
 
-import fit.aquazero.app.core.network.dto.ChatMessageDto
-import fit.aquazero.app.core.network.dto.ChatSendRequest
+import fit.aquazero.app.core.model.AzfJson
+import fit.aquazero.app.core.model.ChatMessageDto
+import fit.aquazero.app.core.model.ChatSendRequest
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton

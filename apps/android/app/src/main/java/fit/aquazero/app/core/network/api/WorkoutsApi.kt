@@ -1,9 +1,9 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.PagedExercisesDto
-import fit.aquazero.app.core.network.dto.SetLogDto
-import fit.aquazero.app.core.network.dto.TodayWorkoutEnvelopeDto
-import fit.aquazero.app.core.network.dto.WorkoutSessionEnvelopeDto
+import fit.aquazero.app.core.model.PagedExercisesDto
+import fit.aquazero.app.core.model.SetLogDto
+import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
+import fit.aquazero.app.core.model.WorkoutSessionEnvelopeDto
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import retrofit2.http.Body

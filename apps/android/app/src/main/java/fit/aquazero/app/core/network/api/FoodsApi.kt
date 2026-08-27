@@ -1,8 +1,8 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.BarcodeLookupDto
-import fit.aquazero.app.core.network.dto.FoodEnvelopeDto
-import fit.aquazero.app.core.network.dto.FoodsSearchDto
+import fit.aquazero.app.core.model.BarcodeLookupDto
+import fit.aquazero.app.core.model.FoodEnvelopeDto
+import fit.aquazero.app.core.model.FoodsSearchDto
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query

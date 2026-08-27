@@ -8,10 +8,10 @@ import androidx.compose.material.icons.outlined.FreeBreakfast
 import androidx.compose.material.icons.outlined.LunchDining
 import androidx.compose.ui.graphics.vector.ImageVector
 import fit.aquazero.app.R
-import fit.aquazero.app.core.network.dto.FoodDto
-import fit.aquazero.app.core.network.dto.MealLogItemDto
-import fit.aquazero.app.core.network.dto.MealType
-import fit.aquazero.app.core.network.dto.WorkoutSessionDto
+import fit.aquazero.app.core.model.FoodDto
+import fit.aquazero.app.core.model.MealLogItemDto
+import fit.aquazero.app.core.model.MealType
+import fit.aquazero.app.core.model.WorkoutSessionDto
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter

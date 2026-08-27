@@ -1,10 +1,10 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.ChatMealDraftDto
-import fit.aquazero.app.core.network.dto.ChatMessagesDto
-import fit.aquazero.app.core.network.dto.ChatSessionCreatedDto
-import fit.aquazero.app.core.network.dto.ChatSessionsDto
-import fit.aquazero.app.core.network.dto.MealType
+import fit.aquazero.app.core.model.ChatMealDraftDto
+import fit.aquazero.app.core.model.ChatMessagesDto
+import fit.aquazero.app.core.model.ChatSessionCreatedDto
+import fit.aquazero.app.core.model.ChatSessionsDto
+import fit.aquazero.app.core.model.MealType
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.DELETE

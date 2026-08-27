@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
@@ -19,16 +21,33 @@ android {
     versionName = "1.0.0"
   }
 
-  // Upload-key signing (CI secrets). Only attached when the keystore is
-  // actually present so local/CI builds without secrets still produce an
-  // unsigned release artifact instead of failing.
-  val releaseKeystore = file(System.getenv("AZF_KEYSTORE_PATH") ?: "keystore.jks")
+  // Release signing configuration: loads from keystore.properties (local)
+  // or environment variables (CI). If no keystore exists, produces unsigned build.
+  val keystorePropsFile = rootProject.file("keystore.properties").takeIf { it.exists() }
+    ?: file("keystore.properties").takeIf { it.exists() }
+  val keystoreProperties = Properties().apply {
+    if (keystorePropsFile != null) {
+      load(keystorePropsFile.inputStream())
+    }
+  }
+
+  val keystorePath = keystoreProperties.getProperty("storeFile")
+    ?: System.getenv("AZF_KEYSTORE_PATH")
+    ?: "keystore.jks"
+  val releaseKeystore = file(keystorePath)
+
   signingConfigs {
     create("release") {
       storeFile = releaseKeystore
-      storePassword = System.getenv("AZF_KEYSTORE_PASSWORD") ?: ""
-      keyAlias = System.getenv("AZF_KEY_ALIAS") ?: ""
-      keyPassword = System.getenv("AZF_KEY_PASSWORD") ?: ""
+      storePassword = keystoreProperties.getProperty("storePassword")
+        ?: System.getenv("AZF_KEYSTORE_PASSWORD")
+        ?: ""
+      keyAlias = keystoreProperties.getProperty("keyAlias")
+        ?: System.getenv("AZF_KEY_ALIAS")
+        ?: ""
+      keyPassword = keystoreProperties.getProperty("keyPassword")
+        ?: System.getenv("AZF_KEY_PASSWORD")
+        ?: ""
     }
   }
 

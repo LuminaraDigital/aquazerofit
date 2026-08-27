@@ -3,16 +3,16 @@ package fit.aquazero.app.core.data
 import fit.aquazero.app.core.database.TrainingDao
 import fit.aquazero.app.core.database.TrainingPlanEntity
 import fit.aquazero.app.core.database.WorkoutSessionEntity
-import fit.aquazero.app.core.network.ApiResult
-import fit.aquazero.app.core.network.AzfJson
+import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.network.api.CompleteWorkoutRequest
 import fit.aquazero.app.core.network.api.GeneratePlanRequest
 import fit.aquazero.app.core.network.api.PlansApi
 import fit.aquazero.app.core.network.api.SwapExerciseRequest
 import fit.aquazero.app.core.network.api.WorkoutsApi
-import fit.aquazero.app.core.network.dto.TodayWorkoutEnvelopeDto
-import fit.aquazero.app.core.network.dto.TrainingPlanDto
-import fit.aquazero.app.core.network.dto.WorkoutSessionDto
+import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
+import fit.aquazero.app.core.model.TrainingPlanDto
+import fit.aquazero.app.core.model.WorkoutSessionDto
 import fit.aquazero.app.core.network.safeCall
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -75,7 +75,7 @@ class PlansRepository @Inject constructor(
                             status = session.status.name.lowercase(),
                             localDate = session.localDate,
                             docJson = AzfJson.encodeToString(
-                                fit.aquazero.app.core.network.dto.WorkoutSessionDto.serializer(),
+                                fit.aquazero.app.core.model.WorkoutSessionDto.serializer(),
                                 session,
                             ),
                             cachedAt = System.currentTimeMillis(),

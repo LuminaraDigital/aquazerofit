@@ -9,9 +9,9 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.designsystem.ToastKind
-import fit.aquazero.app.core.network.ApiResult
-import fit.aquazero.app.core.network.dto.MealRecommendationDto
-import fit.aquazero.app.core.network.dto.WorkoutSessionStatus
+import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.MealRecommendationDto
+import fit.aquazero.app.core.model.WorkoutSessionStatus
 import javax.inject.Inject
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow

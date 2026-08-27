@@ -2,9 +2,9 @@ package fit.aquazero.app.feature.training
 
 import androidx.lifecycle.SavedStateHandle
 import fit.aquazero.app.core.data.PlansRepository
-import fit.aquazero.app.core.network.dto.SessionExerciseDto
-import fit.aquazero.app.core.network.dto.TodayWorkoutEnvelopeDto
-import fit.aquazero.app.core.network.dto.WorkoutSessionDto
+import fit.aquazero.app.core.model.SessionExerciseDto
+import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
+import fit.aquazero.app.core.model.WorkoutSessionDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher

@@ -11,10 +11,10 @@ import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.database.MealLogEntity
 import fit.aquazero.app.core.database.SyncState
 import fit.aquazero.app.core.designsystem.ToastKind
-import fit.aquazero.app.core.network.ApiResult
-import fit.aquazero.app.core.network.dto.FoodDto
-import fit.aquazero.app.core.network.dto.MealLogItemDto
-import fit.aquazero.app.core.network.dto.MealType
+import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.FoodDto
+import fit.aquazero.app.core.model.MealLogItemDto
+import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.feature.dashboard.NutritionFormat
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi

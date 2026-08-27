@@ -1,13 +1,13 @@
 ﻿package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.AuthResponseDto
-import fit.aquazero.app.core.network.dto.AuthTokensDto
-import fit.aquazero.app.core.network.dto.LoginRequest
-import fit.aquazero.app.core.network.dto.LogoutRequest
-import fit.aquazero.app.core.network.dto.PasswordResetConfirmRequest
-import fit.aquazero.app.core.network.dto.PasswordResetRequest
-import fit.aquazero.app.core.network.dto.RefreshRequest
-import fit.aquazero.app.core.network.dto.RegisterRequest
+import fit.aquazero.app.core.model.AuthResponseDto
+import fit.aquazero.app.core.model.AuthTokensDto
+import fit.aquazero.app.core.model.LoginRequest
+import fit.aquazero.app.core.model.LogoutRequest
+import fit.aquazero.app.core.model.PasswordResetConfirmRequest
+import fit.aquazero.app.core.model.PasswordResetRequest
+import fit.aquazero.app.core.model.RefreshRequest
+import fit.aquazero.app.core.model.RegisterRequest
 import retrofit2.http.Body
 import retrofit2.http.POST
 

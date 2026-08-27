@@ -1,9 +1,9 @@
 package fit.aquazero.app.feature.training
 
-import fit.aquazero.app.core.network.AzfJson
-import fit.aquazero.app.core.network.dto.SessionExerciseDto
-import fit.aquazero.app.core.network.dto.TodayWorkoutEnvelopeDto
-import fit.aquazero.app.core.network.dto.WorkoutSessionDto
+import fit.aquazero.app.core.model.AzfJson
+import fit.aquazero.app.core.model.SessionExerciseDto
+import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
+import fit.aquazero.app.core.model.WorkoutSessionDto
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

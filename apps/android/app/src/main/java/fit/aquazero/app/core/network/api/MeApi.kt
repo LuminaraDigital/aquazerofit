@@ -1,12 +1,12 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.ConsentStateDto
-import fit.aquazero.app.core.network.dto.ConsentUpdateRequest
-import fit.aquazero.app.core.network.dto.DerivedTargetsDto
-import fit.aquazero.app.core.network.dto.EntitlementsDto
-import fit.aquazero.app.core.network.dto.ProfileInputDto
-import fit.aquazero.app.core.network.dto.PublicUserDto
-import fit.aquazero.app.core.network.dto.WellnessProfileDto
+import fit.aquazero.app.core.model.ConsentStateDto
+import fit.aquazero.app.core.model.ConsentUpdateRequest
+import fit.aquazero.app.core.model.DerivedTargetsDto
+import fit.aquazero.app.core.model.EntitlementsDto
+import fit.aquazero.app.core.model.ProfileInputDto
+import fit.aquazero.app.core.model.PublicUserDto
+import fit.aquazero.app.core.model.WellnessProfileDto
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.DELETE

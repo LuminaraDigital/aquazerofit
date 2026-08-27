@@ -7,10 +7,10 @@ import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.data.ProfileRepository
 import fit.aquazero.app.core.data.ProgressRepository
 import fit.aquazero.app.core.database.TrendPointEntity
-import fit.aquazero.app.core.network.ApiResult
-import fit.aquazero.app.core.network.dto.ProgressInsightDto
-import fit.aquazero.app.core.network.dto.ProgressSummaryDto
-import fit.aquazero.app.core.network.dto.TrendPointDto
+import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.ProgressInsightDto
+import fit.aquazero.app.core.model.ProgressSummaryDto
+import fit.aquazero.app.core.model.TrendPointDto
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow

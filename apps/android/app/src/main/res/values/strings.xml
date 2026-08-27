@@ -527,6 +527,258 @@
     <string name="calendar_day_logged">logged</string>
     <string name="calendar_day_empty">nothing logged</string>
 
+    <!-- Photo meal capture -->
+    <string name="capture_title">Scan your meal</string>
+    <string name="capture_subtitle">Smart Scan AI</string>
+    <string name="capture_close_cd">Close the camera</string>
+    <string name="capture_torch_on_cd">Turn on the torch</string>
+    <string name="capture_torch_off_cd">Turn off the torch</string>
+    <string name="capture_viewfinder_cd">Camera viewfinder</string>
+    <string name="capture_preview_cd">The photo you just took</string>
+    <string name="capture_gallery_cd">Choose a photo from your gallery</string>
+    <string name="capture_shutter_cd">Take a photo</string>
+    <string name="capture_retake_cd">Retake the photo</string>
+    <string name="capture_analyze">Analyse meal</string>
+    <string name="capture_hint_frame">Fit the whole plate inside the frame.</string>
+    <string name="capture_hint_lighting">Even, natural light gives the best results.</string>
+    <string name="capture_hint_ready">Looking good — analyse when you\'re ready.</string>
+    <string name="capture_preparing">Preparing your photo…</string>
+    <string name="capture_uploading">Uploading your photo…</string>
+    <string name="capture_permission_title">Camera access needed</string>
+    <string name="capture_permission_body">AquaZeroFit uses the camera to photograph your plate. The photo is only used for this analysis.</string>
+    <string name="capture_permission_blocked_body">Camera access is blocked. Turn it on in Settings, or pick a photo from your gallery instead.</string>
+    <string name="capture_permission_grant">Allow camera access</string>
+    <string name="capture_permission_settings">Open Settings</string>
+    <string name="capture_permission_use_gallery">Choose from gallery</string>
+    <string name="capture_error_shutter">That shot didn\'t save. Try again.</string>
+    <string name="capture_rate_limited">Things are busy right now — your photo is queued and will upload shortly.</string>
+    <string name="capture_upload_failed">That photo didn\'t upload. Try again.</string>
+    <string name="capture_error_unsupported_type">That file type isn\'t supported. Use a JPEG, PNG or HEIC photo.</string>
+    <string name="capture_error_too_large">That photo is over the 10 MB limit. Try a smaller one.</string>
+    <string name="capture_error_unreadable">That photo couldn\'t be read. Try another one.</string>
+
+    <!-- Photo analysis — the confirmation gate -->
+    <string name="analysis_scanning_title">Reading your plate…</string>
+    <string name="analysis_scanning_body">Identifying the food and working out the macros. Nothing is logged yet.</string>
+    <string name="analysis_load_error_title">This analysis didn\'t load</string>
+    <string name="analysis_load_error_body">Check your connection and try again — nothing has been logged.</string>
+    <string name="analysis_failed_title">We couldn\'t read that photo</string>
+    <string name="analysis_failed_body">Try again, or add the food by hand instead.</string>
+    <string name="analysis_empty_title">Nothing recognised</string>
+    <string name="analysis_empty_body">Add the food yourself to log this meal.</string>
+    <string name="analysis_totals_title">Estimated total</string>
+    <string name="analysis_meal_label">Logging to %1$s</string>
+    <string name="analysis_items_title">What we found</string>
+    <string name="analysis_item_name">Item</string>
+    <string name="analysis_remove_item">Remove %1$s</string>
+    <string name="analysis_confidence_high">High confidence</string>
+    <string name="analysis_confidence_medium">Medium confidence</string>
+    <string name="analysis_confidence_low">Low confidence</string>
+    <string name="analysis_confidence_pct">%1$s · %2$d%%</string>
+    <string name="analysis_manual_item">Added by you</string>
+    <string name="analysis_unlinked_note">Some items aren\'t matched to the food library. Their macros still count towards your day.</string>
+    <string name="analysis_add_item">Add an item</string>
+    <string name="analysis_confirm">Confirm &amp; log meal</string>
+    <string name="analysis_too_many_items">You can log up to 30 items in one meal.</string>
+    <string name="analysis_confirm_offline">You appear to be offline. Nothing was logged — try again when connected.</string>
+    <string name="analysis_dismiss">Dismiss this message</string>
+
     <!-- Shared -->
     <string name="action_retry">Try again</string>
+
+    <!-- ===================================================================
+         Coach chat
+         =================================================================== -->
+    <string name="coach_title">Coach %1$s</string>
+    <!-- WELLNESS_DISCLAIMER, verbatim from packages/shared/src/constants.ts -->
+    <string name="coach_disclaimer">AquaZeroFit provides general wellness and fitness support only. It does not provide medical diagnosis, treatment or professional healthcare advice.</string>
+    <string name="coach_disclaimer_cd">Wellness disclaimer</string>
+    <string name="coach_conversation_cd">Conversation with your coach</string>
+    <string name="coach_greeting_title">Hi, I\'m %1$s</string>
+    <string name="coach_greeting_body">%1$s Ask me about your nutrition, training or progress.</string>
+    <string name="coach_meal_hint">Or type what you ate — “two eggs on toast and a flat white” — and tap the meal button to turn it into a meal log.</string>
+    <string name="coach_input_label">Message %1$s</string>
+    <string name="coach_input_placeholder">Ask %1$s…</string>
+    <string name="coach_send">Send message</string>
+    <string name="coach_log_meal">Log this as a meal</string>
+    <string name="coach_typing">%1$s is typing</string>
+    <string name="coach_replying">%1$s is replying</string>
+    <string name="coach_replied">%1$s has replied</string>
+    <string name="coach_message_options">Message options</string>
+    <string name="coach_report">Report response</string>
+    <string name="coach_report_hint">Long-press a reply to report it</string>
+    <string name="coach_report_done">Thanks — this response has been reported for review.</string>
+    <string name="coach_report_failed">Could not report that message. Please try again.</string>
+    <string name="coach_reported_badge">Reported</string>
+    <string name="coach_change_cd">%1$s is your coach. Change coach.</string>
+    <string name="coach_error_unavailable">Your coach is unavailable right now. Please try again in a moment.</string>
+    <string name="coach_error_dropped">That reply did not come through. Your message is saved — ask again whenever you are ready.</string>
+    <string name="coach_error_send_retry">Ask again</string>
+    <string name="coach_offline">You are offline. Past conversations are here to read; a new question needs a connection.</string>
+    <string name="coach_load_failed">Could not open the coach</string>
+    <string name="coach_load_failed_body">Your history is safe. Try again when you have a connection.</string>
+    <string name="coach_safety_cd">Supportive note from your coach</string>
+    <string name="coach_prompt_1">What should I eat tonight?</string>
+    <string name="coach_prompt_2">How is my weight trending?</string>
+    <string name="coach_prompt_3">Adjust today\'s workout</string>
+    <string name="coach_prompt_4">How much protein do I need?</string>
+    <string name="coach_tool_nutrition">Today\'s nutrition</string>
+    <string name="coach_tool_workout">Today\'s workout</string>
+    <string name="coach_tool_plan">Current plan</string>
+    <string name="coach_tool_progress">Progress summary</string>
+
+    <!-- Chat-native meal logging -->
+    <string name="draft_title">Ready to log</string>
+    <string name="draft_source">From “%1$s”. Nothing is saved until you tap Log meal.</string>
+    <string name="draft_restored">You have a meal waiting to be confirmed.</string>
+    <string name="draft_empty_body">I couldn\'t read a meal out of that. Try naming the foods and roughly how much, like “two eggs on toast and a flat white”.</string>
+    <string name="draft_log_manually">Log it manually</string>
+    <string name="draft_dismiss">Not this</string>
+    <string name="draft_confirm">Log meal</string>
+    <string name="draft_choose_food">Which one did you have?</string>
+    <string name="draft_choose_placeholder">Choose a food…</string>
+    <string name="draft_unmatched">“%1$s” — not in the food database yet.</string>
+    <string name="draft_include_cd">Include %1$s</string>
+    <string name="draft_portion_as_said">as you said</string>
+    <string name="draft_portion_serving">standard serving: %1$s</string>
+    <string name="draft_portion_assumed">assumed portion</string>
+    <string name="draft_allergen_title">Allergy check</string>
+    <string name="draft_allergen_body">%1$s match an allergy on your profile.</string>
+    <string name="draft_allergen_ack">I know — log it anyway.</string>
+    <string name="draft_contains">Contains %1$s — on your allergy list.</string>
+    <string name="draft_total">Total to log</string>
+    <string name="draft_kcal">%1$d kcal</string>
+    <string name="draft_reading">Reading that as a meal…</string>
+    <string name="draft_failed">Could not log that meal. Please try again.</string>
+    <string name="draft_propose_failed">Could not read that as a meal. Please try again.</string>
+    <string name="draft_pick_food_first">Pick a food for each line you want logged.</string>
+    <string name="draft_grams_cd">Grams of %1$s</string>
+
+    <!-- ===================================================================
+         Character select
+         =================================================================== -->
+    <string name="coach_select_heading">Your corner</string>
+    <string name="coach_select_sub">Every coach gives the same safe, measured advice. What changes is who is saying it.</string>
+    <string name="coach_select_xp_note">You earn XP for logging, training, hydrating and resting — never for eating less.</string>
+    <string name="coach_select_footer">Coaches change the tone, never the advice. Calorie targets, allergen filtering and every safety boundary are computed the same way whoever is in your corner.</string>
+    <string name="coach_select_choose">Choose</string>
+    <string name="coach_select_open">Open chat</string>
+    <string name="coach_select_switching">Switching…</string>
+    <string name="coach_select_active">In your corner</string>
+    <string name="coach_select_switched">%1$s is in your corner.</string>
+    <string name="coach_select_failed">Could not switch coach. Please try again.</string>
+    <string name="coach_select_roster_failed">We couldn\'t load the coach roster</string>
+    <string name="coach_select_roster_failed_body">The names you have already unlocked are still here.</string>
+    <string name="coach_unlock_label">Reach level %1$d</string>
+    <string name="coach_locked_cd">%1$s, locked. %2$s</string>
+    <string name="coach_unlocked_cd">%1$s, unlocked</string>
+    <string name="coach_locked_toast">%1$s joins you at level %2$d. Keep logging — you are on your way.</string>
+    <string name="coach_bond">Bond %1$d · %2$s XP together</string>
+    <string name="coach_portrait_cd">%1$s portrait</string>
+
+    <!-- Personas (proper nouns stay in code; prose lives here) -->
+    <string name="coach_akin_tagline">Show up. Stay kind. Go again.</string>
+    <string name="coach_akin_discipline">Muay Thai · Lethwei · Taekwondo — Melbourne, Australia</string>
+    <string name="coach_akin_domain">Full-body foundations &amp; striking conditioning</string>
+    <string name="coach_akin_voice">Hungry</string>
+    <string name="coach_sanzo_tagline">You showed up. That is already a victory.</string>
+    <string name="coach_sanzo_discipline">Sumo · Grappling — Kyoto, Japan</string>
+    <string name="coach_sanzo_domain">Foundational power &amp; bodyweight basics</string>
+    <string name="coach_sanzo_voice">Joyful</string>
+    <string name="coach_anderson_tagline">Slow is smooth. Smooth is strong.</string>
+    <string name="coach_anderson_discipline">Wrestling · Boxing — Ohio, USA</string>
+    <string name="coach_anderson_domain">Strength &amp; resistance training</string>
+    <string name="coach_anderson_voice">Steady</string>
+    <string name="coach_king_tagline">Breathe with the rhythm. Begin.</string>
+    <string name="coach_king_discipline">Muay Thai · MMA — Phuket, Thailand</string>
+    <string name="coach_king_domain">Cardio &amp; conditioning</string>
+    <string name="coach_king_voice">Centred</string>
+    <string name="coach_jacare_tagline">You woke up! Come — we flow.</string>
+    <string name="coach_jacare_discipline">Brazilian Jiu-Jitsu · Kickboxing — Manaus, Brazil</string>
+    <string name="coach_jacare_domain">Mobility, flexibility &amp; flow</string>
+    <string name="coach_jacare_voice">Playful</string>
+    <string name="coach_kazushi_tagline">Train for decades, not for weeks.</string>
+    <string name="coach_kazushi_discipline">Catch wrestling · MMA — Tokyo, Japan</string>
+    <string name="coach_kazushi_domain">Core, stability &amp; longevity</string>
+    <string name="coach_kazushi_voice">Wise</string>
+    <string name="coach_mataemon_tagline">But what if — hear me out — we go slower?</string>
+    <string name="coach_mataemon_discipline">Judo · Jiu-Jitsu — Shizuoka, Japan</string>
+    <string name="coach_mataemon_domain">Skill, balance &amp; technique</string>
+    <string name="coach_mataemon_voice">Eccentric</string>
+    <string name="coach_uthman_tagline">No talk. Work. Then we rest.</string>
+    <string name="coach_uthman_discipline">Draka · MMA — Moscow, Russia</string>
+    <string name="coach_uthman_domain">High-intensity &amp; metabolic conditioning</string>
+    <string name="coach_uthman_voice">Stoic</string>
+    <string name="coach_ogun_tagline">Discipline is the only throne that cannot be inherited.</string>
+    <string name="coach_ogun_discipline">Complete MMA — Washington D.C., USA</string>
+    <string name="coach_ogun_domain">Elite &amp; advanced performance</string>
+    <string name="coach_ogun_voice">Sovereign</string>
+
+    <!-- ===================================================================
+         Gamification
+         =================================================================== -->
+    <string name="xp_level">Level %1$d</string>
+    <string name="xp_level_short">LV %1$d</string>
+    <string name="xp_earned_today">+%1$d today</string>
+    <string name="xp_full_day_banked">Full day banked</string>
+    <string name="xp_top_of_ladder">%1$s XP — top of the ladder.</string>
+    <string name="xp_banked_progress">%1$s XP banked toward level %2$d</string>
+    <string name="xp_breakdown_title">Banked today</string>
+    <string name="xp_entry">%1$s +%2$d</string>
+    <string name="xp_entry_cd">%1$s, plus %2$d XP</string>
+    <string name="xp_progress_cd">Level %1$d, %2$d percent of the way to level %3$d</string>
+    <string name="celebration_level_up_label">Level up</string>
+    <string name="celebration_rank_up_label">New rank</string>
+    <string name="celebration_achievement_label">Achievement unlocked</string>
+    <string name="celebration_dismiss">Nice</string>
+    <string name="celebration_cd">%1$s. %2$s</string>
+    <string name="celebration_confetti_cd">Celebration</string>
+    <string name="achievement_dismiss_cd">Dismiss</string>
+    <!-- Photo meal capture -->
+
+    <!-- Photo analysis: the confirmation gate -->
+    <string name="analysis_title">Analysis results</string>
+    <string name="analysis_failed_retake">Take another photo</string>
+    <string name="analysis_failed_manual">Log it manually instead</string>
+    <string name="analysis_estimated_calories">Estimated calories</string>
+    <string name="analysis_kcal_value">%1$s kcal</string>
+    <string name="analysis_macro_line">%1$s %2$sg</string>
+    <string name="analysis_macro_row">P %1$sg · C %2$sg · F %3$sg</string>
+    <string name="analysis_breakdown">Analysis breakdown</string>
+    <string name="analysis_no_items">No items on the list — add what was on your plate before confirming.</string>
+    <string name="analysis_unlinked_items">Some items are not matched to a food yet. Remove them, or add the matching food from search, before confirming.</string>
+    <string name="analysis_gate_copy">Check the items and portions before saving. Nothing is added to your log until you confirm.</string>
+    <string name="analysis_ai_disclaimer">AI estimate — not medical advice.</string>
+    <string name="analysis_confirm_cta">Looks right, log it</string>
+    <string name="analysis_saving">Saving…</string>
+    <string name="analysis_already_logged">Already logged</string>
+    <string name="analysis_add_sheet_title">Add a missing item</string>
+    <string name="analysis_add_sheet_search">Search foods</string>
+    <string name="analysis_add_sheet_pick">Pick</string>
+    <string name="analysis_add_sheet_add">Add to the list</string>
+    <string name="analysis_add_sheet_back">Choose a different food</string>
+    <string name="analysis_add_sheet_preview">%1$s kcal · P %2$sg · C %3$sg · F %4$sg</string>
+    <string name="analysis_per_100g">%1$s kcal per 100g</string>
+
+    <!-- Barcode scanner -->
+    <string name="barcode_title">Scan barcode</string>
+    <string name="barcode_manual_label">Barcode (EAN)</string>
+    <string name="barcode_lookup">Look up product</string>
+    <string name="barcode_not_found">We do not know that barcode yet. Try the food search instead.</string>
+    <string name="barcode_invalid_code">That does not look like a valid barcode — check the digits and try again.</string>
+    <string name="barcode_lookup_offline">Lookup failed — check your connection and try again.</string>
+    <string name="barcode_permission_body">Turn on camera access to scan a barcode, or type the digits below.</string>
+    <string name="barcode_permission_blocked">Camera access is turned off for AquaZeroFit. Switch it back on in Settings, or type the barcode below.</string>
+    <string name="barcode_per_100g">%1$s kcal · P %2$sg · C %3$sg · F %4$sg per 100g</string>
+    <string name="barcode_preview">%1$s kcal · P %2$sg · C %3$sg · F %4$sg</string>
+    <string name="barcode_portion">Portion</string>
+    <string name="barcode_vegan">Vegan</string>
+    <string name="barcode_vegetarian">Vegetarian</string>
+    <string name="barcode_nutriscore_cd">Nutri-Score %1$s</string>
+    <string name="barcode_off_attribution">© Open Food Facts contributors</string>
+    <string name="barcode_allergen_title">Allergen warning</string>
+    <string name="barcode_allergen_contains_body">This product contains %1$s, which you listed as an allergy. Allergen data is best-effort — always check the label.</string>
+    <string name="barcode_allergen_traces_body">This product may contain traces of %1$s, which you listed as an allergy. Allergen data is best-effort — always check the label.</string>
+    <string name="barcode_log_cta">Log %1$dg to %2$s</string>
+    <string name="barcode_scan_another">Scan another product</string>
 </resources>

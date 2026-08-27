@@ -1,6 +1,15 @@
 package fit.aquazero.app.feature.nutrition
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -8,273 +17,734 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AddCircleOutline
+import androidx.compose.material.icons.outlined.CenterFocusWeak
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
-import fit.aquazero.app.core.data.LogsRepository
-import fit.aquazero.app.core.data.VisionRepository
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfColors
+import fit.aquazero.app.core.designsystem.AzfCardTier
+import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
-import fit.aquazero.app.core.designsystem.MacroBar
+import fit.aquazero.app.core.designsystem.AzfTextField
+import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.DataLarge
+import fit.aquazero.app.core.designsystem.DataSmall
+import fit.aquazero.app.core.designsystem.ErrorState
+import fit.aquazero.app.core.designsystem.GramsStepper
+import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
-import fit.aquazero.app.core.network.ApiResult
-import fit.aquazero.app.core.network.dto.MealLogItemDto
-import fit.aquazero.app.core.network.dto.MealType
-import fit.aquazero.app.core.network.dto.VisionJobDto
-import fit.aquazero.app.core.network.dto.VisionJobStatus
-import javax.inject.Inject
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import fit.aquazero.app.core.designsystem.SecondaryButton
+import fit.aquazero.app.core.designsystem.Skeleton
+import fit.aquazero.app.core.designsystem.rememberReducedMotion
+import fit.aquazero.app.core.model.FoodDto
+import fit.aquazero.app.core.model.MealType
+import fit.aquazero.app.feature.dashboard.NutritionFormat
 
-sealed interface AnalysisState {
-    data object Loading : AnalysisState
-    data class Ready(val job: VisionJobDto, val items: List<MealLogItemDto>) : AnalysisState
-    data class Error(val message: String) : AnalysisState
-    data object Confirmed : AnalysisState
-}
-
-@HiltViewModel
-class AnalysisResultsViewModel @Inject constructor(
-    private val visionRepository: VisionRepository,
-    private val logsRepository: LogsRepository,
-) : ViewModel() {
-
-    private val _state = MutableStateFlow<AnalysisState>(AnalysisState.Loading)
-    val state: StateFlow<AnalysisState> = _state.asStateFlow()
-
-    fun pollJob(jobId: String) {
-        viewModelScope.launch {
-            _state.value = AnalysisState.Loading
-            var attempts = 0
-            while (attempts < 20) {
-                when (val result = visionRepository.getJob(jobId)) {
-                    is ApiResult.Success -> {
-                        val job = result.data
-                        when (job.status) {
-                            VisionJobStatus.SUCCEEDED -> {
-                                val items = job.predictions.map { pred ->
-                                    MealLogItemDto(
-                                        foodId = pred.foodId,
-                                        name = pred.name,
-                                        grams = pred.estimatedGrams,
-                                        kcal = pred.kcal,
-                                        proteinG = pred.proteinG,
-                                        carbsG = pred.carbsG,
-                                        fatG = pred.fatG,
-                                    )
-                                }
-                                _state.value = AnalysisState.Ready(job, items)
-                                return@launch
-                            }
-                            VisionJobStatus.FAILED -> {
-                                _state.value = AnalysisState.Error(job.error ?: "Analysis failed")
-                                return@launch
-                            }
-                            else -> {
-                                delay(1500)
-                                attempts++
-                            }
-                        }
-                    }
-                    is ApiResult.Failure -> {
-                        delay(1500)
-                        attempts++
-                    }
-                }
-            }
-            _state.value = AnalysisState.Error("Analysis timed out. Please try again.")
-        }
-    }
-
-    fun confirmMeal(mealType: MealType, items: List<MealLogItemDto>, onConfirmed: () -> Unit) {
-        viewModelScope.launch {
-            logsRepository.logMeal(mealType = mealType, items = items, source = "photo")
-            _state.value = AnalysisState.Confirmed
-            onConfirmed()
-        }
-    }
-}
-
+/**
+ * The confirmation gate.
+ *
+ * Predictions arrive, the user edits them, and **nothing reaches the log until
+ * they tap "Looks right, log it"** (product invariant 1). Gram edits recompute
+ * from the per-gram ratios captured at seed time — the model is never asked a
+ * second time — and the list is seeded exactly once so a late poll can never
+ * discard an edit.
+ */
 @Composable
 fun AnalysisResultsScreen(
     jobId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onLogged: (String?) -> Unit = { onBack() },
+    onLogManually: () -> Unit = onBack,
+    onRetakePhoto: () -> Unit = onBack,
     viewModel: AnalysisResultsViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(jobId) {
-        viewModel.pollJob(jobId)
+    LaunchedEffect(jobId) { viewModel.start(jobId) }
+
+    LaunchedEffect(viewModel) {
+        viewModel.eventFlow.collect { event ->
+            when (event) {
+                is AnalysisEvent.Logged -> onLogged(event.mealLogId)
+            }
+        }
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            AzfAppHeader(title = stringResource(R.string.screen_analysis_results).uppercase(), onBack = onBack)
-        }
+            AzfAppHeader(
+                title = stringResource(R.string.analysis_title),
+                onBack = onBack,
+            )
+        },
     ) { innerPadding ->
-        when (val s = state) {
-            is AnalysisState.Loading -> {
-                Column(
-                    modifier = Modifier
-                        .padding(innerPadding)
-                        .fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator(color = AzfColors.PrimaryFixedDim)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Analyzing your meal...",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+        AnalysisContent(
+            state = state,
+            modifier = Modifier.padding(innerPadding),
+            onRename = viewModel::renameItem,
+            onGramsChange = viewModel::setGrams,
+            onRemove = viewModel::removeItem,
+            onAddItem = viewModel::openAddSheet,
+            onConfirm = viewModel::confirm,
+            onRetry = viewModel::retry,
+            onRetakePhoto = onRetakePhoto,
+            onLogManually = onLogManually,
+        )
+    }
+
+    state.addSheet?.let { sheet ->
+        AddItemSheet(
+            sheet = sheet,
+            onDismiss = viewModel::closeAddSheet,
+            onTermChange = viewModel::setSearchTerm,
+            onSelectFood = viewModel::selectFood,
+            onClearSelection = viewModel::clearSelectedFood,
+            onGramsChange = viewModel::setAddGrams,
+            onConfirm = viewModel::confirmAddItem,
+        )
+    }
+}
+
+/** Phase switch. Camera-free and state-driven, so every branch previews. */
+@Composable
+internal fun AnalysisContent(
+    state: AnalysisUiState,
+    modifier: Modifier = Modifier,
+    onRename: (String, String) -> Unit = { _, _ -> },
+    onGramsChange: (String, Int) -> Unit = { _, _ -> },
+    onRemove: (String) -> Unit = {},
+    onAddItem: () -> Unit = {},
+    onConfirm: () -> Unit = {},
+    onRetry: () -> Unit = {},
+    onRetakePhoto: () -> Unit = {},
+    onLogManually: () -> Unit = {},
+) {
+    when (state.phase) {
+        AnalysisPhase.Scanning -> ScanningState(modifier = modifier)
+
+        AnalysisPhase.LoadError -> Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(horizontal = AzfSpacing.ContainerMargin),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            ErrorState(
+                title = stringResource(R.string.analysis_load_error_title),
+                message = state.banner?.message
+                    ?: stringResource(R.string.analysis_load_error_body),
+                retryLabel = stringResource(R.string.action_retry),
+                onRetry = onRetry,
+            )
+        }
+
+        AnalysisPhase.Failed -> Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(horizontal = AzfSpacing.ContainerMargin),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            ErrorState(
+                title = stringResource(R.string.analysis_failed_title),
+                message = state.jobErrorMessage
+                    ?: stringResource(R.string.analysis_failed_body),
+                retryLabel = stringResource(R.string.analysis_failed_retake),
+                onRetry = onRetakePhoto,
+            )
+            SecondaryButton(
+                text = stringResource(R.string.analysis_failed_manual),
+                onClick = onLogManually,
+                modifier = Modifier.padding(top = AzfSpacing.ElementGapMedium),
+            )
+        }
+
+        AnalysisPhase.Review -> ReviewList(
+            state = state,
+            modifier = modifier,
+            onRename = onRename,
+            onGramsChange = onGramsChange,
+            onRemove = onRemove,
+            onAddItem = onAddItem,
+            onConfirm = onConfirm,
+        )
+    }
+}
+
+@Composable
+private fun ScanningState(modifier: Modifier = Modifier) {
+    val reducedMotion = rememberReducedMotion()
+    val accent = LocalAzfExtended.current.primaryFixedDim
+    val transition = rememberInfiniteTransition(label = "scanning")
+    val pulse by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulse",
+    )
+    val alpha = if (reducedMotion) 0.7f else pulse
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = AzfSpacing.ContainerMargin)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(128.dp)
+                .alpha(alpha)
+                .clip(CircleShape)
+                .border(2.dp, accent.copy(alpha = 0.5f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CenterFocusWeak,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(48.dp),
+            )
+        }
+        Text(
+            text = stringResource(R.string.analysis_scanning_title),
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 24.dp),
+        )
+        Text(
+            text = stringResource(R.string.analysis_scanning_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp),
+        )
+        repeat(3) {
+            Skeleton(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(bottom = 12.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReviewList(
+    state: AnalysisUiState,
+    modifier: Modifier = Modifier,
+    onRename: (String, String) -> Unit,
+    onGramsChange: (String, Int) -> Unit,
+    onRemove: (String) -> Unit,
+    onAddItem: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = AzfSpacing.ContainerMargin,
+            end = AzfSpacing.ContainerMargin,
+            top = AzfSpacing.ElementGapMedium,
+            bottom = AzfSpacing.SectionGap,
+        ),
+        verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
+    ) {
+        item(key = "summary") { AnalysisSummaryCard(totals = state.totals, mealType = state.mealType) }
+
+        item(key = "header") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = AzfSpacing.ElementGapMedium),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.analysis_breakdown),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onAddItem, enabled = !state.confirmed) {
+                    Icon(
+                        imageVector = Icons.Outlined.AddCircleOutline,
+                        contentDescription = null,
+                        tint = LocalAzfExtended.current.primaryFixedDim,
+                        modifier = Modifier.size(18.dp),
                     )
+                    Spacer(modifier = Modifier.size(6.dp))
                     Text(
-                        text = "Identifying ingredients & calculating macros",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = stringResource(R.string.analysis_add_item),
+                        color = LocalAzfExtended.current.primaryFixedDim,
+                        style = MaterialTheme.typography.labelLarge,
                     )
                 }
             }
-            is AnalysisState.Error -> {
-                Column(
-                    modifier = Modifier
-                        .padding(innerPadding)
-                        .padding(AzfSpacing.ContainerMargin)
-                        .fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+        }
+
+        if (state.items.isEmpty()) {
+            item(key = "empty") {
+                AzfCard(tier = AzfCardTier.Compact) {
                     Text(
-                        text = s.message,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    PrimaryButton(
-                        text = "TRY AGAIN",
-                        onClick = { viewModel.pollJob(jobId) }
+                        text = stringResource(R.string.analysis_no_items),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
-            is AnalysisState.Ready -> {
-                val totalKcal = s.items.sumOf { it.kcal }
-                val totalProtein = s.items.sumOf { it.proteinG }
-                val totalCarbs = s.items.sumOf { it.carbsG }
-                val totalFat = s.items.sumOf { it.fatG }
+        }
 
-                LazyColumn(
-                    modifier = Modifier
-                        .padding(innerPadding)
-                        .fillMaxSize(),
-                    contentPadding = PaddingValues(AzfSpacing.ContainerPadding)
-                ) {
-                    item {
-                        AzfCard(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = "${totalKcal.toInt()} KCAL",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = AzfColors.PrimaryFixedDim
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            MacroBar(
-                                label = "PROTEIN",
-                                consumed = totalProtein,
-                                target = 150.0,
-                                color = AzfColors.SecondaryFixedDim
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            MacroBar(
-                                label = "CARBS",
-                                consumed = totalCarbs,
-                                target = 200.0,
-                                color = AzfColors.PrimaryFixedDim
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            MacroBar(
-                                label = "FAT",
-                                consumed = totalFat,
-                                target = 70.0,
-                                color = AzfColors.Coral
-                            )
-                        }
+        items(state.items, key = { it.key }) { item ->
+            ReviewItemCard(
+                item = item,
+                editable = !state.confirmed,
+                onRename = { onRename(item.key, it) },
+                onGramsChange = { onGramsChange(item.key, it) },
+                onRemove = { onRemove(item.key) },
+            )
+        }
 
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Text(
-                            text = "IDENTIFIED ITEMS",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-
-                    items(s.items) { item ->
-                        AzfCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.name,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "${item.grams.toInt()}g • P: ${item.proteinG.toInt()}g C: ${item.carbsG.toInt()}g F: ${item.fatG.toInt()}g",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Text(
-                                    text = "${item.kcal.toInt()} kcal",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = AzfColors.PrimaryFixedDim
-                                )
-                            }
-                        }
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(24.dp))
-                        PrimaryButton(
-                            text = "CONFIRM & LOG MEAL",
-                            onClick = {
-                                viewModel.confirmMeal(s.job.mealType, s.items, onConfirmed = onBack)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
+        if (state.unlinkedItemCount > 0) {
+            item(key = "unlinked") {
+                InlineNotice(
+                    text = stringResource(R.string.analysis_unlinked_items),
+                    tone = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            is AnalysisState.Confirmed -> {
-                // Handled via callback
+        }
+
+        state.banner?.let { banner ->
+            item(key = "banner") {
+                InlineNotice(
+                    text = banner.message ?: banner.messageRes?.let { stringResource(it) }.orEmpty(),
+                    tone = MaterialTheme.colorScheme.error,
+                    assertive = true,
+                )
+            }
+        }
+
+        item(key = "gate") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(top = AzfSpacing.ElementGapMedium),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // The gate copy, verbatim. This sentence is the product promise.
+                Text(
+                    text = stringResource(R.string.analysis_gate_copy),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = stringResource(R.string.analysis_ai_disclaimer),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+                )
+                PrimaryButton(
+                    text = stringResource(
+                        when {
+                            state.confirmed -> R.string.analysis_already_logged
+                            state.confirming -> R.string.analysis_saving
+                            else -> R.string.analysis_confirm_cta
+                        },
+                    ),
+                    onClick = onConfirm,
+                    enabled = state.canConfirm,
+                    loading = state.confirming,
+                )
             }
         }
     }
 }
 
+@Composable
+private fun AnalysisSummaryCard(totals: ReviewTotals, mealType: MealType) {
+    AzfCard(tier = AzfCardTier.Hero) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.analysis_estimated_calories),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.analysis_kcal_value,
+                        NutritionFormat.fmtInt(totals.kcal),
+                    ),
+                    style = DataLarge,
+                    color = LocalAzfExtended.current.primaryFixedDim,
+                )
+                Text(
+                    text = stringResource(NutritionFormat.mealLabelRes(mealType)),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                MacroLine(R.string.macro_protein, totals.proteinG)
+                MacroLine(R.string.macro_carbs, totals.carbsG)
+                MacroLine(R.string.macro_fat, totals.fatG)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MacroLine(labelRes: Int, grams: Double) {
+    Text(
+        text = stringResource(
+            R.string.analysis_macro_line,
+            stringResource(labelRes),
+            NutritionFormat.fmt1(grams),
+        ),
+        style = DataSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun ReviewItemCard(
+    item: ReviewItem,
+    editable: Boolean,
+    onRename: (String) -> Unit,
+    onGramsChange: (Int) -> Unit,
+    onRemove: () -> Unit,
+) {
+    val computed = AnalysisReview.toMealLogItem(item)
+    AzfCard(tier = AzfCardTier.Standard) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            AzfTextField(
+                value = item.name,
+                onValueChange = onRename,
+                label = stringResource(R.string.analysis_item_name),
+                enabled = editable,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onRemove, enabled = editable) {
+                Icon(
+                    imageVector = Icons.Outlined.DeleteOutline,
+                    contentDescription = stringResource(R.string.analysis_remove_item, item.name),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AzfSpacing.ElementGapSmall),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            GramsStepper(grams = item.grams, onGramsChange = onGramsChange)
+            Text(
+                text = stringResource(
+                    R.string.analysis_kcal_value,
+                    NutritionFormat.fmtInt(computed.kcal),
+                ),
+                style = DataSmall,
+                color = LocalAzfExtended.current.primaryFixedDim,
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AzfSpacing.ElementGapSmall),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(
+                    R.string.analysis_macro_row,
+                    NutritionFormat.fmt1(computed.proteinG),
+                    NutritionFormat.fmt1(computed.carbsG),
+                    NutritionFormat.fmt1(computed.fatG),
+                ),
+                style = DataSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            item.confidence?.let { ConfidenceChip(confidence = it) }
+        }
+    }
+}
+
+/** Per-item confidence: ≥75% green High, ≥50% aqua Medium, else coral Low. */
+@Composable
+private fun ConfidenceChip(confidence: Double) {
+    val extended = LocalAzfExtended.current
+    val tier = AnalysisReview.tierOf(confidence)
+    val accent = when (tier) {
+        ConfidenceTier.High -> extended.secondaryFixedDim
+        ConfidenceTier.Medium -> extended.primaryFixedDim
+        ConfidenceTier.Low -> extended.coral
+    }
+    val tierLabel = stringResource(
+        when (tier) {
+            ConfidenceTier.High -> R.string.analysis_confidence_high
+            ConfidenceTier.Medium -> R.string.analysis_confidence_medium
+            ConfidenceTier.Low -> R.string.analysis_confidence_low
+        },
+    )
+    val label = stringResource(
+        R.string.analysis_confidence_pct,
+        tierLabel,
+        AnalysisReview.percent(confidence),
+    )
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = accent,
+        modifier = Modifier
+            .clip(AzfShapes.Pill)
+            .background(accent.copy(alpha = 0.15f))
+            .border(1.dp, accent.copy(alpha = 0.6f), AzfShapes.Pill)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
+}
+
+@Composable
+private fun InlineNotice(text: String, tone: Color, assertive: Boolean = false) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(AzfShapes.Inner)
+            .border(1.dp, tone.copy(alpha = 0.5f), AzfShapes.Inner)
+            .background(tone.copy(alpha = 0.08f))
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .semantics {
+                liveRegion = if (assertive) LiveRegionMode.Assertive else LiveRegionMode.Polite
+            },
+    ) {
+        Text(text = text, style = MaterialTheme.typography.bodySmall, color = tone)
+    }
+}
+
+/** Food search for an item the model missed. Adds to the list — never logs. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddItemSheet(
+    sheet: AddItemUi,
+    onDismiss: () -> Unit,
+    onTermChange: (String) -> Unit,
+    onSelectFood: (FoodDto) -> Unit,
+    onClearSelection: () -> Unit,
+    onGramsChange: (Int) -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = AzfSpacing.ContainerMargin)
+                .padding(bottom = AzfSpacing.ContainerMargin),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
+        ) {
+            Text(
+                text = stringResource(R.string.analysis_add_sheet_title),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+
+            val selected = sheet.selected
+            if (selected == null) {
+                AzfTextField(
+                    value = sheet.term,
+                    onValueChange = onTermChange,
+                    label = stringResource(R.string.analysis_add_sheet_search),
+                )
+                if (sheet.searching) {
+                    repeat(3) {
+                        Skeleton(modifier = Modifier.fillMaxWidth().height(48.dp))
+                    }
+                }
+                sheet.results.take(MAX_RESULTS).forEach { food ->
+                    AzfCard(tier = AzfCardTier.Compact) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = food.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = stringResource(
+                                        R.string.analysis_per_100g,
+                                        NutritionFormat.fmtInt(food.per100g.kcal),
+                                    ),
+                                    style = DataSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            TextButton(onClick = { onSelectFood(food) }) {
+                                Text(
+                                    text = stringResource(R.string.analysis_add_sheet_pick),
+                                    color = LocalAzfExtended.current.primaryFixedDim,
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = selected.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                GramsStepper(grams = sheet.grams, onGramsChange = onGramsChange)
+                val preview = AnalysisReview.toMealLogItem(
+                    AnalysisReview.fromFood(selected, sheet.grams, "preview"),
+                )
+                Text(
+                    text = stringResource(
+                        R.string.analysis_add_sheet_preview,
+                        NutritionFormat.fmtInt(preview.kcal),
+                        NutritionFormat.fmt1(preview.proteinG),
+                        NutritionFormat.fmt1(preview.carbsG),
+                        NutritionFormat.fmt1(preview.fatG),
+                    ),
+                    style = DataSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                PrimaryButton(
+                    text = stringResource(R.string.analysis_add_sheet_add),
+                    onClick = onConfirm,
+                )
+                SecondaryButton(
+                    text = stringResource(R.string.analysis_add_sheet_back),
+                    onClick = onClearSelection,
+                )
+            }
+        }
+    }
+}
+
+private const val MAX_RESULTS = 12
+
+// ---------------------------------------------------------------------------
+// Previews
+// ---------------------------------------------------------------------------
+
+private fun previewItems(): List<ReviewItem> = listOf(
+    ReviewItem(
+        key = "pred-0",
+        foodId = "food-salmon",
+        name = "Grilled salmon",
+        grams = 180,
+        perGram = PerGram(2.08, 0.2, 0.0, 0.13),
+        confidence = 0.86,
+    ),
+    ReviewItem(
+        key = "pred-1",
+        foodId = "food-rice",
+        name = "Brown rice",
+        grams = 150,
+        perGram = PerGram(1.11, 0.026, 0.23, 0.009),
+        confidence = 0.62,
+    ),
+    ReviewItem(
+        key = "pred-2",
+        foodId = null,
+        name = "Side salad",
+        grams = 80,
+        perGram = PerGram(0.2, 0.012, 0.03, 0.005),
+        confidence = 0.41,
+    ),
+)
+
+@Preview(showBackground = true, backgroundColor = 0xFF0E1416, heightDp = 900)
+@Composable
+private fun AnalysisReviewPreview() {
+    AzfTheme {
+        AnalysisContent(
+            state = AnalysisUiState(
+                jobId = "vj-preview",
+                phase = AnalysisPhase.Review,
+                mealType = MealType.DINNER,
+                items = previewItems(),
+                seeded = true,
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0E1416, heightDp = 640)
+@Composable
+private fun AnalysisScanningPreview() {
+    AzfTheme {
+        AnalysisContent(state = AnalysisUiState(jobId = "vj-preview"))
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0E1416, heightDp = 640)
+@Composable
+private fun AnalysisFailedPreview() {
+    AzfTheme {
+        AnalysisContent(
+            state = AnalysisUiState(
+                jobId = "vj-preview",
+                phase = AnalysisPhase.Failed,
+                jobErrorMessage = "We could not analyse this photo. You can still log the meal manually.",
+            ),
+        )
+    }
+}

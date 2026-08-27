@@ -2,11 +2,11 @@ package fit.aquazero.app.feature.nutrition
 
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.database.MealLogEntity
-import fit.aquazero.app.core.network.ApiResult
-import fit.aquazero.app.core.network.dto.DailyNutritionDto
-import fit.aquazero.app.core.network.dto.FoodDto
-import fit.aquazero.app.core.network.dto.MealLogItemDto
-import fit.aquazero.app.core.network.dto.MealType
+import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.DailyNutritionDto
+import fit.aquazero.app.core.model.FoodDto
+import fit.aquazero.app.core.model.MealLogItemDto
+import fit.aquazero.app.core.model.MealType
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

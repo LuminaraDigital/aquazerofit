@@ -1,7 +1,7 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.VisionConfirmResponseDto
-import fit.aquazero.app.core.network.dto.VisionJobEnvelopeDto
+import fit.aquazero.app.core.model.VisionConfirmResponseDto
+import fit.aquazero.app.core.model.VisionJobEnvelopeDto
 import okhttp3.MultipartBody
 import retrofit2.http.Body
 import retrofit2.http.Multipart
@@ -14,8 +14,8 @@ import kotlinx.serialization.Serializable
 /** Body for `POST /meal-photos/:jobId/confirm` — the user-edited item list. */
 @Serializable
 data class VisionConfirmRequest(
-    val items: List<fit.aquazero.app.core.network.dto.MealLogItemDto>,
-    val mealType: fit.aquazero.app.core.network.dto.MealType? = null,
+    val items: List<fit.aquazero.app.core.model.MealLogItemDto>,
+    val mealType: fit.aquazero.app.core.model.MealType? = null,
     val localDate: String? = null,
 )
 

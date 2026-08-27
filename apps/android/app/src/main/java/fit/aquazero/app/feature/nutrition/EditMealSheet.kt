@@ -36,8 +36,8 @@ import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.GramsStepper
 import fit.aquazero.app.core.designsystem.PrimaryButton
-import fit.aquazero.app.core.network.dto.MealLogItemDto
-import fit.aquazero.app.core.network.dto.MealType
+import fit.aquazero.app.core.model.MealLogItemDto
+import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.feature.dashboard.NutritionFormat
 
 /**

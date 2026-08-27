@@ -1,9 +1,9 @@
 package fit.aquazero.app.feature.nutrition
 
-import fit.aquazero.app.core.network.dto.Allergen
-import fit.aquazero.app.core.network.dto.FoodDto
-import fit.aquazero.app.core.network.dto.FoodNutrientsDto
-import fit.aquazero.app.core.network.dto.MealLogItemDto
+import fit.aquazero.app.core.model.Allergen
+import fit.aquazero.app.core.model.FoodDto
+import fit.aquazero.app.core.model.FoodNutrientsDto
+import fit.aquazero.app.core.model.MealLogItemDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

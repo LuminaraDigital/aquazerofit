@@ -1,9 +1,9 @@
 package fit.aquazero.app.feature.progress
 
-import fit.aquazero.app.core.network.dto.ConsistencyState
-import fit.aquazero.app.core.network.dto.ConsistencyStatusDto
-import fit.aquazero.app.core.network.dto.ProgressSummaryDto
-import fit.aquazero.app.core.network.dto.TrendPointDto
+import fit.aquazero.app.core.model.ConsistencyState
+import fit.aquazero.app.core.model.ConsistencyStatusDto
+import fit.aquazero.app.core.model.ProgressSummaryDto
+import fit.aquazero.app.core.model.TrendPointDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

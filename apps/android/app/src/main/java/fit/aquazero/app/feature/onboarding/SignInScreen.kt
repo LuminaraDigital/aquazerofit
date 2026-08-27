@@ -38,7 +38,7 @@ import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.revealOnEnter
-import fit.aquazero.app.core.network.ApiResult
+import fit.aquazero.app.core.model.ApiResult
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

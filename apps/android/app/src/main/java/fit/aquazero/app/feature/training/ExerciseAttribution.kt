@@ -2,7 +2,7 @@ package fit.aquazero.app.feature.training
 
 import fit.aquazero.app.BuildConfig
 import fit.aquazero.app.core.database.ExerciseMediaEntity
-import fit.aquazero.app.core.network.dto.ExerciseDto
+import fit.aquazero.app.core.model.ExerciseDto
 
 /**
  * CC-BY-SA attribution assembly (plan §5.6 / AQF-12).

@@ -3,11 +3,11 @@ package fit.aquazero.app.core.data
 import fit.aquazero.app.core.database.ProgressDao
 import fit.aquazero.app.core.database.ProgressSummaryEntity
 import fit.aquazero.app.core.database.TrendPointEntity
-import fit.aquazero.app.core.network.ApiResult
-import fit.aquazero.app.core.network.AzfJson
+import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.network.api.LogsApi
 import fit.aquazero.app.core.network.api.ProgressApi
-import fit.aquazero.app.core.network.dto.ProgressSummaryDto
+import fit.aquazero.app.core.model.ProgressSummaryDto
 import fit.aquazero.app.core.network.safeCall
 import javax.inject.Inject
 import javax.inject.Singleton

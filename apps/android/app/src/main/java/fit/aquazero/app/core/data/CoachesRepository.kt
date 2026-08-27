@@ -2,12 +2,12 @@ package fit.aquazero.app.core.data
 
 import fit.aquazero.app.core.database.CatalogDao
 import fit.aquazero.app.core.database.CoachEntity
-import fit.aquazero.app.core.network.ApiResult
+import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.network.api.CoachesApi
-import fit.aquazero.app.core.network.dto.CoachRosterDto
-import fit.aquazero.app.core.network.dto.CoachSelectRequest
-import fit.aquazero.app.core.network.dto.ProgressionStatusDto
-import fit.aquazero.app.core.network.dto.ReactionAckRequest
+import fit.aquazero.app.core.model.CoachRosterDto
+import fit.aquazero.app.core.model.CoachSelectRequest
+import fit.aquazero.app.core.model.ProgressionStatusDto
+import fit.aquazero.app.core.model.ReactionAckRequest
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow

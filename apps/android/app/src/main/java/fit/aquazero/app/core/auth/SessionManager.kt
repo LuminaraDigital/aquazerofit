@@ -1,11 +1,11 @@
 package fit.aquazero.app.core.auth
 
-import fit.aquazero.app.core.network.ApiResult
+import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.network.api.AuthApi
-import fit.aquazero.app.core.network.dto.LoginRequest
-import fit.aquazero.app.core.network.dto.LogoutRequest
-import fit.aquazero.app.core.network.dto.PublicUserDto
-import fit.aquazero.app.core.network.dto.RegisterRequest
+import fit.aquazero.app.core.model.LoginRequest
+import fit.aquazero.app.core.model.LogoutRequest
+import fit.aquazero.app.core.model.PublicUserDto
+import fit.aquazero.app.core.model.RegisterRequest
 import fit.aquazero.app.core.network.safeCall
 import javax.inject.Inject
 import javax.inject.Named
@@ -108,7 +108,7 @@ class SessionManager @Inject constructor(
     }
 
     private suspend fun installSession(
-        block: suspend () -> fit.aquazero.app.core.network.dto.AuthResponseDto,
+        block: suspend () -> fit.aquazero.app.core.model.AuthResponseDto,
     ): ApiResult<PublicUserDto> {
         val result = safeCall(block)
         return when (result) {

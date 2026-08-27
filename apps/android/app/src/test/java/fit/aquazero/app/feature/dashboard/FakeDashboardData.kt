@@ -2,13 +2,13 @@ package fit.aquazero.app.feature.dashboard
 
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.database.UserEntity
-import fit.aquazero.app.core.network.ApiResult
-import fit.aquazero.app.core.network.dto.DailyNutritionDto
-import fit.aquazero.app.core.network.dto.MealLogDto
-import fit.aquazero.app.core.network.dto.MealRecommendationDto
-import fit.aquazero.app.core.network.dto.MealType
-import fit.aquazero.app.core.network.dto.ProgressSummaryDto
-import fit.aquazero.app.core.network.dto.TodayWorkoutEnvelopeDto
+import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.DailyNutritionDto
+import fit.aquazero.app.core.model.MealLogDto
+import fit.aquazero.app.core.model.MealRecommendationDto
+import fit.aquazero.app.core.model.MealType
+import fit.aquazero.app.core.model.ProgressSummaryDto
+import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

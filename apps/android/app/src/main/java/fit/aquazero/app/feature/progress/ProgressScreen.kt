@@ -56,9 +56,9 @@ import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.revealOnEnter
-import fit.aquazero.app.core.network.dto.ConsistencyStatusDto
-import fit.aquazero.app.core.network.dto.ProgressSummaryDto
-import fit.aquazero.app.core.network.dto.TrendPointDto
+import fit.aquazero.app.core.model.ConsistencyStatusDto
+import fit.aquazero.app.core.model.ProgressSummaryDto
+import fit.aquazero.app.core.model.TrendPointDto
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale

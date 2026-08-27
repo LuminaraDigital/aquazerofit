@@ -1,7 +1,7 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.ProgressInsightDto
-import fit.aquazero.app.core.network.dto.ProgressSummaryDto
+import fit.aquazero.app.core.model.ProgressInsightDto
+import fit.aquazero.app.core.model.ProgressSummaryDto
 import retrofit2.http.GET
 import retrofit2.http.Query
 

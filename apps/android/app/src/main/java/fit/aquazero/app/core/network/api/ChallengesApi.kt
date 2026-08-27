@@ -1,9 +1,9 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.ChallengeEnvelopeDto
-import fit.aquazero.app.core.network.dto.ChallengesDto
-import fit.aquazero.app.core.network.dto.CreateChallengeRequest
-import fit.aquazero.app.core.network.dto.JoinChallengeRequest
+import fit.aquazero.app.core.model.ChallengeEnvelopeDto
+import fit.aquazero.app.core.model.ChallengesDto
+import fit.aquazero.app.core.model.CreateChallengeRequest
+import fit.aquazero.app.core.model.JoinChallengeRequest
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST

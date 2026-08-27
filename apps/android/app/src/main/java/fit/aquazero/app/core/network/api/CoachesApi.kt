@@ -1,9 +1,9 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.CoachRosterDto
-import fit.aquazero.app.core.network.dto.CoachSelectRequest
-import fit.aquazero.app.core.network.dto.ProgressionStatusDto
-import fit.aquazero.app.core.network.dto.ReactionAckRequest
+import fit.aquazero.app.core.model.CoachRosterDto
+import fit.aquazero.app.core.model.CoachSelectRequest
+import fit.aquazero.app.core.model.ProgressionStatusDto
+import fit.aquazero.app.core.model.ReactionAckRequest
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST

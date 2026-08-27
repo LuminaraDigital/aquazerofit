@@ -1,7 +1,7 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.PlanEnvelopeDto
-import fit.aquazero.app.core.network.dto.ReadinessEnvelopeDto
+import fit.aquazero.app.core.model.PlanEnvelopeDto
+import fit.aquazero.app.core.model.ReadinessEnvelopeDto
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.GET

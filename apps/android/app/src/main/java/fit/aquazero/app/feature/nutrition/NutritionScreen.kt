@@ -35,8 +35,8 @@ import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.revealOnEnter
-import fit.aquazero.app.core.network.dto.FoodDto
-import fit.aquazero.app.core.network.dto.MealType
+import fit.aquazero.app.core.model.FoodDto
+import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.feature.dashboard.CardSkeleton
 import fit.aquazero.app.feature.dashboard.HydrationCard
 import fit.aquazero.app.feature.dashboard.NutritionFormat

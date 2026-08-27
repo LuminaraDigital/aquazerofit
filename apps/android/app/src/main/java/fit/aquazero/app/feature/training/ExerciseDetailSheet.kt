@@ -49,8 +49,8 @@ import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
-import fit.aquazero.app.core.network.dto.Equipment
-import fit.aquazero.app.core.network.dto.ExerciseDto
+import fit.aquazero.app.core.model.Equipment
+import fit.aquazero.app.core.model.ExerciseDto
 
 /**
  * Exercise detail bottom sheet — the mobile form of the web's `BottomSheet`.

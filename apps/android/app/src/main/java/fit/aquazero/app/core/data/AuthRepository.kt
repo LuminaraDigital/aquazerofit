@@ -2,10 +2,10 @@ package fit.aquazero.app.core.data
 
 import fit.aquazero.app.core.auth.AuthState
 import fit.aquazero.app.core.auth.SessionManager
-import fit.aquazero.app.core.network.ApiResult
+import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.network.api.AuthApi
-import fit.aquazero.app.core.network.dto.PasswordResetRequest
-import fit.aquazero.app.core.network.dto.PublicUserDto
+import fit.aquazero.app.core.model.PasswordResetRequest
+import fit.aquazero.app.core.model.PublicUserDto
 import fit.aquazero.app.core.network.safeCall
 import fit.aquazero.app.core.sync.OutboxRepository
 import javax.inject.Inject

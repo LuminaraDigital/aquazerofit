@@ -79,7 +79,7 @@ import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.TabularNumbers
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.pressScale
-import fit.aquazero.app.core.network.dto.WorkoutSessionDto
+import fit.aquazero.app.core.model.WorkoutSessionDto
 
 /**
  * The guided workout session: overview → work → rest → … → summary.

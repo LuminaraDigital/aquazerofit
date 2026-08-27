@@ -15,7 +15,7 @@ import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material.icons.outlined.TableRows
 import androidx.compose.ui.graphics.vector.ImageVector
 import fit.aquazero.app.R
-import fit.aquazero.app.core.network.dto.Equipment
+import fit.aquazero.app.core.model.Equipment
 
 /** Filter chip vocabularies, mirroring the web library's fixed lists. */
 object ExerciseFilters {

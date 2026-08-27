@@ -1,8 +1,8 @@
 package fit.aquazero.app.feature.dashboard
 
-import fit.aquazero.app.core.network.dto.FoodDto
-import fit.aquazero.app.core.network.dto.FoodNutrientsDto
-import fit.aquazero.app.core.network.dto.MealType
+import fit.aquazero.app.core.model.FoodDto
+import fit.aquazero.app.core.model.FoodNutrientsDto
+import fit.aquazero.app.core.model.MealType
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Test

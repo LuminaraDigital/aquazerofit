@@ -1,7 +1,7 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.RecipeEnvelopeDto
-import fit.aquazero.app.core.network.dto.RecipesDto
+import fit.aquazero.app.core.model.RecipeEnvelopeDto
+import fit.aquazero.app.core.model.RecipesDto
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query

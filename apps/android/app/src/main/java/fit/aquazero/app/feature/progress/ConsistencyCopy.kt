@@ -2,8 +2,8 @@ package fit.aquazero.app.feature.progress
 
 import androidx.annotation.StringRes
 import fit.aquazero.app.R
-import fit.aquazero.app.core.network.dto.ConsistencyState
-import fit.aquazero.app.core.network.dto.ConsistencyStatusDto
+import fit.aquazero.app.core.model.ConsistencyState
+import fit.aquazero.app.core.model.ConsistencyStatusDto
 
 /**
  * The single, auditable vocabulary for consistency — a direct port of the

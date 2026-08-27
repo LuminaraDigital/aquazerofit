@@ -1,7 +1,7 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.ExerciseEnvelopeDto
-import fit.aquazero.app.core.network.dto.PagedExercisesDto
+import fit.aquazero.app.core.model.ExerciseEnvelopeDto
+import fit.aquazero.app.core.model.PagedExercisesDto
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query

@@ -1,6 +1,6 @@
 package fit.aquazero.app.core.auth
 
-import fit.aquazero.app.core.network.dto.RefreshRequest
+import fit.aquazero.app.core.model.RefreshRequest
 import fit.aquazero.app.core.network.api.AuthApi
 import java.io.IOException
 import javax.inject.Inject

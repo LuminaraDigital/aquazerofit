@@ -1,9 +1,9 @@
 package fit.aquazero.app.core.network.api
 
-import fit.aquazero.app.core.network.dto.MealLogEnvelopeDto
-import fit.aquazero.app.core.network.dto.MealRecommendationDto
-import fit.aquazero.app.core.network.dto.MealRecommendationRequest
-import fit.aquazero.app.core.network.dto.RecommendationFeedbackRequest
+import fit.aquazero.app.core.model.MealLogEnvelopeDto
+import fit.aquazero.app.core.model.MealRecommendationDto
+import fit.aquazero.app.core.model.MealRecommendationRequest
+import fit.aquazero.app.core.model.RecommendationFeedbackRequest
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.POST

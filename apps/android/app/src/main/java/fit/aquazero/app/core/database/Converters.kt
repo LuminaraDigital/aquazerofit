@@ -1,8 +1,8 @@
 package fit.aquazero.app.core.database
 
 import androidx.room3.ColumnTypeConverter
-import fit.aquazero.app.core.network.AzfJson
-import fit.aquazero.app.core.network.dto.MealLogItemDto
+import fit.aquazero.app.core.model.AzfJson
+import fit.aquazero.app.core.model.MealLogItemDto
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 

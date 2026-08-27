@@ -48,10 +48,10 @@ import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.pressScale
-import fit.aquazero.app.core.network.dto.FoodDto
-import fit.aquazero.app.core.network.dto.FoodNutrientsDto
-import fit.aquazero.app.core.network.dto.FoodServingDto
-import fit.aquazero.app.core.network.dto.MealType
+import fit.aquazero.app.core.model.FoodDto
+import fit.aquazero.app.core.model.FoodNutrientsDto
+import fit.aquazero.app.core.model.FoodServingDto
+import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.feature.dashboard.NutritionFormat
 
 /**

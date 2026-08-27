@@ -37,7 +37,7 @@ import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
-import fit.aquazero.app.core.network.dto.TrendPointDto
+import fit.aquazero.app.core.model.TrendPointDto
 import kotlin.math.max
 import kotlin.math.roundToInt
 

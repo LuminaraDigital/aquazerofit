@@ -47,9 +47,9 @@ import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.DataLarge
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
-import fit.aquazero.app.core.network.dto.AchievementStatusDto
-import fit.aquazero.app.core.network.dto.ConsistencyStatusDto
-import fit.aquazero.app.core.network.dto.ProgressInsightDto
+import fit.aquazero.app.core.model.AchievementStatusDto
+import fit.aquazero.app.core.model.ConsistencyStatusDto
+import fit.aquazero.app.core.model.ProgressInsightDto
 
 /** Compact cumulative metric tile. Nothing here can be reset by a missed day. */
 @Composable

@@ -65,8 +65,8 @@ import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.revealOnEnter
-import fit.aquazero.app.core.network.dto.Equipment
-import fit.aquazero.app.core.network.dto.PlanDayDto
+import fit.aquazero.app.core.model.Equipment
+import fit.aquazero.app.core.model.PlanDayDto
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle as JavaTextStyle

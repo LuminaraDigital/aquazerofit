@@ -2,9 +2,9 @@ package fit.aquazero.app.feature.nutrition
 
 import androidx.annotation.StringRes
 import fit.aquazero.app.R
-import fit.aquazero.app.core.network.dto.Allergen
-import fit.aquazero.app.core.network.dto.FoodDto
-import fit.aquazero.app.core.network.dto.MealLogItemDto
+import fit.aquazero.app.core.model.Allergen
+import fit.aquazero.app.core.model.FoodDto
+import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.feature.dashboard.NutritionFormat
 import kotlin.math.roundToInt
 

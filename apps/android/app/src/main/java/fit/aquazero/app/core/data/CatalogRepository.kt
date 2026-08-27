@@ -5,16 +5,16 @@ import fit.aquazero.app.core.database.ExerciseEntity
 import fit.aquazero.app.core.database.ExerciseMediaEntity
 import fit.aquazero.app.core.database.FoodEntity
 import fit.aquazero.app.core.database.RecipeEntity
-import fit.aquazero.app.core.network.ApiResult
-import fit.aquazero.app.core.network.AzfJson
+import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.network.api.ExercisesApi
 import fit.aquazero.app.core.network.api.FoodsApi
 import fit.aquazero.app.core.network.api.RecipesApi
-import fit.aquazero.app.core.network.dto.ExerciseDto
-import fit.aquazero.app.core.network.dto.FoodDto
-import fit.aquazero.app.core.network.dto.RecipeDto
-import fit.aquazero.app.core.network.getOrNull
-import fit.aquazero.app.core.network.map
+import fit.aquazero.app.core.model.ExerciseDto
+import fit.aquazero.app.core.model.FoodDto
+import fit.aquazero.app.core.model.RecipeDto
+import fit.aquazero.app.core.model.getOrNull
+import fit.aquazero.app.core.model.map
 import fit.aquazero.app.core.network.safeCall
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -155,12 +155,12 @@ class CatalogRepository @Inject constructor(
     )
 
     private fun ExerciseDto.difficultyName(): String = when (difficulty) {
-        fit.aquazero.app.core.network.dto.ExerciseExperience.BEGINNER -> "beginner"
-        fit.aquazero.app.core.network.dto.ExerciseExperience.INTERMEDIATE -> "intermediate"
-        fit.aquazero.app.core.network.dto.ExerciseExperience.ADVANCED -> "advanced"
+        fit.aquazero.app.core.model.ExerciseExperience.BEGINNER -> "beginner"
+        fit.aquazero.app.core.model.ExerciseExperience.INTERMEDIATE -> "intermediate"
+        fit.aquazero.app.core.model.ExerciseExperience.ADVANCED -> "advanced"
     }
 
-    private fun fit.aquazero.app.core.network.dto.ExerciseMediaDto.toEntity(
+    private fun fit.aquazero.app.core.model.ExerciseMediaDto.toEntity(
         exerciseId: String,
     ): ExerciseMediaEntity = ExerciseMediaEntity(
         exerciseId = exerciseId,

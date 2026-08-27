@@ -6,12 +6,12 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.data.PlansRepository
-import fit.aquazero.app.core.network.ApiResult
-import fit.aquazero.app.core.network.AzfJson
+import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.network.api.CompleteWorkoutRequest
 import fit.aquazero.app.core.network.api.CompletedExerciseInput
-import fit.aquazero.app.core.network.dto.SetLogDto
-import fit.aquazero.app.core.network.dto.WorkoutSessionDto
+import fit.aquazero.app.core.model.SetLogDto
+import fit.aquazero.app.core.model.WorkoutSessionDto
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.roundToInt

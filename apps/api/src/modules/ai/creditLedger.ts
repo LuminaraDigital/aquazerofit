@@ -14,6 +14,7 @@
  * Nothing is ever mutated or deleted — settlement state is derived from the
  * presence of commit/release docs referencing the reservationId.
  */
+import crypto from 'node:crypto';
 import { AppError } from '../../platform/errors';
 import { store } from '../../platform/store';
 import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS } from '@aquazerofit/shared';
@@ -30,12 +31,18 @@ export interface LedgerContainer {
   delete(id: string): unknown;
 }
 
-let idCounter = 0;
+/**
+ * Transaction id, and — via `res_${txId()}` — the reservation id a caller
+ * holds between reserve and commit.
+ *
+ * crypto.randomUUID, not a timestamp counter: a reservation id is a bearer
+ * handle to somebody's credit balance, and the old shape (Date.now() in
+ * base36, a module counter, four base36 characters of Math.random()) was
+ * about twenty bits of non-cryptographic entropy on a known timestamp, with
+ * the counter leaking how many transactions the process had written.
+ */
 function txId(): string {
-  idCounter = (idCounter + 1) % 1_679_616;
-  return `ct_${Date.now().toString(36)}${idCounter.toString(36).padStart(4, '0')}${Math.random()
-    .toString(36)
-    .slice(2, 6)}`;
+  return `ct_${crypto.randomUUID()}`;
 }
 
 function todayIsoDate(): string {
@@ -48,6 +55,53 @@ export interface CreditLedger {
   reserve(userId: string, task: CreditTask): Promise<string>;
   commit(reservationId: string): Promise<boolean>;
   release(reservationId: string): Promise<boolean>;
+}
+
+/**
+ * Serialises credit mutations for one key (a userId, or a reservationId).
+ *
+ * `reserve` is a read-modify-write: grant, fold the balance, check it, append
+ * the hold. Nothing between those steps stopped a second concurrent request
+ * from reading the same balance and spending it too. It has not misbehaved in
+ * production for one reason only — the store serves reads synchronously from
+ * memory, so despite the `await`s the whole function completes inside a single
+ * microtask drain and never actually suspends.
+ *
+ * That is an accident of the storage backing, not a property of this code, and
+ * it expires the moment any one of three things happens: the async-store
+ * refactor lands (`platform/store.ts` names it as pending work), a genuine
+ * `await` is added between the read and the write, or the daily grant is moved
+ * behind a real query. Each would turn a dormant double-spend into a live one,
+ * and the first is a change someone will make for unrelated reasons.
+ *
+ * So the atomicity is stated here rather than inherited. Chaining per key
+ * costs nothing while requests do not overlap and is correct when they do.
+ *
+ * SCOPE: this is a per-PROCESS lock, which is exactly right today —
+ * `assertSingleInstance()` refuses to boot a second serving process. If that
+ * guard is ever lifted, this must become a database-level guarantee (a unique
+ * constraint on the daily grant, and a conditional write for the hold, in the
+ * shape of `pgStore.compareAndSwapRefreshToken`). A per-process lock across
+ * two instances is not a lock.
+ */
+const keyLocks = new Map<string, Promise<unknown>>();
+
+function withKeyLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = keyLocks.get(key) ?? Promise.resolve();
+  // `fn` runs whether the previous holder resolved or threw: one caller's
+  // failure must not strand everyone queued behind it.
+  const result = prev.then(fn, fn);
+  const tail = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  keyLocks.set(key, tail);
+  // Drop the entry once nobody is queued behind us, so the map cannot grow
+  // one permanent record per user who ever spent a credit.
+  void tail.finally(() => {
+    if (keyLocks.get(key) === tail) keyLocks.delete(key);
+  });
+  return result;
 }
 
 export function createCreditLedger(getContainer: () => LedgerContainer): CreditLedger {
@@ -71,9 +125,15 @@ export function createCreditLedger(getContainer: () => LedgerContainer): CreditL
     return Array.isArray(rows) ? rows : [];
   }
 
-  return {
-    /** One FREE_TIER_DAILY_CREDITS grant per user per UTC day. */
-    async grantDailyIfNeeded(userId: string): Promise<boolean> {
+  /**
+   * The grant, WITHOUT taking the lock.
+   *
+   * Separate because `reserveUnlocked` calls it while already holding the
+   * user's lock, and the lock is not reentrant — going through the public
+   * method there would wait on a chain this call is itself the head of, and
+   * deadlock every credit spend for that user.
+   */
+  async function grantDailyUnlocked(userId: string): Promise<boolean> {
       const today = todayIsoDate();
       const txs = await userTxs(userId);
       const alreadyGranted = txs.some(
@@ -90,22 +150,21 @@ export function createCreditLedger(getContainer: () => LedgerContainer): CreditL
         createdAt: new Date().toISOString(),
       });
       return true;
-    },
+  }
 
-    /** Balance = fold. No cached counters, ever. */
-    async balance(userId: string): Promise<number> {
-      const txs = await userTxs(userId);
-      return txs.reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0);
-    },
+  async function balanceUnlocked(userId: string): Promise<number> {
+    const txs = await userTxs(userId);
+    return txs.reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0);
+  }
 
-    /** Hold the cost of a task; returns the reservationId to commit/release. */
-    async reserve(userId: string, task: CreditTask): Promise<string> {
+  /** The hold, WITHOUT taking the lock. See [grantDailyUnlocked]. */
+  async function reserveUnlocked(userId: string, task: CreditTask): Promise<string> {
       const cost = CREDIT_COSTS[task];
       if (typeof cost !== 'number') {
         throw new AppError('VALIDATION_FAILED', `Unknown credit task: ${String(task)}`);
       }
-      await this.grantDailyIfNeeded(userId);
-      const available = await this.balance(userId);
+    await grantDailyUnlocked(userId);
+    const available = await balanceUnlocked(userId);
       if (available < cost) {
         throw new AppError(
           'CREDITS_INSUFFICIENT',
@@ -125,6 +184,34 @@ export function createCreditLedger(getContainer: () => LedgerContainer): CreditL
         createdAt: new Date().toISOString(),
       });
       return reservationId;
+  }
+
+  return {
+    /**
+     * One FREE_TIER_DAILY_CREDITS grant per user per UTC day.
+     * Serialised per user so two simultaneous requests cannot both decide the
+     * grant is missing and issue it.
+     */
+    grantDailyIfNeeded(userId: string): Promise<boolean> {
+      return withKeyLock(userId, () => grantDailyUnlocked(userId));
+    },
+
+    /** Balance = fold. No cached counters, ever. */
+    balance(userId: string): Promise<number> {
+      // Read-only, so it needs no lock of its own — but it queues behind any
+      // in-flight mutation for this user, which is what makes a balance read
+      // taken immediately after a spend reflect it.
+      return withKeyLock(userId, () => balanceUnlocked(userId));
+    },
+
+    /**
+     * Hold the cost of a task; returns the reservationId to commit/release.
+     * Serialised per user: the read of the balance and the write of the hold
+     * are one critical section, so two concurrent turns cannot both see the
+     * same credits and spend them.
+     */
+    reserve(userId: string, task: CreditTask): Promise<string> {
+      return withKeyLock(userId, () => reserveUnlocked(userId, task));
     },
 
     /** Settle a reservation as spent. Idempotent; no-op when already settled. */

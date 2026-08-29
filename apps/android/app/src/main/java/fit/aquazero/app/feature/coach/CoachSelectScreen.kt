@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,7 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -44,8 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
-import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfAppHeader
+import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
@@ -76,7 +75,7 @@ fun CoachSelectScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val toasts = rememberToastSink()
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     val switchFailed = stringResource(R.string.coach_select_failed)
 
@@ -87,7 +86,7 @@ fun CoachSelectScreen(
                 CoachSelectEvent.OpenChat -> onBack()
                 CoachSelectEvent.SwitchFailed -> toasts.show(switchFailed, ToastKind.Error)
                 is CoachSelectEvent.StillLocked -> toasts.show(
-                    context.getString(
+                    resources.getString(
                         R.string.coach_locked_toast,
                         event.coachName,
                         event.level,

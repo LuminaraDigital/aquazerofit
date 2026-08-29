@@ -45,10 +45,10 @@ import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.ChatMealDraftDto
+import fit.aquazero.app.core.model.ChatMealDraftStatus
 import fit.aquazero.app.core.model.ChatMealItemDto
 import fit.aquazero.app.core.model.ChatMealItemStatus
 import fit.aquazero.app.core.model.ChatMealMatchDto
-import fit.aquazero.app.core.model.ChatMealDraftStatus
 import fit.aquazero.app.core.model.GramsBasis
 import fit.aquazero.app.core.model.MealType
 
@@ -517,6 +517,9 @@ internal fun allergenLabel(allergen: Allergen): String = when (allergen) {
 // Previews
 // ---------------------------------------------------------------------------
 
+// A preview fixture: length here is the size of the sample payload, not
+// complexity. Splitting it up would only scatter one literal object.
+@Suppress("LongMethod")
 private fun previewDraft(): ChatMealDraftDto = ChatMealDraftDto(
     id = "draft1",
     userId = "u1",

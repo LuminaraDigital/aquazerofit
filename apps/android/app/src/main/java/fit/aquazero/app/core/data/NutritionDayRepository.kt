@@ -1,15 +1,13 @@
 package fit.aquazero.app.core.data
 
-import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.common.DailyNutritionCalculator
+import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.database.LogsDao
 import fit.aquazero.app.core.database.MealLogEntity
 import fit.aquazero.app.core.database.OutboxEntityTypes
 import fit.aquazero.app.core.database.SyncState
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
-import fit.aquazero.app.core.network.api.LogsApi
-import fit.aquazero.app.core.network.api.RecommendationsApi
 import fit.aquazero.app.core.model.DailyNutritionDto
 import fit.aquazero.app.core.model.MealLogDto
 import fit.aquazero.app.core.model.MealLogItemDto
@@ -18,6 +16,8 @@ import fit.aquazero.app.core.model.MealRecommendationRequest
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.UpdateMealLogRequest
 import fit.aquazero.app.core.model.map
+import fit.aquazero.app.core.network.api.LogsApi
+import fit.aquazero.app.core.network.api.RecommendationsApi
 import fit.aquazero.app.core.network.safeCall
 import javax.inject.Inject
 import javax.inject.Singleton

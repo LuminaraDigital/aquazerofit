@@ -12,7 +12,6 @@ import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.MealRecommendationDto
 import fit.aquazero.app.core.model.WorkoutSessionStatus
-import javax.inject.Inject
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Coarse load phase of the day's nutrition (skeleton / content / retry). */
 enum class DashboardPhase { Loading, Ready, Error }
@@ -152,7 +152,10 @@ class DashboardViewModel @Inject constructor(
         }
         viewModelScope.launch {
             data.user().collect { user ->
-                _uiState.update { it.copy(firstName = user?.displayName?.trim()?.substringBefore(' ')?.takeIf(String::isNotEmpty)) }
+                val firstName = user?.displayName?.trim()
+                    ?.substringBefore(' ')
+                    ?.takeIf(String::isNotEmpty)
+                _uiState.update { it.copy(firstName = firstName) }
             }
         }
         viewModelScope.launch {
@@ -218,7 +221,8 @@ class DashboardViewModel @Inject constructor(
                                     ?.let(NutritionFormat::estimateDurationMinutes) ?: 0,
                                 kcalBurned = session?.kcalBurned,
                                 completed = session?.status == WorkoutSessionStatus.COMPLETED,
-                                rest = envelope.data.rest || session == null ||
+                                rest = envelope.data.rest ||
+                                    session == null ||
                                     session.focus.contains("rest", ignoreCase = true),
                             ),
                         )

@@ -5,18 +5,18 @@ import fit.aquazero.app.core.database.TrainingPlanEntity
 import fit.aquazero.app.core.database.WorkoutSessionEntity
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
+import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
+import fit.aquazero.app.core.model.TrainingPlanDto
+import fit.aquazero.app.core.model.WorkoutSessionDto
 import fit.aquazero.app.core.network.api.CompleteWorkoutRequest
 import fit.aquazero.app.core.network.api.GeneratePlanRequest
 import fit.aquazero.app.core.network.api.PlansApi
 import fit.aquazero.app.core.network.api.SwapExerciseRequest
 import fit.aquazero.app.core.network.api.WorkoutsApi
-import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
-import fit.aquazero.app.core.model.TrainingPlanDto
-import fit.aquazero.app.core.model.WorkoutSessionDto
 import fit.aquazero.app.core.network.safeCall
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Training plans + today's workout. Plan generation is an online-only AI

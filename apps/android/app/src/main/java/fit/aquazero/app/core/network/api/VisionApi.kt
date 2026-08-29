@@ -2,14 +2,14 @@ package fit.aquazero.app.core.network.api
 
 import fit.aquazero.app.core.model.VisionConfirmResponseDto
 import fit.aquazero.app.core.model.VisionJobEnvelopeDto
+import kotlinx.serialization.Serializable
 import okhttp3.MultipartBody
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
-import retrofit2.http.GET
 import retrofit2.http.Part
 import retrofit2.http.Path
-import kotlinx.serialization.Serializable
 
 /** Body for `POST /meal-photos/:jobId/confirm` — the user-edited item list. */
 @Serializable

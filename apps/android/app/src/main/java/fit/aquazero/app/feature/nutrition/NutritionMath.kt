@@ -19,8 +19,12 @@ data class Micronutrients(
 ) {
     /** True when nothing logged today carried micronutrient data. */
     val isEmpty: Boolean
-        get() = fiberG == 0.0 && sugarG == 0.0 && sodiumMg == 0 &&
-            potassiumMg == 0 && calciumMg == 0 && ironMg == 0.0
+        get() = fiberG == 0.0 &&
+            sugarG == 0.0 &&
+            sodiumMg == 0 &&
+            potassiumMg == 0 &&
+            calciumMg == 0 &&
+            ironMg == 0.0
 }
 
 /**

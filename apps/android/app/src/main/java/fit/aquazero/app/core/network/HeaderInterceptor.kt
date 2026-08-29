@@ -1,11 +1,11 @@
 package fit.aquazero.app.core.network
 
+import okhttp3.Interceptor
+import okhttp3.Response
 import java.util.Locale
 import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
-import okhttp3.Interceptor
-import okhttp3.Response
 
 /**
  * Adds the standing headers to every request:

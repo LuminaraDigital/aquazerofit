@@ -17,10 +17,10 @@ import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.feature.dashboard.NutritionFormat
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /** One point of a daily series (kcal bars, calendar dots). */
 data class DayValue(val date: String, val value: Double)

@@ -18,7 +18,6 @@ import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
 import fit.aquazero.app.feature.settings.reminders.ReminderPrefsStore
 import fit.aquazero.app.feature.settings.reminders.ReminderScheduler
-import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Which half of the setup flow is on screen. */
 enum class SetupPhase { FORM, REVEAL }
@@ -59,7 +59,9 @@ data class SetupUiState(
 ) {
     /** True once every required control has an answer. */
     val isComplete: Boolean
-        get() = age.isNotBlank() && goal != null && activityLevel != null &&
+        get() = age.isNotBlank() &&
+            goal != null &&
+            activityLevel != null &&
             (if (unit == UnitPreference.IMPERIAL) heightFt.isNotBlank() else heightCm.isNotBlank()) &&
             weight.isNotBlank()
 }

@@ -7,17 +7,17 @@ import fit.aquazero.app.core.database.UserDao
 import fit.aquazero.app.core.database.UserEntity
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
-import fit.aquazero.app.core.network.api.MeApi
 import fit.aquazero.app.core.model.ConsentStateDto
 import fit.aquazero.app.core.model.ConsentUpdateRequest
 import fit.aquazero.app.core.model.DerivedTargetsDto
 import fit.aquazero.app.core.model.ProfileInputDto
 import fit.aquazero.app.core.model.PublicUserDto
 import fit.aquazero.app.core.model.WellnessProfileDto
+import fit.aquazero.app.core.network.api.MeApi
 import fit.aquazero.app.core.network.safeCall
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Account, wellness profile, derived targets and consents. Server-owned,

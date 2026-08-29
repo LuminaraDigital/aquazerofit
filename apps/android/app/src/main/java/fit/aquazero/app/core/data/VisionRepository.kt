@@ -8,21 +8,15 @@ import android.media.ExifInterface
 import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import fit.aquazero.app.core.model.ApiResult
-import fit.aquazero.app.core.network.api.LogsApi
-import fit.aquazero.app.core.network.api.VisionApi
-import fit.aquazero.app.core.network.api.VisionConfirmRequest
 import fit.aquazero.app.core.model.MealDayDto
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.VisionJobDto
 import fit.aquazero.app.core.model.map
+import fit.aquazero.app.core.network.api.LogsApi
+import fit.aquazero.app.core.network.api.VisionApi
+import fit.aquazero.app.core.network.api.VisionConfirmRequest
 import fit.aquazero.app.core.network.safeCall
-import java.io.File
-import java.io.IOException
-import java.util.Locale
-import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
@@ -31,6 +25,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
+import java.io.IOException
+import java.util.Locale
+import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Client-side meal-photo rules, mirroring the shared constants

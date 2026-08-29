@@ -25,7 +25,6 @@ import fit.aquazero.app.core.network.api.ProfileEnvelopeDto
 import fit.aquazero.app.core.network.api.TargetsEnvelopeDto
 import fit.aquazero.app.core.network.api.UpdateIdentityRequest
 import fit.aquazero.app.core.network.api.UserEnvelopeDto
-import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import okhttp3.MediaType.Companion.toMediaType
@@ -33,6 +32,7 @@ import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.HttpException
 import retrofit2.Response
+import java.io.IOException
 
 /**
  * Hand-written doubles for the settings lane: no Retrofit, no Room, no Hilt.

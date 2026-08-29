@@ -4,16 +4,16 @@ import fit.aquazero.app.core.model.RefreshRequest
 import fit.aquazero.app.core.network.RefreshOutcome
 import fit.aquazero.app.core.network.TokenRefresher
 import fit.aquazero.app.core.network.api.AuthApi
-import java.io.IOException
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
+import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Named
+import javax.inject.Singleton
 
 /** One-shot auth signals; the shell reacts to [ForcedLogout]. */
 sealed interface AuthEvent {

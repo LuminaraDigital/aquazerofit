@@ -7,10 +7,10 @@ import fit.aquazero.app.core.model.DailyNutritionDto
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
-import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 
 /** Hand-written [NutritionData] double — no Room, no WorkManager, no network. */
 class FakeNutritionData : NutritionData {

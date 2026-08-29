@@ -5,10 +5,10 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import fit.aquazero.app.core.sync.WorkManagerSyncScheduler
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import javax.inject.Inject
 
 /**
  * Application entry point. Registers the Hilt-aware [androidx.work.WorkerFactory]

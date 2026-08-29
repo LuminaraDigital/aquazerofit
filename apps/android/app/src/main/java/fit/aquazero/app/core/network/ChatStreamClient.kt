@@ -3,9 +3,6 @@ package fit.aquazero.app.core.network
 import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.model.ChatMessageDto
 import fit.aquazero.app.core.model.ChatSendRequest
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -20,6 +17,9 @@ import okhttp3.Response
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
+import javax.inject.Inject
+import javax.inject.Named
+import javax.inject.Singleton
 
 /**
  * One frame of the chat stream, per the API's SSE contract

@@ -3,15 +3,15 @@ package fit.aquazero.app.core.data
 import fit.aquazero.app.core.auth.AuthState
 import fit.aquazero.app.core.auth.SessionManager
 import fit.aquazero.app.core.model.ApiResult
-import fit.aquazero.app.core.network.api.AuthApi
 import fit.aquazero.app.core.model.PasswordResetRequest
 import fit.aquazero.app.core.model.PublicUserDto
+import fit.aquazero.app.core.network.api.AuthApi
 import fit.aquazero.app.core.network.safeCall
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Feature-facing auth surface. Screens talk to this; [SessionManager] owns

@@ -15,11 +15,11 @@ import fit.aquazero.app.core.database.OutboxOpTypes
 import fit.aquazero.app.core.database.SyncState
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
-import fit.aquazero.app.core.network.api.LogsApi
 import fit.aquazero.app.core.model.CreateMealLogRequest
 import fit.aquazero.app.core.model.CreateWaterLogRequest
 import fit.aquazero.app.core.model.CreateWeightLogRequest
 import fit.aquazero.app.core.model.UpdateMealLogRequest
+import fit.aquazero.app.core.network.api.LogsApi
 import fit.aquazero.app.core.network.safeCall
 
 /**

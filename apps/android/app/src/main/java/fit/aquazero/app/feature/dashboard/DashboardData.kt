@@ -18,10 +18,10 @@ import fit.aquazero.app.core.model.MealRecommendationDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.ProgressSummaryDto
 import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Everything the dashboard reads or writes, expressed as one narrow port over

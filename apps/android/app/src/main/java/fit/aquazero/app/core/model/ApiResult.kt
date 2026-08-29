@@ -1,7 +1,7 @@
 package fit.aquazero.app.core.model
 
-import java.io.IOException
 import kotlinx.serialization.json.JsonElement
+import java.io.IOException
 
 /**
  * Result wrapper for every API call. [Failure.Api] maps the server's error

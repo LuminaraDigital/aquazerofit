@@ -19,12 +19,12 @@ import fit.aquazero.app.core.model.CreateWaterLogRequest
 import fit.aquazero.app.core.model.CreateWeightLogRequest
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 
 /**
  * Offline-first log writes (plan §4.2): Room first (optimistic, PENDING),

@@ -1,8 +1,8 @@
 package fit.aquazero.app.feature.coach
 
-import fit.aquazero.app.core.network.ChatStreamEvent
 import fit.aquazero.app.core.model.ChatMessageDto
 import fit.aquazero.app.core.model.ChatRole
+import fit.aquazero.app.core.network.ChatStreamEvent
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 

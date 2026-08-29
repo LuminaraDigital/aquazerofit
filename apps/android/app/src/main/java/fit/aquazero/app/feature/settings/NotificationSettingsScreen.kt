@@ -26,15 +26,15 @@ import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerState
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -62,6 +63,7 @@ import fit.aquazero.app.core.designsystem.AzfSwitchRow
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.ToastKind
+import fit.aquazero.app.core.designsystem.currentLocale
 import fit.aquazero.app.feature.dashboard.rememberToastSink
 import fit.aquazero.app.feature.settings.reminders.ReminderPrefs
 import fit.aquazero.app.feature.settings.reminders.TimeOfDay
@@ -97,6 +99,7 @@ fun NotificationSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val toasts = rememberToastSink()
     var timeTarget by remember { mutableStateOf<TimeTarget?>(null) }
 
@@ -108,7 +111,7 @@ fun NotificationSettingsScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is NotificationSettingsEvent.Message -> toasts.show(
-                    context.getString(event.messageRes),
+                    resources.getString(event.messageRes),
                     if (event.isError) ToastKind.Error else ToastKind.Success,
                 )
                 NotificationSettingsEvent.RequestPermission -> {
@@ -275,9 +278,10 @@ fun NotificationSettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
+                        val locale = currentLocale()
                         DayOfWeek.entries.forEach { day ->
                             AzfChip(
-                                text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                                text = day.getDisplayName(TextStyle.SHORT, locale),
                                 selected = state.prefs.weighInDay == day,
                                 onClick = { viewModel.setWeighInDay(day) },
                             )

@@ -1,8 +1,8 @@
 package fit.aquazero.app.feature.nutrition
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +47,7 @@ import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
+import fit.aquazero.app.core.designsystem.currentLocale
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -132,9 +133,10 @@ internal fun AquaCalendarPicker(
             Spacer(Modifier.height(8.dp))
 
             Row(modifier = Modifier.fillMaxWidth()) {
+                val locale = currentLocale()
                 WEEK_START_ORDER.forEach { day ->
                     Text(
-                        text = day.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+                        text = day.getDisplayName(TextStyle.NARROW, locale),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -191,7 +193,15 @@ private fun DayCell(
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .alpha(if (!enabled) 0.3f else if (inMonth) 1f else 0.5f)
+            .alpha(
+                if (!enabled) {
+                    0.3f
+                } else if (inMonth) {
+                    1f
+                } else {
+                    0.5f
+                },
+            )
             .clip(AzfShapes.Inner)
             .background(
                 if (selected) accent.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceContainerLow,

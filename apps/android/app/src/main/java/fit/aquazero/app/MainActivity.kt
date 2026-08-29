@@ -1,6 +1,5 @@
 package fit.aquazero.app
 
-import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -13,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 import fit.aquazero.app.core.designsystem.AzfTheme
+import android.graphics.Color as AndroidColor
 
 /**
  * The single activity. Installs the splash screen, goes edge-to-edge with

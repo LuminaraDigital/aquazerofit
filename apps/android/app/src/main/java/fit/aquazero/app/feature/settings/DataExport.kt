@@ -33,7 +33,10 @@ fun Context.shareDataExport(json: String): Boolean {
     }
     val chooser = Intent.createChooser(send, getString(R.string.settings_export_share_title))
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    return runCatching { startActivity(chooser); true }.getOrDefault(false)
+    return runCatching {
+        startActivity(chooser)
+        true
+    }.getOrDefault(false)
 }
 
 /**

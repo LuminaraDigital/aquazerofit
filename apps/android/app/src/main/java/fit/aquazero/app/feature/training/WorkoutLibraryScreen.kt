@@ -1,8 +1,8 @@
 package fit.aquazero.app.feature.training
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,7 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -54,8 +54,8 @@ import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfChip
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
-import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.AzfTextField
+import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.ErrorState
@@ -64,13 +64,13 @@ import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastController
+import fit.aquazero.app.core.designsystem.currentLocale
 import fit.aquazero.app.core.designsystem.revealOnEnter
 import fit.aquazero.app.core.model.Equipment
 import fit.aquazero.app.core.model.PlanDayDto
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle as JavaTextStyle
-import java.util.Locale
 
 /**
  * Workout library — the Workouts tab.
@@ -88,19 +88,19 @@ fun WorkoutLibraryScreen(
     toastController: ToastController? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(viewModel, toastController) {
         if (toastController == null) return@LaunchedEffect
         viewModel.events.collect { event ->
             when (event) {
                 is WorkoutLibraryEvent.PlanGenerated ->
-                    toastController.success(context.getString(R.string.training_generate_done))
+                    toastController.success(resources.getString(R.string.training_generate_done))
                 is WorkoutLibraryEvent.PlanGenerationOffline ->
-                    toastController.info(context.getString(R.string.training_generate_offline))
+                    toastController.info(resources.getString(R.string.training_generate_offline))
                 is WorkoutLibraryEvent.PlanGenerationFailed ->
                     toastController.error(
-                        event.message ?: context.getString(R.string.training_generate_failed),
+                        event.message ?: resources.getString(R.string.training_generate_failed),
                     )
             }
         }
@@ -411,6 +411,7 @@ private fun PlanWeekStrip(
     val todayWord = stringResource(R.string.training_day_today)
     val completedWord = stringResource(R.string.training_day_completed)
     val restWord = stringResource(R.string.training_day_rest)
+    val locale = currentLocale()
 
     Row(
         modifier = modifier
@@ -436,7 +437,7 @@ private fun PlanWeekStrip(
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = date.dayOfWeek.getDisplayName(JavaTextStyle.NARROW, Locale.getDefault()),
+                    text = date.dayOfWeek.getDisplayName(JavaTextStyle.NARROW, locale),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (isToday) accent else MaterialTheme.colorScheme.onSurfaceVariant,
                 )

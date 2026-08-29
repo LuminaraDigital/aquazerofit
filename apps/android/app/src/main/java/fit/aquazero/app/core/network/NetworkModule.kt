@@ -21,13 +21,13 @@ import fit.aquazero.app.core.network.api.RecipesApi
 import fit.aquazero.app.core.network.api.RecommendationsApi
 import fit.aquazero.app.core.network.api.VisionApi
 import fit.aquazero.app.core.network.api.WorkoutsApi
-import java.util.concurrent.TimeUnit
-import javax.inject.Named
-import javax.inject.Singleton
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
+import javax.inject.Named
+import javax.inject.Singleton
 
 /**
  * Networking graph. Two OkHttp clients share one connection pool:

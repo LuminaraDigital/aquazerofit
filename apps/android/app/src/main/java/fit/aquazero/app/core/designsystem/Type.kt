@@ -1,3 +1,13 @@
+// Design tokens are PascalCase throughout this package, matching the Compose
+// convention these values are read alongside (`MaterialTheme.colorScheme...`).
+// Screaming-snake for the handful that happen to be `const` would make the
+// token list inconsistent with itself.
+@file:Suppress(
+    "ktlint:standard:property-naming",
+    // Same reason, detekt's equivalent rule.
+    "TopLevelPropertyNaming",
+)
+
 package fit.aquazero.app.core.designsystem
 
 import androidx.compose.material3.Typography

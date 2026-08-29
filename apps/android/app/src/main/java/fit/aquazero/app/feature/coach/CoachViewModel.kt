@@ -8,13 +8,12 @@ import fit.aquazero.app.core.data.ChatRepository
 import fit.aquazero.app.core.data.CoachesRepository
 import fit.aquazero.app.core.database.ChatMessageEntity
 import fit.aquazero.app.core.model.ApiResult
-import fit.aquazero.app.core.network.ChatStreamEvent
-import fit.aquazero.app.core.network.api.ConfirmMealDraftRequest
-import fit.aquazero.app.core.network.api.MealDraftSelection
 import fit.aquazero.app.core.model.ChatMealDraftDto
 import fit.aquazero.app.core.model.ChatMealDraftStatus
 import fit.aquazero.app.core.model.ChatMessageDto
-import javax.inject.Inject
+import fit.aquazero.app.core.network.ChatStreamEvent
+import fit.aquazero.app.core.network.api.ConfirmMealDraftRequest
+import fit.aquazero.app.core.network.api.MealDraftSelection
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +27,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** How the current turn ended, when it ended badly. */
 enum class TurnFailure {

@@ -1,23 +1,23 @@
 package fit.aquazero.app.core.auth
 
 import fit.aquazero.app.core.model.ApiResult
-import fit.aquazero.app.core.network.RefreshOutcome
-import fit.aquazero.app.core.network.api.AuthApi
 import fit.aquazero.app.core.model.LoginRequest
 import fit.aquazero.app.core.model.LogoutRequest
 import fit.aquazero.app.core.model.PublicUserDto
 import fit.aquazero.app.core.model.RegisterRequest
+import fit.aquazero.app.core.network.RefreshOutcome
+import fit.aquazero.app.core.network.api.AuthApi
 import fit.aquazero.app.core.network.safeCall
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Named
+import javax.inject.Singleton
 
 /** Session state consumed by the navigation shell. */
 sealed interface AuthState {

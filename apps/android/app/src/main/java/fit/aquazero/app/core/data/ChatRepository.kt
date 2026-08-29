@@ -1,22 +1,22 @@
 package fit.aquazero.app.core.data
 
+import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.database.ChatDao
 import fit.aquazero.app.core.database.ChatMessageEntity
 import fit.aquazero.app.core.database.ChatSessionEntity
 import fit.aquazero.app.core.model.ApiResult
-import fit.aquazero.app.core.network.ChatStreamClient
-import fit.aquazero.app.core.network.ChatStreamEvent
-import fit.aquazero.app.core.network.api.ChatApi
-import fit.aquazero.app.core.network.api.CreateMealDraftRequest
-import fit.aquazero.app.core.common.LocalDates
-import fit.aquazero.app.core.network.api.ConfirmMealDraftRequest
 import fit.aquazero.app.core.model.ChatMessageDto
 import fit.aquazero.app.core.model.ChatSessionCreatedDto
 import fit.aquazero.app.core.model.MealType
+import fit.aquazero.app.core.network.ChatStreamClient
+import fit.aquazero.app.core.network.ChatStreamEvent
+import fit.aquazero.app.core.network.api.ChatApi
+import fit.aquazero.app.core.network.api.ConfirmMealDraftRequest
+import fit.aquazero.app.core.network.api.CreateMealDraftRequest
 import fit.aquazero.app.core.network.safeCall
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Coach chat: SSE streaming for the live turn, Room for read-only offline

@@ -14,8 +14,6 @@ import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.feature.dashboard.NutritionFormat
 import fit.aquazero.app.feature.nutrition.CameraPermission
-import javax.inject.Inject
-import kotlin.math.roundToInt
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +22,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+import kotlin.math.roundToInt
 
 /** Default portion when a product declares no common serving. */
 internal const val BARCODE_DEFAULT_GRAMS: Int = 100
@@ -146,12 +146,7 @@ class BarcodeScannerViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     val food = result.data.food
                     if (food == null) {
-                        _state.value = _state.value.copy(
-                            looking = false,
-                            notFound = true,
-                            scanning = true,
-                        )
-                        lastHandledCode = null
+                        showNotFound()
                     } else {
                         _state.value = _state.value.copy(
                             looking = false,
@@ -168,48 +163,38 @@ class BarcodeScannerViewModel @Inject constructor(
                 }
 
                 is ApiResult.Failure.Api -> {
-                    lastHandledCode = null
                     if (result.httpStatus == HTTP_NOT_FOUND) {
-                        _state.value = _state.value.copy(
-                            looking = false,
-                            notFound = true,
-                            scanning = true,
-                        )
+                        showNotFound()
                     } else {
-                        _state.value = _state.value.copy(
-                            looking = false,
-                            scanning = true,
-                            banner = BarcodeBanner(
-                                messageRes = if (result.code == "VALIDATION_FAILED") {
-                                    R.string.barcode_invalid_code
-                                } else {
-                                    null
-                                },
-                                message = result.message.takeIf { result.code != "VALIDATION_FAILED" },
+                        val invalid = result.code == "VALIDATION_FAILED"
+                        showBanner(
+                            BarcodeBanner(
+                                messageRes = R.string.barcode_invalid_code.takeIf { invalid },
+                                message = result.message.takeUnless { invalid },
                             ),
                         )
                     }
                 }
 
-                is ApiResult.Failure.Network -> {
-                    lastHandledCode = null
-                    _state.value = _state.value.copy(
-                        looking = false,
-                        scanning = true,
-                        banner = BarcodeBanner(messageRes = R.string.barcode_lookup_offline),
-                    )
-                }
+                is ApiResult.Failure.Network ->
+                    showBanner(BarcodeBanner(messageRes = R.string.barcode_lookup_offline))
 
-                is ApiResult.Failure.Malformed -> {
-                    lastHandledCode = null
-                    _state.value = _state.value.copy(
-                        looking = false,
-                        scanning = true,
-                        banner = BarcodeBanner(messageRes = R.string.barcode_lookup_unreadable),
-                    )
-                }
+                is ApiResult.Failure.Malformed ->
+                    showBanner(BarcodeBanner(messageRes = R.string.barcode_lookup_unreadable))
             }
         }
+    }
+
+    /** Back to scanning, with the "no product" hint shown. */
+    private fun showNotFound() {
+        lastHandledCode = null
+        _state.value = _state.value.copy(looking = false, notFound = true, scanning = true)
+    }
+
+    /** Back to scanning, with an explanatory banner instead of a result. */
+    private fun showBanner(banner: BarcodeBanner) {
+        lastHandledCode = null
+        _state.value = _state.value.copy(looking = false, scanning = true, banner = banner)
     }
 
     fun setGrams(grams: Int) {

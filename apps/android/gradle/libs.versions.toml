@@ -9,8 +9,10 @@ androidxTestExt = "1.3.0"
 androidxTestRunner = "1.7.0"
 androidxTestEspresso = "3.7.0"
 coroutines = "1.10.2"
+detekt = "2.0.0-alpha.6"
 junit = "4.13.2"
 kotlin = "2.3.20"
+ktlint = "14.2.0"
 nav3Core = "1.1.7"
 lifecycleViewmodelNav3 = "2.10.0"
 ksp = "2.3.11"
@@ -98,3 +100,5 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room3 = { id = "androidx.room3", version.ref = "room3" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }

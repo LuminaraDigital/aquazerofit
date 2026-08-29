@@ -11,7 +11,6 @@ import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.ProgressInsightDto
 import fit.aquazero.app.core.model.ProgressSummaryDto
 import fit.aquazero.app.core.model.TrendPointDto
-import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Selectable window for every chart on the screen. */
 enum class ProgressRange(val days: Int, val apiRange: String) {

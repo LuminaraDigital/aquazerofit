@@ -8,8 +8,6 @@ import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.data.LogsRepository
 import fit.aquazero.app.core.data.ProfileRepository
 import fit.aquazero.app.core.database.WeightLogEntity
-import javax.inject.Inject
-import kotlin.math.roundToInt
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+import kotlin.math.roundToInt
 
 /** Display unit for the weight field. Submission is always canonical kg. */
 enum class WeightUnit { KG, LB }
@@ -90,7 +90,13 @@ object WeightUnits {
 /** Signed display value in the current unit: "+0.4" / "-1.2". */
 fun signedDisplay(deltaKg: Double, unit: WeightUnit): String {
     val converted = WeightUnits.fromKg(deltaKg, unit)
-    val sign = if (converted > 0) "+" else if (converted < 0) "-" else ""
+    val sign = if (converted > 0) {
+        "+"
+    } else if (converted < 0) {
+        "-"
+    } else {
+        ""
+    }
     return "$sign${String.format(java.util.Locale.US, "%.1f", kotlin.math.abs(converted))}"
 }
 

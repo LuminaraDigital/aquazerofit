@@ -4,9 +4,9 @@ import fit.aquazero.app.core.database.OutboxDao
 import fit.aquazero.app.core.database.OutboxEntity
 import fit.aquazero.app.core.database.OutboxOpTypes
 import fit.aquazero.app.core.database.OutboxState
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Gatekeeper for the outbox state machine (plan §4.2).

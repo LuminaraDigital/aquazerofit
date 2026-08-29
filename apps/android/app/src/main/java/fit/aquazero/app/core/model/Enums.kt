@@ -1,3 +1,12 @@
+// The serial name and the constant belong on one line here: this file mirrors
+// `packages/shared/src/types.ts` one entry per union member, and splitting each
+// entry across three lines makes drift between the two files harder to spot in
+// review. Both rules stay on everywhere else.
+@file:Suppress(
+    "ktlint:standard:annotation",
+    "ktlint:standard:spacing-between-declarations-with-annotations",
+)
+
 package fit.aquazero.app.core.model
 
 import kotlinx.serialization.SerialName

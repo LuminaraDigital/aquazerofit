@@ -8,13 +8,10 @@ import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.data.PlansRepository
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
-import fit.aquazero.app.core.network.api.CompleteWorkoutRequest
-import fit.aquazero.app.core.network.api.CompletedExerciseInput
 import fit.aquazero.app.core.model.SetLogDto
 import fit.aquazero.app.core.model.WorkoutSessionDto
-import javax.inject.Inject
-import kotlin.math.max
-import kotlin.math.roundToInt
+import fit.aquazero.app.core.network.api.CompleteWorkoutRequest
+import fit.aquazero.app.core.network.api.CompletedExerciseInput
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -25,6 +22,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import javax.inject.Inject
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 /** The four phases of a guided session. */
 enum class SessionPhase { OVERVIEW, WORK, REST, SUMMARY }

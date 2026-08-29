@@ -12,7 +12,6 @@ import fit.aquazero.app.core.model.MemoryFactCategory
 import fit.aquazero.app.core.model.MemoryFactDto
 import fit.aquazero.app.core.model.MemoryFactStatus
 import fit.aquazero.app.core.model.UserMemoryDto
-import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Immutable state of the coach-memory screen. */
 data class MemoryUiState(

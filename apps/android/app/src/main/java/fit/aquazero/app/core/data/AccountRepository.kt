@@ -20,11 +20,11 @@ import fit.aquazero.app.core.network.api.AccountApi
 import fit.aquazero.app.core.network.api.DeletionStatusDto
 import fit.aquazero.app.core.network.api.UpdateIdentityRequest
 import fit.aquazero.app.core.network.safeCall
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Account lifecycle: identity, wellness profile, derived targets, the four

@@ -63,14 +63,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview as ComposePreview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -89,11 +89,12 @@ import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.feature.dashboard.NutritionFormat
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
 import java.util.concurrent.Executor
 import kotlin.coroutines.resume
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
+import androidx.compose.ui.tooling.preview.Preview as ComposePreview
 
 /**
  * Photo meal capture.
@@ -116,6 +117,7 @@ fun CaptureMealScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
 
@@ -222,7 +224,7 @@ fun CaptureMealScreen(
                         .fillMaxSize()
                         .clearAndSetSemantics {
                             contentDescription =
-                                context.getString(R.string.capture_viewfinder_cd)
+                                resources.getString(R.string.capture_viewfinder_cd)
                         },
                 )
             }
@@ -598,10 +600,10 @@ internal fun CameraRationale(
 internal fun ViewfinderBrackets(modifier: Modifier = Modifier) {
     val accent = LocalAzfExtended.current.primaryFixedDim
     Box(modifier = modifier.padding(horizontal = 32.dp, vertical = 120.dp)) {
-        Bracket(accent, Alignment.TopStart, top = true, start = true)
-        Bracket(accent, Alignment.TopEnd, top = true, start = false)
-        Bracket(accent, Alignment.BottomStart, top = false, start = true)
-        Bracket(accent, Alignment.BottomEnd, top = false, start = false)
+        Bracket(accent, Alignment.TopStart)
+        Bracket(accent, Alignment.TopEnd)
+        Bracket(accent, Alignment.BottomStart)
+        Bracket(accent, Alignment.BottomEnd)
     }
 }
 
@@ -609,8 +611,6 @@ internal fun ViewfinderBrackets(modifier: Modifier = Modifier) {
 private fun BoxScope.Bracket(
     color: Color,
     alignment: Alignment,
-    top: Boolean,
-    start: Boolean,
 ) {
     val thickness = 3.dp
     val length = 36.dp
@@ -762,7 +762,7 @@ private fun CaptureOverlayReadyPreview() {
                 onMealTypeChange = {},
                 onOpenPhotoPicker = {},
                 onShutter = {},
-                    onRetake = {},
+                onRetake = {},
                 onAnalyze = {},
                 onRequestPermission = {},
                 onOpenSettings = {},
@@ -788,7 +788,7 @@ private fun CaptureOverlayErrorPreview() {
                 onMealTypeChange = {},
                 onOpenPhotoPicker = {},
                 onShutter = {},
-                    onRetake = {},
+                onRetake = {},
                 onAnalyze = {},
                 onRequestPermission = {},
                 onOpenSettings = {},

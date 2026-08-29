@@ -3,9 +3,9 @@ package fit.aquazero.app.feature.dashboard
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.database.UserEntity
 import fit.aquazero.app.core.designsystem.ToastKind
-import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AchievementDefinitionDto
 import fit.aquazero.app.core.model.AchievementStatusDto
+import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.ConsumedTargetDto
 import fit.aquazero.app.core.model.DailyNutritionDto
 import fit.aquazero.app.core.model.MealLogDto

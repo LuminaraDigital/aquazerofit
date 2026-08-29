@@ -7,6 +7,8 @@ plugins {
   alias(libs.plugins.ksp)
   alias(libs.plugins.hilt)
   alias(libs.plugins.room3)
+  alias(libs.plugins.detekt)
+  alias(libs.plugins.ktlint)
 }
 
 android {
@@ -22,7 +24,16 @@ android {
   }
 
   // Release signing configuration: loads from keystore.properties (local)
-  // or environment variables (CI). If no keystore exists, produces unsigned build.
+  // or environment variables (CI).
+  //
+  // A missing keystore no longer degrades silently to an unsigned build. It
+  // used to: `if (releaseKeystore.exists())` simply skipped the signingConfig,
+  // so `assembleRelease` printed BUILD SUCCESSFUL and emitted
+  // `app-release-unsigned.apk`. The release workflow never materialised a
+  // keystore either — it exported AZF_KEYSTORE_PATH, which is a path, with
+  // nothing to point it at — so a tagged release would have gone green and
+  // produced an artifact Play Console rejects. The guard below turns that
+  // into a build failure at packaging time. See checkReleaseSigning.
   val keystorePropsFile = rootProject.file("keystore.properties").takeIf { it.exists() }
     ?: file("keystore.properties").takeIf { it.exists() }
   val keystoreProperties = Properties().apply {
@@ -93,9 +104,82 @@ kotlin {
   jvmToolchain(17)
 }
 
+// Static analysis. `ktlintCheck detekt` is the documented pre-push gate
+// (AGENTS.md); both run over the same sources the compiler sees.
+//
+// detekt 2.0.0-alpha is deliberate, not an oversight: 1.23.8 is the last 1.x
+// and its embedded Kotlin compiler throws `IllegalArgumentException: 25.0.2`
+// on the JDK 25 that Android Studio's JBR now ships, so it cannot run here at
+// all. Move back to a 1.x/2.x stable the moment one supports JDK 25.
+detekt {
+  buildUponDefaultConfig = true
+  config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+  // The Kotlin sources live under src/*/java in this module.
+  source.setFrom(files("src/main/java", "src/test/java", "src/androidTest/java"))
+}
+
+tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
+  jvmTarget = JavaVersion.VERSION_17.toString()
+  reports {
+    html.required.set(true)
+    sarif.required.set(false)
+  }
+}
+
 room3 {
   schemaDirectory("$projectDir/schemas")
 }
+
+/**
+ * Refuse to package an unsigned release.
+ *
+ * The check runs at execution time on the packaging tasks rather than at
+ * configuration time, so `assembleDebug`, `test`, `lint`, ktlint and detekt are
+ * all unaffected by a missing keystore — only producing a release artifact is.
+ *
+ * `-Pazf.allowUnsignedRelease=true` is the deliberate escape hatch for someone
+ * who genuinely wants a local unsigned release build (checking R8 output, say).
+ * CI must never pass it: an artifact that reaches Play has to be signed, and a
+ * flag is the difference between choosing that and discovering it.
+ */
+val allowUnsignedRelease: Boolean =
+  providers.gradleProperty("azf.allowUnsignedRelease").orNull == "true"
+
+val releaseKeystoreFile: File = run {
+  val props = Properties().apply {
+    val f = rootProject.file("keystore.properties").takeIf { it.exists() }
+      ?: file("keystore.properties").takeIf { it.exists() }
+    if (f != null) load(f.inputStream())
+  }
+  file(
+    props.getProperty("storeFile")
+      ?: System.getenv("AZF_KEYSTORE_PATH")
+      ?: "keystore.jks",
+  )
+}
+
+tasks.matching { it.name == "packageRelease" || it.name == "packageReleaseBundle" }
+  .configureEach {
+    doFirst {
+      if (!releaseKeystoreFile.exists() && !allowUnsignedRelease) {
+        throw GradleException(
+          """
+          Refusing to package an unsigned release.
+
+          No keystore at: ${releaseKeystoreFile.absolutePath}
+
+          In CI, decode it from a base64 secret before this task runs:
+            echo "${'$'}{{ secrets.AZF_KEYSTORE_BASE64 }}" | base64 -d > apps/android/app/keystore.jks
+          and set AZF_KEYSTORE_PATH to that file, plus AZF_KEYSTORE_PASSWORD,
+          AZF_KEY_ALIAS and AZF_KEY_PASSWORD.
+
+          Locally, either create app/keystore.properties or pass
+          -Pazf.allowUnsignedRelease=true if you actually want an unsigned build.
+          """.trimIndent(),
+        )
+      }
+    }
+  }
 
 dependencies {
   val composeBom = platform(libs.androidx.compose.bom)

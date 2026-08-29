@@ -8,7 +8,6 @@ import fit.aquazero.app.core.database.CoachEntity
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.ExperienceStatusDto
 import fit.aquazero.app.feature.gamification.MonotonicExperience
-import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** One row of the roster: the persona plus whatever the server knows about it. */
 data class CoachCard(

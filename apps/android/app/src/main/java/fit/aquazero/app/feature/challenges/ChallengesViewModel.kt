@@ -9,7 +9,6 @@ import fit.aquazero.app.core.data.ChallengesRepository
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.BuddyChallengeDto
 import fit.aquazero.app.core.model.BuddyChallengeKind
-import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Immutable state of the buddy-huddles screen. */
 data class ChallengesUiState(

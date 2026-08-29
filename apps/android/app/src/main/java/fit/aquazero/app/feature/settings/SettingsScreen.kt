@@ -44,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -68,6 +69,7 @@ import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.ToastKind
+import fit.aquazero.app.core.designsystem.currentLocale
 import fit.aquazero.app.core.model.ActivityLevel
 import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.DietaryPreference
@@ -112,6 +114,7 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val toasts = rememberToastSink()
     val linkFailed = stringResource(R.string.settings_link_failed)
 
@@ -119,13 +122,13 @@ fun SettingsScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is SettingsEvent.Message -> toasts.show(
-                    context.getString(event.messageRes, SettingsViewModel.DELETION_GRACE_DAYS),
+                    resources.getString(event.messageRes, SettingsViewModel.DELETION_GRACE_DAYS),
                     if (event.isError) ToastKind.Error else ToastKind.Success,
                 )
                 is SettingsEvent.ShareExport -> {
                     if (!context.shareDataExport(event.json)) {
                         toasts.show(
-                            context.getString(R.string.settings_export_failed),
+                            resources.getString(R.string.settings_export_failed),
                             ToastKind.Error,
                         )
                     }
@@ -774,7 +777,7 @@ private fun formatHeight(heightCm: Double, unit: UnitPreference): String =
 @Composable
 private fun formatWeight(weightKg: Double, unit: UnitPreference): String {
     val value = SetupUnits.round1(SetupUnits.kgToDisplay(weightKg, unit))
-    val text = String.format(Locale.getDefault(), "%.1f", value)
+    val text = String.format(currentLocale(), "%.1f", value)
     return if (unit == UnitPreference.IMPERIAL) {
         stringResource(R.string.settings_weight_imperial, text)
     } else {

@@ -8,11 +8,11 @@ import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.model.EntitlementsDto
 import fit.aquazero.app.core.model.UserTier
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Immutable state of the read-only plan screen. */
 data class PlanUiState(

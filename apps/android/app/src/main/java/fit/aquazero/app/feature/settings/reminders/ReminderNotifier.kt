@@ -1,6 +1,8 @@
 package fit.aquazero.app.feature.settings.reminders
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -66,6 +68,22 @@ class ReminderNotifier @Inject constructor(
             .setAutoCancel(true)
             .setContentIntent(openAppIntent())
             .build()
+        post(type, notification)
+    }
+
+    /**
+     * The actual post, isolated so the suppression covers this one call.
+     *
+     * Lint cannot follow the guard: [notify] returns early unless
+     * [canPostNotifications] is true, and that delegates to [hasPermission],
+     * which is the `ContextCompat.checkSelfPermission` call for
+     * `POST_NOTIFICATIONS` (implicitly held below API 33). The post is also
+     * wrapped in `runCatching`, so an OEM throwing `SecurityException` anyway
+     * cannot take the calling worker down. Both halves of what the check asks
+     * for are present — it just cannot see through the indirection.
+     */
+    @SuppressLint("MissingPermission")
+    private fun post(type: ReminderType, notification: Notification) {
         runCatching {
             NotificationManagerCompat.from(context).notify(type.notificationId, notification)
         }

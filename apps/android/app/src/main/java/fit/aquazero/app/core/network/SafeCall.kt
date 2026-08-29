@@ -3,9 +3,9 @@ package fit.aquazero.app.core.network
 import fit.aquazero.app.core.model.ApiErrorEnvelope
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
-import java.io.IOException
 import kotlinx.serialization.SerializationException
 import retrofit2.HttpException
+import java.io.IOException
 
 /**
  * Run a Retrofit suspend call and map its outcome into [ApiResult],

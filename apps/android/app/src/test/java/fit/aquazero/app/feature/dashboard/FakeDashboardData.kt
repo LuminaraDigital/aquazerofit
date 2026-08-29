@@ -9,9 +9,9 @@ import fit.aquazero.app.core.model.MealRecommendationDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.ProgressSummaryDto
 import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
-import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.io.IOException
 
 /** Hand-written [DashboardData] double — no Room, no WorkManager, no network. */
 class FakeDashboardData : DashboardData {

@@ -16,8 +16,6 @@ import fit.aquazero.app.core.model.VisionJobDto
 import fit.aquazero.app.core.model.VisionJobStatus
 import fit.aquazero.app.core.model.VisionPredictionDto
 import fit.aquazero.app.feature.dashboard.NutritionFormat
-import javax.inject.Inject
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -28,6 +26,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+import kotlin.math.roundToInt
 
 /** Per-gram macro ratios, so a portion edit recomputes deterministically. */
 data class PerGram(

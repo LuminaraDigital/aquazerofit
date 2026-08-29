@@ -3,9 +3,9 @@ package fit.aquazero.app.feature.dashboard
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.FoodNutrientsDto
 import fit.aquazero.app.core.model.MealType
-import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.util.Locale
 
 /**
  * The per-100 g → grams arithmetic is the one thing on these screens that

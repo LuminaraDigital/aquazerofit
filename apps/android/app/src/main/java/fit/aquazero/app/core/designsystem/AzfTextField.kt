@@ -42,7 +42,7 @@ fun AzfTextField(
             singleLine = singleLine,
             keyboardOptions = keyboardOptions,
             visualTransformation =
-                if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+            if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
             shape = AzfShapes.Inner,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = LocalAzfExtended.current.primaryFixedDim,

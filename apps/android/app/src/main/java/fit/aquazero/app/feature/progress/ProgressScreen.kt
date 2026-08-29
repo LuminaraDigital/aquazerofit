@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -81,18 +81,19 @@ fun ProgressScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
                 is ProgressEvent.ShareExport -> context.shareText(
-                    subject = context.getString(R.string.progress_export_title),
+                    subject = resources.getString(R.string.progress_export_title),
                     body = event.body,
-                    chooserTitle = context.getString(R.string.progress_export_chooser),
+                    chooserTitle = resources.getString(R.string.progress_export_chooser),
                 )
 
                 is ProgressEvent.ExportEmpty ->
-                    toastController?.info(context.getString(R.string.progress_export_empty))
+                    toastController?.info(resources.getString(R.string.progress_export_empty))
             }
         }
     }
@@ -493,7 +494,13 @@ internal fun formatKg(value: Double): String = String.format(Locale.US, "%.1f", 
 
 /** Signed one-decimal kilogram delta: "+0.4 kg" / "-1.2 kg". */
 internal fun signedKg(value: Double): String {
-    val sign = if (value > 0) "+" else if (value < 0) "-" else ""
+    val sign = if (value > 0) {
+        "+"
+    } else if (value < 0) {
+        "-"
+    } else {
+        ""
+    }
     return "$sign${String.format(Locale.US, "%.1f", abs(value))} kg"
 }
 

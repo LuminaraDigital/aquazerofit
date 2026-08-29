@@ -7,18 +7,18 @@ import fit.aquazero.app.core.database.FoodEntity
 import fit.aquazero.app.core.database.RecipeEntity
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
-import fit.aquazero.app.core.network.api.ExercisesApi
-import fit.aquazero.app.core.network.api.FoodsApi
-import fit.aquazero.app.core.network.api.RecipesApi
 import fit.aquazero.app.core.model.ExerciseDto
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.RecipeDto
 import fit.aquazero.app.core.model.getOrNull
 import fit.aquazero.app.core.model.map
+import fit.aquazero.app.core.network.api.ExercisesApi
+import fit.aquazero.app.core.network.api.FoodsApi
+import fit.aquazero.app.core.network.api.RecipesApi
 import fit.aquazero.app.core.network.safeCall
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Catalog access (plan §4.1): foods search stays server-side with a

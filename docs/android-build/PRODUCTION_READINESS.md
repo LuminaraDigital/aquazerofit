@@ -15,7 +15,7 @@ Verified by running `assembleRelease`, not by inspection.
 
 | Check | Result |
 | --- | --- |
-| `assembleRelease` | **BUILD SUCCESSFUL** |
+| `assembleRelease` | **BUILD SUCCESSFUL** at audit time, producing an *unsigned* APK. Since superseded — see the note below. |
 | Release APK | `app-release-unsigned.apk`, **26.7 MB** (debug is 54.1 MB — shrinking is working) |
 | `missing_rules.txt` | **Not generated** — R8 detected no missing keeps |
 | kotlinx.serialization | **143 serializers retained**, 110 of them app DTOs, names preserved (`…$$serializer -> …$$serializer`) |
@@ -96,9 +96,16 @@ None of these are code defects.
    failures, but nothing substitutes for launching the minified build. The
    android CLI emulator is unavailable on Windows — use Android Studio's AVD or
    a physical device.
-2. **Signing.** The release config attaches a signing config only when a
-   keystore exists; CI needs `AZF_KEYSTORE_*` secrets and Play App Signing
-   enrolment. Build the AAB (`bundleRelease`) rather than the APK for upload.
+2. **Signing — now enforced.** *(Resolved after this audit was written.)* The
+   release config used to attach a signing config only when a keystore existed,
+   so `assembleRelease` printed BUILD SUCCESSFUL and emitted
+   `app-release-unsigned.apk` — an artifact Play Console rejects — and the
+   release workflow exported `AZF_KEYSTORE_PATH` without materialising a
+   keystore for it to point at, so a tagged release would have gone green and
+   shipped nothing usable. `packageRelease` now fails with "Refusing to package
+   an unsigned release", verified by running it with no keystore present. CI
+   still needs the `AZF_KEYSTORE_*` secrets and Play App Signing enrolment, and
+   uploads should use `bundleRelease` (AAB) rather than the APK.
 3. **Accessibility pass.** JVM tests only so far — no instrumented or TalkBack
    run. Content descriptions and live regions are present in code but unverified
    on device.

@@ -8,16 +8,15 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.data.AccountRepository
 import fit.aquazero.app.core.data.AuthRepository
 import fit.aquazero.app.core.database.ConsentEntity
+import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.model.DietaryPreference
-import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.ProfileInputDto
 import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
 import fit.aquazero.app.feature.settings.reminders.ReminderPrefsStore
 import fit.aquazero.app.feature.settings.reminders.ReminderScheduler
-import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Which of the four consent bits a toggle is addressing. */
 enum class ConsentKey { WELLNESS, AI_PERSONALISATION, ANALYTICS, REMINDERS }

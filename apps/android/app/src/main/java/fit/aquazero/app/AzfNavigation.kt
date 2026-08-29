@@ -3,7 +3,6 @@ package fit.aquazero.app
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
@@ -58,11 +57,11 @@ import fit.aquazero.app.feature.settings.PlanEntitlementsScreen
 import fit.aquazero.app.feature.settings.SettingsScreen
 import fit.aquazero.app.feature.training.WorkoutLibraryScreen
 import fit.aquazero.app.feature.training.WorkoutSessionScreen
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Root-level session holder: restores the session once at process start. */
 @HiltViewModel
@@ -203,200 +202,200 @@ private fun MainShell(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-    Scaffold(
-        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
-        bottomBar = {
-            if (onTab) {
-                AzfBottomNav(selected = selectedTab, onSelect = ::switchTab)
-            }
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = if (onTab) padding.calculateBottomPadding() else 0.dp),
-        ) {
-            NavDisplay(
-                backStack = backStack,
-                onBack = { backStack.removeLastOrNull() },
-                entryProvider = entryProvider {
-                    // ----- tab roots -----
-                    entry<DashboardKey> {
-                        when (hasProfile) {
-                            null -> Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                CircularProgressIndicator(color = AzfColors.PrimaryFixedDim)
+        Scaffold(
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+            bottomBar = {
+                if (onTab) {
+                    AzfBottomNav(selected = selectedTab, onSelect = ::switchTab)
+                }
+            },
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = if (onTab) padding.calculateBottomPadding() else 0.dp),
+            ) {
+                NavDisplay(
+                    backStack = backStack,
+                    onBack = { backStack.removeLastOrNull() },
+                    entryProvider = entryProvider {
+                        // ----- tab roots -----
+                        entry<DashboardKey> {
+                            when (hasProfile) {
+                                null -> Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator(color = AzfColors.PrimaryFixedDim)
+                                }
+                                false -> FirstRunScreen(
+                                    onSetUpTargets = { backStack.add(SetupKey) },
+                                    onBrowseWorkouts = { switchTab(AzfTab.Workouts) },
+                                    onAskCoach = { switchTab(AzfTab.Coach) },
+                                    onLogWeight = { backStack.add(LogWeightKey) },
+                                )
+                                true -> DashboardScreen(
+                                    onCaptureMeal = { backStack.add(CaptureMealKey) },
+                                    onOpenWorkout = { sessionId ->
+                                        if (sessionId != null) {
+                                            backStack.add(WorkoutSessionKey(sessionId))
+                                        } else {
+                                            switchTab(AzfTab.Workouts)
+                                        }
+                                    },
+                                    onOpenProgress = { switchTab(AzfTab.Progress) },
+                                )
                             }
-                            false -> FirstRunScreen(
+                        }
+                        entry<NutritionKey> {
+                            NutritionScreen(
+                                onNavigateToCapture = { backStack.add(CaptureMealKey) },
+                                onNavigateToMealPlan = { backStack.add(MealPlanKey) },
+                                onNavigateToBarcode = { backStack.add(BarcodeKey) },
+                            )
+                        }
+                        entry<WorkoutLibraryKey> {
+                            WorkoutLibraryScreen(
+                                onStartSession = { sessionId ->
+                                    backStack.add(WorkoutSessionKey(sessionId))
+                                },
+                                toastController = toastController,
+                            )
+                        }
+                        entry<ProgressKey> {
+                            ProgressScreen(
+                                onLogWeight = { backStack.add(LogWeightKey) },
+                                toastController = toastController,
+                            )
+                        }
+                        entry<CoachKey> {
+                            CoachScreen(
+                                onOpenCoachSelect = { backStack.add(CoachSelectKey) },
+                                onOpenManualLogging = ::toNutritionDay,
+                            )
+                        }
+
+                        // ----- onboarding interstitials -----
+                        entry<FirstRunKey> {
+                            FirstRunScreen(
                                 onSetUpTargets = { backStack.add(SetupKey) },
                                 onBrowseWorkouts = { switchTab(AzfTab.Workouts) },
                                 onAskCoach = { switchTab(AzfTab.Coach) },
                                 onLogWeight = { backStack.add(LogWeightKey) },
                             )
-                            true -> DashboardScreen(
-                                onCaptureMeal = { backStack.add(CaptureMealKey) },
-                                onOpenWorkout = { sessionId ->
-                                    if (sessionId != null) {
-                                        backStack.add(WorkoutSessionKey(sessionId))
-                                    } else {
-                                        switchTab(AzfTab.Workouts)
-                                    }
+                        }
+                        entry<SetupKey> { SetupScreen(onBack = ::pop) }
+
+                        // ----- full-screen destinations above the tabs -----
+                        entry<CaptureMealKey> {
+                            CaptureMealScreen(
+                                onBack = ::pop,
+                                onNavigateToAnalysis = { jobId ->
+                                    backStack.removeLastOrNull() // remove capture
+                                    backStack.add(AnalysisResultsKey(jobId))
                                 },
-                                onOpenProgress = { switchTab(AzfTab.Progress) },
                             )
                         }
-                    }
-                    entry<NutritionKey> {
-                        NutritionScreen(
-                            onNavigateToCapture = { backStack.add(CaptureMealKey) },
-                            onNavigateToMealPlan = { backStack.add(MealPlanKey) },
-                            onNavigateToBarcode = { backStack.add(BarcodeKey) },
-                        )
-                    }
-                    entry<WorkoutLibraryKey> {
-                        WorkoutLibraryScreen(
-                            onStartSession = { sessionId ->
-                                backStack.add(WorkoutSessionKey(sessionId))
-                            },
-                            toastController = toastController,
-                        )
-                    }
-                    entry<ProgressKey> {
-                        ProgressScreen(
-                            onLogWeight = { backStack.add(LogWeightKey) },
-                            toastController = toastController,
-                        )
-                    }
-                    entry<CoachKey> {
-                        CoachScreen(
-                            onOpenCoachSelect = { backStack.add(CoachSelectKey) },
-                            onOpenManualLogging = ::toNutritionDay,
-                        )
-                    }
-
-                    // ----- onboarding interstitials -----
-                    entry<FirstRunKey> {
-                        FirstRunScreen(
-                            onSetUpTargets = { backStack.add(SetupKey) },
-                            onBrowseWorkouts = { switchTab(AzfTab.Workouts) },
-                            onAskCoach = { switchTab(AzfTab.Coach) },
-                            onLogWeight = { backStack.add(LogWeightKey) },
-                        )
-                    }
-                    entry<SetupKey> { SetupScreen(onBack = ::pop) }
-
-                    // ----- full-screen destinations above the tabs -----
-                    entry<CaptureMealKey> {
-                        CaptureMealScreen(
-                            onBack = ::pop,
-                            onNavigateToAnalysis = { jobId ->
-                                backStack.removeLastOrNull() // remove capture
-                                backStack.add(AnalysisResultsKey(jobId))
-                            },
-                        )
-                    }
-                    entry<AnalysisResultsKey> { key ->
-                        AnalysisResultsScreen(
-                            jobId = key.jobId,
-                            onBack = ::pop,
-                            // A confirmed photo log lands on the day view, where
-                            // the entry it just created is visible.
-                            onLogged = { toNutritionDay() },
-                            onLogManually = ::toNutritionDay,
-                            onRetakePhoto = {
-                                backStack.removeLastOrNull()
-                                backStack.add(CaptureMealKey)
-                            },
-                        )
-                    }
-                    entry<BarcodeKey> {
-                        BarcodeScannerSheet(
-                            onDismiss = ::pop,
-                            onLogged = { toNutritionDay() },
-                        )
-                    }
-                    entry<MealPlanKey> {
-                        MealPlanScreen(
-                            onBack = ::pop,
-                            onOpenRecipe = { recipeId ->
-                                backStack.add(RecipeDetailKey(recipeId))
-                            },
-                        )
-                    }
-                    entry<RecipeDetailKey> { key ->
-                        RecipeDetailScreen(
-                            recipeId = key.recipeId,
-                            onBack = ::pop,
-                            onLogged = ::toNutritionDay,
-                        )
-                    }
-                    entry<WorkoutSessionKey> { key ->
-                        WorkoutSessionScreen(
-                            sessionId = key.sessionId,
-                            onBack = ::pop,
-                            toastController = toastController,
-                        )
-                    }
-                    entry<LogWeightKey> {
-                        LogWeightScreen(onBack = ::pop, toastController = toastController)
-                    }
-                    entry<CoachSelectKey> { CoachSelectScreen(onBack = ::pop) }
-                    entry<ChallengesKey> { ChallengesScreen(onBack = ::pop) }
-                    entry<SettingsKey> {
-                        SettingsScreen(
-                            onBack = ::pop,
-                            onOpenNotifications = { backStack.add(NotificationSettingsKey) },
-                            onOpenMemory = { backStack.add(MemoryKey) },
-                            onOpenPlan = { backStack.add(PlanEntitlementsKey) },
-                            onOpenChallenges = { backStack.add(ChallengesKey) },
-                            onEditBiometrics = { backStack.add(SetupKey) },
-                        )
-                    }
-                    entry<NotificationSettingsKey> { NotificationSettingsScreen(onBack = ::pop) }
-                    entry<MemoryKey> {
-                        MemoryScreen(
-                            onBack = ::pop,
-                            // The consent that pauses memory lives in Settings,
-                            // so "review consent settings" goes there rather
-                            // than dropping the user back where they started.
-                            onReviewConsents = {
-                                backStack.removeLastOrNull()
-                                if (backStack.lastOrNull() !is SettingsKey) {
-                                    backStack.add(SettingsKey)
-                                }
-                            },
-                        )
-                    }
-                    entry<PlanEntitlementsKey> { PlanEntitlementsScreen(onBack = ::pop) }
-                },
-            )
-        }
-    }
-
-    // Settings is a Play compliance surface — account deletion, consents and
-    // the AGPL source link all live behind it — so it must be reachable from
-    // anywhere in the app, not only from one tab. The action sits in the
-    // header's trailing position on the tab roots, drawn by the shell so no
-    // individual tab screen has to own it. Coach is the exception: it already
-    // puts its own control there, and two overlapping icons is worse than one
-    // tab that reaches Settings via any of the other four.
-    if (onTab && currentKey !is CoachKey) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-        ) {
-            IconButton(onClick = { backStack.add(SettingsKey) }) {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = stringResource(R.string.shell_open_settings),
-                    tint = AzfColors.OnSurfaceVariant,
+                        entry<AnalysisResultsKey> { key ->
+                            AnalysisResultsScreen(
+                                jobId = key.jobId,
+                                onBack = ::pop,
+                                // A confirmed photo log lands on the day view, where
+                                // the entry it just created is visible.
+                                onLogged = { toNutritionDay() },
+                                onLogManually = ::toNutritionDay,
+                                onRetakePhoto = {
+                                    backStack.removeLastOrNull()
+                                    backStack.add(CaptureMealKey)
+                                },
+                            )
+                        }
+                        entry<BarcodeKey> {
+                            BarcodeScannerSheet(
+                                onDismiss = ::pop,
+                                onLogged = { toNutritionDay() },
+                            )
+                        }
+                        entry<MealPlanKey> {
+                            MealPlanScreen(
+                                onBack = ::pop,
+                                onOpenRecipe = { recipeId ->
+                                    backStack.add(RecipeDetailKey(recipeId))
+                                },
+                            )
+                        }
+                        entry<RecipeDetailKey> { key ->
+                            RecipeDetailScreen(
+                                recipeId = key.recipeId,
+                                onBack = ::pop,
+                                onLogged = ::toNutritionDay,
+                            )
+                        }
+                        entry<WorkoutSessionKey> { key ->
+                            WorkoutSessionScreen(
+                                sessionId = key.sessionId,
+                                onBack = ::pop,
+                                toastController = toastController,
+                            )
+                        }
+                        entry<LogWeightKey> {
+                            LogWeightScreen(onBack = ::pop, toastController = toastController)
+                        }
+                        entry<CoachSelectKey> { CoachSelectScreen(onBack = ::pop) }
+                        entry<ChallengesKey> { ChallengesScreen(onBack = ::pop) }
+                        entry<SettingsKey> {
+                            SettingsScreen(
+                                onBack = ::pop,
+                                onOpenNotifications = { backStack.add(NotificationSettingsKey) },
+                                onOpenMemory = { backStack.add(MemoryKey) },
+                                onOpenPlan = { backStack.add(PlanEntitlementsKey) },
+                                onOpenChallenges = { backStack.add(ChallengesKey) },
+                                onEditBiometrics = { backStack.add(SetupKey) },
+                            )
+                        }
+                        entry<NotificationSettingsKey> { NotificationSettingsScreen(onBack = ::pop) }
+                        entry<MemoryKey> {
+                            MemoryScreen(
+                                onBack = ::pop,
+                                // The consent that pauses memory lives in Settings,
+                                // so "review consent settings" goes there rather
+                                // than dropping the user back where they started.
+                                onReviewConsents = {
+                                    backStack.removeLastOrNull()
+                                    if (backStack.lastOrNull() !is SettingsKey) {
+                                        backStack.add(SettingsKey)
+                                    }
+                                },
+                            )
+                        }
+                        entry<PlanEntitlementsKey> { PlanEntitlementsScreen(onBack = ::pop) }
+                    },
                 )
             }
         }
-    }
+
+        // Settings is a Play compliance surface — account deletion, consents and
+        // the AGPL source link all live behind it — so it must be reachable from
+        // anywhere in the app, not only from one tab. The action sits in the
+        // header's trailing position on the tab roots, drawn by the shell so no
+        // individual tab screen has to own it. Coach is the exception: it already
+        // puts its own control there, and two overlapping icons is worse than one
+        // tab that reaches Settings via any of the other four.
+        if (onTab && currentKey !is CoachKey) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+            ) {
+                IconButton(onClick = { backStack.add(SettingsKey) }) {
+                    Icon(
+                        imageVector = Icons.Outlined.Settings,
+                        contentDescription = stringResource(R.string.shell_open_settings),
+                        tint = AzfColors.OnSurfaceVariant,
+                    )
+                }
+            }
+        }
     }
 }

@@ -1,12 +1,12 @@
 package fit.aquazero.app.core.network
 
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.runBlocking
 import okhttp3.Authenticator
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * OkHttp 401 handler. Delegates to a [TokenRefresher] (single-flight via

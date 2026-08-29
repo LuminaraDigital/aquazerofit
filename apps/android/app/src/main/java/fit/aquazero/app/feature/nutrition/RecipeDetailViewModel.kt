@@ -12,8 +12,6 @@ import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.RecipeDto
 import fit.aquazero.app.feature.dashboard.NutritionFormat
-import javax.inject.Inject
-import kotlin.math.roundToInt
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +20,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+import kotlin.math.roundToInt
 
 /** Immutable state of the recipe detail screen. */
 data class RecipeDetailUiState(

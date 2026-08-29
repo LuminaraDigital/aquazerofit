@@ -10,13 +10,12 @@ import fit.aquazero.app.core.database.ExerciseEntity
 import fit.aquazero.app.core.database.ExerciseMediaEntity
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
-import fit.aquazero.app.core.network.api.GeneratePlanRequest
 import fit.aquazero.app.core.model.ExerciseDto
 import fit.aquazero.app.core.model.PlanDayDto
 import fit.aquazero.app.core.model.TrainingPlanDto
 import fit.aquazero.app.core.model.WorkoutSessionDto
 import fit.aquazero.app.core.model.WorkoutSessionStatus
-import javax.inject.Inject
+import fit.aquazero.app.core.network.api.GeneratePlanRequest
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +31,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Active filter selection for the exercise library. */
 data class LibraryFilters(

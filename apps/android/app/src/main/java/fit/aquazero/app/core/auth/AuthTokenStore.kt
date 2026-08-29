@@ -1,11 +1,11 @@
 package fit.aquazero.app.core.auth
 
 import fit.aquazero.app.core.network.AccessTokenProvider
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * The access token lives in memory ONLY — never on disk, never in logs.

@@ -3,6 +3,7 @@ package fit.aquazero.app.feature.training
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.res.Resources
 import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -47,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -98,6 +100,7 @@ fun WorkoutSessionScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val view = LocalView.current
 
     LaunchedEffect(sessionId) { viewModel.start(sessionId) }
@@ -123,7 +126,7 @@ fun WorkoutSessionScreen(
     @Suppress("DEPRECATION")
     LaunchedEffect(announcement?.id) {
         val slot = announcement ?: return@LaunchedEffect
-        view.announceForAccessibility(context.announcementText(slot.announcement))
+        view.announceForAccessibility(resources.announcementText(slot.announcement))
     }
 
     LaunchedEffect(viewModel, toastController) {
@@ -131,16 +134,16 @@ fun WorkoutSessionScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is WorkoutSessionEvent.Completed -> {
-                    toastController.success(context.getString(R.string.session_saved))
+                    toastController.success(resources.getString(R.string.session_saved))
                     onBack()
                 }
 
                 is WorkoutSessionEvent.CompleteOffline ->
-                    toastController.info(context.getString(R.string.session_save_offline))
+                    toastController.info(resources.getString(R.string.session_save_offline))
 
                 is WorkoutSessionEvent.CompleteFailed ->
                     toastController.error(
-                        event.message ?: context.getString(R.string.session_save_failed),
+                        event.message ?: resources.getString(R.string.session_save_failed),
                     )
             }
         }
@@ -862,7 +865,7 @@ private fun ActualField(
 }
 
 /** Resolve an announcement payload to its localized sentence. */
-private fun Context.announcementText(announcement: SessionAnnouncement): String =
+private fun Resources.announcementText(announcement: SessionAnnouncement): String =
     when (announcement) {
         is SessionAnnouncement.Started ->
             getString(R.string.session_announce_started, announcement.exerciseName)

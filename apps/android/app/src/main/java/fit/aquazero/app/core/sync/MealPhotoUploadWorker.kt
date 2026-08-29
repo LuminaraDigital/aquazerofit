@@ -19,11 +19,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import fit.aquazero.app.core.data.VisionRepository
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.MealType
+import kotlinx.coroutines.flow.Flow
 import java.time.Duration
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Uploads one staged meal photo to `POST /meal-photos`.

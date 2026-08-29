@@ -70,7 +70,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview as ComposePreview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -107,6 +106,7 @@ import fit.aquazero.app.feature.nutrition.awaitOnMain
 import fit.aquazero.app.feature.nutrition.findActivity
 import fit.aquazero.app.feature.nutrition.openAppSettings
 import kotlinx.coroutines.launch
+import androidx.compose.ui.tooling.preview.Preview as ComposePreview
 
 /** ML Kit formats we ask for: retail product codes only. */
 private val BARCODE_FORMATS = intArrayOf(

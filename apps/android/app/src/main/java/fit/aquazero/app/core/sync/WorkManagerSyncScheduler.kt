@@ -9,12 +9,12 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import fit.aquazero.app.core.data.SyncScheduler
-import java.time.Duration
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import java.time.Duration
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Enqueues the unique sync worker: on every offline write, and whenever

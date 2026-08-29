@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import fit.aquazero.app.core.designsystem.AssetImage
-import fit.aquazero.app.core.designsystem.BrandAssets
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -32,19 +30,21 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.R
 import fit.aquazero.app.core.data.AuthRepository
+import fit.aquazero.app.core.designsystem.AssetImage
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
+import fit.aquazero.app.core.designsystem.BrandAssets
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.revealOnEnter
 import fit.aquazero.app.core.model.ApiResult
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Immutable UI state for the sign-in / register screen. */
 data class SignInUiState(
@@ -62,8 +62,10 @@ data class SignInUiState(
     val passwordValid: Boolean
         get() = passwordLongEnough && passwordHasUppercase && passwordHasDigit
     val canSubmit: Boolean
-        get() = email.isNotBlank() && password.isNotBlank() &&
-            (!registerMode || passwordValid) && !loading
+        get() = email.isNotBlank() &&
+            password.isNotBlank() &&
+            (!registerMode || passwordValid) &&
+            !loading
 }
 
 /** Drives login/register against [AuthRepository]. */

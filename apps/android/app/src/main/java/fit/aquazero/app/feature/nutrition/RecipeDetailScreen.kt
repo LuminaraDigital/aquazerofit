@@ -34,7 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -82,7 +82,7 @@ fun RecipeDetailScreen(
     viewModel: RecipeDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val toasts = rememberToastSink()
 
     LaunchedEffect(recipeId) { viewModel.load(recipeId) }
@@ -91,7 +91,7 @@ fun RecipeDetailScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is RecipeDetailEvent.Message -> toasts.show(
-                    context.getString(event.messageRes),
+                    resources.getString(event.messageRes),
                     if (event.isError) ToastKind.Error else ToastKind.Success,
                 )
                 RecipeDetailEvent.Logged -> onLogged()
@@ -519,9 +519,10 @@ private fun AllergenNote(allergens: List<Allergen>) {
 @Composable
 private fun allergenNames(allergens: List<Allergen>): String {
     // `joinToString` is not inline, so its transform is not a composable
-    // scope; the resources are read through the context instead.
-    val context = LocalContext.current
-    return allergens.joinToString(", ") { context.getString(allergenName(it)) }
+    // scope; the configuration-aware Resources is read here instead and the
+    // lambda only formats with it.
+    val resources = LocalResources.current
+    return allergens.joinToString(", ") { resources.getString(allergenName(it)) }
 }
 
 private fun allergenName(allergen: Allergen): Int = when (allergen) {

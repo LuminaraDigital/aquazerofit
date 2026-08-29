@@ -24,7 +24,7 @@ import type {
   WeightLog,
   WorkoutSession,
 } from '@aquazerofit/shared';
-import { getStore } from '../../platform/store';
+import { getStore, indexKey, LOGS_BY_USER_TYPE } from '../../platform/store';
 import { addDays, lastNDates } from '../../platform/dates';
 import { readTargets, round1 } from '../ai/util';
 import { computeStreak } from './service';
@@ -49,10 +49,27 @@ interface PeriodActivity {
 function loadAllActivity(userId: string): PeriodActivity {
   const store = getStore();
   return {
-    meals: store.where<MealLog>('logs', (d) => d.type === 'mealLog' && d.userId === userId),
-    waters: store.where<WaterLog>('logs', (d) => d.type === 'waterLog' && d.userId === userId),
+    // Indexed, for the same reason as loadActivity in ./service.ts — `logs`
+    // carries every user's records, so a bare scan here walked all of them.
+    meals: store.whereIndexed<MealLog>(
+      'logs',
+      LOGS_BY_USER_TYPE,
+      indexKey(userId, 'mealLog'),
+      (d) => d.type === 'mealLog' && d.userId === userId,
+    ),
+    waters: store.whereIndexed<WaterLog>(
+      'logs',
+      LOGS_BY_USER_TYPE,
+      indexKey(userId, 'waterLog'),
+      (d) => d.type === 'waterLog' && d.userId === userId,
+    ),
     weights: store
-      .where<WeightLog>('logs', (d) => d.type === 'weightLog' && d.userId === userId)
+      .whereIndexed<WeightLog>(
+        'logs',
+        LOGS_BY_USER_TYPE,
+        indexKey(userId, 'weightLog'),
+        (d) => d.type === 'weightLog' && d.userId === userId,
+      )
       .sort((a, b) => a.localDate.localeCompare(b.localDate)),
     completedSessions: store.where<WorkoutSession>(
       'plans',

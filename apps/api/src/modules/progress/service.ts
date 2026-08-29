@@ -22,7 +22,7 @@ import {
   type WeightLog,
   type WorkoutSession,
 } from '@aquazerofit/shared';
-import { getStore } from '../../platform/store';
+import { getStore, indexKey, LOGS_BY_USER_TYPE } from '../../platform/store';
 import { addDays } from '../../platform/dates';
 import { getProfile } from '../me/service';
 
@@ -36,12 +36,34 @@ export interface UserActivity {
 export function loadActivity(userId: string): UserActivity {
   const store = getStore();
   return {
+    // Indexed rather than scanned. `logs` holds every meal, water, weight and
+    // idempotency record for EVERY user, so each bare `where` here walked the
+    // whole corpus — and this function runs on the dashboard, the coach roster
+    // and the progress summary, three times over before the plans scan below.
+    // whereIndexed re-applies the same predicate and falls back to a full scan
+    // when the index is absent, so this is a speed change and cannot be a
+    // correctness one.
     meals: store
-      .where<MealLog>('logs', (d) => d.type === 'mealLog' && d.userId === userId)
+      .whereIndexed<MealLog>(
+        'logs',
+        LOGS_BY_USER_TYPE,
+        indexKey(userId, 'mealLog'),
+        (d) => d.type === 'mealLog' && d.userId === userId,
+      )
       .sort((a, b) => a.loggedAt.localeCompare(b.loggedAt)),
-    waters: store.where<WaterLog>('logs', (d) => d.type === 'waterLog' && d.userId === userId),
+    waters: store.whereIndexed<WaterLog>(
+      'logs',
+      LOGS_BY_USER_TYPE,
+      indexKey(userId, 'waterLog'),
+      (d) => d.type === 'waterLog' && d.userId === userId,
+    ),
     weights: store
-      .where<WeightLog>('logs', (d) => d.type === 'weightLog' && d.userId === userId)
+      .whereIndexed<WeightLog>(
+        'logs',
+        LOGS_BY_USER_TYPE,
+        indexKey(userId, 'weightLog'),
+        (d) => d.type === 'weightLog' && d.userId === userId,
+      )
       .sort((a, b) => a.localDate.localeCompare(b.localDate)),
     completedSessions: store
       .where<WorkoutSession>(

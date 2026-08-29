@@ -28,7 +28,7 @@ import {
   type WeightLog,
   type WorkoutSession,
 } from '@aquazerofit/shared';
-import { getStore } from '../../platform/store';
+import { getStore, indexKey, LOGS_BY_USER_TYPE } from '../../platform/store';
 import { addDays, lastNDates } from '../../platform/dates';
 import { targetsId, type TargetsDoc } from '../me/service';
 
@@ -158,8 +158,12 @@ function loadWindow(userId: string, today: string, periodDays: number): WindowDa
     return true;
   };
 
-  for (const meal of store.where<MealLog>(
+  // Indexed: readiness runs on every plan generation, and `logs` holds every
+  // user's records. See loadActivity in ../progress/service.ts.
+  for (const meal of store.whereIndexed<MealLog>(
     'logs',
+    LOGS_BY_USER_TYPE,
+    indexKey(userId, 'mealLog'),
     (d) => d.type === 'mealLog' && d.userId === userId,
   )) {
     if (note(meal.localDate)) {

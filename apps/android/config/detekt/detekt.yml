@@ -27,11 +27,16 @@ complexity:
   TooManyFunctions:
     # Raised to today's worst case in each bucket, no higher:
     #   file 20 (NutritionSections.kt), class 27 (WorkoutSessionViewModel),
-    #   interface 20 (CatalogDao), object 22 (NetworkModule, all @Provides).
+    #   interface 21 (CatalogDao), object 23 (NetworkModule, all @Provides).
+    #
+    # CatalogDao moved 20 -> 21 for `thumbnailsFor`, which the library list
+    # needs to draw exercise images. It is now carrying foods, recipes,
+    # exercises, achievements and coaches; the next query it grows should
+    # split the exercise catalog into its own DAO rather than move this again.
     allowedFunctionsPerFile: 20
     allowedFunctionsPerClass: 27
-    allowedFunctionsPerInterface: 20
-    allowedFunctionsPerObject: 22
+    allowedFunctionsPerInterface: 21
+    allowedFunctionsPerObject: 23
 
 naming:
   FunctionNaming:

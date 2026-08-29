@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -47,7 +48,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.SubcomposeAsyncImage
 import fit.aquazero.app.R
+import fit.aquazero.app.core.database.ExerciseThumbnail
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
@@ -639,7 +642,9 @@ private fun ExerciseListCard(card: ExerciseCard, onClick: () -> Unit) {
             .semantics { contentDescription = openLabel },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ExercisePlaceholder(
+            ExerciseThumbnailImage(
+                thumbnail = card.thumbnail,
+                exerciseName = card.name,
                 equipment = equipment.firstOrNull() ?: Equipment.NONE,
                 modifier = Modifier.size(56.dp),
             )
@@ -666,9 +671,22 @@ private fun ExerciseListCard(card: ExerciseCard, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 // CC-BY-SA: required on every exercise card (plan §5.6).
+                // When the card renders media, the credit follows the image —
+                // the exercise says "wger.de community contributors" while the
+                // picture may be Everkinetic's, and the licence asks for the
+                // author of the work being reproduced.
                 ExerciseAttribution
-                    .exerciseCredit(card.licenceAuthor, card.licence)
-                    ?.let { credit ->
+                    .thumbnailCredit(card.thumbnail, card.licenceAuthor, card.licence)
+                    ?.let { base ->
+                        // Play requires AI-generated imagery to say so wherever
+                        // it is shown. A 56dp thumbnail has no room for the
+                        // sheet's labelled row, so the disclosure rides on the
+                        // credit line that is already mandatory here.
+                        val credit = if (card.thumbnail?.isAiGenerated == true) {
+                            "$base · " + stringResource(R.string.attribution_ai_media)
+                        } else {
+                            base
+                        }
                         Text(
                             text = credit,
                             style = MaterialTheme.typography.labelSmall,
@@ -690,6 +708,34 @@ private fun ExerciseListCard(card: ExerciseCard, onClick: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * The exercise image on a library row, or the equipment glyph when there is
+ * no reviewed art for this exercise.
+ *
+ * The glyph is also the loading and error state, so a slow or dead media URL
+ * degrades to exactly what the row showed before rather than to a gap.
+ */
+@Composable
+private fun ExerciseThumbnailImage(
+    thumbnail: ExerciseThumbnail?,
+    exerciseName: String,
+    equipment: Equipment,
+    modifier: Modifier = Modifier,
+) {
+    if (thumbnail == null) {
+        ExercisePlaceholder(equipment = equipment, modifier = modifier)
+        return
+    }
+    SubcomposeAsyncImage(
+        model = ExerciseAttribution.mediaUrl(thumbnail.url),
+        contentDescription = stringResource(R.string.attribution_demonstration, exerciseName),
+        contentScale = ContentScale.Crop,
+        modifier = modifier.clip(AzfShapes.Card),
+        loading = { ExercisePlaceholder(equipment = equipment, modifier = Modifier.fillMaxSize()) },
+        error = { ExercisePlaceholder(equipment = equipment, modifier = Modifier.fillMaxSize()) },
+    )
 }
 
 @Composable

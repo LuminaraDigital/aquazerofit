@@ -8,6 +8,7 @@ import fit.aquazero.app.core.data.CatalogRepository
 import fit.aquazero.app.core.data.PlansRepository
 import fit.aquazero.app.core.database.ExerciseEntity
 import fit.aquazero.app.core.database.ExerciseMediaEntity
+import fit.aquazero.app.core.database.ExerciseThumbnail
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.model.ExerciseDto
@@ -54,6 +55,13 @@ data class ExerciseCard(
      */
     val licence: String,
     val licenceAuthor: String,
+    /**
+     * Reviewed, exercise-specific art for this row, or null to draw the
+     * equipment glyph. Generic category fallbacks are deliberately excluded
+     * here rather than at the call site — see
+     * [ExerciseAttribution.isGenericFallback].
+     */
+    val thumbnail: ExerciseThumbnail? = null,
 )
 
 /** Expanded detail behind the bottom sheet, including per-media attribution. */
@@ -162,9 +170,15 @@ class WorkoutLibraryViewModel @Inject constructor(
             combine(filters, pagesLoaded, cachedMatches) { active, pages, matches ->
                 Triple(active, pages, matches)
             }.collect { (active, pages, matches) ->
+                // Thumbnails are looked up for the visible slice only. The
+                // whole corpus is cached and paged in memory, so resolving
+                // media for every match would read the media table for up to
+                // CACHE_WINDOW rows on each keystroke to draw one page.
+                val visible = matches.take(pages * PAGE_SIZE)
+                val thumbnails = catalogRepository.exerciseThumbnails(visible.map { it.id })
                 _uiState.value = _uiState.value.copy(
                     filters = active,
-                    exercises = matches.take(pages * PAGE_SIZE).map { it.toCard() },
+                    exercises = visible.map { it.toCard(thumbnails[it.id]) },
                     totalMatches = matches.size,
                 )
             }
@@ -346,7 +360,7 @@ class WorkoutLibraryViewModel @Inject constructor(
         return true
     }
 
-    private fun ExerciseEntity.toCard(): ExerciseCard = ExerciseCard(
+    private fun ExerciseEntity.toCard(thumbnail: ExerciseThumbnail?): ExerciseCard = ExerciseCard(
         id = id,
         name = name,
         primaryMuscle = csvValues(primaryMusclesCsv).firstOrNull(),
@@ -354,6 +368,7 @@ class WorkoutLibraryViewModel @Inject constructor(
         equipmentNames = csvValues(equipmentCsv),
         licence = licence,
         licenceAuthor = licenceAuthor,
+        thumbnail = thumbnail?.takeUnless { ExerciseAttribution.isGenericFallback(it.url) },
     )
 
     companion object {

@@ -61,6 +61,23 @@ interface CatalogDao {
     @Query("SELECT * FROM exercise_media WHERE exerciseId = :exerciseId")
     suspend fun mediaFor(exerciseId: String): List<ExerciseMediaEntity>
 
+    /**
+     * One image per exercise for the library list, chosen as the lowest
+     * `rowId` so the thumbnail is stable across refreshes rather than
+     * whichever row SQLite happened to return.
+     *
+     * Scoped to the ids actually on screen. The library caches the whole
+     * corpus and pages it in memory, so joining media into [exercisesPage]
+     * would decode media for up to `CACHE_WINDOW` rows on every keystroke to
+     * show twenty-four.
+     */
+    @Query(
+        "SELECT exerciseId, url, source, licence, licenceAuthor, attributionText, " +
+            "isAiGenerated, MIN(rowId) AS rowId FROM exercise_media " +
+            "WHERE exerciseId IN (:exerciseIds) AND kind = 'image' GROUP BY exerciseId",
+    )
+    suspend fun thumbnailsFor(exerciseIds: List<String>): List<ExerciseThumbnail>
+
     @Query("SELECT COUNT(*) FROM exercises")
     suspend fun exerciseCount(): Int
 

@@ -3,6 +3,7 @@ package fit.aquazero.app.core.data
 import fit.aquazero.app.core.database.CatalogDao
 import fit.aquazero.app.core.database.ExerciseEntity
 import fit.aquazero.app.core.database.ExerciseMediaEntity
+import fit.aquazero.app.core.database.ExerciseThumbnail
 import fit.aquazero.app.core.database.FoodEntity
 import fit.aquazero.app.core.database.RecipeEntity
 import fit.aquazero.app.core.model.ApiResult
@@ -78,6 +79,20 @@ class CatalogRepository @Inject constructor(
         val exercise = catalogDao.exerciseById(id) ?: return null
         return exercise to catalogDao.mediaFor(id)
     }
+
+    /**
+     * Thumbnails for the exercises currently on screen, keyed by exercise id.
+     *
+     * Deliberately id-scoped rather than folded into [exercisesPage]: the
+     * library caches the whole corpus and pages it in memory, so a join would
+     * read media for every cached row on every keystroke to draw one page.
+     */
+    suspend fun exerciseThumbnails(ids: List<String>): Map<String, ExerciseThumbnail> =
+        if (ids.isEmpty()) {
+            emptyMap()
+        } else {
+            catalogDao.thumbnailsFor(ids).associateBy { it.exerciseId }
+        }
 
     /**
      * Bulk-refresh the whole exercise catalog through the paged envelope

@@ -78,6 +78,27 @@ data class ExerciseMediaEntity(
     val isAiGenerated: Boolean = false,
 )
 
+/**
+ * Projection of the one image the library list draws per exercise.
+ *
+ * Carries the provenance columns rather than just the URL because a rendered
+ * thumbnail has to credit *its own* author: the exercise document says
+ * "wger.de community contributors" while the picture on it may be
+ * Everkinetic's, and CC-BY-SA asks for the latter. See
+ * `ExerciseAttribution.thumbnailCredit`.
+ */
+data class ExerciseThumbnail(
+    val exerciseId: String,
+    val url: String,
+    val source: String? = null,
+    val licence: String? = null,
+    val licenceAuthor: String? = null,
+    val attributionText: String? = null,
+    val isAiGenerated: Boolean = false,
+    /** Selection key only — [CatalogDao.thumbnailsFor] picks the lowest. */
+    val rowId: Long = 0L,
+)
+
 /** Cached `AchievementDefinition`. */
 @Entity(tableName = "achievement_definitions")
 data class AchievementDefinitionEntity(

@@ -54,6 +54,9 @@ import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.model.ChatToolCallDto
+import fit.aquazero.app.core.ui.CoachAvatar
+import fit.aquazero.app.core.ui.CoachPersona
+import fit.aquazero.app.core.ui.CoachRoster
 
 /** Bubble corner radii: the tail corner is tight, the rest are card-round. */
 private val UserBubbleShape = RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp)

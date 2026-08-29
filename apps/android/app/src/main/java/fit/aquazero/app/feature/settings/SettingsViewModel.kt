@@ -15,8 +15,8 @@ import fit.aquazero.app.core.model.DietaryPreference
 import fit.aquazero.app.core.model.ProfileInputDto
 import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
-import fit.aquazero.app.feature.settings.reminders.ReminderPrefsStore
-import fit.aquazero.app.feature.settings.reminders.ReminderScheduler
+import fit.aquazero.app.core.ui.reminders.ReminderPrefsStore
+import fit.aquazero.app.core.ui.reminders.ReminderScheduler
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

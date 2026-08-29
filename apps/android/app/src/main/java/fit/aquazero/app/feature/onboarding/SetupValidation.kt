@@ -4,7 +4,7 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.model.ActivityLevel
 import fit.aquazero.app.core.model.Goal
 import fit.aquazero.app.core.model.UnitPreference
-import kotlin.math.roundToInt
+import fit.aquazero.app.core.ui.SetupUnits
 
 /**
  * The bounds `profileSchema` enforces server-side
@@ -19,37 +19,6 @@ object SetupRanges {
     const val MAX_HEIGHT_CM = 250.0
     const val MIN_AGE = 16
     const val MAX_AGE = 100
-}
-
-/** Imperial ↔ metric conversion for the two fields that offer both. */
-object SetupUnits {
-
-    /** Exact international pound. */
-    const val KG_PER_LB = 0.45359237
-
-    /** Exact inch. */
-    const val CM_PER_INCH = 2.54
-
-    fun ftInToCm(feet: Int, inches: Int): Double = (feet * 12 + inches) * CM_PER_INCH
-
-    fun cmToFtIn(cm: Double): Pair<Int, Int> {
-        val totalInches = (cm / CM_PER_INCH).roundToInt()
-        return (totalInches / 12) to (totalInches % 12)
-    }
-
-    fun lbToKg(pounds: Double): Double = pounds * KG_PER_LB
-
-    fun kgToLb(kg: Double): Double = kg / KG_PER_LB
-
-    /** Display value in the chosen unit, canonical storage always in kg. */
-    fun kgToDisplay(kg: Double, unit: UnitPreference): Double =
-        if (unit == UnitPreference.IMPERIAL) kgToLb(kg) else kg
-
-    fun displayToKg(value: Double, unit: UnitPreference): Double =
-        if (unit == UnitPreference.IMPERIAL) lbToKg(value) else value
-
-    /** One decimal, matching what the server stores. */
-    fun round1(value: Double): Double = (value * 10).roundToInt() / 10.0
 }
 
 /** What the six controls resolve to once units are applied. */

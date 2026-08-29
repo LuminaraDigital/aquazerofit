@@ -1,4 +1,4 @@
-package fit.aquazero.app.feature.coach
+package fit.aquazero.app.core.ui
 
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
@@ -45,6 +45,10 @@ import fit.aquazero.app.core.designsystem.BrandAssets
  * check on a local asset costs a file handle and renders the right thing on
  * the first pass. It also makes `@Preview` render the monogram cleanly instead
  * of an empty box, which is the state a coach with no art actually ships in.
+ *
+ * Lives with [CoachPersona] for the same reason: the celebration and unlock
+ * surfaces draw a coach too, and a shared composable is what stops them
+ * importing a feature to do it.
  */
 private fun assetExists(context: Context, path: String): Boolean = runCatching {
     context.assets.open(path).close()

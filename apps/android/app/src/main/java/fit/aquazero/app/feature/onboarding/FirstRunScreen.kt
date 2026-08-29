@@ -33,6 +33,7 @@ import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.revealOnEnter
+import fit.aquazero.app.core.ui.TargetsNotSetCard
 
 /**
  * First-run home — what a signed-in account with no wellness profile sees.

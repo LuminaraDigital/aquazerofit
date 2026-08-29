@@ -5,6 +5,7 @@ import fit.aquazero.app.core.model.ActivityLevel
 import fit.aquazero.app.core.model.Goal
 import fit.aquazero.app.core.model.Sex
 import fit.aquazero.app.core.model.UnitPreference
+import fit.aquazero.app.core.ui.SetupUnits
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

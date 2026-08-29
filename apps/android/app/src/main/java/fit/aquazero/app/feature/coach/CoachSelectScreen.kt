@@ -55,6 +55,8 @@ import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.designsystem.pressScale
 import fit.aquazero.app.core.model.CoachRankDto
 import fit.aquazero.app.core.model.ExperienceStatusDto
+import fit.aquazero.app.core.ui.CoachPortrait
+import fit.aquazero.app.core.ui.CoachRoster
 import fit.aquazero.app.feature.dashboard.rememberToastSink
 import fit.aquazero.app.feature.gamification.XpPanel
 

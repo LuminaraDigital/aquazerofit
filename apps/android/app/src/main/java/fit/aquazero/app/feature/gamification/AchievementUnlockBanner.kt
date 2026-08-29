@@ -51,8 +51,8 @@ import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
-import fit.aquazero.app.feature.coach.CoachAvatar
-import fit.aquazero.app.feature.coach.CoachRoster
+import fit.aquazero.app.core.ui.CoachAvatar
+import fit.aquazero.app.core.ui.CoachRoster
 
 /**
  * Achievement unlock: a banner, not a takeover.

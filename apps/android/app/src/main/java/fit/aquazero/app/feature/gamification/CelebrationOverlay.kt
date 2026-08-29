@@ -50,9 +50,9 @@ import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.model.CoachRankDto
 import fit.aquazero.app.core.model.ExperienceStatusDto
-import fit.aquazero.app.feature.coach.CoachPersona
-import fit.aquazero.app.feature.coach.CoachPortrait
-import fit.aquazero.app.feature.coach.CoachRoster
+import fit.aquazero.app.core.ui.CoachPersona
+import fit.aquazero.app.core.ui.CoachPortrait
+import fit.aquazero.app.core.ui.CoachRoster
 
 /**
  * The full-screen moment.

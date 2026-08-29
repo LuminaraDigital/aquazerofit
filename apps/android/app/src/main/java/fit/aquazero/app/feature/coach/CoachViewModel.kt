@@ -14,6 +14,8 @@ import fit.aquazero.app.core.model.ChatMessageDto
 import fit.aquazero.app.core.network.ChatStreamEvent
 import fit.aquazero.app.core.network.api.ConfirmMealDraftRequest
 import fit.aquazero.app.core.network.api.MealDraftSelection
+import fit.aquazero.app.core.ui.CoachPersona
+import fit.aquazero.app.core.ui.CoachRoster
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow

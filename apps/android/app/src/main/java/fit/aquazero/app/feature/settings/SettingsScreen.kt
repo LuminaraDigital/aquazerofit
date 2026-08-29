@@ -77,9 +77,9 @@ import fit.aquazero.app.core.model.Goal
 import fit.aquazero.app.core.model.Sex
 import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
+import fit.aquazero.app.core.ui.SetupUnits
+import fit.aquazero.app.core.ui.TargetsNotSetCard
 import fit.aquazero.app.feature.dashboard.rememberToastSink
-import fit.aquazero.app.feature.onboarding.SetupUnits
-import fit.aquazero.app.feature.onboarding.TargetsNotSetCard
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale

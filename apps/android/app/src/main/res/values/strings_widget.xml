@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home-screen surfaces: the "Today" app widget and the launcher shortcuts.
+
+  A separate file from strings.xml purely to keep two concurrent workstreams
+  out of each other's diffs — Android merges everything under res/values into
+  one namespace, so these resolve identically. Keys are prefixed widget_ /
+  shortcut_ so the merge can never collide.
+
+  Strings the app already owns are reused rather than restated: the widget's
+  hydration total, its water-button description and its calorie content
+  description all come from the dashboard's existing entries, so the two
+  surfaces cannot drift into describing the same number differently.
+-->
+<resources>
+
+    <!-- Widget picker -->
+    <string name="widget_name">Today</string>
+    <string name="widget_description">Calories, water and today\'s workout — with a one-tap glass of water.</string>
+
+    <!-- Widget body -->
+    <string name="widget_open_app_cd">Open AquaZeroFit</string>
+    <string name="widget_kcal_value">%1$s / %2$s kcal</string>
+    <string name="widget_water_add">+250 ml</string>
+    <string name="widget_workout_done">Workout done</string>
+    <string name="widget_workout_pending">Workout to do</string>
+    <string name="widget_loading">Loading today…</string>
+    <string name="widget_setup">Finish setup to see your day</string>
+
+    <!-- Launcher shortcuts -->
+    <string name="shortcut_log_meal_short">Log meal</string>
+    <string name="shortcut_log_meal_long">Log a meal</string>
+    <string name="shortcut_workout_short">Workout</string>
+    <string name="shortcut_workout_long">Start today\'s workout</string>
+    <string name="shortcut_log_weight_short">Log weight</string>
+    <string name="shortcut_log_weight_long">Log today\'s weight</string>
+
+</resources>

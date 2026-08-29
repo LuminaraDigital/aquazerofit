@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut: log a meal.
+
+     Shortcut icons are drawn small and badged with the app icon, so this is a
+     single flat glyph on the palette's card colour with no gradients or
+     strokes to lose at 24dp. Colours are DESIGN.md's SurfaceContainer and
+     Primary, matching AzfColors. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#1A2122"
+        android:pathData="M24,24m-24,0a24,24 0 1,0 48,0a24,24 0 1,0 -48,0" />
+    <!-- Fork: three tines over a shared collar and stem. -->
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M15.5,13 h1.8 v7.5 h-1.8 z" />
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M19.1,13 h1.8 v7.5 h-1.8 z" />
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M22.7,13 h1.8 v7.5 h-1.8 z" />
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M15.5,20.5 h9 v2.2 c0,1.6 -1.1,2.9 -2.6,3.3 v9.9 h-3.8 v-9.9 c-1.5,-0.4 -2.6,-1.7 -2.6,-3.3 z" />
+    <!-- Knife: a wedge blade over a straight handle. -->
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M29.4,13 c2.6,1.9 3.6,5.3 3.6,8.8 v3.4 h-3.6 v10.7 h-2.4 v-10.7 h-1.2 v-3.4 c0,-3.5 1,-6.9 3.6,-8.8 z" />
+</vector>

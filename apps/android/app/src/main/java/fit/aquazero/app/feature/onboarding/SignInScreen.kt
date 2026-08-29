@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +29,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import fit.aquazero.app.BuildConfig
 import fit.aquazero.app.R
 import fit.aquazero.app.core.data.AuthRepository
 import fit.aquazero.app.core.designsystem.AssetImage
@@ -35,16 +37,44 @@ import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.BrandAssets
+import fit.aquazero.app.core.designsystem.CAPTCHA_ACTION_PASSWORD_RESET
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.TurnstileChallenge
 import fit.aquazero.app.core.designsystem.revealOnEnter
 import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.TurnstileOutcome
+import fit.aquazero.app.core.telemetry.CrashReporter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+/**
+ * Copy the view model needs but cannot resolve: it has no `Context`, and the
+ * error it shows depends on which way an attempt failed. Resolved once in the
+ * composable and handed down, the way [SignInViewModel.submit] already took
+ * its two messages before the challenge added three more.
+ */
+data class SignInMessages(
+    val generic: String,
+    val offline: String,
+    val challengeUnavailable: String,
+    val challengeFailed: String,
+    val challengeCancelled: String,
+)
+
+/**
+ * Minimum password length, mirroring `passwordSchema.min(12)` in
+ * `packages/shared/src/schemas.ts`.
+ *
+ * Duplicated rather than derived because the Android app does not consume the
+ * shared package — so when that schema changes, this changes with it, and
+ * `PasswordPolicyTest` is what catches the day it does not.
+ */
+private const val MIN_PASSWORD_LENGTH = 12
 
 /** Immutable UI state for the sign-in / register screen. */
 data class SignInUiState(
@@ -55,12 +85,39 @@ data class SignInUiState(
     val loading: Boolean = false,
     val emailError: Boolean = false,
     val submitError: String? = null,
+    /**
+     * Non-null while the bot-protection challenge is on screen. Holds the
+     * action name the server audits the attempt under.
+     */
+    val challengeAction: String? = null,
+    /**
+     * True once a reset mail has been requested. Shown for any well-formed
+     * address, whether or not an account exists — the screen must not become
+     * an oracle for which emails are registered.
+     */
+    val resetSent: Boolean = false,
 ) {
-    val passwordLongEnough: Boolean get() = password.length >= 8
+    /**
+     * These four must mirror `passwordSchema` in `packages/shared`
+     * (min 12, lower, upper, digit) exactly.
+     *
+     * They did not: this asked for 8 characters and never checked for a
+     * lowercase letter, while the server asked for 12 and did. So `PASSWORD1`
+     * ticked every box on screen, enabled Register, and came back a 400 —
+     * with the checklist still showing all-green, which reads as the server
+     * being broken rather than the password being short. A client rule that
+     * is looser than the server's is not a convenience, it is a dead end the
+     * user cannot debug.
+     */
+    val passwordLongEnough: Boolean get() = password.length >= MIN_PASSWORD_LENGTH
+    val passwordHasLowercase: Boolean get() = password.any { it.isLowerCase() }
     val passwordHasUppercase: Boolean get() = password.any { it.isUpperCase() }
     val passwordHasDigit: Boolean get() = password.any { it.isDigit() }
     val passwordValid: Boolean
-        get() = passwordLongEnough && passwordHasUppercase && passwordHasDigit
+        get() = passwordLongEnough &&
+            passwordHasLowercase &&
+            passwordHasUppercase &&
+            passwordHasDigit
     val canSubmit: Boolean
         get() = email.isNotBlank() &&
             password.isNotBlank() &&
@@ -72,6 +129,7 @@ data class SignInUiState(
 @HiltViewModel
 class SignInViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val crashReporter: CrashReporter,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SignInUiState())
@@ -91,35 +149,143 @@ class SignInViewModel @Inject constructor(
     fun toggleMode() =
         _state.update { it.copy(registerMode = !it.registerMode, submitError = null) }
 
-    /** Validate and submit; on success the session flips the root nav. */
-    fun submit(genericError: String, offlineError: String) {
+    /**
+     * Validate and submit; on success the session flips the root nav.
+     *
+     * Registration is bot-gated server-side, so it takes a detour: ask whether
+     * a challenge is required, and only then either register straight away or
+     * raise the challenge sheet. Sign-in is deliberately NOT challenged (the
+     * per-email lockout and the /auth rate lane cover it), so it goes direct.
+     *
+     * `loading` stays true across the challenge. The button is the thing the
+     * user pressed, and it should not spring back to life underneath a sheet.
+     */
+    fun submit(messages: SignInMessages) {
         val s = _state.value
         if (!EMAIL_REGEX.matches(s.email.trim())) {
             _state.update { it.copy(emailError = true) }
             return
         }
         _state.update { it.copy(loading = true, submitError = null) }
-        viewModelScope.launch {
-            val result = if (s.registerMode) {
-                authRepository.register(
-                    email = s.email.trim(),
-                    password = s.password,
-                    displayName = s.displayName.trim().ifBlank { null },
-                )
-            } else {
-                authRepository.login(email = s.email.trim(), password = s.password)
+        if (!s.registerMode) {
+            viewModelScope.launch {
+                finish(authRepository.login(email = s.email.trim(), password = s.password), messages)
             }
-            when (result) {
-                is ApiResult.Success -> _state.update { it.copy(loading = false) }
-                is ApiResult.Failure.Api -> _state.update {
-                    it.copy(loading = false, submitError = result.message.ifBlank { genericError })
+            return
+        }
+        viewModelScope.launch {
+            runStep(registerStepFor(authRepository.captchaRequirement(), messages), messages)
+        }
+    }
+
+    /**
+     * Ask for a reset mail.
+     *
+     * Bot-gated exactly like registration, so it takes the same detour. An
+     * Android-only user who forgets their password previously had no route at
+     * all — the repository method and the `password-reset` action name both
+     * already existed, with nothing calling them.
+     */
+    fun requestPasswordReset(messages: SignInMessages) {
+        val s = _state.value
+        if (!EMAIL_REGEX.matches(s.email.trim())) {
+            _state.update { it.copy(emailError = true) }
+            return
+        }
+        _state.update { it.copy(loading = true, submitError = null, resetSent = false) }
+        viewModelScope.launch {
+            runStep(passwordResetStepFor(authRepository.captchaRequirement(), messages), messages)
+        }
+    }
+
+    /** Dismiss the reset confirmation and return to the form. */
+    fun dismissResetSent() = _state.update { it.copy(resetSent = false) }
+
+    /** Terminal result of the challenge sheet. Exactly one of these arrives. */
+    fun onChallengeResult(outcome: TurnstileOutcome, messages: SignInMessages) {
+        // Captured before the clear: the action name is what tells us which
+        // flow raised the sheet, and both funnel back through the same
+        // Submit step.
+        val action = _state.value.challengeAction
+        _state.update { it.copy(challengeAction = null) }
+        viewModelScope.launch { runStep(challengeStepFor(outcome, messages), messages, action) }
+    }
+
+    private suspend fun runStep(
+        step: SignInStep,
+        messages: SignInMessages,
+        action: String? = _state.value.challengeAction,
+    ) {
+        when (step) {
+            is SignInStep.Submit ->
+                if (action == CAPTCHA_ACTION_PASSWORD_RESET) {
+                    sendResetMail(step.captchaToken, messages)
+                } else {
+                    register(step.captchaToken, messages)
                 }
-                is ApiResult.Failure.Network -> _state.update {
-                    it.copy(loading = false, submitError = offlineError)
+            is SignInStep.Challenge -> _state.update { it.copy(challengeAction = step.action) }
+            is SignInStep.Abort -> _state.update {
+                it.copy(loading = false, submitError = step.message)
+            }
+        }
+    }
+
+    /**
+     * A 4xx here is reported as success on purpose.
+     *
+     * The server answers the same way for a known and an unknown address, and
+     * surfacing a difference the transport happened to expose would hand an
+     * attacker an account-enumeration oracle on the one screen that is
+     * reachable without signing in. Only a transport failure is worth telling
+     * the user about, because only that means no mail was sent.
+     */
+    private suspend fun sendResetMail(captchaToken: String?, messages: SignInMessages) {
+        val email = _state.value.email.trim()
+        when (val result = authRepository.requestPasswordReset(email, captchaToken)) {
+            is ApiResult.Failure.Network -> _state.update {
+                it.copy(loading = false, submitError = messages.offline)
+            }
+            else -> {
+                if (result is ApiResult.Failure) {
+                    // Not shown to the user; recorded so a broken reset lane
+                    // is still visible to us.
+                    crashReporter.log("password reset request failed: ${failureCode(result)}")
                 }
-                is ApiResult.Failure.Malformed -> _state.update {
-                    it.copy(loading = false, submitError = genericError)
-                }
+                _state.update { it.copy(loading = false, resetSent = true) }
+            }
+        }
+    }
+
+    private fun failureCode(failure: ApiResult.Failure): String = when (failure) {
+        is ApiResult.Failure.Api -> failure.code
+        is ApiResult.Failure.Malformed -> "MALFORMED_RESPONSE"
+        is ApiResult.Failure.Network -> "NETWORK"
+    }
+
+    private suspend fun register(captchaToken: String?, messages: SignInMessages) {
+        val s = _state.value
+        finish(
+            authRepository.register(
+                email = s.email.trim(),
+                password = s.password,
+                displayName = s.displayName.trim().ifBlank { null },
+                captchaToken = captchaToken,
+            ),
+            messages,
+        )
+    }
+
+    private fun finish(result: ApiResult<*>, messages: SignInMessages) {
+        when (result) {
+            is ApiResult.Success -> _state.update { it.copy(loading = false) }
+            is ApiResult.Failure.Api -> _state.update {
+                it.copy(loading = false, submitError = result.message.ifBlank { messages.generic })
+            }
+            is ApiResult.Failure.Network -> _state.update {
+                it.copy(loading = false, submitError = messages.offline)
+            }
+            is ApiResult.Failure.Malformed -> _state.update {
+                it.copy(loading = false, submitError = messages.generic)
             }
         }
     }
@@ -145,8 +311,36 @@ fun SignInScreen(
     androidx.compose.runtime.LaunchedEffect(startInRegisterMode) {
         viewModel.setMode(startInRegisterMode)
     }
-    val genericError = stringResource(R.string.signin_error_generic)
-    val offlineError = stringResource(R.string.signin_error_offline)
+    val messages = SignInMessages(
+        generic = stringResource(R.string.signin_error_generic),
+        offline = stringResource(R.string.signin_error_offline),
+        challengeUnavailable = stringResource(R.string.captcha_error_unavailable),
+        challengeFailed = stringResource(R.string.captcha_error_failed),
+        challengeCancelled = stringResource(R.string.captcha_error_cancelled),
+    )
+
+    state.challengeAction?.let { action ->
+        TurnstileChallenge(
+            action = action,
+            webBaseUrl = BuildConfig.WEB_BASE_URL,
+            onResult = { outcome -> viewModel.onChallengeResult(outcome, messages) },
+        )
+    }
+
+    if (state.resetSent) {
+        // Deliberately says "if that address has an account" rather than
+        // confirming one exists — see SignInViewModel.sendResetMail.
+        AlertDialog(
+            onDismissRequest = viewModel::dismissResetSent,
+            title = { Text(text = stringResource(R.string.signin_reset_sent_title)) },
+            text = { Text(text = stringResource(R.string.signin_reset_sent_body)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissResetSent) {
+                    Text(text = stringResource(R.string.signin_reset_sent_dismiss))
+                }
+            },
+        )
+    }
 
     Column(
         modifier = modifier
@@ -215,11 +409,28 @@ fun SignInScreen(
                 text = stringResource(
                     if (state.registerMode) R.string.signin_submit_register else R.string.signin_submit_login,
                 ),
-                onClick = { viewModel.submit(genericError, offlineError) },
+                onClick = { viewModel.submit(messages) },
                 enabled = state.canSubmit,
                 loading = state.loading,
                 modifier = Modifier.padding(top = 24.dp),
             )
+            if (!state.registerMode) {
+                TextButton(
+                    onClick = { viewModel.requestPasswordReset(messages) },
+                    // Reachable while an address is being typed but not while a
+                    // request is already in flight.
+                    enabled = !state.loading,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 4.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.signin_forgot_password),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             TextButton(
                 onClick = viewModel::toggleMode,
                 modifier = Modifier
@@ -250,6 +461,7 @@ private fun PasswordChecklist(state: SignInUiState, modifier: Modifier = Modifie
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ChecklistRow(met = state.passwordLongEnough, label = stringResource(R.string.signin_error_password_length))
+        ChecklistRow(met = state.passwordHasLowercase, label = stringResource(R.string.signin_error_password_lowercase))
         ChecklistRow(met = state.passwordHasUppercase, label = stringResource(R.string.signin_error_password_uppercase))
         ChecklistRow(met = state.passwordHasDigit, label = stringResource(R.string.signin_error_password_digit))
     }

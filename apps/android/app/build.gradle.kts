@@ -9,7 +9,30 @@ plugins {
   alias(libs.plugins.room3)
   alias(libs.plugins.detekt)
   alias(libs.plugins.ktlint)
+  alias(libs.plugins.google.services)
+  alias(libs.plugins.firebase.crashlytics)
 }
+
+/** Fallback version for local builds, when no tag is driving the build. */
+val defaultVersionCode = 1
+
+/** Fallback version name for local builds. See [defaultVersionCode]. */
+val defaultVersionName = "1.0.0"
+
+/**
+ * `-Pazf.versionCode=N` or `AZF_VERSION_CODE=N`. Must increase with every
+ * upload; the release workflow derives it from the release tag.
+ */
+val versionCodeOverride: Int? =
+  (providers.gradleProperty("azf.versionCode").orNull ?: System.getenv("AZF_VERSION_CODE"))
+    ?.trim()
+    ?.toIntOrNull()
+
+/** `-Pazf.versionName=x.y.z` or `AZF_VERSION_NAME=x.y.z`. */
+val versionNameOverride: String? =
+  (providers.gradleProperty("azf.versionName").orNull ?: System.getenv("AZF_VERSION_NAME"))
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
 
 android {
   namespace = "fit.aquazero.app"
@@ -19,8 +42,23 @@ android {
     applicationId = "fit.aquazero.app"
     minSdk = 26
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0.0"
+
+    // Instrumented tests run through Hilt's runner so @HiltAndroidTest can
+    // swap the DI graph; without this the app's own Application starts and
+    // every test talks to the real network.
+    testInstrumentationRunner = "fit.aquazero.app.AzfTestRunner"
+
+    // Version, overridable from CI so a tagged release ships that tag.
+    //
+    // A constant here is fine exactly once. Play refuses an upload whose
+    // versionCode it has already accepted, so with `versionCode = 1` baked in,
+    // the release workflow keeps producing green, correctly signed, identically
+    // versioned bundles and every one after the first is rejected at the
+    // upload step — after the signing key has already been decoded, used and
+    // shredded. The tag is the single source of truth; these are the seams it
+    // comes in through.
+    versionCode = versionCodeOverride ?: defaultVersionCode
+    versionName = versionNameOverride ?: defaultVersionName
   }
 
   // Release signing configuration: loads from keystore.properties (local)
@@ -64,8 +102,8 @@ android {
 
   buildTypes {
     debug {
-      buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api/v1\"")
-      buildConfigField("String", "MEDIA_BASE_URL", "\"http://10.0.2.2:4000\"")
+      buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4040/api/v1\"")
+      buildConfigField("String", "MEDIA_BASE_URL", "\"http://10.0.2.2:4040\"")
       // Legal/support pages are always the published ones: a debug build must
       // not show a privacy policy served off a dev laptop.
       buildConfigField("String", "WEB_BASE_URL", "\"https://app.aquazero.fit\"")
@@ -129,6 +167,11 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
 room3 {
   schemaDirectory("$projectDir/schemas")
 }
+
+// Ship the exported schemas into the instrumented-test APK so
+// MigrationTestHelper can open the real v1 JSON. Without this the migration
+// test can only compare against constants it carries itself.
+android.sourceSets["androidTest"].assets.srcDir("$projectDir/schemas")
 
 /**
  * Refuse to package an unsigned release.
@@ -238,6 +281,14 @@ dependencies {
   implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.work.runtime.ktx)
 
+  // Health Connect — passive steps/heart rate/sleep in, weight out.
+  implementation(libs.androidx.health.connect)
+
+  // Home-screen widget. Glance renders through RemoteViews rather than
+  // Compose UI, so nothing in core:designsystem can be reused inside it.
+  implementation(libs.androidx.glance.appwidget)
+  implementation(libs.androidx.glance.material3)
+
   // Camera / ML
   implementation(libs.androidx.camera.core)
   implementation(libs.androidx.camera.camera2)
@@ -247,6 +298,11 @@ dependencies {
   implementation(libs.androidx.camera.mlkit.vision)
   implementation(libs.mlkit.barcode.scanning)
 
+  // Firebase
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.analytics)
+  implementation(libs.firebase.crashlytics)
+
   // Local tests
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
@@ -254,8 +310,15 @@ dependencies {
   // Instrumented tests
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
+  // Lets SchemaMigrationReadinessTest read app/schemas/*.json directly rather
+  // than transcribing the identity hash into a constant it has to be told to
+  // update. See the assets srcDir below.
+  androidTestImplementation(libs.room3.testing)
+  androidTestImplementation(libs.hilt.android.testing)
+  kspAndroidTest(libs.hilt.compiler)
   androidTestImplementation(libs.androidx.test.core)
   androidTestImplementation(libs.androidx.test.ext.junit)
   androidTestImplementation(libs.androidx.test.runner)
   androidTestImplementation(libs.androidx.test.espresso.core)
+  androidTestImplementation(libs.androidx.test.uiautomator)
 }

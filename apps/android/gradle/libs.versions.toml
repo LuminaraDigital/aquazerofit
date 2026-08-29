@@ -26,9 +26,15 @@ coil = "3.6.0"
 datastore = "1.2.1"
 work = "2.11.2"
 camerax = "1.6.2"
-mlkitBarcode = "17.3.0"
+playServicesMlkitBarcode = "18.3.1"
 splashscreen = "1.2.0"
 browser = "1.9.0"
+firebaseBom = "34.18.0"
+googleServices = "4.5.0"
+firebaseCrashlytics = "3.0.8"
+healthConnect = "1.1.0"
+glance = "1.2.0"
+uiautomator = "2.4.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -91,7 +97,28 @@ androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", versi
 androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 androidx-camera-compose = { module = "androidx.camera:camera-compose", version.ref = "camerax" }
 androidx-camera-mlkit-vision = { module = "androidx.camera:camera-mlkit-vision", version.ref = "camerax" }
-mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
+# The *unbundled* barcode scanner. `com.google.mlkit:barcode-scanning` is the
+# same API with the native model embedded: four copies of libbarhopper_v3.so,
+# 20.2 MB of a 26 MB APK. This variant ships no .so at all — Play services
+# supplies the model, prefetched via ModuleInstallClient.deferredInstall (see
+# feature/nutrition/barcode/BarcodeScannerSheet.kt). Keep the alias name so
+# app/build.gradle.kts does not have to change.
+mlkit-barcode-scanning = { module = "com.google.android.gms:play-services-mlkit-barcode-scanning", version.ref = "playServicesMlkitBarcode" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
+
+# Health Connect — passive steps/heart-rate/sleep in, weight out.
+androidx-health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
+
+# Glance — the home-screen widget. Separate from Compose UI: widgets render
+# through RemoteViews, so the app's own composables cannot be reused here.
+androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
+androidx-glance-material3 = { module = "androidx.glance:glance-material3", version.ref = "glance" }
+
+androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "uiautomator" }
+hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
+room3-testing = { module = "androidx.room3:room3-testing", version.ref = "room3" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
@@ -100,5 +127,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room3 = { id = "androidx.room3", version.ref = "room3" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlytics" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }

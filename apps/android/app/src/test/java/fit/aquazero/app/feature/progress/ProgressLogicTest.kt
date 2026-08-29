@@ -80,7 +80,10 @@ class ProgressLogicTest {
             bestDays = 12,
             activeDays = 18,
             windowDays = 28,
-            graceRemaining = 2,
+            // 1 = the full allowance, untouched. The server computes
+            // max(0, CONSISTENCY_GRACE_DAYS - graceUsed) with the constant at
+            // 1, so 2 was a value it can never send.
+            graceRemaining = 1,
             state = ConsistencyState.RESTING,
         )
         // A zero current run does not zero the hero number, and is not rendered.
@@ -91,12 +94,31 @@ class ProgressLogicTest {
     }
 
     @Test
+    fun `an unbroken run is not told a day off was already covered`() {
+        // The regression: the client compared graceRemaining against 2 while
+        // the server's allowance is 1, so `graceRemaining < GRACE_DAYS` was
+        // true for every possible value the server can send. A user who had
+        // never missed a day was reassured about a lapse that never happened.
+        val spotless = ConsistencyStatusDto(
+            currentDays = 14,
+            activeDays = 14,
+            windowDays = 28,
+            graceRemaining = 1,
+            state = ConsistencyState.STEADY,
+        )
+        assertFalse(ConsistencyCopy.hasAbsorbedDay(spotless))
+    }
+
+    @Test
     fun `grace reassurance wins over the plain state line`() {
         val absorbed = ConsistencyStatusDto(
             currentDays = 5,
             activeDays = 9,
             windowDays = 28,
-            graceRemaining = 1,
+            // 0 = the one grace day has been spent. This fixture said 1,
+            // which is the opposite state, and passed only because the client
+            // compared against a GRACE_DAYS of 2 that the server never used.
+            graceRemaining = 0,
             state = ConsistencyState.BUILDING,
         )
         assertTrue(ConsistencyCopy.hasAbsorbedDay(absorbed))
@@ -128,7 +150,7 @@ class ProgressLogicTest {
     @Test
     fun `every consistency state resolves to supportive copy with no loss vocabulary`() {
         ConsistencyState.entries.forEach { state ->
-            val status = ConsistencyStatusDto(state = state, activeDays = 3, graceRemaining = 2)
+            val status = ConsistencyStatusDto(state = state, activeDays = 3, graceRemaining = 1)
             // Resolving must never throw and must never fall through to a
             // "broken" branch — there is no such state in the model.
             ConsistencyCopy.stateLabel(state)

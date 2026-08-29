@@ -19,8 +19,19 @@ import fit.aquazero.app.core.model.ConsistencyStatusDto
  */
 object ConsistencyCopy {
 
-    /** Grace days the server allows before a run is considered paused. */
-    const val GRACE_DAYS = 2
+    /**
+     * Grace days the server allows before a run is considered paused,
+     * mirroring `CONSISTENCY_GRACE_DAYS` in `packages/shared/src/constants.ts`.
+     *
+     * This said 2 while the server said 1. `graceRemaining` is computed as
+     * `max(0, CONSISTENCY_GRACE_DAYS - graceUsed)`, so it can only ever arrive
+     * as 0 or 1 — which made [hasAbsorbedDay]'s `graceRemaining < GRACE_DAYS`
+     * unconditionally true. Every user with a run showed "a day off is already
+     * covered", including one who had never missed a day: reassurance offered
+     * for a lapse that never happened, which reads as the app not knowing what
+     * they did.
+     */
+    const val GRACE_DAYS = 1
 
     /** Short badge word for a state. Describes the rhythm, never the person. */
     @StringRes

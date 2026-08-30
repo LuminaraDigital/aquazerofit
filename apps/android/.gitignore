@@ -19,6 +19,7 @@ keystore.properties
 # Build artefacts
 *.apk
 *.aab
+/dist/
 /captures/
 .externalNativeBuild/
 .cxx/

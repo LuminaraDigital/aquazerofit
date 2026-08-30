@@ -3,6 +3,7 @@ package fit.aquazero.app.core.data
 import fit.aquazero.app.core.database.OutboxDao
 import fit.aquazero.app.core.database.OutboxEntity
 import fit.aquazero.app.core.database.OutboxEntityTypes
+import fit.aquazero.app.core.database.OutboxOpTypes
 import fit.aquazero.app.core.database.OutboxState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,8 +17,14 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** In-memory OutboxDao honoring the same WHERE-clause semantics as Room. */
-private class FakeOutboxDao : OutboxDao {
+/**
+ * In-memory OutboxDao honoring the same WHERE-clause semantics as Room.
+ *
+ * Shared with the sync tests rather than copied: the value of this fake is
+ * that it matches the queries exactly, and a second copy is a second chance to
+ * get that wrong.
+ */
+internal class FakeOutboxDao : OutboxDao {
     private val rows = MutableStateFlow<List<OutboxEntity>>(emptyList())
     private var nextId = 1L
 
@@ -35,9 +42,28 @@ private class FakeOutboxDao : OutboxDao {
     override suspend fun inStates(states: List<OutboxState>): List<OutboxEntity> =
         rows.value.filter { it.state in states }.sortedBy { it.id }
 
+    override suspend fun liveCreateCount(localId: String): Int = rows.value.count {
+        it.localId == localId &&
+            it.opType == OutboxOpTypes.CREATE &&
+            it.state in listOf(OutboxState.QUEUED, OutboxState.IN_FLIGHT)
+    }
+
+    override suspend fun countResumedAttempt(id: Long) {
+        rows.value = rows.value.map {
+            if (it.id == id && it.state == OutboxState.IN_FLIGHT) {
+                it.copy(attempts = it.attempts + 1)
+            } else {
+                it
+            }
+        }
+    }
+
     override fun pendingCount(): Flow<Int> = rows.map { list ->
         list.count { it.state != OutboxState.SYNCED }
     }
+
+    override suspend fun pendingCountOnce(): Int =
+        rows.value.count { it.state != OutboxState.SYNCED }
 
     override suspend fun transition(id: Long, from: OutboxState, to: OutboxState, nowMs: Long): Int {
         var moved = 0
@@ -77,6 +103,10 @@ private class FakeOutboxDao : OutboxDao {
 
     override suspend fun pruneSynced(beforeMs: Long) {
         rows.value = rows.value.filterNot { it.state == OutboxState.SYNCED && it.createdAt < beforeMs }
+    }
+
+    override suspend fun clearAll() {
+        rows.value = emptyList()
     }
 }
 

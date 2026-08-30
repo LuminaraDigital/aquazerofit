@@ -70,6 +70,10 @@ export function CoachAvatar({
       src={src}
       alt=""
       aria-hidden="true"
+      // Square by contract (public/coaches/*/avatar.webp are all 256x256), so
+      // the caller's `size` is both the rendered and the reserved box.
+      width={size}
+      height={size}
       loading="lazy"
       decoding="async"
       // Skip straight to the monogram when the neutral avatar is what just
@@ -99,6 +103,10 @@ function initialsOf(name: string): string {
  * separate from the avatar because the portrait is a tall crop that must not
  * be forced into a circle.
  */
+/** Intrinsic size of every portrait.webp under public/coaches. */
+const PORTRAIT_W = 600;
+const PORTRAIT_H = 900;
+
 export function CoachPortrait({
   art,
   name,
@@ -131,6 +139,8 @@ export function CoachPortrait({
       src={art.portrait}
       alt=""
       aria-hidden="true"
+      width={PORTRAIT_W}
+      height={PORTRAIT_H}
       loading="lazy"
       decoding="async"
       onError={() => setFailed(true)}

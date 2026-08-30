@@ -10,8 +10,24 @@ package fit.aquazero.app.core.data
  */
 interface SyncScheduler {
     /**
-     * Request a drain. [initialDelaySeconds] honours a server `Retry-After`
-     * when the previous attempt was rate-limited.
+     * Request a drain.
+     *
+     * @param initialDelaySeconds honours a server `Retry-After` when the
+     *   previous attempt was rate-limited.
+     * @param queueBehindCurrent when true, the request is queued *behind* a
+     *   drain that is already in progress instead of being discarded as a
+     *   duplicate of it.
+     *
+     *   Every caller outside the drain itself wants the default: several
+     *   offline writes in a row should cost one drain, not one each. The
+     *   drain worker is the exception, because the in-progress run it would
+     *   be de-duplicated against is *itself*. Requesting a follow-up with the
+     *   default policy from inside the worker silently drops it, and the
+     *   outbox then sits untouched until some unrelated event — a later write,
+     *   or connectivity returning — happens to schedule the next run.
      */
-    fun requestSync(initialDelaySeconds: Long = 0L)
+    fun requestSync(initialDelaySeconds: Long = 0L, queueBehindCurrent: Boolean = false)
+
+    /** Stop an in-flight or queued outbox drain (called before wiping the outbox). */
+    fun cancelPendingSync()
 }

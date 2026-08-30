@@ -4,13 +4,14 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -56,15 +57,25 @@ private fun Droplet(filled: Boolean, size: Dp, modifier: Modifier = Modifier) {
     )
     val aqua = LocalAzfExtended.current.primaryFixedDim
     val track = LocalAzfExtended.current.ringTrack
-    Canvas(modifier = modifier.size(size)) {
-        val path = dropletPath(this.size.width, this.size.height)
-        drawPath(path = path, color = track, style = Stroke(width = this.size.width * 0.08f))
-        if (fillScale > 0f) {
-            scale(scale = fillScale) {
-                drawPath(path = path, color = aqua, style = Fill)
-            }
-        }
-    }
+    Spacer(
+        modifier = modifier
+            .size(size)
+            .drawWithCache {
+                // Four cubics that depend only on the box, not on the fill, so
+                // they are built once per size instead of once per droplet per
+                // frame — eight droplets for the length of the spring settle.
+                // `fillScale` stays inside onDrawBehind, where it belongs.
+                val path = dropletPath(this.size.width, this.size.height)
+                val outline = Stroke(width = this.size.width * 0.08f)
+                onDrawBehind {
+                    drawPath(path = path, color = track, style = outline)
+                    if (fillScale <= 0f) return@onDrawBehind
+                    scale(scale = fillScale) {
+                        drawPath(path = path, color = aqua, style = Fill)
+                    }
+                }
+            },
+    )
 }
 
 /** Classic droplet: pointed crown flowing into a round belly. */

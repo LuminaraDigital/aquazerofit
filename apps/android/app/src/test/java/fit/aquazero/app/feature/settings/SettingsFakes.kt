@@ -210,6 +210,8 @@ class FakeUserDao : UserDao {
 
     override fun user(): Flow<UserEntity?> = userFlow
 
+    override suspend fun userOnce(): UserEntity? = userFlow.value
+
     override suspend fun upsertProfile(profile: ProfileEntity) {
         profileFlow.value = profile
     }
@@ -240,6 +242,30 @@ class FakeUserDao : UserDao {
 
     override suspend fun clearUser() {
         userFlow.value = null
+    }
+
+    override suspend fun clearProfile() {
+        profileFlow.value = null
+    }
+
+    override suspend fun clearTargets() {
+        targetsFlow.value = null
+    }
+
+    override suspend fun clearConsents() {
+        consentsFlow.value = null
+    }
+
+    override suspend fun clearEntitlements() {
+        entitlementsFlow.value = null
+    }
+
+    override suspend fun clearAllAccountRows() {
+        clearUser()
+        clearProfile()
+        clearTargets()
+        clearConsents()
+        clearEntitlements()
     }
 }
 

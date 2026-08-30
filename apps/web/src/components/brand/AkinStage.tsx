@@ -9,9 +9,18 @@ import {
   type AkinPose,
 } from '@aquazerofit/shared';
 import { poseUrl } from './AquaMascot';
+import { fetchPriorityHigh } from '@/lib/fetchPriority';
 
 const CYCLE_MS = 4200;
 const POSE_ORDER: AkinPose[] = [...AKIN_POSES];
+
+/**
+ * Intrinsic size of every pose file (public/akin-{idle,guard,lift}.jpg).
+ * Declared so the frame reserves the right box before the first decode; the
+ * Tailwind `frame` classes still decide the rendered size.
+ */
+const POSE_W = 682;
+const POSE_H = 1024;
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined') return false;
@@ -24,12 +33,15 @@ export function AkinStage({
   showControls = true,
   showCaption = true,
   size = 'hero',
+  priority = false,
 }: {
   className?: string;
   autoPlay?: boolean;
   showControls?: boolean;
   showCaption?: boolean;
   size?: 'lg' | 'hero';
+  /** Set on the one stage that is the page's LCP element (the landing hero). */
+  priority?: boolean;
 }) {
   const [pose, setPose] = useState<AkinPose>('idle');
   const [prev, setPrev] = useState<AkinPose | null>(null);
@@ -106,12 +118,20 @@ export function AkinStage({
             reducedRef.current ? 'akin-bob-off' : ''
           }`}
         >
+          {/* Both poses load eagerly on purpose. They are only ever mounted
+              while on screen — the outgoing one exists solely for the 520ms
+              crossfade — and the effect above has already warmed every pose,
+              so deferring them would only make the transition flicker. */}
           {prev && (
             <img
               key={`out-${prev}`}
               src={poseUrl(prev)}
               alt=""
               aria-hidden="true"
+              width={POSE_W}
+              height={POSE_H}
+              loading="eager"
+              decoding="async"
               className="akin-pose akin-pose-out absolute inset-0 h-full w-full object-contain object-bottom"
               draggable={false}
             />
@@ -121,6 +141,11 @@ export function AkinStage({
             src={poseUrl(pose)}
             alt=""
             aria-hidden="true"
+            width={POSE_W}
+            height={POSE_H}
+            loading="eager"
+            decoding="async"
+            {...fetchPriorityHigh(priority)}
             className="akin-pose akin-pose-in absolute inset-0 h-full w-full object-contain object-bottom"
             draggable={false}
           />

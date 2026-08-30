@@ -135,7 +135,7 @@ recommendationsRouter.post(
 
     // --- Admission
     assertLaneAllowed(user.tier, 'planStructured');
-    const reservationId = await creditLedger.reserve(user.id, 'mealRecommendation');
+    const reservationId = await creditLedger.reserve(user.id, 'mealRecommendation', user.tier);
 
     if (!personalised) {
       // Consent-off fallback: a generic, deterministic recommendation with NO

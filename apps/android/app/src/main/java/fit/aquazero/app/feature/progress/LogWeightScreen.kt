@@ -48,7 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.database.SyncState
@@ -67,8 +67,8 @@ import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.ToastController
+import fit.aquazero.app.core.ui.LocaleFormatters
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 
@@ -172,7 +172,7 @@ private fun LogWeightContent(
             }
             item(key = "quick-notes") {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(quickNoteRes(), key = { it }) { res ->
+                    items(QUICK_NOTE_RES, key = { it }) { res ->
                         val text = stringResource(res)
                         AzfChip(
                             text = text,
@@ -501,18 +501,27 @@ private fun RecentEntryRow(log: WeightLogEntity, deltaKg: Double?, unit: WeightU
 // helpers
 // ---------------------------------------------------------------------------
 
-private fun quickNoteRes(): List<Int> = listOf(
+/**
+ * The quick-note chips. A fixed list of resource ids, so it is built once at
+ * class-load rather than rebuilt on every recomposition of the chip row.
+ */
+private val QUICK_NOTE_RES: List<Int> = listOf(
     R.string.log_weight_quick_morning,
     R.string.log_weight_quick_post_workout,
     R.string.log_weight_quick_after_meal,
 )
 
-/** "Thu, 14 Aug" in the device locale. */
+/**
+ * "Thu, 14 Aug" in the device locale.
+ *
+ * Two calls per recent-entry row, so the formatter is cached by
+ * [LocaleFormatters] rather than compiled from the pattern on every scroll.
+ */
 private fun longDate(isoDate: String): String = runCatching {
-    LocalDate.parse(isoDate)
-        .format(DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault()))
+    LocalDate.parse(isoDate).format(LocaleFormatters.of(RECENT_DATE_PATTERN))
 }.getOrDefault(isoDate)
 
+private const val RECENT_DATE_PATTERN = "EEE, d MMM"
 private const val ENTRY_WIDTH = 220
 private const val ENTRY_SIZE_SP = 64
 private const val ENTRY_LINE_SP = 68

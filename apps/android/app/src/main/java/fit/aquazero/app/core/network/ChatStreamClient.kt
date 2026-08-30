@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -45,7 +46,7 @@ sealed interface ChatStreamEvent {
 private data class SseFrame(
     val type: String,
     val token: String? = null,
-    val message: kotlinx.serialization.json.JsonElement? = null,
+    val message: JsonElement? = null,
     val code: String? = null,
 )
 
@@ -56,8 +57,8 @@ private data class SseFrame(
  */
 @Singleton
 class ChatStreamClient @Inject constructor(
-    @Named("api") private val okHttpClient: OkHttpClient,
-    @Named("apiBaseUrl") private val baseUrl: String,
+    @param:Named("sse") private val okHttpClient: OkHttpClient,
+    @param:Named("apiBaseUrl") private val baseUrl: String,
 ) {
 
     /** Open a streaming turn on [sessionId] with the user's [content]. */
@@ -100,7 +101,7 @@ class ChatStreamClient @Inject constructor(
                         trySend(
                             ChatStreamEvent.Error(
                                 code = frame.code ?: "AI_UNAVAILABLE",
-                                message = frame.message?.toString().orEmpty(),
+                                message = frame.message.asDisplayText(),
                             ),
                         )
                         close()
@@ -126,4 +127,19 @@ class ChatStreamClient @Inject constructor(
         val source = EventSources.createFactory(okHttpClient).newEventSource(request, listener)
         awaitClose { source.cancel() }
     }
+}
+
+/**
+ * Render an SSE frame's `message` as text fit for a user.
+ *
+ * The field is typed [JsonElement] because the `done` frame carries a message
+ * *object*, but the `error` frame carries a plain string — and `toString()` on
+ * a string [JsonPrimitive] re-emits it in JSON form, quotes included. Server
+ * error copy was reaching the UI as `"Something went wrong"`, quote marks and
+ * all. Unwrap the primitive; fall back to the raw form for any other shape so
+ * an unexpected payload degrades to something inspectable rather than empty.
+ */
+private fun JsonElement?.asDisplayText(): String {
+    val primitive = this as? JsonPrimitive ?: return this?.toString().orEmpty()
+    return if (primitive.isString) primitive.content else primitive.toString()
 }

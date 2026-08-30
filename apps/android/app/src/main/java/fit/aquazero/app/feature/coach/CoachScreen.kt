@@ -1,5 +1,10 @@
 package fit.aquazero.app.feature.coach
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +26,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,9 +39,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -44,9 +55,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.core.content.ContextCompat
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
+import fit.aquazero.app.core.audio.SpeechInputState
 import fit.aquazero.app.core.database.ChatMessageEntity
 import fit.aquazero.app.core.designsystem.AkinStage
 import fit.aquazero.app.core.designsystem.AzfAppHeader
@@ -57,7 +70,6 @@ import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
@@ -68,15 +80,14 @@ import fit.aquazero.app.core.ui.CoachPortrait
 import fit.aquazero.app.core.ui.CoachRoster
 import fit.aquazero.app.feature.dashboard.rememberToastSink
 import fit.aquazero.app.feature.gamification.CelebrationHost
+import kotlinx.coroutines.flow.conflate
 
 /**
  * The coach conversation.
  *
  * Structure, top to bottom: header (coach avatar → character select), the
  * **persistent** wellness disclaimer, the message list, and a composer with
- * two buttons — send, and "log this as a meal". The second one is the whole
- * reason the first can stay dumb: logging is an explicit act, never something
- * inferred from what the user happened to type.
+ * three buttons — mic (speech dictation), meal log, and send.
  *
  * The celebration layer is hosted here as well as on the dashboard, because
  * logging a meal from chat can be the thing that levels someone up, and the
@@ -90,7 +101,10 @@ fun CoachScreen(
     viewModel: CoachViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val speechState by viewModel.speechState.collectAsStateWithLifecycle()
+    val speakingMessageId by viewModel.speakingMessageId.collectAsStateWithLifecycle()
     val toasts = rememberToastSink()
+    val context = LocalContext.current
 
     val reportDone = stringResource(R.string.coach_report_done)
     val reportFailed = stringResource(R.string.coach_report_failed)
@@ -98,6 +112,61 @@ fun CoachScreen(
     val proposeFailed = stringResource(R.string.draft_propose_failed)
     val mealLogged = stringResource(R.string.meal_logged)
     val draftRestored = stringResource(R.string.draft_restored)
+
+    // rememberSaveable, not remember: dictation writes here, and losing a
+    // spoken message to a backgrounded app means saying it all again.
+    var input by rememberSaveable { mutableStateOf("") }
+
+    // Denial copy is about the microphone, not the meal draft. Two distinct
+    // cases: a plain "not now", and a blocked permission where Android stops
+    // showing the dialog entirely — there the button would otherwise do
+    // nothing at all, forever, with no explanation.
+    val micDenied = stringResource(R.string.coach_mic_denied)
+    val micBlocked = stringResource(R.string.coach_mic_blocked)
+    val activity = LocalActivity.current
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            viewModel.startVoiceDictation { text ->
+                input = if (input.isBlank()) text else "$input $text"
+            }
+        } else {
+            val canAskAgain = activity?.shouldShowRequestPermissionRationale(
+                Manifest.permission.RECORD_AUDIO,
+            ) ?: false
+            toasts.show(if (canAskAgain) micDenied else micBlocked, ToastKind.Info)
+        }
+    }
+
+    val onToggleMic: () -> Unit = {
+        if (speechState is SpeechInputState.Listening || speechState is SpeechInputState.Transcribing) {
+            viewModel.stopVoiceDictation()
+        } else {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO,
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasPermission) {
+                viewModel.startVoiceDictation { text ->
+                    input = if (input.isBlank()) text else "$input $text"
+                }
+            } else {
+                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
+    LaunchedEffect(speechState) {
+        if (speechState is SpeechInputState.Transcribing) {
+            val partial = (speechState as SpeechInputState.Transcribing).partialText
+            if (partial.isNotEmpty()) {
+                input = partial
+            }
+        }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
@@ -122,7 +191,6 @@ fun CoachScreen(
                     toasts.show(message, kind)
                 }
                 CoachEvent.MealLogged -> Unit
-                CoachEvent.OpenManualLogging -> onOpenManualLogging()
             }
         }
     }
@@ -130,6 +198,8 @@ fun CoachScreen(
     Box(modifier = modifier.fillMaxSize()) {
         CoachContent(
             state = state,
+            speechState = speechState,
+            speakingMessageId = speakingMessageId,
             onSend = viewModel::send,
             onProposeMeal = viewModel::proposeMeal,
             onConfirmDraft = viewModel::confirmDraft,
@@ -139,6 +209,11 @@ fun CoachScreen(
             onDismissFailure = viewModel::dismissTurnFailure,
             onOpenCoachSelect = onOpenCoachSelect,
             onLogManually = onOpenManualLogging,
+            onToggleMic = onToggleMic,
+            onSpeakMessage = viewModel::toggleSpeakMessage,
+            onExecuteAction = viewModel::executeAction,
+            input = input,
+            onInputChange = { input = it },
         )
         // Placed last so a level-up sits above the conversation, not under it.
         CelebrationHost()
@@ -148,6 +223,8 @@ fun CoachScreen(
 @Composable
 fun CoachContent(
     state: CoachUiState,
+    speechState: SpeechInputState = SpeechInputState.Idle,
+    speakingMessageId: String? = null,
     onSend: (String) -> Unit,
     onProposeMeal: (String) -> Unit,
     onConfirmDraft: (MealDraftConfirmation) -> Unit,
@@ -157,20 +234,20 @@ fun CoachContent(
     onDismissFailure: () -> Unit,
     onOpenCoachSelect: () -> Unit,
     onLogManually: () -> Unit,
+    onToggleMic: () -> Unit = {},
+    onSpeakMessage: (String, String) -> Unit = { _, _ -> },
+    onExecuteAction: (ChatAction) -> Unit = {},
     modifier: Modifier = Modifier,
+    // Hoisted, because voice dictation writes into it from CoachScreen.
+    // A local `remember` here silently swallowed every dictated word:
+    // the screen transcribed into its own copy while the field below
+    // was bound to a different one. Previews keep the empty default.
+    input: String = "",
+    onInputChange: (String) -> Unit = {},
 ) {
-    var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    // Keep the newest turn in view as tokens arrive.
-    LaunchedEffect(
-        state.messages.size,
-        state.streamingText,
-        state.pendingUserMessage,
-        state.draft?.id,
-    ) {
-        listState.animateScrollToItem(0)
-    }
+    AutoScrollToNewest(state, listState)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -191,12 +268,13 @@ fun CoachContent(
                 },
             )
         },
-    ) { innerPadding ->
+    ) { padding ->
         Column(
             modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .padding(padding),
         ) {
+            LiveRegion(state)
             WellnessDisclaimerBar(
                 modifier = Modifier.padding(
                     horizontal = AzfSpacing.ContainerMargin,
@@ -204,17 +282,13 @@ fun CoachContent(
                 ),
             )
 
-            LiveRegion(state)
-
             Box(modifier = Modifier.weight(1f)) {
-                when {
-                    state.loading -> LoadingConversation()
-                    state.bootstrapFailed && state.messages.isEmpty() -> ErrorState(
-                        title = stringResource(R.string.coach_load_failed),
-                        message = stringResource(R.string.coach_load_failed_body),
-                    )
-                    else -> Conversation(
+                if (state.loading && state.messages.isEmpty()) {
+                    LoadingConversation()
+                } else {
+                    Conversation(
                         state = state,
+                        speakingMessageId = speakingMessageId,
                         listState = listState,
                         onSend = onSend,
                         onReport = onReport,
@@ -223,26 +297,72 @@ fun CoachContent(
                         onRetry = onRetry,
                         onDismissFailure = onDismissFailure,
                         onLogManually = onLogManually,
+                        onSpeakMessage = onSpeakMessage,
+                        onExecuteAction = onExecuteAction,
                     )
                 }
             }
 
             Composer(
                 value = input,
-                onValueChange = { input = it },
+                onValueChange = onInputChange,
                 state = state,
+                speechState = speechState,
+                onToggleMic = onToggleMic,
                 onSend = {
                     val text = input
-                    input = ""
+                    onInputChange("")
                     onSend(text)
                 },
                 onProposeMeal = {
                     val text = input
-                    input = ""
+                    onInputChange("")
                     onProposeMeal(text)
                 },
             )
         }
+    }
+}
+
+/**
+ * Keep the newest turn in view.
+ *
+ * The list is [reverseLayout][LazyColumn], so **index 0 is the newest turn** —
+ * the draft, the in-flight stream, the pending user line — and scrolling to 0
+ * pins the conversation to the bottom of the screen.
+ *
+ * Two effects, deliberately, because they want different scroll calls:
+ *
+ * - Turn boundaries (a message committed, a draft opened, a stream starting or
+ *   ending) are rare and are worth animating.
+ * - Tokens are not. Keying an effect on `streamingText` restarted it on every
+ *   token, cancelling the in-flight `animateScrollToItem` before it could
+ *   settle — the list visibly juddered and never arrived. Tokens are followed
+ *   instead by a conflated snapshot flow that jumps instantly, which no
+ *   subsequent token can interrupt.
+ */
+@Composable
+private fun AutoScrollToNewest(
+    state: CoachUiState,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+) {
+    LaunchedEffect(
+        listState,
+        state.messages.size,
+        state.pendingUserMessage,
+        state.draft?.id,
+        state.streaming,
+    ) {
+        listState.animateScrollToItem(0)
+    }
+
+    // rememberUpdatedState so the long-lived collector reads the current turn's
+    // text rather than the value captured when it started.
+    val current by rememberUpdatedState(state)
+    LaunchedEffect(listState) {
+        snapshotFlow { current.streamingText.length }
+            .conflate()
+            .collect { length -> if (length > 0) listState.scrollToItem(0) }
     }
 }
 
@@ -288,6 +408,7 @@ private fun LoadingConversation() {
 private fun Conversation(
     state: CoachUiState,
     listState: androidx.compose.foundation.lazy.LazyListState,
+    speakingMessageId: String? = null,
     onSend: (String) -> Unit,
     onReport: (String) -> Unit,
     onConfirmDraft: (MealDraftConfirmation) -> Unit,
@@ -295,6 +416,8 @@ private fun Conversation(
     onRetry: () -> Unit,
     onDismissFailure: () -> Unit,
     onLogManually: () -> Unit,
+    onSpeakMessage: (String, String) -> Unit = { _, _ -> },
+    onExecuteAction: (ChatAction) -> Unit = {},
 ) {
     val conversationLabel = stringResource(R.string.coach_conversation_cd)
     LazyColumn(
@@ -381,12 +504,19 @@ private fun Conversation(
             if (message.role == "user") {
                 UserBubble(content = message.content, timestamp = message.createdAt.timeOfDay())
             } else {
+                val actions = remember(message.content, message.id) {
+                    ChatActionExtractor.extractActions(message.content, message.id)
+                }
                 AssistantBubble(
                     content = message.content,
                     persona = state.persona,
                     guardrailBlocked = message.guardrailBlocked,
                     reported = message.reported,
                     timestamp = message.createdAt.timeOfDay(),
+                    actions = actions,
+                    isSpeaking = speakingMessageId == message.id,
+                    onSpeakClick = { onSpeakMessage(message.id, message.content) },
+                    onActionClick = onExecuteAction,
                     onReport = { onReport(message.id) },
                 )
             }
@@ -536,12 +666,15 @@ private fun Composer(
     value: String,
     onValueChange: (String) -> Unit,
     state: CoachUiState,
+    speechState: SpeechInputState = SpeechInputState.Idle,
+    onToggleMic: () -> Unit = {},
     onSend: () -> Unit,
     onProposeMeal: () -> Unit,
 ) {
     val hasText = value.isNotBlank()
     val enabled = state.canSend
     val accent = LocalAzfExtended.current.primaryFixedDim
+    val isListening = speechState is SpeechInputState.Listening || speechState is SpeechInputState.Transcribing
 
     Column(
         modifier = Modifier
@@ -559,7 +692,38 @@ private fun Composer(
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
+
+        if (isListening) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Listening... Speak your meal or question",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = state.persona.colour,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
         Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onToggleMic, enabled = enabled) {
+                Icon(
+                    imageVector = if (isListening) Icons.Outlined.MicOff else Icons.Outlined.Mic,
+                    contentDescription = if (isListening) "Stop voice dictation" else "Start voice dictation",
+                    tint = if (isListening) {
+                        state.persona.colour
+                    } else if (enabled) {
+                        accent
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    },
+                )
+            }
+            Spacer(Modifier.width(4.dp))
             AzfTextField(
                 value = value,
                 onValueChange = onValueChange,

@@ -27,6 +27,9 @@ class OutboxRepository @Inject constructor(
     /** Ops not yet fully drained, for UI badges and the logout drain gate. */
     val pendingCount: Flow<Int> = outboxDao.pendingCount()
 
+    /** Snapshot of [pendingCount] for one-shot gates after a foreground drain. */
+    suspend fun pendingCountOnce(): Int = outboxDao.pendingCountOnce()
+
     /** Enqueue a CREATE with its freshly minted idempotency key. */
     suspend fun enqueueCreate(
         entityType: String,
@@ -87,6 +90,17 @@ class OutboxRepository @Inject constructor(
     /** Transactionally claim the FIFO head of a stream for delivery. */
     suspend fun claimHead(entityType: String, nowMs: Long = System.currentTimeMillis()): OutboxEntity? =
         outboxDao.claimHead(entityType, nowMs)
+
+    /**
+     * True while a CREATE for [localId] is still queued or in flight.
+     *
+     * Which is to say: true while a follow-up UPDATE for that row can still
+     * expect a `serverId` to appear, and false when it never will. The drain
+     * needs the distinction because both cases look identical from the row
+     * itself — see the orphan rule in `OutboxDrainer.resolveMissingServerId`.
+     */
+    suspend fun hasLiveCreate(localId: String): Boolean =
+        outboxDao.liveCreateCount(localId) > 0
 
     /** Mark an op delivered. */
     suspend fun markSynced(opId: Long) =

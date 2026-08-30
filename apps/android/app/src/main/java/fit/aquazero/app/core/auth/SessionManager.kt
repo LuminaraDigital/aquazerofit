@@ -1,5 +1,6 @@
 package fit.aquazero.app.core.auth
 
+import fit.aquazero.app.core.data.LocalCachePurger
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.LoginRequest
 import fit.aquazero.app.core.model.LogoutRequest
@@ -37,10 +38,11 @@ sealed interface AuthState {
  */
 @Singleton
 class SessionManager @Inject constructor(
-    @Named("authless") private val authApi: AuthApi,
+    @param:Named("authless") private val authApi: AuthApi,
     private val tokenStore: AuthTokenStore,
     private val vault: RefreshTokenVault,
     private val refreshCoordinator: RefreshCoordinator,
+    private val localCachePurger: LocalCachePurger,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -80,14 +82,27 @@ class SessionManager @Inject constructor(
     suspend fun login(email: String, password: String): ApiResult<PublicUserDto> =
         installSession { authApi.login(LoginRequest(email = email, password = password)) }
 
-    /** Registration; the server signs the new account straight in. */
+    /**
+     * Registration; the server signs the new account straight in.
+     *
+     * [captchaToken] carries the Turnstile challenge result when the server
+     * says one is required (`GET /auth/captcha`). Null is not a bypass — it is
+     * simply omitted from the body, and a server with bot protection on
+     * answers with `VALIDATION_FAILED`/`fieldErrors.captchaToken`.
+     */
     suspend fun register(
         email: String,
         password: String,
         displayName: String?,
+        captchaToken: String? = null,
     ): ApiResult<PublicUserDto> = installSession {
         authApi.register(
-            RegisterRequest(email = email, password = password, displayName = displayName),
+            RegisterRequest(
+                email = email,
+                password = password,
+                displayName = displayName,
+                captchaToken = captchaToken,
+            ),
         )
     }
 
@@ -114,16 +129,22 @@ class SessionManager @Inject constructor(
         val result = safeCall(block)
         return when (result) {
             is ApiResult.Success -> {
+                val incoming = result.data.user
+                val previousId = localCachePurger.cachedUserId()
+                if (previousId != null && previousId != incoming.id) {
+                    localCachePurger.purgeForDifferentUser()
+                }
                 vault.store(result.data.refreshToken)
                 tokenStore.set(result.data.accessToken)
-                _authState.value = AuthState.SignedIn(result.data.user)
-                ApiResult.Success(result.data.user)
+                _authState.value = AuthState.SignedIn(incoming)
+                ApiResult.Success(incoming)
             }
             is ApiResult.Failure -> result
         }
     }
 
     private suspend fun clearSession() {
+        localCachePurger.purgeOnUserLogout()
         tokenStore.clear()
         vault.clear()
         _authState.value = AuthState.SignedOut

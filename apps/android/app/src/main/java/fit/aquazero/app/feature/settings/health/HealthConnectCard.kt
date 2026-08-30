@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DirectionsWalk
+import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.MonitorHeart
@@ -38,7 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
@@ -256,7 +256,7 @@ private fun ConnectedSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     } else {
-        FigureRow(Icons.Outlined.DirectionsWalk, R.string.health_steps_label, snapshot.stepsText())
+        FigureRow(Icons.AutoMirrored.Outlined.DirectionsWalk, R.string.health_steps_label, snapshot.stepsText())
         FigureRow(Icons.Outlined.Favorite, R.string.health_heart_rate_label, snapshot.averageBpmText())
         FigureRow(Icons.Outlined.MonitorHeart, R.string.health_resting_label, snapshot.restingBpmText())
         FigureRow(Icons.Outlined.NightsStay, R.string.health_sleep_label, snapshot.sleepText())

@@ -88,7 +88,8 @@ data class ReadinessSignalDto(
 /** Mirrors TS `ReadinessAssessment` — `GET /plans/readiness` → `{readiness}`. */
 @Serializable
 data class ReadinessAssessmentDto(
-    val mode: ReadinessMode,
+    /** Defaults to the most cautious mode: an unreadable mode never pushes harder. */
+    val mode: ReadinessMode = ReadinessMode.PROTECT,
     val score: Int,
     val signals: List<ReadinessSignalDto> = emptyList(),
     val headline: String = "",

@@ -80,6 +80,18 @@ function validDraft(): Record<string, unknown> {
         isRest: false,
         slots: [{ order: 1, entries: [{ id: 'se-3-1', exerciseId: 'ex_jack', sets: 3, reps: 30, restSeconds: 45 }] }],
       },
+      /*
+       * Orders 4–7 are rest. A draft is a whole calendar week with
+       * `daysPerWeek` training days inside it — not a list of sessions. This
+       * fixture had only the three training days, which is what the validator
+       * used to demand and what `plans/service.aiDraftIsValid` has always
+       * refused, so the two gates disagreed and the lane could never land a
+       * plan. Padding the week here is the test-side half of that fix.
+       */
+      { order: 4, focus: 'Rest', isRest: true, slots: [] },
+      { order: 5, focus: 'Rest', isRest: true, slots: [] },
+      { order: 6, focus: 'Rest', isRest: true, slots: [] },
+      { order: 7, focus: 'Rest', isRest: true, slots: [] },
     ],
     progressionRules: [
       { slotEntryId: 'se-1-1', kind: 'reps', iteration: 2, value: 12, op: 'replace', requires: ['reps'] },
@@ -121,7 +133,10 @@ describe('extractJsonTolerant', () => {
 describe('validatePlanDraft', () => {
   it('accepts a valid draft', () => {
     const result = validatePlanDraft(validDraft(), REQ);
-    expect('draft' in result && result.draft.days).toHaveLength(3);
+    expect('draft' in result).toBe(true);
+    const { draft } = result as { draft: { days: { isRest: boolean }[] } };
+    expect(draft.days).toHaveLength(7);
+    expect(draft.days.filter((d) => !d.isRest)).toHaveLength(REQ.daysPerWeek);
   });
 
   it('rejects an unknown exercise id', () => {
@@ -130,8 +145,29 @@ describe('validatePlanDraft', () => {
     expect('error' in validatePlanDraft(draft, REQ)).toBe(true);
   });
 
-  it('rejects a day-count mismatch', () => {
+  it('rejects a training-day count that does not match daysPerWeek', () => {
+    // The fixture is a seven-day week with three training days.
     expect('error' in validatePlanDraft(validDraft(), { ...REQ, daysPerWeek: 4 })).toBe(true);
+  });
+
+  it('rejects a draft that is a list of sessions rather than a full week', () => {
+    const draft = validDraft();
+    // Drop the rest days: three days, three of them training. This is exactly
+    // the shape P-05 1.1.0 asked for and the shape the downstream gate has
+    // always rejected — it must now fail here, at the gate that can say why.
+    draft.days = (draft.days as { isRest: boolean }[]).filter((d) => !d.isRest);
+    const result = validatePlanDraft(draft, REQ);
+    expect('error' in result).toBe(true);
+    expect((result as { error: string }).error).toMatch(/calendar week/);
+  });
+
+  it('rejects seven unique day orders that are not 1–7', () => {
+    const draft = validDraft();
+    // Seven distinct orders, one out of range. A bare uniqueness check passes
+    // this and the downstream gate then rejects it — the same wasted-tokens
+    // shape as the day-count split.
+    (draft.days as { order: number }[])[6]!.order = 99;
+    expect('error' in validatePlanDraft(draft, REQ)).toBe(true);
   });
 
   it('rejects an absurd load for a beginner (cap = 2x bodyweight = 140 kg)', () => {
@@ -187,7 +223,9 @@ describe('tryGenerateAiPlan (mock provider, zero keys)', () => {
   it('produces a deterministic valid draft', async () => {
     const first = await tryGenerateAiPlan(REQ);
     expect(first).not.toBeNull();
-    expect(first!.draft.days).toHaveLength(3);
+    // Seven calendar days, three of them training — REQ.daysPerWeek is 3.
+    expect(first!.draft.days).toHaveLength(7);
+    expect(first!.draft.days.filter((d) => !d.isRest)).toHaveLength(3);
     expect(first!.ai.provider).toBe('mock');
     expect(first!.ai.promptVersion).toMatch(/^P-05@/);
 
@@ -218,14 +256,28 @@ describe('tryGenerateAiPlan (mock provider, zero keys)', () => {
     expect(await tryGenerateAiPlan({ ...REQ, pool: advancedOnly })).toBeNull();
   });
 
-  it('supports daysPerWeek boundaries 1 and 7', async () => {
-    const one = await tryGenerateAiPlan({ ...REQ, daysPerWeek: 1 });
-    expect(one).not.toBeNull();
-    expect(one!.draft.days).toHaveLength(1);
-    const seven = await tryGenerateAiPlan({ ...REQ, daysPerWeek: 7 });
-    expect(seven).not.toBeNull();
-    expect(seven!.draft.days).toHaveLength(7);
-  });
+  /*
+   * The week is always seven days long; daysPerWeek only moves how many of
+   * them carry work. Asserting the training-day count at both extremes is what
+   * pins the contract — a draft whose length tracked daysPerWeek would satisfy
+   * a length-only assertion and still be rejected downstream.
+   */
+  it.each([1, 2, 3, 4, 5, 6, 7])(
+    'emits a seven-day week with exactly %i training days',
+    async (daysPerWeek) => {
+      const result = await tryGenerateAiPlan({ ...REQ, daysPerWeek });
+      expect(result).not.toBeNull();
+      expect(result!.draft.days).toHaveLength(7);
+      expect(result!.draft.days.filter((d) => !d.isRest)).toHaveLength(daysPerWeek);
+      // Rest days carry no work, and orders cover the week exactly once each.
+      for (const day of result!.draft.days.filter((d) => d.isRest)) {
+        expect(day.slots).toHaveLength(0);
+      }
+      expect([...result!.draft.days].map((d) => d.order).sort((a, b) => a - b)).toEqual([
+        1, 2, 3, 4, 5, 6, 7,
+      ]);
+    },
+  );
 });
 
 describe('suggestExerciseSwap', () => {

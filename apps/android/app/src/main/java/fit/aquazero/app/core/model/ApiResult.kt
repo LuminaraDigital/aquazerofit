@@ -43,18 +43,6 @@ sealed interface ApiResult<out T> {
     }
 }
 
-/**
- * True for failures worth retrying automatically (network or 5xx or 429).
- *
- * [ApiResult.Failure.Malformed] is deliberately not retryable: the same
- * request would decode the same way, so retrying only delays the error.
- */
-fun ApiResult.Failure.isRetryable(): Boolean = when (this) {
-    is ApiResult.Failure.Network -> true
-    is ApiResult.Failure.Api -> httpStatus >= 500 || httpStatus == 429
-    is ApiResult.Failure.Malformed -> false
-}
-
 /** Map a successful result, passing failures through. */
 inline fun <T, R> ApiResult<T>.map(transform: (T) -> R): ApiResult<R> = when (this) {
     is ApiResult.Success -> ApiResult.Success(transform(data))

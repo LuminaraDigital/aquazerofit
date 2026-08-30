@@ -16,9 +16,9 @@ import java.time.DayOfWeek
 enum class ReminderType(
     /** Stable channel id — never renamed, or existing user choices are lost. */
     val channelId: String,
-    @StringRes val channelNameRes: Int,
-    @StringRes val titleRes: Int,
-    @StringRes val bodyRes: Int,
+    @param:StringRes val channelNameRes: Int,
+    @param:StringRes val titleRes: Int,
+    @param:StringRes val bodyRes: Int,
     /** Distinct notification ids so one lane never replaces another. */
     val notificationId: Int,
 ) {

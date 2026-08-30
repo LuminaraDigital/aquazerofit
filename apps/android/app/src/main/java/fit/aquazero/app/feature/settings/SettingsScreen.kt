@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.DeleteForever
@@ -23,10 +25,8 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NotificationsActive
-import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.WorkspacePremium
@@ -49,7 +49,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.BuildConfig
 import fit.aquazero.app.R
@@ -77,12 +77,11 @@ import fit.aquazero.app.core.model.Goal
 import fit.aquazero.app.core.model.Sex
 import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
+import fit.aquazero.app.core.ui.LocaleFormatters
 import fit.aquazero.app.core.ui.SetupUnits
 import fit.aquazero.app.core.ui.TargetsNotSetCard
 import fit.aquazero.app.feature.dashboard.rememberToastSink
 import java.time.YearMonth
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -160,12 +159,12 @@ fun SettingsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { IdentityCard(state, viewModel) }
+            item(contentType = "identity") { IdentityCard(state, viewModel) }
 
-            item { DisclaimerCard() }
+            item(contentType = "disclaimer") { DisclaimerCard() }
 
-            item { AzfSectionHeading(stringResource(R.string.settings_profile_heading)) }
-            item {
+            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_profile_heading)) }
+            item(contentType = "profile") {
                 when {
                     state.profile != null -> ProfileSummaryCard(
                         profile = state.profile,
@@ -183,11 +182,13 @@ fun SettingsScreen(
             }
 
             if (state.profile != null) {
-                item { AzfSectionHeading(stringResource(R.string.settings_preferences_heading)) }
-                item { PreferenceCards(state, viewModel) }
+                item(contentType = "heading") {
+                    AzfSectionHeading(stringResource(R.string.settings_preferences_heading))
+                }
+                item(contentType = "preferences") { PreferenceCards(state, viewModel) }
             }
 
-            item {
+            item(contentType = "nav-row") {
                 AzfNavigationRow(
                     title = stringResource(R.string.settings_notifications),
                     body = stringResource(R.string.settings_notifications_body),
@@ -197,10 +198,10 @@ fun SettingsScreen(
                 )
             }
 
-            item { AzfSectionHeading(stringResource(R.string.settings_privacy_heading)) }
-            item { ConsentCard(state, viewModel) }
+            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_privacy_heading)) }
+            item(contentType = "consent") { ConsentCard(state, viewModel) }
 
-            item {
+            item(contentType = "nav-row") {
                 AzfNavigationRow(
                     title = stringResource(R.string.settings_memory_title),
                     body = stringResource(R.string.settings_memory_body),
@@ -209,7 +210,7 @@ fun SettingsScreen(
                     trailing = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 )
             }
-            item {
+            item(contentType = "nav-row") {
                 AzfNavigationRow(
                     title = stringResource(R.string.settings_challenges_title),
                     body = stringResource(R.string.settings_challenges_body),
@@ -218,7 +219,7 @@ fun SettingsScreen(
                     trailing = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 )
             }
-            item {
+            item(contentType = "nav-row") {
                 AzfNavigationRow(
                     title = stringResource(R.string.settings_plan_title),
                     body = stringResource(R.string.settings_plan_body),
@@ -227,7 +228,7 @@ fun SettingsScreen(
                     trailing = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 )
             }
-            item {
+            item(contentType = "nav-row") {
                 AzfNavigationRow(
                     title = if (state.exporting) {
                         stringResource(R.string.settings_export_preparing)
@@ -241,29 +242,29 @@ fun SettingsScreen(
                 )
             }
 
-            item { AzfSectionHeading(stringResource(R.string.settings_legal_heading)) }
-            item {
+            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_legal_heading)) }
+            item(contentType = "legal") {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     AzfNavigationRow(
                         title = stringResource(R.string.settings_privacy_policy),
                         body = stringResource(R.string.settings_link_opens_browser),
                         onClick = { open(ExternalLinks.PRIVACY) },
                         icon = Icons.Outlined.Shield,
-                        trailing = Icons.Outlined.OpenInNew,
+                        trailing = Icons.AutoMirrored.Outlined.OpenInNew,
                     )
                     AzfNavigationRow(
                         title = stringResource(R.string.settings_terms),
                         body = stringResource(R.string.settings_link_opens_browser),
                         onClick = { open(ExternalLinks.TERMS) },
                         icon = Icons.Outlined.Description,
-                        trailing = Icons.Outlined.OpenInNew,
+                        trailing = Icons.AutoMirrored.Outlined.OpenInNew,
                     )
                     AzfNavigationRow(
                         title = stringResource(R.string.settings_support),
                         body = stringResource(R.string.settings_link_opens_browser),
                         onClick = { open(ExternalLinks.SUPPORT) },
-                        icon = Icons.Outlined.HelpOutline,
-                        trailing = Icons.Outlined.OpenInNew,
+                        icon = Icons.AutoMirrored.Outlined.HelpOutline,
+                        trailing = Icons.AutoMirrored.Outlined.OpenInNew,
                     )
                     // AGPL-3.0 §13: the source of the running program must be
                     // offered to its users. This row is a licence obligation,
@@ -274,30 +275,43 @@ fun SettingsScreen(
                         body = stringResource(R.string.settings_source_code_body),
                         onClick = { open(ExternalLinks.SOURCE_CODE) },
                         icon = Icons.Outlined.Code,
-                        trailing = Icons.Outlined.OpenInNew,
+                        trailing = Icons.AutoMirrored.Outlined.OpenInNew,
                     )
                     AzfNavigationRow(
                         title = stringResource(R.string.settings_licence),
                         body = stringResource(R.string.settings_link_opens_browser),
                         onClick = { open(ExternalLinks.LICENCE) },
                         icon = Icons.Outlined.Gavel,
-                        trailing = Icons.Outlined.OpenInNew,
+                        trailing = Icons.AutoMirrored.Outlined.OpenInNew,
                     )
                 }
             }
 
-            item { AzfSectionHeading(stringResource(R.string.settings_danger_heading)) }
-            item { DeletionCard(state, viewModel, onOpenWeb = { open(ExternalLinks.ACCOUNT_DELETION) }) }
+            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_danger_heading)) }
+            item(contentType = "deletion") {
+                DeletionCard(
+                    state = state,
+                    viewModel = viewModel,
+                    onOpenWeb = { open(ExternalLinks.ACCOUNT_DELETION) },
+                )
+            }
 
-            item {
+            item(contentType = "sign-out") {
                 SecondaryButton(
-                    text = stringResource(R.string.settings_sign_out),
+                    text = stringResource(
+                        if (state.signingOut) {
+                            R.string.settings_sign_out_draining
+                        } else {
+                            R.string.settings_sign_out
+                        },
+                    ),
                     onClick = { viewModel.signOut() },
+                    enabled = !state.signingOut,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
 
-            item {
+            item(contentType = "version") {
                 Text(
                     text = stringResource(
                         R.string.settings_version,
@@ -683,7 +697,7 @@ private fun SettingsDialogs(state: SettingsUiState, viewModel: SettingsViewModel
             title = stringResource(R.string.settings_sign_out_pending_title),
             body = stringResource(R.string.settings_sign_out_pending_body, dialog.pending),
             confirmLabel = stringResource(R.string.settings_sign_out_pending_confirm),
-            busy = false,
+            busy = state.signingOut,
             onConfirm = { viewModel.signOut(force = true) },
             onDismiss = viewModel::dismissDialog,
         )
@@ -785,11 +799,18 @@ private fun formatWeight(weightKg: Double, unit: UnitPreference): String {
     }
 }
 
-/** "August 2026" from the ISO timestamp `/me` returns; the raw value on failure. */
+/**
+ * "August 2026" from the ISO timestamp `/me` returns; the raw value on failure.
+ *
+ * Called from inside the identity card's composition, so the formatter comes
+ * from the [LocaleFormatters] cache instead of being compiled per call.
+ */
 private fun formatMonthYear(isoTimestamp: String): String = runCatching {
     val date = java.time.OffsetDateTime.parse(isoTimestamp).toLocalDate()
-    YearMonth.from(date).format(DateTimeFormatter.ofPattern("LLLL yyyy", Locale.getDefault()))
+    YearMonth.from(date).format(LocaleFormatters.of(MONTH_YEAR_PATTERN))
 }.getOrDefault(isoTimestamp)
+
+private const val MONTH_YEAR_PATTERN = "LLLL yyyy"
 
 @Preview(showBackground = true, backgroundColor = 0xFF0E1416, heightDp = 1600)
 @Composable

@@ -15,6 +15,8 @@ import fit.aquazero.app.core.model.DietaryPreference
 import fit.aquazero.app.core.model.ProfileInputDto
 import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
+import fit.aquazero.app.core.sync.ConnectivityMonitor
+import fit.aquazero.app.core.sync.OutboxDrainCoordinator
 import fit.aquazero.app.core.ui.reminders.ReminderPrefsStore
 import fit.aquazero.app.core.ui.reminders.ReminderScheduler
 import kotlinx.coroutines.channels.Channel
@@ -62,6 +64,8 @@ data class SettingsUiState(
     /** Set once deletion has been requested in this session. */
     val deletionRequestedAt: String? = null,
     val pendingOutbox: Int = 0,
+    /** True while a logout drain or final sign-out is in flight. */
+    val signingOut: Boolean = false,
 ) {
     /** False while a profile write is in flight, so a second tap cannot race it. */
     val profileEditable: Boolean get() = profile != null && !savingProfile
@@ -69,7 +73,7 @@ data class SettingsUiState(
 
 /** One-shot effects. */
 sealed interface SettingsEvent {
-    data class Message(@StringRes val messageRes: Int, val isError: Boolean = false) : SettingsEvent
+    data class Message(@param:StringRes val messageRes: Int, val isError: Boolean = false) : SettingsEvent
 
     /** The export bundle is ready; the screen hands it to the share sheet. */
     data class ShareExport(val json: String) : SettingsEvent
@@ -94,6 +98,8 @@ class SettingsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val reminderPrefsStore: ReminderPrefsStore,
     private val reminderScheduler: ReminderScheduler,
+    private val connectivityMonitor: ConnectivityMonitor,
+    private val outboxDrainCoordinator: OutboxDrainCoordinator,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -358,22 +364,43 @@ class SettingsViewModel @Inject constructor(
     // ----- session -----
 
     /**
-     * Sign out. Entries the outbox has not drained are lost with the session,
-     * so a non-empty outbox raises a confirmation naming the count rather than
-     * discarding them quietly (plan §4.2).
+     * Sign out. When the outbox still holds unsynced entries the flow is:
+     * 1. online → drain with visible progress, then sign out if empty;
+     * 2. still pending or offline → confirm abandonment (plan §4.2).
      */
     fun signOut(force: Boolean = false) {
+        if (_uiState.value.signingOut) return
+        if (force) {
+            viewModelScope.launch { finishSignOut() }
+            return
+        }
         val pending = _uiState.value.pendingOutbox
-        if (!force && pending > 0) {
+        if (pending == 0) {
+            viewModelScope.launch { finishSignOut() }
+            return
+        }
+        if (!connectivityMonitor.currentlyOnline()) {
             showDialog(SettingsDialog.SignOutWithPending(pending))
             return
         }
         viewModelScope.launch {
-            reminderScheduler.cancelAll()
-            authRepository.logout()
-            _uiState.value = _uiState.value.copy(dialog = null)
-            _events.send(SettingsEvent.SignedOut)
+            _uiState.value = _uiState.value.copy(signingOut = true)
+            val remaining = outboxDrainCoordinator.drainForLogout()
+            if (remaining == 0) {
+                finishSignOut()
+            } else {
+                _uiState.value = _uiState.value.copy(signingOut = false)
+                showDialog(SettingsDialog.SignOutWithPending(remaining))
+            }
         }
+    }
+
+    private suspend fun finishSignOut() {
+        _uiState.value = _uiState.value.copy(signingOut = true)
+        reminderScheduler.cancelAll()
+        authRepository.logout()
+        _uiState.value = _uiState.value.copy(dialog = null, signingOut = false)
+        _events.send(SettingsEvent.SignedOut)
     }
 
     private fun emit(@StringRes messageRes: Int, isError: Boolean = false) {

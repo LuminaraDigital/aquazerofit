@@ -6,8 +6,14 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="datastore/azf_auth.preferences_pb" />
+        <exclude domain="database" path="azf.db" />
+        <exclude domain="database" path="azf.db-wal" />
+        <exclude domain="database" path="azf.db-shm" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/azf_auth.preferences_pb" />
+        <exclude domain="database" path="azf.db" />
+        <exclude domain="database" path="azf.db-wal" />
+        <exclude domain="database" path="azf.db-shm" />
     </device-transfer>
 </data-extraction-rules>

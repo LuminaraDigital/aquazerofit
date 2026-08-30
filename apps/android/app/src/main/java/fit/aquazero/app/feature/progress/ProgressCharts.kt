@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -122,7 +123,9 @@ fun WeightChart(
 ) {
     val lineColor = LocalAzfExtended.current.primaryFixedDim
     val goalColor = LocalAzfExtended.current.secondaryFixedDim
-    val values = points.map { it.value }
+    // The projection only needs the values; extracting them is O(n) and the
+    // series changes far less often than this composable runs.
+    val values = remember(points) { points.map { it.value } }
     Canvas(
         modifier = modifier
             .fillMaxWidth()

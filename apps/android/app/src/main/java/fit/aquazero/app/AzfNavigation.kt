@@ -17,13 +17,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.core.auth.AuthState
@@ -140,6 +143,7 @@ private fun PreAuthFlow() {
     NavDisplay(
         backStack = backStack,
         onBack = { backStack.removeLastOrNull() },
+        entryDecorators = azfEntryDecorators(),
         entryProvider = entryProvider {
             entry<WelcomeKey> {
                 WelcomeScreen(
@@ -218,6 +222,7 @@ private fun MainShell(
                 NavDisplay(
                     backStack = backStack,
                     onBack = { backStack.removeLastOrNull() },
+                    entryDecorators = azfEntryDecorators(),
                     entryProvider = entryProvider {
                         // ----- tab roots -----
                         entry<DashboardKey> {
@@ -399,3 +404,29 @@ private fun MainShell(
         }
     }
 }
+
+/**
+ * Entry decorators for every [NavDisplay] in the app.
+ *
+ * The ViewModel one is why this exists. Navigation 3 ships no ViewModelStore
+ * decorator by default, so without it every `hiltViewModel()` resolved
+ * `LocalViewModelStoreOwner` to the Activity: screen ViewModels were never
+ * `onCleared()` when an entry was popped, survived `backStack.clear()` on a
+ * tab switch, and two entries of one type shared a single instance. The
+ * dependency was already declared and simply never wired up.
+ *
+ * The saveable-state decorator is NavDisplay's own default, restored by hand:
+ * passing `entryDecorators` REPLACES the default list rather than adding to
+ * it, so omitting it would quietly drop per-entry saveable state.
+ *
+ * NavDisplay's scene decorators are deliberately absent. Their factories
+ * (`rememberSceneSetupNavEntryDecorator`, and the shared-element one, which
+ * also needs a `SharedTransitionScope` NavDisplay owns) are `internal` to the
+ * library, so no caller can supply them — which means NavDisplay applies them
+ * itself around whatever this list contains. Do not try to add them.
+ */
+@Composable
+private fun <T : Any> azfEntryDecorators(): List<NavEntryDecorator<T>> = listOf(
+    rememberSaveableStateHolderNavEntryDecorator(),
+    rememberViewModelStoreNavEntryDecorator(),
+)

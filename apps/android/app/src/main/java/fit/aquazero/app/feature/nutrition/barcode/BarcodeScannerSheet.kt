@@ -1,6 +1,7 @@
 package fit.aquazero.app.feature.nutrition.barcode
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -52,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -60,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -72,9 +75,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.android.gms.common.moduleinstall.ModuleInstall
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -105,6 +109,7 @@ import fit.aquazero.app.feature.nutrition.NutritionMath
 import fit.aquazero.app.feature.nutrition.awaitOnMain
 import fit.aquazero.app.feature.nutrition.findActivity
 import fit.aquazero.app.feature.nutrition.openAppSettings
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import androidx.compose.ui.tooling.preview.Preview as ComposePreview
 
@@ -117,12 +122,51 @@ private val BARCODE_FORMATS = intArrayOf(
 )
 
 /**
+ * Ask Play services to fetch the barcode model in the background.
+ *
+ * We ship the *unbundled* scanner (`play-services-mlkit-barcode-scanning`),
+ * which carries no native model — that is what keeps 20.2 MB of
+ * `libbarhopper_v3.so` out of the APK. The price is that on a device which has
+ * never scanned anything the model is not there yet, and the first scan either
+ * stalls behind a download or fails outright.
+ *
+ * `deferredInstall` fixes that without costing the user anything: it queues the
+ * download for a moment Play services considers cheap and returns immediately.
+ * It is a no-op once the module is present, so calling it speculatively — on
+ * every visit to the nutrition tab, on every scanner failure — is correct and
+ * free. Nothing here is awaited and nothing here reports success; treat it as a
+ * hint, never as a precondition.
+ *
+ * Every line of it can throw on a device with no Play services, broken Play
+ * services, or a stripped ROM — which is precisely the device this exists to
+ * help — so the whole thing is swallowed. A failed hint must never be the
+ * reason a screen does not open.
+ */
+fun prefetchBarcodeScannerModule(context: Context) {
+    runCatching {
+        // The scanner client doubles as the `OptionalModuleApi` descriptor that
+        // names the module to fetch; close it once the request is lodged so we
+        // do not leave a detector pipeline open just to read a descriptor.
+        val descriptor = BarcodeScanning.getClient()
+        ModuleInstall.getClient(context)
+            .deferredInstall(descriptor)
+            .addOnCompleteListener { descriptor.close() }
+    }
+}
+
+/**
  * Barcode scan-and-log sheet.
  *
- * Scanning runs entirely on-device through ML Kit's bundled barcode model
+ * Scanning runs entirely on-device through ML Kit's barcode model
  * (`MlKitAnalyzer` + `camera-mlkit-vision`) — no frames leave the phone, so
  * this adds nothing to the Data safety declaration. Only the resolved code is
  * sent, to `GET /foods/barcode/:code`.
+ *
+ * The model itself lives in Play services rather than in our APK (see
+ * [prefetchBarcodeScannerModule]), so "the scanner works" is not something this
+ * screen may assume. [LiveScanner] treats a scanner that will not start as an
+ * ordinary state, not as an error, and the manual-entry field below it is
+ * always on screen for exactly that reason.
  *
  * Three things are non-negotiable in the result card: the Nutri-Score badge,
  * the deterministic allergen warning (declared allergens ∩ the user's
@@ -155,6 +199,11 @@ fun BarcodeScannerSheet(
     }
 
     LaunchedEffect(Unit) {
+        // Backstop only. By the time the sheet is open this is too late to help
+        // *this* scan, so the lead wires the real call at the nutrition tab —
+        // but a cheap no-op here means a device that failed once has the model
+        // queued before the user tries again.
+        prefetchBarcodeScannerModule(context)
         val granted = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.CAMERA,
@@ -317,43 +366,67 @@ private fun LiveScanner(
     var surfaceRequest by remember { mutableStateOf<SurfaceRequest?>(null) }
     var camera by remember { mutableStateOf<Camera?>(null) }
     var hasTorch by remember { mutableStateOf(false) }
+    var unavailable by remember { mutableStateOf(false) }
+    // Bumped by the retry button; it is a key of the effect below, so a new
+    // value tears the old attempt down and starts a clean one.
+    var attempt by remember { mutableIntStateOf(0) }
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, attempt) {
         var provider: ProcessCameraProvider? = null
         var scanner: BarcodeScanner? = null
         var analysis: ImageAnalysis? = null
         val job = scope.launch {
-            val cameraProvider = ProcessCameraProvider.getInstance(context).awaitOnMain(context)
-            provider = cameraProvider
-            val options = BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(BARCODE_FORMATS.first(), *BARCODE_FORMATS.drop(1).toIntArray())
-                .build()
-            val barcodeScanner = BarcodeScanning.getClient(options)
-            scanner = barcodeScanner
-
-            val preview = Preview.Builder().build().apply {
-                setSurfaceProvider { request -> surfaceRequest = request }
-            }
-            val imageAnalysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-            analysis = imageAnalysis
-            val executor = ContextCompat.getMainExecutor(context)
-            imageAnalysis.setAnalyzer(
-                executor,
-                MlKitAnalyzer(
-                    listOf(barcodeScanner),
-                    ImageAnalysis.COORDINATE_SYSTEM_ORIGINAL,
-                    executor,
-                ) { result ->
-                    val hit = result.getValue(barcodeScanner)?.firstOrNull { barcode ->
-                        barcode.format in BARCODE_FORMATS
-                    }
-                    onDetected(hit?.rawValue)
-                },
-            )
-
+            // The WHOLE body is guarded, on purpose. This coroutine belongs to
+            // `rememberCoroutineScope()`, which carries no exception handler:
+            // anything that escapes it is an unhandled coroutine exception and
+            // takes the process down. Three separate calls below throw on
+            // devices that are otherwise working perfectly well:
+            //
+            //   * `ProcessCameraProvider.getInstance` — no camera at all, or a
+            //     vendor HAL that fails to initialise;
+            //   * `BarcodeScanning.getClient` — `MlKitException.UNAVAILABLE`
+            //     when Play services has not fetched the unbundled model yet or
+            //     is not on the device, and `IllegalStateException` if R8 ever
+            //     drops the ML Kit component registrar (the keep rule in
+            //     proguard-rules.pro guards that one trigger, and only that
+            //     one);
+            //   * `bindToLifecycle` — the camera is already held elsewhere.
+            //
+            // Only the last of those used to be covered. Narrowing this back to
+            // the bind call, or to any subset, restores the crash. If you need
+            // finer-grained handling, nest a `runCatching` inside — do not
+            // shrink this one.
             runCatching {
+                val cameraProvider = ProcessCameraProvider.getInstance(context).awaitOnMain(context)
+                provider = cameraProvider
+                val options = BarcodeScannerOptions.Builder()
+                    .setBarcodeFormats(BARCODE_FORMATS.first(), *BARCODE_FORMATS.drop(1).toIntArray())
+                    .build()
+                val barcodeScanner = BarcodeScanning.getClient(options)
+                scanner = barcodeScanner
+
+                val preview = Preview.Builder().build().apply {
+                    setSurfaceProvider { request -> surfaceRequest = request }
+                }
+                val imageAnalysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+                analysis = imageAnalysis
+                val executor = ContextCompat.getMainExecutor(context)
+                imageAnalysis.setAnalyzer(
+                    executor,
+                    MlKitAnalyzer(
+                        listOf(barcodeScanner),
+                        ImageAnalysis.COORDINATE_SYSTEM_ORIGINAL,
+                        executor,
+                    ) { result ->
+                        val hit = result.getValue(barcodeScanner)?.firstOrNull { barcode ->
+                            barcode.format in BARCODE_FORMATS
+                        }
+                        onDetected(hit?.rawValue)
+                    },
+                )
+
                 cameraProvider.unbindAll()
                 camera = cameraProvider.bindToLifecycle(
                     lifecycleOwner,
@@ -362,6 +435,17 @@ private fun LiveScanner(
                     imageAnalysis,
                 )
                 hasTorch = camera?.cameraInfo?.hasFlashUnit() == true
+            }.onFailure { error ->
+                // Cancellation is not a failure. `onDispose` cancels this job on
+                // every teardown and on every retry, and `runCatching` catches
+                // `CancellationException` like anything else — swallowing it
+                // here would break structured concurrency and would light the
+                // error state up on the way out, permanently wedging retry.
+                if (error is CancellationException) throw error
+                unavailable = true
+                // The most likely cause is a model that is not on the device
+                // yet, so queue it before offering the retry.
+                prefetchBarcodeScannerModule(context)
             }
         }
         onDispose {
@@ -371,6 +455,7 @@ private fun LiveScanner(
             scanner?.close()
             camera = null
             surfaceRequest = null
+            hasTorch = false
         }
     }
 
@@ -381,6 +466,33 @@ private fun LiveScanner(
         }
     }
 
+    if (unavailable) {
+        ScannerUnavailable(
+            bodyRes = R.string.barcode_scanner_unavailable,
+            actionRes = R.string.barcode_scanner_retry,
+            onAction = {
+                unavailable = false
+                attempt++
+            },
+        )
+    } else {
+        CameraSurface(
+            surfaceRequest = surfaceRequest,
+            torchOn = state.torchOn,
+            hasTorch = hasTorch,
+            onToggleTorch = onToggleTorch,
+        )
+    }
+}
+
+/** The viewfinder itself: preview, reticle, and the torch toggle over the top. */
+@Composable
+private fun CameraSurface(
+    surfaceRequest: SurfaceRequest?,
+    torchOn: Boolean,
+    hasTorch: Boolean,
+    onToggleTorch: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -405,13 +517,13 @@ private fun LiveScanner(
                     .background(Color.Black.copy(alpha = 0.5f)),
             ) {
                 Icon(
-                    imageVector = if (state.torchOn) {
+                    imageVector = if (torchOn) {
                         Icons.Outlined.FlashlightOn
                     } else {
                         Icons.Outlined.FlashlightOff
                     },
                     contentDescription = stringResource(
-                        if (state.torchOn) {
+                        if (torchOn) {
                             R.string.capture_torch_off_cd
                         } else {
                             R.string.capture_torch_on_cd
@@ -424,15 +536,33 @@ private fun LiveScanner(
     }
 }
 
+private val RETICLE_WIDTH = 240.dp
+private val RETICLE_HEIGHT = 140.dp
+
+/**
+ * How far the scan line travels either side of the reticle's centre, as a
+ * fraction of [RETICLE_HEIGHT]. At 0.35 the line swings ±49dp about the 70dp
+ * midpoint of a 140dp box — 21dp to 119dp — which stops it just inside the
+ * 18dp corner brackets at both ends. The animation runs over the *full* signed
+ * range; anything that discards the negative half halves the sweep.
+ */
+private const val SWEEP_FRACTION = 0.35f
+
 /** Aiming reticle: corner brackets plus a sweeping line (motion-gated). */
 @Composable
 private fun ScanReticle(modifier: Modifier = Modifier) {
     val accent = LocalAzfExtended.current.primaryFixedDim
     val reducedMotion = rememberReducedMotion()
     val transition = rememberInfiniteTransition(label = "reticle")
-    val sweep by transition.animateFloat(
-        initialValue = -0.35f,
-        targetValue = 0.35f,
+    // Deliberately NOT `by`: destructuring the State here would read `sweep`
+    // during composition, so every animation frame would recompose, remeasure
+    // and relayout this subtree — sixty times a second, on the same main
+    // thread that is already driving a CameraX preview and ML Kit analysis.
+    // Held as a State and read inside the `graphicsLayer` lambda below, the
+    // read happens in the draw phase instead: no composition, no layout.
+    val sweep = transition.animateFloat(
+        initialValue = -SWEEP_FRACTION,
+        targetValue = SWEEP_FRACTION,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1600, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
@@ -441,8 +571,8 @@ private fun ScanReticle(modifier: Modifier = Modifier) {
     )
     Box(
         modifier = modifier
-            .width(240.dp)
-            .height(140.dp)
+            .width(RETICLE_WIDTH)
+            .height(RETICLE_HEIGHT)
             .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(12.dp)),
     ) {
         Corner(accent, Alignment.TopStart)
@@ -455,9 +585,19 @@ private fun ScanReticle(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .height(2.dp)
                 .padding(horizontal = 8.dp)
-                .let { base ->
-                    if (reducedMotion) base else base.padding(top = (sweep * 120).dp.coerceAtLeast(0.dp))
-                }
+                // `translationY` is signed, so the line sweeps up as well as
+                // down. The old `padding(top = ...)` could not go negative and
+                // was clamped to zero, which silently threw away the whole
+                // upper half of the travel.
+                .then(
+                    if (reducedMotion) {
+                        Modifier
+                    } else {
+                        Modifier.graphicsLayer {
+                            translationY = sweep.value * RETICLE_HEIGHT.toPx()
+                        }
+                    },
+                )
                 .background(accent.copy(alpha = 0.9f)),
         )
     }

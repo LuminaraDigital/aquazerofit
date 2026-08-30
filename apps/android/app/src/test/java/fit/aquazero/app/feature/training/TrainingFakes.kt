@@ -67,6 +67,20 @@ class FakeTrainingDao : TrainingDao {
             draftUpdatedAtMs = 0L,
         )
     }
+
+    override suspend fun clearAllSessions() {
+        sessions.clear()
+        sessionFlow.value = null
+    }
+
+    override suspend fun clearAllPlans() {
+        plans.value = null
+    }
+
+    override suspend fun clearAllTraining() {
+        clearAllSessions()
+        clearAllPlans()
+    }
 }
 
 /** [PlansApi] fake; [plan] null makes every call fail like an offline device. */
@@ -138,4 +152,58 @@ class FakeWorkoutsApi(
         sessionId: String,
         body: SwapExerciseRequest,
     ): TodayWorkoutEnvelopeDto = todayEnvelope ?: throw IOException("offline")
+}
+
+class FakeCoachesRepository : fit.aquazero.app.core.data.CoachesRepository(
+    coachesApi = object : fit.aquazero.app.core.network.api.CoachesApi {
+        override suspend fun roster(): fit.aquazero.app.core.model.CoachRosterDto =
+            fit.aquazero.app.core.model.CoachRosterDto(activeCoachId = fit.aquazero.app.core.ui.CoachRoster.DEFAULT_ID)
+        override suspend fun select(
+            body: fit.aquazero.app.core.model.CoachSelectRequest,
+        ): fit.aquazero.app.core.model.CoachRosterDto =
+            fit.aquazero.app.core.model.CoachRosterDto(activeCoachId = body.coachId)
+        override suspend fun progression(): fit.aquazero.app.core.model.ProgressionStatusDto =
+            fit.aquazero.app.core.model.ProgressionStatusDto()
+        override suspend fun ackReactions(body: fit.aquazero.app.core.model.ReactionAckRequest) = Unit
+    },
+    catalogDao = object : fit.aquazero.app.core.database.CatalogDao {
+        override suspend fun upsertFoods(foods: List<fit.aquazero.app.core.database.FoodEntity>) = Unit
+        override suspend fun searchCachedFoods(
+            query: String,
+            limit: Int,
+        ) = emptyList<fit.aquazero.app.core.database.FoodEntity>()
+        override suspend fun foodById(id: String) = null
+        override fun recentFoods(
+            limit: Int,
+        ) = kotlinx.coroutines.flow.flowOf(emptyList<fit.aquazero.app.core.database.FoodEntity>())
+        override suspend fun touchFood(id: String, nowMs: Long) = Unit
+        override suspend fun upsertRecipes(recipes: List<fit.aquazero.app.core.database.RecipeEntity>) = Unit
+        override fun recipes() = kotlinx.coroutines.flow.flowOf(
+            emptyList<fit.aquazero.app.core.database.RecipeEntity>(),
+        )
+        override suspend fun recipeById(id: String) = null
+        override suspend fun upsertExercises(exercises: List<fit.aquazero.app.core.database.ExerciseEntity>) = Unit
+        override suspend fun upsertExerciseMedia(media: List<fit.aquazero.app.core.database.ExerciseMediaEntity>) = Unit
+        override suspend fun clearMediaFor(exerciseIds: List<String>) = Unit
+        override fun exercisesPage(
+            query: String,
+            category: String?,
+            limit: Int,
+            offset: Int,
+        ) = kotlinx.coroutines.flow.flowOf(emptyList<fit.aquazero.app.core.database.ExerciseEntity>())
+        override suspend fun exerciseById(id: String) = null
+        override suspend fun mediaFor(
+            exerciseId: String,
+        ) = emptyList<fit.aquazero.app.core.database.ExerciseMediaEntity>()
+        override suspend fun thumbnailsFor(
+            exerciseIds: List<String>,
+        ) = emptyList<fit.aquazero.app.core.database.ExerciseThumbnail>()
+        override suspend fun exerciseCount() = 0
+        override suspend fun upsertCoaches(coaches: List<fit.aquazero.app.core.database.CoachEntity>) = Unit
+        override fun coaches() = kotlinx.coroutines.flow.flowOf(emptyList<fit.aquazero.app.core.database.CoachEntity>())
+        override fun activeCoach() = kotlinx.coroutines.flow.flowOf(null)
+    },
+) {
+    override fun activeCoachId(): kotlinx.coroutines.flow.Flow<String?> =
+        kotlinx.coroutines.flow.flowOf(fit.aquazero.app.core.ui.CoachRoster.DEFAULT_ID)
 }

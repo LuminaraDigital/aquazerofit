@@ -36,7 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
@@ -59,8 +59,8 @@ import fit.aquazero.app.core.designsystem.revealOnEnter
 import fit.aquazero.app.core.model.ConsistencyStatusDto
 import fit.aquazero.app.core.model.ProgressSummaryDto
 import fit.aquazero.app.core.model.TrendPointDto
+import fit.aquazero.app.core.ui.LocaleFormatters
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -133,7 +133,12 @@ private fun ProgressContent(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(key = "ranges") {
+            // Every slot below declares a `contentType`. This list is entirely
+            // heterogeneous — a chip row, two charts, cards, a grid — so
+            // without one Compose treats the slots as interchangeable and
+            // discards the subcomposition whenever a slot's kind changes
+            // (loading → loaded, error → loaded, insight appearing).
+            item(key = "ranges", contentType = "ranges") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ProgressRange.entries.forEach { range ->
                         AzfChip(
@@ -146,7 +151,11 @@ private fun ProgressContent(
             }
 
             if (state.loading && state.summary == null) {
-                items(count = 3, key = { "progress-skeleton-$it" }) {
+                items(
+                    count = 3,
+                    key = { "progress-skeleton-$it" },
+                    contentType = { "skeleton" },
+                ) {
                     Skeleton(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -158,7 +167,7 @@ private fun ProgressContent(
             }
 
             if (state.refreshError && state.summary == null) {
-                item(key = "progress-error") {
+                item(key = "progress-error", contentType = "error") {
                     ErrorState(
                         title = stringResource(R.string.progress_error_title),
                         message = stringResource(R.string.progress_error_body),
@@ -171,7 +180,7 @@ private fun ProgressContent(
 
             val summary = state.summary ?: return@LazyColumn
 
-            item(key = "consistency") {
+            item(key = "consistency", contentType = "consistency") {
                 ConsistencyCard(
                     consistency = summary.consistency,
                     modifier = Modifier.revealOnEnter(0),
@@ -179,16 +188,16 @@ private fun ProgressContent(
             }
 
             state.insight?.let { insight ->
-                item(key = "insight") {
+                item(key = "insight", contentType = "insight") {
                     WeeklyInsightCard(insight = insight, modifier = Modifier.revealOnEnter(1))
                 }
             }
 
-            item(key = "weight-hero") {
+            item(key = "weight-hero", contentType = "weight-hero") {
                 WeightHeroRow(state = state, modifier = Modifier.revealOnEnter(2))
             }
 
-            item(key = "weight-chart") {
+            item(key = "weight-chart", contentType = "weight-chart") {
                 AzfCard(tier = AzfCardTier.Hero, modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -244,7 +253,7 @@ private fun ProgressContent(
                 }
             }
 
-            item(key = "kcal") {
+            item(key = "kcal", contentType = "kcal-chart") {
                 AzfCard(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = stringResource(R.string.progress_calorie_trend).uppercase(),
@@ -283,7 +292,7 @@ private fun ProgressContent(
                 }
             }
 
-            item(key = "stats") {
+            item(key = "stats", contentType = "stats") {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MetricCard(
                         label = stringResource(R.string.progress_stat_workouts),
@@ -304,7 +313,7 @@ private fun ProgressContent(
                 }
             }
 
-            item(key = "macros") {
+            item(key = "macros", contentType = "macros") {
                 AzfCard(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = stringResource(R.string.progress_macro_split).uppercase(),
@@ -328,7 +337,7 @@ private fun ProgressContent(
                 }
             }
 
-            item(key = "achievements-header") {
+            item(key = "achievements-header", contentType = "heading") {
                 Spacer(modifier = Modifier.height(AzfSpacing.ElementGapSmall))
                 Text(
                     text = stringResource(R.string.progress_achievements).uppercase(),
@@ -337,7 +346,7 @@ private fun ProgressContent(
                 )
             }
 
-            item(key = "achievements") {
+            item(key = "achievements", contentType = "achievements") {
                 if (summary.achievements.isEmpty()) {
                     EmptyState(
                         title = stringResource(R.string.progress_no_badges_title),
@@ -353,7 +362,11 @@ private fun ProgressContent(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         userScrollEnabled = false,
                     ) {
-                        items(summary.achievements, key = { it.definition.id }) { achievement ->
+                        items(
+                            items = summary.achievements,
+                            key = { it.definition.id },
+                            contentType = { "achievement" },
+                        ) { achievement ->
                             AchievementTile(
                                 status = achievement,
                                 earnedDateLabel = achievement.earnedAt
@@ -365,7 +378,7 @@ private fun ProgressContent(
                 }
             }
 
-            item(key = "actions") {
+            item(key = "actions", contentType = "actions") {
                 Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
                 PrimaryButton(
                     text = stringResource(R.string.progress_log_weight),
@@ -504,9 +517,14 @@ internal fun signedKg(value: Double): String {
     return "$sign${String.format(Locale.US, "%.1f", abs(value))} kg"
 }
 
-/** "14 Aug" in the device locale; falls back to the raw string when unparsable. */
+/**
+ * "14 Aug" in the device locale; falls back to the raw string when unparsable.
+ *
+ * Called once per achievement tile and twice per chart, so the formatter is
+ * cached by [LocaleFormatters] instead of compiled from the pattern each time.
+ */
 internal fun shortDate(isoDate: String): String = runCatching {
-    LocalDate.parse(isoDate).format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
+    LocalDate.parse(isoDate).format(LocaleFormatters.of(SHORT_DATE_PATTERN))
 }.getOrDefault(isoDate)
 
 private fun achievementGridHeight(count: Int): Int {
@@ -527,6 +545,7 @@ private fun Context.shareText(subject: String, body: String, chooserTitle: Strin
 private const val ACHIEVEMENT_COLUMNS = 3
 private const val ACHIEVEMENT_ROW_HEIGHT = 116
 private const val ISO_DATE_LENGTH = 10
+private const val SHORT_DATE_PATTERN = "d MMM"
 
 @Preview(showBackground = true, backgroundColor = 0xFF0E1416)
 @Composable

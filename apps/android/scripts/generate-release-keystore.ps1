@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Generates a production 4096-bit RSA release signing keystore for AquaZeroFit Android.
 .DESCRIPTION
@@ -21,8 +21,16 @@ if ($env:JAVA_HOME -and (Test-Path "$env:JAVA_HOME\bin\keytool.exe")) {
 }
 
 if (-not $Password) {
-    # Generate random 24-character password if not provided
-    $Password = [System.Web.Security.Membership]::GeneratePassword(24, 4)
+    # Generate random 24-character alphanumeric password if not provided
+    $chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    $bytes = New-Object byte[] 24
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $passBuilder = New-Object System.Text.StringBuilder
+    foreach ($b in $bytes) {
+        $idx = $b % $chars.Length
+        [void]$passBuilder.Append($chars[$idx])
+    }
+    $Password = $passBuilder.ToString()
     Write-Host "Generated strong keystore password: $Password" -ForegroundColor Yellow
 }
 

@@ -12,14 +12,17 @@ import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.MealRecommendationDto
 import fit.aquazero.app.core.model.WorkoutSessionStatus
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Clock
 import javax.inject.Inject
 
 /** Coarse load phase of the day's nutrition (skeleton / content / retry). */
@@ -104,7 +107,7 @@ data class DashboardUiState(
 /** One-shot effects; the screen turns these into toasts. */
 sealed interface DashboardEvent {
     /** Show a transient message. */
-    data class Message(@StringRes val messageRes: Int, val kind: ToastKind) : DashboardEvent
+    data class Message(@param:StringRes val messageRes: Int, val kind: ToastKind) : DashboardEvent
 }
 
 /**
@@ -113,15 +116,27 @@ sealed interface DashboardEvent {
  * calmly. The water tap is optimistic: the Room write lands immediately and
  * the ring moves with it, and a failure rolls the local state back with a
  * toast — nothing is ever silently lost.
+ *
+ * The day is never cached. A dashboard left on the back stack outlives
+ * midnight, so [clock] is injected and re-read at every use: the string this
+ * screen keys Room reads and water writes on is always the current wall-clock
+ * day, and [observedDay] carries the Room collection onto the new one when it
+ * turns over.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val data: DashboardData,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 
-    private val today = LocalDates.today()
+    /** Recomputed on every read — see the class KDoc; never store this. */
+    private val today: String get() = LocalDates.today(clock)
 
-    private val _uiState = MutableStateFlow(DashboardUiState(today = today))
+    /** The day the Room collection and the day fetch are keyed on. */
+    private val observedDay = MutableStateFlow(today)
+
+    private val _uiState = MutableStateFlow(DashboardUiState(today = observedDay.value))
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
     private val _events = MutableSharedFlow<DashboardEvent>(
@@ -135,9 +150,40 @@ class DashboardViewModel @Inject constructor(
         refresh()
     }
 
+    /**
+     * Re-key the screen onto the current wall-clock day, and return it.
+     *
+     * "Today" is not a value a ViewModel can hold: this one survives
+     * backgrounding, so a session opened at 23:50 is still alive at 00:05 and
+     * would otherwise file every tap against yesterday. Publishing to
+     * [observedDay] restarts the Room collection through `flatMapLatest`, and
+     * the server-side day totals are dropped because they belong to the day
+     * that just ended.
+     */
+    private fun syncToToday(): String {
+        val current = today
+        if (observedDay.value != current) {
+            observedDay.value = current
+            _uiState.update {
+                it.copy(today = current, serverWaterMl = 0, kcalBurned = 0.0)
+            }
+        }
+        return current
+    }
+
+    /**
+     * Called by the screen every time it resumes. A session that crossed
+     * midnight while backgrounded moves onto the new day and refetches it;
+     * a resume on the same day costs nothing.
+     */
+    fun onResumed() {
+        if (observedDay.value == today) return
+        refresh()
+    }
+
     private fun observeRoom() {
         viewModelScope.launch {
-            data.dailyNutrition(today).collect { nutrition ->
+            observedDay.flatMapLatest { data.dailyNutrition(it) }.collect { nutrition ->
                 _uiState.update { state ->
                     val next = state.copy(nutrition = nutrition)
                     // Content arriving from Room clears an earlier fetch error:
@@ -184,8 +230,9 @@ class DashboardViewModel @Inject constructor(
 
     /** Refresh-on-observe: pull the day, the account and the progress snapshot. */
     fun refresh() {
+        val localDate = syncToToday()
         viewModelScope.launch {
-            when (val day = data.refreshDay(today)) {
+            when (val day = data.refreshDay(localDate)) {
                 is ApiResult.Success -> _uiState.update {
                     it.copy(
                         phase = DashboardPhase.Ready,
@@ -237,13 +284,18 @@ class DashboardViewModel @Inject constructor(
      * One-tap +250 ml. Optimistic by construction — [DashboardData.logWater]
      * writes Room first and returns before the network is involved — so the
      * only failure we can surface is the local write itself.
+     *
+     * The day is resolved here rather than at construction, so a tap made
+     * after midnight is filed against the day the user is actually in — and
+     * the card jumps to that day with it.
      */
     fun logWater(amountMl: Int = WATER_INCREMENT_ML) {
         if (_uiState.value.waterPending) return
+        val localDate = syncToToday()
         _uiState.update { it.copy(waterPending = true) }
         viewModelScope.launch {
             val before = _uiState.value.serverWaterMl
-            runCatching { data.logWater(amountMl, today) }
+            runCatching { data.logWater(amountMl, localDate) }
                 .onSuccess {
                     _uiState.update { state -> state.copy(waterPending = false) }
                     emit(DashboardEvent.Message(R.string.water_logged, ToastKind.Success))

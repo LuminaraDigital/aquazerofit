@@ -318,9 +318,13 @@ export class PostgresStore extends MemoryBackedStore {
     const result = await this.exec.query(stmt.text, stmt.values);
     if (result.rows.length === 0) return undefined;
     const row = result.rows[0] as { doc: RefreshTokenRecord };
-    // Hydrate the updated document into memory
-    const updated = row.doc;
-    this.container('users').set(tokenId, updated);
+    // Fold the durably-updated row back into the local copy. Not markDirty:
+    // the database already has it, and re-flushing would overwrite a newer
+    // version another instance may have written. setWithoutDirty rather than a
+    // bare container().set so index maintenance is not bypassed here (see
+    // MemoryBackedStore.setWithoutDirty).
+    const updated = { ...row.doc, id: tokenId };
+    this.setWithoutDirty('users', updated);
     return updated;
   }
 }

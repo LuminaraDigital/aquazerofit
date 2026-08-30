@@ -10,9 +10,12 @@ data class WellnessProfileDto(
     val heightCm: Double,
     val age: Int,
     val sex: Sex = Sex.UNSPECIFIED,
-    val goal: Goal,
-    val activityLevel: ActivityLevel,
-    val exerciseExperience: ExerciseExperience,
+    // The three below are defaulted for decode tolerance only: a value this
+    // build does not recognise must not fail the whole profile. Each falls
+    // back to the least assuming option rather than a flattering one.
+    val goal: Goal = Goal.MAINTAIN,
+    val activityLevel: ActivityLevel = ActivityLevel.SEDENTARY,
+    val exerciseExperience: ExerciseExperience = ExerciseExperience.BEGINNER,
     val dietaryPreferences: List<DietaryPreference> = emptyList(),
     val allergies: List<Allergen> = emptyList(),
     val equipment: List<Equipment> = emptyList(),
@@ -21,7 +24,14 @@ data class WellnessProfileDto(
     val updatedAt: String,
 )
 
-/** Body for `PUT /me/profile` (shared `profileSchema`). */
+/**
+ * Body for `PUT /me/profile` (shared `profileSchema`).
+ *
+ * Outbound only — nothing ever decodes this type, so [goal], [activityLevel]
+ * and [exerciseExperience] deliberately stay required. `coerceInputValues` has
+ * no bearing on an encode, and a default here would buy nothing while making
+ * it possible to silently ship someone else's goal for a user who chose one.
+ */
 @Serializable
 data class ProfileInputDto(
     val weightKg: Double,
@@ -77,9 +87,21 @@ data class ConsentUpdateRequest(
 /** Response of `GET /me/entitlements`. */
 @Serializable
 data class EntitlementsDto(
-    val tier: UserTier,
+    /** Defaults to the *least* entitled tier: an unreadable tier grants nothing. */
+    val tier: UserTier = UserTier.FREE,
     val dailyCredits: Int,
     val creditsRemaining: Int,
+    /**
+     * Ceiling on a banked balance — the daily grant tops [creditsRemaining] up
+     * towards this number and never past it.
+     *
+     * Defaults to 0, which is the sentinel for "this server did not say":
+     * builds predating the ceiling omit the field and still carry unspent
+     * credits over without limit. Any other default would be a number the plan
+     * screen prints as fact, so a stale server would have the app quote a
+     * savings ceiling nobody is enforcing.
+     */
+    val maxBankedCredits: Int = 0,
     val costs: Map<String, Int> = emptyMap(),
     val premiumLanes: List<String> = emptyList(),
 )

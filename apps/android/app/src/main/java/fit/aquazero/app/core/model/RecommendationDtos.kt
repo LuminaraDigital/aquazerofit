@@ -26,7 +26,10 @@ data class MealRecommendationDto(
 /** Body for `POST /recommendations/meals`. */
 @Serializable
 data class MealRecommendationRequest(
-    /** Required by the route: it rejects the call without both of these. */
+    /**
+     * Required by the route: it rejects the call without both of these.
+     * Outbound only, so no decode-tolerance default belongs here.
+     */
     val mealType: MealType,
     val localDate: String,
 )

@@ -17,7 +17,8 @@
 import crypto from 'node:crypto';
 import { AppError } from '../../platform/errors';
 import { store } from '../../platform/store';
-import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS } from '@aquazerofit/shared';
+import { CREDIT_COSTS, dailyCreditsFor, maxBankedCreditsFor } from '@aquazerofit/shared';
+import type { UserTier } from '@aquazerofit/shared';
 import type { CreditTask, CreditTransaction } from '@aquazerofit/shared';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,9 +51,9 @@ function todayIsoDate(): string {
 }
 
 export interface CreditLedger {
-  grantDailyIfNeeded(userId: string): Promise<boolean>;
+  grantDailyIfNeeded(userId: string, tier?: UserTier): Promise<boolean>;
   balance(userId: string): Promise<number>;
-  reserve(userId: string, task: CreditTask): Promise<string>;
+  reserve(userId: string, task: CreditTask, tier?: UserTier): Promise<string>;
   commit(reservationId: string): Promise<boolean>;
   release(reservationId: string): Promise<boolean>;
 }
@@ -133,19 +134,43 @@ export function createCreditLedger(getContainer: () => LedgerContainer): CreditL
    * method there would wait on a chain this call is itself the head of, and
    * deadlock every credit spend for that user.
    */
-  async function grantDailyUnlocked(userId: string): Promise<boolean> {
+  async function grantDailyUnlocked(userId: string, tier: UserTier = 'free'): Promise<boolean> {
       const today = todayIsoDate();
       const txs = await userTxs(userId);
       const alreadyGranted = txs.some(
         (t) => t.kind === 'grant' && t.reason === 'dailyGrant' && t.createdAt.slice(0, 10) === today,
       );
       if (alreadyGranted) return false;
+
+      /*
+       * Top up TOWARD the ceiling, never past it.
+       *
+       * The balance is a plain fold with no upper bound, so before this clamp
+       * an account that triggered the grant daily without spending banked one
+       * FREE_TIER_DAILY_CREDITS per day forever, then could discharge the
+       * whole stockpile in a single sitting. The daily grant was doing nothing
+       * to bound cost per user per day; it bounded only the long-run average.
+       *
+       * The write happens even when `topUp` is 0. A zero-amount grant is a
+       * no-op on the fold but it is what keeps `alreadyGranted` true for the
+       * rest of the day — skip it and the next reserve re-runs this branch,
+       * sees room freed by the intervening spend, and tops up again. That
+       * turns the ceiling into "restore to MAX_BANKED_CREDITS on demand",
+       * which is strictly more generous than the uncapped behaviour it was
+       * meant to replace. It also leaves an honest audit row: on this day the
+       * grant was assessed and came to nothing.
+       */
+      const daily = dailyCreditsFor(tier);
+      const ceiling = maxBankedCreditsFor(tier);
+      const current = txs.reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0);
+      const topUp = Math.max(0, Math.min(daily, ceiling - current));
+
       await append({
         id: txId(),
         userId,
         type: 'creditTransaction',
         kind: 'grant',
-        amount: FREE_TIER_DAILY_CREDITS,
+        amount: topUp,
         reason: 'dailyGrant',
         createdAt: new Date().toISOString(),
       });
@@ -158,12 +183,12 @@ export function createCreditLedger(getContainer: () => LedgerContainer): CreditL
   }
 
   /** The hold, WITHOUT taking the lock. See [grantDailyUnlocked]. */
-  async function reserveUnlocked(userId: string, task: CreditTask): Promise<string> {
+  async function reserveUnlocked(userId: string, task: CreditTask, tier: UserTier = 'free'): Promise<string> {
       const cost = CREDIT_COSTS[task];
       if (typeof cost !== 'number') {
         throw new AppError('VALIDATION_FAILED', `Unknown credit task: ${String(task)}`);
       }
-    await grantDailyUnlocked(userId);
+    await grantDailyUnlocked(userId, tier);
     const available = await balanceUnlocked(userId);
       if (available < cost) {
         throw new AppError(
@@ -186,14 +211,65 @@ export function createCreditLedger(getContainer: () => LedgerContainer): CreditL
       return reservationId;
   }
 
+  /** Settlement as spent, WITHOUT taking the lock. See [grantDailyUnlocked]. */
+  async function commitUnlocked(reservationId: string): Promise<boolean> {
+    const txs = await reservationTxs(reservationId);
+    const reserveTx = txs.find((t) => t.kind === 'reserve');
+    const settled = txs.some((t) => t.kind === 'commit' || t.kind === 'release');
+    if (!reserveTx || settled) return false;
+    const cost = Math.abs(reserveTx.amount);
+    const now = new Date().toISOString();
+    // Two entries keep the plain fold correct and each doc's sign canonical.
+    await append({
+      id: txId(),
+      userId: reserveTx.userId,
+      type: 'creditTransaction',
+      kind: 'release',
+      amount: cost,
+      reservationId,
+      reason: 'settleReservation',
+      createdAt: now,
+    });
+    await append({
+      id: txId(),
+      userId: reserveTx.userId,
+      type: 'creditTransaction',
+      kind: 'commit',
+      amount: -cost,
+      reservationId,
+      reason: reserveTx.reason.replace(/^reserve:/, 'commit:'),
+      createdAt: now,
+    });
+    return true;
+  }
+
+  /** Return the hold, WITHOUT taking the lock. See [grantDailyUnlocked]. */
+  async function releaseUnlocked(reservationId: string): Promise<boolean> {
+    const txs = await reservationTxs(reservationId);
+    const reserveTx = txs.find((t) => t.kind === 'reserve');
+    const settled = txs.some((t) => t.kind === 'commit' || t.kind === 'release');
+    if (!reserveTx || settled) return false;
+    await append({
+      id: txId(),
+      userId: reserveTx.userId,
+      type: 'creditTransaction',
+      kind: 'release',
+      amount: Math.abs(reserveTx.amount),
+      reservationId,
+      reason: 'releaseReservation',
+      createdAt: new Date().toISOString(),
+    });
+    return true;
+  }
+
   return {
     /**
      * One FREE_TIER_DAILY_CREDITS grant per user per UTC day.
      * Serialised per user so two simultaneous requests cannot both decide the
      * grant is missing and issue it.
      */
-    grantDailyIfNeeded(userId: string): Promise<boolean> {
-      return withKeyLock(userId, () => grantDailyUnlocked(userId));
+    grantDailyIfNeeded(userId: string, tier: UserTier = 'free'): Promise<boolean> {
+      return withKeyLock(userId, () => grantDailyUnlocked(userId, tier));
     },
 
     /** Balance = fold. No cached counters, ever. */
@@ -210,59 +286,28 @@ export function createCreditLedger(getContainer: () => LedgerContainer): CreditL
      * are one critical section, so two concurrent turns cannot both see the
      * same credits and spend them.
      */
-    reserve(userId: string, task: CreditTask): Promise<string> {
-      return withKeyLock(userId, () => reserveUnlocked(userId, task));
+    reserve(userId: string, task: CreditTask, tier: UserTier = 'free'): Promise<string> {
+      return withKeyLock(userId, () => reserveUnlocked(userId, task, tier));
     },
 
-    /** Settle a reservation as spent. Idempotent; no-op when already settled. */
-    async commit(reservationId: string): Promise<boolean> {
-      const txs = await reservationTxs(reservationId);
-      const reserveTx = txs.find((t) => t.kind === 'reserve');
-      const settled = txs.some((t) => t.kind === 'commit' || t.kind === 'release');
-      if (!reserveTx || settled) return false;
-      const cost = Math.abs(reserveTx.amount);
-      const now = new Date().toISOString();
-      // Two entries keep the plain fold correct and each doc's sign canonical.
-      await append({
-        id: txId(),
-        userId: reserveTx.userId,
-        type: 'creditTransaction',
-        kind: 'release',
-        amount: cost,
-        reservationId,
-        reason: 'settleReservation',
-        createdAt: now,
-      });
-      await append({
-        id: txId(),
-        userId: reserveTx.userId,
-        type: 'creditTransaction',
-        kind: 'commit',
-        amount: -cost,
-        reservationId,
-        reason: reserveTx.reason.replace(/^reserve:/, 'commit:'),
-        createdAt: now,
-      });
-      return true;
+    /**
+     * Settle a reservation as spent. Idempotent; no-op when already settled.
+     *
+     * Locked on the reservationId for the same reason `reserve` is locked on
+     * the userId: "read the settlements, decide nothing has settled, append"
+     * is a read-modify-write, and the `settled` check is worthless if two
+     * callers can both pass it. Two concurrent commits of one reservation
+     * would each append a commit pair and charge the user twice, against an
+     * append-only ledger where a duplicate is permanent. A retry after a lost
+     * response is the ordinary way to get two.
+     */
+    commit(reservationId: string): Promise<boolean> {
+      return withKeyLock(reservationId, () => commitUnlocked(reservationId));
     },
 
     /** Return a held cost to the balance (task failed or was blocked). */
-    async release(reservationId: string): Promise<boolean> {
-      const txs = await reservationTxs(reservationId);
-      const reserveTx = txs.find((t) => t.kind === 'reserve');
-      const settled = txs.some((t) => t.kind === 'commit' || t.kind === 'release');
-      if (!reserveTx || settled) return false;
-      await append({
-        id: txId(),
-        userId: reserveTx.userId,
-        type: 'creditTransaction',
-        kind: 'release',
-        amount: Math.abs(reserveTx.amount),
-        reservationId,
-        reason: 'releaseReservation',
-        createdAt: new Date().toISOString(),
-      });
-      return true;
+    release(reservationId: string): Promise<boolean> {
+      return withKeyLock(reservationId, () => releaseUnlocked(reservationId));
     },
   };
 }

@@ -2,6 +2,7 @@ package fit.aquazero.app.core.database
 
 import androidx.room3.Dao
 import androidx.room3.Query
+import androidx.room3.Transaction
 import androidx.room3.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -14,6 +15,9 @@ interface UserDao {
 
     @Query("SELECT * FROM user LIMIT 1")
     fun user(): Flow<UserEntity?>
+
+    @Query("SELECT * FROM user LIMIT 1")
+    suspend fun userOnce(): UserEntity?
 
     @Upsert
     suspend fun upsertProfile(profile: ProfileEntity)
@@ -48,4 +52,25 @@ interface UserDao {
     /** Purge all per-user rows (different-user sign-in; plan §4.2 policy). */
     @Query("DELETE FROM user")
     suspend fun clearUser()
+
+    @Query("DELETE FROM profile")
+    suspend fun clearProfile()
+
+    @Query("DELETE FROM targets")
+    suspend fun clearTargets()
+
+    @Query("DELETE FROM consents")
+    suspend fun clearConsents()
+
+    @Query("DELETE FROM entitlements")
+    suspend fun clearEntitlements()
+
+    @Transaction
+    suspend fun clearAllAccountRows() {
+        clearUser()
+        clearProfile()
+        clearTargets()
+        clearConsents()
+        clearEntitlements()
+    }
 }

@@ -21,7 +21,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class MainActivityEntryPoint @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) : AppEntryPoint {
 
     override fun openAppIntent(): PendingIntent {

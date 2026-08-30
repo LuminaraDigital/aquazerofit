@@ -6,16 +6,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -35,7 +36,11 @@ fun MacroBar(
 ) {
     val reducedMotion = rememberReducedMotion()
     val fraction = if (target > 0) (consumed / target).toFloat().coerceIn(0f, 1f) else 0f
-    val animated by animateFloatAsState(
+    // A `State<Float>`, not a `by` delegate: the fill is read inside the draw
+    // lambda below. It used to feed `fillMaxWidth(animated)`, so all 600ms of
+    // it recomposed, remeasured and relaid out the bar on every frame — three
+    // of these per hero card, on two screens, on every meal logged.
+    val animated = animateFloatAsState(
         targetValue = fraction,
         animationSpec = if (reducedMotion) tween(0) else tween(600, easing = AzfMotion.RevealEasing),
         label = "macroFill",
@@ -60,16 +65,24 @@ fun MacroBar(
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(AzfShapes.Pill)
-                .background(LocalAzfExtended.current.ringTrack),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(animated)
-                    .fillMaxHeight()
-                    .clip(AzfShapes.Pill)
-                    .background(color),
-            )
-        }
+                .background(LocalAzfExtended.current.ringTrack)
+                // Drawn rather than scaled. `graphicsLayer { scaleX }` would
+                // also be draw-phase, but it squashes the pill's caps with the
+                // bar: at a tenth full the 4dp right cap becomes 0.4dp, and a
+                // rounded-cap bar reading as a square-ended one is the one
+                // thing DESIGN.md asks this component not to do. A rounded
+                // rect keeps the caps circular at every fraction.
+                .drawWithCache {
+                    val cap = CornerRadius(size.height / 2f)
+                    onDrawBehind {
+                        drawRoundRect(
+                            color = color,
+                            size = Size(size.width * animated.value, size.height),
+                            cornerRadius = cap,
+                        )
+                    }
+                },
+        )
     }
 }
 

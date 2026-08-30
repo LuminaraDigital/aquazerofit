@@ -3,9 +3,12 @@ package fit.aquazero.app.feature.coach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import fit.aquazero.app.core.audio.CoachVoiceEngine
+import fit.aquazero.app.core.audio.SpeechInputState
 import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.data.ChatRepository
 import fit.aquazero.app.core.data.CoachesRepository
+import fit.aquazero.app.core.data.LogsRepository
 import fit.aquazero.app.core.database.ChatMessageEntity
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.ChatMealDraftDto
@@ -75,8 +78,12 @@ sealed interface CoachEvent {
     /** A meal was logged; the celebration layer wants a look at progression. */
     data object MealLogged : CoachEvent
 
-    /** Route the user to manual logging for a food the corpus does not know. */
-    data object OpenManualLogging : CoachEvent
+    // `OpenManualLogging` was removed along with the `openManualLogging()` that
+    // was its only sender. Nothing called that function: CoachScreen wires the
+    // "log it manually" affordance straight to its own `onOpenManualLogging`
+    // callback, so the event never travelled through the ViewModel and the
+    // branch handling it was unreachable. Route it through here again only if a
+    // ViewModel decision — not a tap — needs to trigger the navigation.
 }
 
 /** Toast identities, resolved to strings by the screen. */
@@ -111,10 +118,15 @@ enum class CoachToast {
 class CoachViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val coachesRepository: CoachesRepository,
+    private val voiceEngine: CoachVoiceEngine,
+    private val logsRepository: LogsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CoachUiState())
     val uiState: StateFlow<CoachUiState> = _uiState.asStateFlow()
+
+    val speechState: StateFlow<SpeechInputState> = voiceEngine.speechState
+    val speakingMessageId: StateFlow<String?> = voiceEngine.speakingMessageId
 
     private val _events = Channel<CoachEvent>(Channel.BUFFERED)
     val events: Flow<CoachEvent> = _events.receiveAsFlow()
@@ -388,8 +400,63 @@ class CoachViewModel @Inject constructor(
         viewModelScope.launch { chatRepository.dismissMealDraft(draft.id) }
     }
 
-    fun openManualLogging() {
-        viewModelScope.launch { _events.send(CoachEvent.OpenManualLogging) }
+    // -----------------------------------------------------------------------
+    // Voice & Speech-to-Text
+    // -----------------------------------------------------------------------
+
+    fun startVoiceDictation(onResult: (String) -> Unit) {
+        voiceEngine.startListening(
+            onResult = { text ->
+                onResult(text)
+            },
+            onError = { _ ->
+                // Handled via speechState flow
+            },
+        )
+    }
+
+    fun stopVoiceDictation() {
+        voiceEngine.stopListening()
+    }
+
+    fun toggleSpeakMessage(messageId: String, text: String) {
+        if (speakingMessageId.value == messageId) {
+            voiceEngine.stopSpeaking()
+        } else {
+            val personaId = _uiState.value.persona.id
+            voiceEngine.speak(text, personaId, messageId)
+        }
+    }
+
+    fun stopSpeaking() {
+        voiceEngine.stopSpeaking()
+    }
+
+    // -----------------------------------------------------------------------
+    // Action Chips Execution
+    // -----------------------------------------------------------------------
+
+    fun executeAction(action: ChatAction) {
+        when (action) {
+            is ChatAction.LogWater -> {
+                viewModelScope.launch {
+                    logsRepository.logWater(action.amountMl)
+                    _events.send(CoachEvent.Toast(CoachToast.MealLogged))
+                }
+            }
+            is ChatAction.LogMealDraft -> {
+                proposeMeal(action.query)
+            }
+            is ChatAction.QuickLogFood -> {
+                proposeMeal(action.name)
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        voiceEngine.stopListening()
+        voiceEngine.stopSpeaking()
     }
 
     // -----------------------------------------------------------------------

@@ -1,0 +1,76 @@
+name: Feature request
+description: Suggest a change or an addition
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Please check [CONTRIBUTING.md](../blob/HEAD/CONTRIBUTING.md) first. Some
+        changes are rejected on principle rather than on merit — calorie
+        arithmetic and allergen exclusion stay in code and never move into a
+        prompt, the credit ledger stays append-only, and no AGPL source is
+        vendored from upstream projects.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What are you trying to do that the project makes hard or impossible?
+        Describe the situation rather than the solution you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like to happen
+      description: The change you are proposing, and how someone would use it.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - Web app (apps/web)
+        - Telegram Mini App
+        - Android app (apps/android)
+        - API (apps/api)
+        - AI coach / prompts
+        - Build / tooling
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you have considered
+      description: >-
+        Including doing nothing. If there is a way to get the same result with
+        the project as it stands, say why it is not good enough.
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and privacy impact
+      description: >-
+        This project handles health-adjacent personal data — weight, meal logs,
+        allergies and conversations with an AI coach. If your proposal touches
+        any of that, or changes what the AI is trusted to decide, describe the
+        impact here.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have searched existing issues for this request.
+          required: true
+        - label: >-
+            This is not a security vulnerability. (Those go through private
+            disclosure — see SECURITY.md.)
+          required: true

@@ -2,6 +2,7 @@ package fit.aquazero.app.core.network.api
 
 import fit.aquazero.app.core.model.VisionConfirmResponseDto
 import fit.aquazero.app.core.model.VisionJobEnvelopeDto
+import fit.aquazero.app.core.model.VisionUploadResponseDto
 import kotlinx.serialization.Serializable
 import okhttp3.MultipartBody
 import retrofit2.http.Body
@@ -28,7 +29,7 @@ interface VisionApi {
     suspend fun upload(
         @Part photo: MultipartBody.Part,
         @Part mealType: MultipartBody.Part,
-    ): VisionJobEnvelopeDto
+    ): VisionUploadResponseDto
 
     /** Poll job status (1s cadence while queued/processing). */
     @GET("meal-photos/{jobId}")

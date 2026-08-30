@@ -16,6 +16,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { fetchCaptchaConfig, loadTurnstile } from '../../lib/turnstile';
 
+/** Why this widget cannot currently produce a token. */
+export type TurnstileFailure = 'expired' | 'error' | 'load-failed';
+
 interface TurnstileProps {
   /** Receives the solved token, or '' whenever the current one stops being valid. */
   onToken: (token: string) => void;
@@ -23,9 +26,19 @@ interface TurnstileProps {
   action: string;
   /** Increment to discard the current token and issue a fresh challenge. */
   resetSignal?: number;
+  /**
+   * Optional notification that no token is coming.
+   *
+   * The web forms do not need it: `onToken('')` already tells them to disable
+   * submit, and the message below tells the person what to do. A host that
+   * embeds this widget and waits on a callback does need it, because otherwise
+   * an expired or blocked challenge is indistinguishable from one the user has
+   * simply not finished yet, and the host waits forever.
+   */
+  onFailure?: (reason: TurnstileFailure) => void;
 }
 
-export function Turnstile({ onToken, action, resetSignal = 0 }: TurnstileProps) {
+export function Turnstile({ onToken, action, resetSignal = 0, onFailure }: TurnstileProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
   const [siteKey, setSiteKey] = useState<string | null>(null);
@@ -37,6 +50,8 @@ export function Turnstile({ onToken, action, resetSignal = 0 }: TurnstileProps) 
   // clear a token the user already earned.
   const onTokenRef = useRef(onToken);
   onTokenRef.current = onToken;
+  const onFailureRef = useRef(onFailure);
+  onFailureRef.current = onFailure;
 
   useEffect(() => {
     let cancelled = false;
@@ -66,15 +81,21 @@ export function Turnstile({ onToken, action, resetSignal = 0 }: TurnstileProps) 
           // A token silently expires after five minutes. Clearing it here is
           // what stops a form left open over a coffee break from submitting a
           // stale token and coming back with an error the user cannot act on.
-          'expired-callback': () => onTokenRef.current(''),
+          'expired-callback': () => {
+            onTokenRef.current('');
+            onFailureRef.current?.('expired');
+          },
           'error-callback': () => {
             onTokenRef.current('');
             setFailed(true);
+            onFailureRef.current?.('error');
           },
         });
       })
       .catch(() => {
-        if (!cancelled) setFailed(true);
+        if (cancelled) return;
+        setFailed(true);
+        onFailureRef.current?.('load-failed');
       });
     return () => {
       cancelled = true;

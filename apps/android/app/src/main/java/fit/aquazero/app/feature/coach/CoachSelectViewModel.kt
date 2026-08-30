@@ -55,12 +55,16 @@ sealed interface CoachSelectEvent {
 /**
  * Character select.
  *
- * **There is no purchase path here, and there is no code that could add one.**
- * The Stars shortcut exists on the web and is stripped for Play — the app is
- * free, and the level door was always open to everyone. That is not a
- * packaging decision: a roster where the best-written character sits behind a
- * paywall turns a wellness product into a slot machine, and turns "earn an
- * audience with the King" into a transaction.
+ * **No coach on this screen is for sale, and none ever becomes one.** The app
+ * does now sell exactly one thing — the premium subscription, in
+ * `feature/settings/PlanEntitlementsScreen` — and a coach is deliberately not
+ * part of it: premium buys model lanes, never a character. The Stars shortcut
+ * exists on the web and is stripped for Play, and the level door stays open to
+ * everyone on both tiers. That is not a packaging decision: a roster where the
+ * best-written character sits behind a paywall turns a wellness product into a
+ * slot machine, and turns "earn an audience with the King" into a transaction.
+ * Anything that routes this screen into a billing flow is that change, however
+ * it is phrased.
  *
  * Entitlements come from the server and cache into Room, so the grid renders
  * offline from the last known state. The persona metadata is client-side

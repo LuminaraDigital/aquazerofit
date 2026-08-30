@@ -16,7 +16,7 @@ import javax.inject.Singleton
 /** Emits online/offline transitions via [ConnectivityManager] callbacks. */
 @Singleton
 class ConnectivityMonitor @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
 
     /** True while any network with validated internet capability is up. */

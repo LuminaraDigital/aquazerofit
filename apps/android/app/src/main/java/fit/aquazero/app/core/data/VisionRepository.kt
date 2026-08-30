@@ -196,7 +196,7 @@ object VisionConfirmRecovery {
 class VisionRepository @Inject constructor(
     private val visionApi: VisionApi,
     private val logsApi: LogsApi,
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
 
     /** App-private staging directory — never on external storage. */
@@ -285,7 +285,7 @@ class VisionRepository @Inject constructor(
     suspend fun uploadStaged(
         stagedPath: String,
         mealType: MealType,
-    ): ApiResult<VisionJobDto> {
+    ): ApiResult<String> {
         val file = File(stagedPath)
         if (!file.exists()) {
             return ApiResult.Failure.Network(IOException("Staged photo is gone: $stagedPath"))
@@ -298,7 +298,7 @@ class VisionRepository @Inject constructor(
         // The upload route reads only `mealType`; the day is fixed at confirm
         // time, where `localDate` is part of the confirmation payload.
         val mealTypePart = MultipartBody.Part.createFormData("mealType", mealType.wireName())
-        return safeCall { visionApi.upload(photoPart, mealTypePart) }.map { it.job }
+        return safeCall { visionApi.upload(photoPart, mealTypePart) }.map { it.effectiveJobId }
     }
 
     /** Poll `GET /meal-photos/:jobId` (1s cadence while queued/processing). */

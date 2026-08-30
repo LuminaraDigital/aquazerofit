@@ -40,7 +40,7 @@ data class MemoryEnvelopeDto(
     val memory: UserMemoryDto,
 )
 
-/** Body for `POST /me/memory/facts`. */
+/** Body for `POST /me/memory/facts`. Outbound only, so [category] stays required. */
 @Serializable
 data class AddMemoryFactRequest(
     val text: String,

@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -23,12 +24,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Spa
+import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +67,16 @@ import fit.aquazero.app.core.ui.CoachRoster
 /** Bubble corner radii: the tail corner is tight, the rest are card-round. */
 private val UserBubbleShape = RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp)
 private val AssistantBubbleShape = RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp)
+
+/**
+ * Compiled once, not once per recomposition.
+ *
+ * The lower/upper seam inside a camel-case tool name. `humaniseTool` is reached
+ * from the composable `toolLabel`, so a `Regex(...)` built inside it recompiled
+ * the pattern every time a tool card recomposed — which, mid-stream, is every
+ * token. Same reasoning as the patterns in `ChatActionModel.kt`.
+ */
+private val CAMEL_BOUNDARY = Regex("([a-z])([A-Z])")
 
 /** The user's own turn: gradient fill, right-aligned, no affordances. */
 @Composable
@@ -117,6 +133,10 @@ fun AssistantBubble(
     reported: Boolean = false,
     toolCalls: List<ChatToolCallDto> = emptyList(),
     timestamp: String? = null,
+    actions: List<ChatAction> = emptyList(),
+    isSpeaking: Boolean = false,
+    onSpeakClick: (() -> Unit)? = null,
+    onActionClick: ((ChatAction) -> Unit)? = null,
     onReport: (() -> Unit)? = null,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -128,7 +148,26 @@ fun AssistantBubble(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.Start,
     ) {
-        CoachByline(persona)
+        Row(
+            modifier = Modifier.fillMaxWidth(0.92f),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CoachByline(persona)
+            if (onSpeakClick != null && !guardrailBlocked) {
+                IconButton(
+                    onClick = onSpeakClick,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.VolumeUp,
+                        contentDescription = if (isSpeaking) "Stop voice" else "Read aloud",
+                        tint = if (isSpeaking) persona.colour else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
         Spacer(Modifier.height(6.dp))
         Box(modifier = Modifier.fillMaxWidth(0.92f)) {
             val bubble = Modifier
@@ -173,6 +212,13 @@ fun AssistantBubble(
                             modifier = Modifier.padding(top = 10.dp),
                         )
                     }
+                    if (actions.isNotEmpty() && onActionClick != null) {
+                        ActionChipGroup(
+                            actions = actions,
+                            onActionClick = onActionClick,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                 }
             }
 
@@ -206,6 +252,82 @@ fun AssistantBubble(
                     text = timestamp,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 1-Tap interactive action chips embedded within a coach response.
+ */
+@Composable
+fun ActionChipGroup(
+    actions: List<ChatAction>,
+    onActionClick: (ChatAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = LocalHapticFeedback.current
+    var executedActionIds by remember { mutableStateOf(setOf<String>()) }
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        actions.forEach { action ->
+            val executed = action.id in executedActionIds
+            val bg = if (executed) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHighest
+            }
+
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(bg)
+                    .border(
+                        BorderStroke(
+                            1.dp,
+                            if (executed) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                        ),
+                        RoundedCornerShape(12.dp),
+                    )
+                    .clickable(enabled = !executed) {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        executedActionIds = executedActionIds + action.id
+                        onActionClick(action)
+                    }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = when {
+                        executed -> Icons.Outlined.Check
+                        action is ChatAction.LogWater -> Icons.Outlined.WaterDrop
+                        else -> Icons.Outlined.Restaurant
+                    },
+                    contentDescription = null,
+                    tint = if (executed) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = if (executed) "Logged" else action.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (executed) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
                 )
             }
         }
@@ -354,7 +476,7 @@ private fun toolLabel(tool: String): String = when (tool) {
 internal fun humaniseTool(tool: String): String {
     val words = tool
         .removePrefix("get")
-        .replace(Regex("([a-z])([A-Z])"), "$1 $2")
+        .replace(CAMEL_BOUNDARY, "$1 $2")
         .lowercase()
         .trim()
     return words.replaceFirstChar { it.uppercase() }

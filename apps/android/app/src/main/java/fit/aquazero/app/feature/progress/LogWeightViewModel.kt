@@ -242,9 +242,19 @@ class LogWeightViewModel @Inject constructor(
         )
     }
 
-    /** Validate, then write locally and queue for sync. */
+    /**
+     * Validate, then write locally and queue for sync.
+     *
+     * Guarded in the ViewModel, not only in the UI. The button already passes
+     * `enabled = !loading`, but that leaves a same-frame double tap able to
+     * enqueue two writes with two idempotency keys — which the server's
+     * per-date upsert absorbs, so the bug is invisible rather than absent.
+     * `AnalysisResultsViewModel.confirm` and `CaptureMealViewModel.analyze`
+     * both guard here; this write path is now consistent with them.
+     */
     fun submit() {
         val state = _uiState.value
+        if (state.saving) return
         val validation = LogWeightValidation.validate(
             raw = state.value,
             unit = state.unit,

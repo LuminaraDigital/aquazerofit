@@ -2,6 +2,7 @@ package fit.aquazero.app.core.database
 
 import androidx.room3.Dao
 import androidx.room3.Query
+import androidx.room3.Transaction
 import androidx.room3.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -38,4 +39,16 @@ interface TrainingDao {
             "draftUpdatedAtMs = 0 WHERE id = :id",
     )
     suspend fun clearDraft(id: String)
+
+    @Query("DELETE FROM workout_sessions")
+    suspend fun clearAllSessions()
+
+    @Query("DELETE FROM training_plans")
+    suspend fun clearAllPlans()
+
+    @Transaction
+    suspend fun clearAllTraining() {
+        clearAllSessions()
+        clearAllPlans()
+    }
 }

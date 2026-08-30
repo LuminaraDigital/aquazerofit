@@ -7,7 +7,13 @@ import crypto from 'node:crypto';
 import type { Request, Response } from 'express';
 import type { MealLog, MealLogItem, MealType, WaterLog, WeightLog } from '@aquazerofit/shared';
 import { AppError } from '../../platform/errors';
-import { getStore, newId } from '../../platform/store';
+import {
+  LOGS_BY_USER_TYPE,
+  LOGS_BY_USER_TYPE_DATE,
+  getStore,
+  indexKey,
+  newId,
+} from '../../platform/store';
 import { addDays } from '../../platform/dates';
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
@@ -86,6 +92,31 @@ export function withIdempotency(
   res.status(out.status).json(out.body);
 }
 
+/**
+ * Delete replay records whose 24h window has closed.
+ *
+ * These are written on every idempotent create and nothing removed them, so
+ * they accumulated forever in the `logs` container — permanently, since the
+ * store never forgets a document it has hydrated. Two costs, both real: the
+ * container grows without bound in memory and in Postgres, and (before the
+ * secondary indexes) every meal, water and weight query scanned all of them.
+ *
+ * `expiresAt` is always an ISO-8601 UTC string produced by toISOString(), so
+ * every value has the same length, offset and field order and a lexicographic
+ * comparison is a chronological one. The boundary matches the read path in
+ * withIdempotency, which replays only while `expiresAt > now`: a record at
+ * exactly `now` is already unusable, so sweeping it deletes nothing live.
+ *
+ * Returns the number removed.
+ */
+export function sweepIdempotencyRecords(now = new Date()): number {
+  const cutoff = now.toISOString();
+  return getStore().deleteWhere<IdempotencyDoc>(
+    'logs',
+    (d) => d.type === 'idempotency' && d.expiresAt <= cutoff,
+  );
+}
+
 // ----- meal logs -----
 
 export function createMealLog(
@@ -145,10 +176,27 @@ export function deleteMealLog(userId: string, id: string): void {
   getStore().delete('logs', id);
 }
 
+/**
+ * One user's meals on one local date.
+ *
+ * Indexed rather than scanned. The `logs` container holds every meal, water,
+ * weight, workout-session, buddy-challenge and idempotency record for EVERY
+ * user, so the predicate form of this walked the lot to find one person's
+ * breakfast. The predicate is still passed and still decides the answer — see
+ * MemoryBackedStore.whereIndexed — so this cannot return anything the scan
+ * would not have.
+ *
+ * The sort key is unchanged. Only the tie-break between two logs written in
+ * the same millisecond can differ from the scan's, because the candidates
+ * arrive in index-bucket order rather than container-insertion order; both are
+ * arbitrary and neither is part of the contract.
+ */
 export function mealLogsForDate(userId: string, localDate: string): MealLog[] {
   return getStore()
-    .where<MealLog>(
+    .whereIndexed<MealLog>(
       'logs',
+      LOGS_BY_USER_TYPE_DATE,
+      indexKey(userId, 'mealLog', localDate),
       (d) => d.type === 'mealLog' && d.userId === userId && d.localDate === localDate,
     )
     .sort((a, b) => a.loggedAt.localeCompare(b.loggedAt));
@@ -183,10 +231,13 @@ export function createWaterLog(
   return { log, dayTotalMl: waterTotalForDate(userId, input.localDate) };
 }
 
+/** Same exact-match index as mealLogsForDate, different record type. */
 export function waterTotalForDate(userId: string, localDate: string): number {
   return getStore()
-    .where<WaterLog>(
+    .whereIndexed<WaterLog>(
       'logs',
+      LOGS_BY_USER_TYPE_DATE,
+      indexKey(userId, 'waterLog', localDate),
       (d) => d.type === 'waterLog' && d.userId === userId && d.localDate === localDate,
     )
     .reduce((s, l) => s + l.amountMl, 0);
@@ -217,10 +268,22 @@ export function upsertWeightLog(
   return log;
 }
 
+/**
+ * One user's weight entries between two local dates, inclusive.
+ *
+ * This is a RANGE query, and the exact-match composite index cannot serve it:
+ * probing it would mean enumerating every date between the bounds, which is
+ * wrong for a wide window and impossible for an open-ended one. So it uses the
+ * coarser userId+type index and scans that bucket — one entry per day the user
+ * has ever weighed in, rather than every log row in the deployment. The date
+ * comparison stays exactly where it was, in the predicate.
+ */
 export function weightLogsInRange(userId: string, fromDate: string, toDate: string): WeightLog[] {
   return getStore()
-    .where<WeightLog>(
+    .whereIndexed<WeightLog>(
       'logs',
+      LOGS_BY_USER_TYPE,
+      indexKey(userId, 'weightLog'),
       (d) =>
         d.type === 'weightLog' &&
         d.userId === userId &&

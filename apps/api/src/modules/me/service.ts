@@ -18,6 +18,7 @@ import { getStore, newId, type ContainerName } from '../../platform/store';
 import { revokeAllForUser, sha256Hex } from '../../platform/auth';
 import { computeTargets } from './targets';
 import { removeUserFromChallenges } from '../challenges/service';
+import { effectiveTier } from '../billing/entitlements';
 
 export type ProfileDoc = WellnessProfile & { id: string; type: 'wellnessProfile' };
 export type TargetsDoc = DerivedTargets & { id: string; type: 'derivedTargets' };
@@ -44,7 +45,7 @@ export function toPublicUser(user: User): PublicUser {
     email: user.email,
     displayName: user.displayName,
     role: user.role,
-    tier: user.tier,
+    tier: effectiveTier(user),
     emailVerified: user.emailVerified,
     hasProfile: getProfile(user.id) !== undefined,
     telegramLinked: user.tgId !== undefined && user.tgId !== null,

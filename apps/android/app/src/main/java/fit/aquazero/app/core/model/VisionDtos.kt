@@ -22,7 +22,12 @@ data class VisionJobDto(
     val id: String,
     val userId: String = "",
     val type: String = "cvJob",
-    val status: VisionJobStatus,
+    /**
+     * Defaults to a non-terminal state: a status this build cannot read is not
+     * grounds for telling the user their photo failed, or for showing results
+     * that are not there. The poller keeps asking instead.
+     */
+    val status: VisionJobStatus = VisionJobStatus.PROCESSING,
     val mealType: MealType = MealType.SNACK,
     val predictions: List<VisionPredictionDto> = emptyList(),
     val ai: AiMetadataDto? = null,
@@ -31,7 +36,18 @@ data class VisionJobDto(
     val completedAt: String? = null,
 )
 
-/** Envelope for `GET /meal-photos/:jobId` and `POST /meal-photos` — `{job}`. */
+/** Response for `POST /meal-photos` — `{jobId, status}` with optional `{job}`. */
+@Serializable
+data class VisionUploadResponseDto(
+    val jobId: String? = null,
+    val status: String? = null,
+    val job: VisionJobDto? = null,
+) {
+    val effectiveJobId: String
+        get() = jobId ?: job?.id.orEmpty()
+}
+
+/** Envelope for `GET /meal-photos/:jobId` — `{job}`. */
 @Serializable
 data class VisionJobEnvelopeDto(
     val job: VisionJobDto,

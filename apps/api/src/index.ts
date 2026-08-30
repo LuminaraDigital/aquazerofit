@@ -11,15 +11,23 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(here, '..', '..', '..', '.env') });
 
 import { createApp } from './app';
-import { config, assertProductionSecrets } from './platform/config';
+import { config, assertProductionSecrets, assertSingleInstance } from './platform/config';
 import { warnIfBotProtectionUnconfigured } from './platform/botProtection';
 import { describeStoreInitFailure, getStore, initStore } from './platform/store';
 import { sweepExpiredDeletions } from './modules/me/service';
+import { sweepIdempotencyRecords } from './modules/logs/service';
 import { sweepVisionArtifacts } from './modules/vision/router';
 import { sweepGrowthEvents } from './modules/analytics/router';
 
 // Fail fast: never boot a production process on dev fallback secrets.
 assertProductionSecrets();
+// Fail fast: this store is not multi-instance safe and a second instance loses
+// data silently. See assertSingleInstance() for the full reasoning and for why
+// the count is declared (AZF_INSTANCE_COUNT) rather than detected. Placed here
+// rather than at config import time on purpose: the hazard is N concurrently
+// SERVING API processes, and the one-shot CLI entrypoints (seed, importers)
+// import config too and must stay runnable alongside a running server.
+assertSingleInstance();
 // Advisory rather than fatal: an unprotected signup form is a real weakness,
 // but killing a deploy over incomplete Cloudflare onboarding is a worse one.
 warnIfBotProtectionUnconfigured();
@@ -65,6 +73,15 @@ function runGrowthEventSweep(): void {
   }
 }
 
+function runIdempotencySweep(): void {
+  try {
+    const pruned = sweepIdempotencyRecords();
+    if (pruned > 0) console.log(`[sweep] pruned ${pruned} expired idempotency record(s)`);
+  } catch (err) {
+    console.error('[sweep] idempotency sweep failed', err);
+  }
+}
+
 function runVisionSweep(): void {
   sweepVisionArtifacts()
     .then((n) => {
@@ -75,10 +92,21 @@ function runVisionSweep(): void {
 
 runDeletionSweep();
 runGrowthEventSweep();
+// Prune on boot as well as on the interval: a process that restarts more often
+// than the interval would otherwise never sweep at all, which is exactly how
+// the idempotency backlog grew unbounded in the first place.
+runIdempotencySweep();
 runVisionSweep();
 setInterval(runDeletionSweep, 6 * 3600 * 1000).unref();
 setInterval(runGrowthEventSweep, 6 * 3600 * 1000).unref();
 setInterval(runVisionSweep, 3600 * 1000).unref();
+// unref'ed like its neighbours so a pending sweep can never hold a shutting
+// down process open, and not scheduled at all under test — nothing in the
+// suite loads this module today, but a timer that outlives a test worker is a
+// hang nobody enjoys diagnosing, so the guard is stated rather than assumed.
+if (!config.isTest) {
+  setInterval(runIdempotencySweep, config.idempotencySweepIntervalMs).unref();
+}
 
 const server = app.listen(config.port, () => {
   // eslint-disable-next-line no-console

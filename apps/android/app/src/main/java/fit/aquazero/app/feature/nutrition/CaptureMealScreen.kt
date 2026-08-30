@@ -73,7 +73,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -93,7 +93,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
 import java.util.concurrent.Executor
-import kotlin.coroutines.resume
 import androidx.compose.ui.tooling.preview.Preview as ComposePreview
 
 /**
@@ -730,12 +729,29 @@ internal fun Context.openAppSettings() {
     runCatching { startActivity(intent) }
 }
 
-/** Await a CameraX `ListenableFuture` without pulling in a futures-ktx dependency. */
+/**
+ * Await a CameraX `ListenableFuture` without pulling in a futures-ktx dependency.
+ *
+ * `resumeWith(runCatching { get() })` rather than `resume(get())`, and the
+ * difference is a crash. The listener body runs on the MAIN executor, outside
+ * the coroutine: if the future completed exceptionally, a bare `get()` throws
+ * `ExecutionException` from a Runnable on the main Looper before `resume` is
+ * ever reached. Nothing can catch it there — not the enclosing `scope.launch`,
+ * not the `runCatching` the call sites open on the following line, not
+ * `invokeOnCancellation`. The process dies.
+ *
+ * That is not hypothetical: the manifest declares
+ * `<uses-feature android:name="android.hardware.camera" android:required="false" />`,
+ * so Play installs this on camera-less devices where
+ * `ProcessCameraProvider.getInstance()` fails with `InitializationException`
+ * every time. Routing the failure through `runCatching` hands it to the
+ * continuation instead, where the callers' existing error handling sees it.
+ */
 internal suspend fun <T> ListenableFuture<T>.awaitOnMain(
     context: Context,
 ): T = suspendCancellableCoroutine { continuation ->
     val executor: Executor = ContextCompat.getMainExecutor(context)
-    addListener({ continuation.resume(get()) }, executor)
+    addListener({ continuation.resumeWith(runCatching { get() }) }, executor)
     continuation.invokeOnCancellation { cancel(false) }
 }
 

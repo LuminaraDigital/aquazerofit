@@ -31,6 +31,9 @@ const KEYS = [
   'APP_PUBLIC_URL',
   'DATABASE_URL',
   'AUTH_ALLOW_CAPTCHALESS_MOBILE',
+  'MFA_REQUIRE_ADMIN',
+  'TURNSTILE_SECRET_KEY',
+  'TURNSTILE_SITE_KEY',
 ] as const;
 
 const ORIGINAL = Object.fromEntries(KEYS.map((k) => [k, process.env[k]])) as Record<
@@ -53,6 +56,11 @@ function setProductionEnv(overrides: Partial<Record<(typeof KEYS)[number], strin
   delete process.env.MAIL_PROVIDER;
   // The captcha-less mobile bypass is closed-testing only and boot-fatal here.
   delete process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE;
+  // Admin MFA enforcement: off is a migration window, not a production state.
+  process.env.MFA_REQUIRE_ADMIN = 'true';
+  // Both Turnstile keys, because bot protection is off unless both are set.
+  process.env.TURNSTILE_SECRET_KEY = '0x_test_secret';
+  process.env.TURNSTILE_SITE_KEY = '0x_test_site';
   for (const [k, v] of Object.entries(overrides)) process.env[k] = v;
 }
 
@@ -124,6 +132,95 @@ describe('assertProductionSecrets', () => {
     process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = 'true';
     expect(() => assertProductionSecrets()).not.toThrow();
     expect(config.authAllowCaptchalessMobile).toBe(true);
+  });
+
+  /**
+   * requireFreshMfa is mounted on the admin router, but with MFA_REQUIRE_ADMIN
+   * off an administrator who never enrolled is audited and then let through —
+   * so the guard that reads every account on the platform is password-only.
+   * The off default is a one-time enrolment window for an existing deployment;
+   * production must not be able to sit in it indefinitely because someone
+   * forgot the second half of the rollout.
+   */
+  it('refuses to boot in production without MFA_REQUIRE_ADMIN', () => {
+    setProductionEnv();
+    delete process.env.MFA_REQUIRE_ADMIN;
+    expect(() => assertProductionSecrets()).toThrow(/MFA_REQUIRE_ADMIN/);
+
+    process.env.MFA_REQUIRE_ADMIN = 'false';
+    expect(() => assertProductionSecrets()).toThrow(/MFA_REQUIRE_ADMIN/);
+  });
+
+  it('boots in production when admin MFA is required', () => {
+    setProductionEnv({ MFA_REQUIRE_ADMIN: 'true' });
+    expect(() => assertProductionSecrets()).not.toThrow();
+    expect(config.mfaRequireAdmin).toBe(true);
+
+    process.env.MFA_REQUIRE_ADMIN = '1';
+    expect(() => assertProductionSecrets()).not.toThrow();
+  });
+
+  it('leaves admin MFA optional outside production', () => {
+    // The migration window is real; the guard is about where it may stay open.
+    process.env.NODE_ENV = 'development';
+    delete process.env.MFA_REQUIRE_ADMIN;
+    expect(() => assertProductionSecrets()).not.toThrow();
+    expect(config.mfaRequireAdmin).toBe(false);
+  });
+
+  /**
+   * config.botProtectionEnabled requires BOTH keys, and assertHuman is a no-op
+   * without it — so a production boot with neither key serves registration and
+   * password-reset request unchallenged and says nothing about it beyond one
+   * console.warn. The pair is the point: half of it is the state an operator
+   * actually reaches, and it protects exactly as much as none of it.
+   */
+  it('refuses to boot in production with no Turnstile keys at all', () => {
+    setProductionEnv();
+    delete process.env.TURNSTILE_SECRET_KEY;
+    delete process.env.TURNSTILE_SITE_KEY;
+    expect(() => assertProductionSecrets()).toThrow(/TURNSTILE_SECRET_KEY/);
+    expect(() => assertProductionSecrets()).toThrow(/TURNSTILE_SITE_KEY/);
+    expect(config.botProtectionEnabled).toBe(false);
+  });
+
+  it('refuses to boot with only the secret key set', () => {
+    setProductionEnv();
+    delete process.env.TURNSTILE_SITE_KEY;
+    expect(() => assertProductionSecrets()).toThrow(/TURNSTILE_SITE_KEY/);
+    // Only the missing half is named — that is the actionable part.
+    expect(() => assertProductionSecrets()).not.toThrow(/TURNSTILE_SECRET_KEY/);
+    expect(config.botProtectionEnabled).toBe(false);
+  });
+
+  it('refuses to boot with only the site key set', () => {
+    setProductionEnv();
+    delete process.env.TURNSTILE_SECRET_KEY;
+    expect(() => assertProductionSecrets()).toThrow(/TURNSTILE_SECRET_KEY/);
+    expect(config.botProtectionEnabled).toBe(false);
+  });
+
+  it('treats a whitespace-only key as unset', () => {
+    // config.turnstile*Key trim before comparing, so a key of spaces leaves
+    // protection off; a guard that only checked truthiness would wave it past.
+    setProductionEnv({ TURNSTILE_SITE_KEY: '   ' });
+    expect(() => assertProductionSecrets()).toThrow(/TURNSTILE_SITE_KEY/);
+  });
+
+  it('boots in production with both Turnstile keys set', () => {
+    setProductionEnv();
+    expect(() => assertProductionSecrets()).not.toThrow();
+    expect(config.botProtectionEnabled).toBe(true);
+  });
+
+  it('leaves the keys optional outside production', () => {
+    // Development, the test suite and the keyless offline demo all run with no
+    // Turnstile at all; the guard is about where that is acceptable.
+    process.env.NODE_ENV = 'development';
+    delete process.env.TURNSTILE_SECRET_KEY;
+    delete process.env.TURNSTILE_SITE_KEY;
+    expect(() => assertProductionSecrets()).not.toThrow();
+    expect(config.botProtectionEnabled).toBe(false);
   });
 
   it('rejects a wildcard CORS origin in production', () => {

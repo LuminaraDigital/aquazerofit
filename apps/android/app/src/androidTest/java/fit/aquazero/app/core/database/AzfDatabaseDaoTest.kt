@@ -208,8 +208,12 @@ class AzfDatabaseDaoTest {
         assertTrue(dao.consents().first()!!.reminders)
         assertNotNull(dao.entitlements().first())
 
-        dao.clearUser()
+        dao.clearAllAccountRows()
         assertNull(dao.user().first())
+        assertNull(dao.profileOnce())
+        assertNull(dao.targetsOnce())
+        assertNull(dao.consents().first())
+        assertNull(dao.entitlements().first())
     }
 
     @Test

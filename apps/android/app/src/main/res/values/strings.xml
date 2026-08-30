@@ -45,25 +45,40 @@
     <string name="signin_error_offline">You appear to be offline. Try again when connected.</string>
     <string name="signin_password_rules">Password requirements</string>
 
-    <!-- Screen titles -->
+    <!--
+      Screen titles.
+
+      Ten more screen_* entries used to sit here, and an audit read them as
+      evidence that ten screens were missing their titles. They were not: every
+      one of those screens already renders a localised title, just from a
+      differently-named string. The screen_* copy was the blander duplicate and
+      was never wired to anything.
+
+        screen_analysis_results      → analysis_title       "Analysis results"
+        screen_coach                 → coach_title          "Coach %1$s"
+        screen_coach_select          → coach_select_heading "Your corner"
+        screen_challenges            → challenges_title     "Buddy huddles"
+        screen_settings              → settings_title       "Profile & settings"
+        screen_notification_settings → reminders_heading    "Reminders"
+        screen_memory                → memory_title         "Coach memory"
+        screen_plan_entitlements     → plan_title           "Your plan"
+        screen_first_run             → app_name
+
+      screen_capture_meal had no counterpart because CaptureMealScreen is a
+      full-bleed viewfinder: it carries capture_title in the content and a close
+      button, and an AzfAppHeader over a live camera preview would be wrong.
+
+      So before adding a screen_* string, check the screen does not already
+      title itself under another name.
+    -->
     <string name="screen_dashboard">Home</string>
     <string name="screen_nutrition">Nutrition</string>
-    <string name="screen_capture_meal">Photo meal</string>
-    <string name="screen_analysis_results">Analysis</string>
     <string name="screen_meal_plan">Meal plan</string>
     <string name="screen_recipe">Recipe</string>
     <string name="screen_workouts">Workouts</string>
     <string name="screen_workout_session">Session</string>
     <string name="screen_progress">Progress</string>
     <string name="screen_log_weight">Log weight</string>
-    <string name="screen_coach">Coach</string>
-    <string name="screen_coach_select">Choose your coach</string>
-    <string name="screen_challenges">Challenges</string>
-    <string name="screen_settings">Settings</string>
-    <string name="screen_notification_settings">Reminders</string>
-    <string name="screen_memory">Memory</string>
-    <string name="screen_plan_entitlements">Plan</string>
-    <string name="screen_first_run">Welcome aboard</string>
     <string name="screen_setup">Set up your profile</string>
 
     <!-- Meal types -->
@@ -598,6 +613,8 @@
     <string name="coach_greeting_title">Hi, I\'m %1$s</string>
     <string name="coach_greeting_body">%1$s Ask me about your nutrition, training or progress.</string>
     <string name="coach_meal_hint">Or type what you ate — “two eggs on toast and a flat white” — and tap the meal button to turn it into a meal log.</string>
+    <string name="coach_mic_denied">Microphone access is off, so dictation can\'t start. You can still type your message.</string>
+    <string name="coach_mic_blocked">Microphone access is blocked. Turn it on in Settings to dictate, or type your message instead.</string>
     <string name="coach_input_label">Message %1$s</string>
     <string name="coach_input_placeholder">Ask %1$s…</string>
     <string name="coach_send">Send message</string>
@@ -1019,6 +1036,7 @@
     <string name="settings_profile_updated">Profile updated — targets recomputed.</string>
     <string name="settings_profile_save_failed">Could not save changes. Please try again.</string>
     <string name="settings_sign_out">Sign out</string>
+    <string name="settings_sign_out_draining">Sending unsynced entries…</string>
     <string name="settings_version">AquaZeroFit v%1$s (%2$d)</string>
 
     <!-- Settings: account deletion (Play compliance surface) -->
@@ -1153,15 +1171,22 @@
     <string name="memory_clear_failed">Could not clear your memories. Please try again.</string>
     <string name="memory_add_consent_failed">AI personalisation is switched off — enable it in Settings first.</string>
 
-    <!-- Plan / entitlements: read-only, no purchase UI -->
+    <!-- Plan / entitlements. The premium subscription is the only thing sold
+         in this app; coach personas are not purchasable on any surface. -->
     <string name="plan_title">Your plan</string>
     <string name="plan_current">Current plan</string>
     <string name="plan_tier_free">Free</string>
     <string name="plan_tier_premium">Premium</string>
     <string name="plan_credits_available">AI credits available</string>
     <string name="plan_credit_available_one">AI credit available</string>
-    <string name="plan_credits_explainer">The first AI action you take each day adds %1$d credits to your balance, and anything you do not spend carries over. Logging meals, water and weight by hand never costs a credit.</string>
-    <string name="plan_credits_explainer_one">The first AI action you take each day adds 1 credit to your balance, and anything you do not spend carries over. Logging meals, water and weight by hand never costs a credit.</string>
+    <string name="plan_credits_explainer">The first AI action you take each day adds %1$d credits to your balance, up to a maximum of %2$d. Logging meals, water and weight by hand never costs a credit.</string>
+    <string name="plan_credits_explainer_one">The first AI action you take each day adds 1 credit to your balance, up to a maximum of %1$d. Logging meals, water and weight by hand never costs a credit.</string>
+    <!-- Shown only against a server that predates the banking ceiling and so
+         omits maxBankedCredits, where unspent credits genuinely do carry over
+         without limit. Quoting a ceiling of 0 at those users would be worse
+         than the old sentence, which is still true for them. -->
+    <string name="plan_credits_explainer_uncapped">The first AI action you take each day adds %1$d credits to your balance, and anything you do not spend carries over. Logging meals, water and weight by hand never costs a credit.</string>
+    <string name="plan_credits_explainer_uncapped_one">The first AI action you take each day adds 1 credit to your balance, and anything you do not spend carries over. Logging meals, water and weight by hand never costs a credit.</string>
     <string name="plan_difference_heading">What premium changes</string>
     <string name="plan_difference_heading_premium">What premium gives you</string>
     <string name="plan_no_lanes">Nothing is held back from the free plan at the moment — every feature in the app is available to you.</string>
@@ -1180,10 +1205,25 @@
     <string name="plan_task_plan_generation">New training plan</string>
     <string name="plan_task_recipe_generation">Recipe</string>
     <string name="plan_task_progress_insight">Weekly insight</string>
-    <string name="plan_no_purchase_heading">There is nothing to buy here</string>
-    <string name="plan_no_purchase_body">AquaZeroFit is free on Google Play and there is no purchase step in the app. We would rather say that than show you a button that does nothing.</string>
-    <string name="plan_no_purchase_body_2">Your free plan keeps working exactly as it does now, and nothing you use today is going to be taken away to make room for a paid tier.</string>
-    <string name="plan_premium_note">Nothing to do here — this page is just your current position. Your weekly note is written for you automatically.</string>
+    <string name="plan_task_exercise_swap">Exercise swap suggestion</string>
+    <string name="plan_task_memory_extraction">Coach memory update</string>
+    <string name="plan_upgrade_heading">Go premium</string>
+    <string name="plan_upgrade_body">Premium is a monthly subscription through Google Play. It adds the lanes listed above; everything on your free plan keeps working exactly as it does now, and nothing you use today is being taken away to make room for it.</string>
+    <string name="plan_upgrade_coaches">Coaches are not part of this. Every coach is earned by training, on both plans, and no amount of money unlocks one.</string>
+    <!-- %1$s is Google Play's own formatted price, in the user's currency. The
+         product is a monthly base plan, so the period is safe to state here. -->
+    <string name="plan_upgrade_cta">Go premium — %1$s a month</string>
+    <string name="plan_upgrade_terms">Renews every month until you cancel. You can cancel any time in Google Play, and you keep premium until the month you have paid for runs out.</string>
+    <string name="plan_upgrade_unavailable">Google Play cannot offer the subscription on this device right now, so there is nothing to buy here at the moment. Your free plan is unaffected.</string>
+    <string name="plan_upgrade_done">You\'re on premium. Your plan has been updated.</string>
+    <string name="plan_upgrade_pending">Google Play is still processing your payment. Premium switches on by itself once it clears — there is nothing else for you to do.</string>
+    <string name="plan_upgrade_rejected">Google could not confirm that purchase, so we have not changed your plan. A purchase we do not confirm is refunded by Google automatically — you will not be left paying for it.</string>
+    <string name="plan_upgrade_verify_later">Google took the purchase, but we could not confirm it just yet. The app retries by itself next time you open it; if it never confirms, Google refunds it.</string>
+    <string name="plan_upgrade_offline">You\'re offline, so the purchase could not be confirmed. It will be picked up next time you open the app with a connection.</string>
+    <string name="plan_upgrade_play_unavailable">Google Play billing isn\'t available on this device, so premium can\'t be bought here.</string>
+    <string name="plan_upgrade_failed">That purchase didn\'t go through. Your plan is unchanged.</string>
+    <string name="plan_premium_note">You\'re on premium — your weekly note is written for you automatically. The subscription renews in Google Play, and you can cancel it there whenever you like.</string>
+    <string name="plan_manage_subscription">Manage subscription in Google Play</string>
     <string name="plan_error">We could not read your plan details right now.</string>
 
     <!-- Buddy huddles -->

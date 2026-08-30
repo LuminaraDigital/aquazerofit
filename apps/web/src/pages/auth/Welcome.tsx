@@ -16,6 +16,7 @@ import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SecondaryButton } from '../../components/ui/SecondaryButton';
 import { ToastProvider, useToast } from '../../components/ui/Toast';
 import { AppBackground } from '../../components/layout/AppBackground';
+import { fetchPriorityHigh } from '../../lib/fetchPriority';
 
 const SLIDES = [
   {
@@ -82,7 +83,16 @@ function WelcomeInner() {
         {/* Brand header */}
         <div className="flex justify-center mb-section-gap reveal">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="" className="w-9 h-9 object-contain" aria-hidden="true" />
+            <img
+              src="/logo.png"
+              alt=""
+              width={359}
+              height={376}
+              loading="eager"
+              decoding="async"
+              className="w-9 h-9 object-contain"
+              aria-hidden="true"
+            />
             <span className="font-heading font-extrabold tracking-tight text-2xl text-primary">
               AquaZeroFit
             </span>
@@ -119,9 +129,16 @@ function WelcomeInner() {
                       </span>
                     </div>
                   ) : (
+                    // Only the first slide carries the logo, and that slide is
+                    // what the carousel opens on — this is the LCP element.
                     <img
                       src="/logo.png"
                       alt="AquaZeroFit logo"
+                      width={359}
+                      height={376}
+                      loading="eager"
+                      decoding="async"
+                      {...fetchPriorityHigh()}
                       className="relative z-10 w-full h-full object-contain"
                     />
                   )}

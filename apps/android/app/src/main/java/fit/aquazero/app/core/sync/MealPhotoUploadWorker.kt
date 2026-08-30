@@ -66,11 +66,12 @@ class MealPhotoUploadWorker @AssistedInject constructor(
 
         return when (val result = visionRepository.uploadStaged(stagedPath, mealType)) {
             is ApiResult.Success -> {
-                val owned = visionRepository.adoptStagedForJob(stagedPath, result.data.id)
+                val jobId = result.data
+                val owned = visionRepository.adoptStagedForJob(stagedPath, jobId)
                 Result.success(
                     workDataOf(
                         KEY_CAPTURE_ID to captureId,
-                        KEY_JOB_ID to result.data.id,
+                        KEY_JOB_ID to jobId,
                         KEY_STAGED_PATH to owned,
                     ),
                 )
@@ -149,7 +150,7 @@ class MealPhotoUploadWorker @AssistedInject constructor(
  */
 @Singleton
 class MealPhotoUploadScheduler @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
 
     /**
@@ -168,9 +169,23 @@ class MealPhotoUploadScheduler @Inject constructor(
         return captureId
     }
 
-    /** Re-queue the same payload after a `Retry-After` delay. */
+    /**
+     * Re-queue the same payload after a `Retry-After` delay.
+     *
+     * APPEND_OR_REPLACE, not REPLACE. This is called *by the running worker*,
+     * and REPLACE on a unique name cancels the work currently under it — so
+     * the worker cancelled itself before returning, WorkManager recorded the
+     * run as CANCELLED rather than SUCCEEDED, and `observeUploads` took its
+     * cancellation branch and cleared `pendingCaptureId`. The rescheduled
+     * upload then completed with nothing listening, so the photo uploaded but
+     * the user never reached the confirmation gate. APPEND_OR_REPLACE chains
+     * the retry after the current run instead of killing it.
+     *
+     * [enqueue] keeps REPLACE deliberately: there the caller is a *new*
+     * capture, and displacing a stale one is the intended behaviour.
+     */
     fun reschedule(inputData: Data, delaySeconds: Long) {
-        enqueueInternal(inputData, delaySeconds, ExistingWorkPolicy.REPLACE)
+        enqueueInternal(inputData, delaySeconds, ExistingWorkPolicy.APPEND_OR_REPLACE)
     }
 
     /** Live state of the single upload stream. */

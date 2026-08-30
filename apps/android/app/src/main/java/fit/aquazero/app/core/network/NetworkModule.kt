@@ -7,11 +7,11 @@ import dagger.hilt.components.SingletonComponent
 import fit.aquazero.app.BuildConfig
 import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.network.api.AuthApi
+import fit.aquazero.app.core.network.api.BillingApi
 import fit.aquazero.app.core.network.api.ChallengesApi
 import fit.aquazero.app.core.network.api.ChatApi
 import fit.aquazero.app.core.network.api.CoachesApi
 import fit.aquazero.app.core.network.api.ExercisesApi
-import fit.aquazero.app.core.network.api.ExportApi
 import fit.aquazero.app.core.network.api.FoodsApi
 import fit.aquazero.app.core.network.api.LogsApi
 import fit.aquazero.app.core.network.api.MeApi
@@ -21,6 +21,7 @@ import fit.aquazero.app.core.network.api.RecipesApi
 import fit.aquazero.app.core.network.api.RecommendationsApi
 import fit.aquazero.app.core.network.api.VisionApi
 import fit.aquazero.app.core.network.api.WorkoutsApi
+import okhttp3.Dispatcher
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -30,14 +31,29 @@ import javax.inject.Named
 import javax.inject.Singleton
 
 /**
- * Networking graph. Two OkHttp clients share one connection pool:
+ * Networking graph. Three OkHttp clients share one connection pool:
  *  - `api`: headers + [TokenAuthenticator] - everything authenticated.
  *  - `authless`: headers only - used by the refresh coordinator so a refresh
  *    can never recursively trigger itself.
+ *  - `sse`: `api` with the read timeout widened for streaming (see below).
+ *
+ * **Each client gets its own [Dispatcher]; only the connection pool is
+ * shared.** `newBuilder()` copies the dispatcher *reference*, so deriving the
+ * clients from one another silently pooled every call in the app into a
+ * single `maxRequestsPerHost = 5` budget against the one host we talk to.
+ * That made the refresh path self-blocking: [TokenAuthenticator] runs on a
+ * dispatcher thread and blocks it while refreshing, so five concurrent 401s
+ * held all five slots, and the refresh — enqueued on the same dispatcher —
+ * waited behind the calls waiting on it. No read timeout applies, because the
+ * refresh call never starts. Separate dispatchers make that deadlock
+ * structurally impossible rather than merely unlikely.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
+
+    /** Read-gap bound for the SSE chat stream; see [sseClient]. */
+    private const val SSE_READ_TIMEOUT_SECONDS = 180L
 
     @Provides
     @Singleton
@@ -68,6 +84,33 @@ object NetworkModule {
         authenticator: TokenAuthenticator,
     ): OkHttpClient = base.newBuilder()
         .authenticator(authenticator)
+        .dispatcher(apiDispatcher())
+        .build()
+
+    /**
+     * Client for the streaming chat turn.
+     *
+     * OkHttp's read timeout is a gap-between-reads timeout, and on an SSE
+     * response the gap that matters is the one before the first `token` frame:
+     * the server flushes its headers immediately, then does guardrail and
+     * context work and waits on the model. The 30s that suits a request/response
+     * call is inside the range that wait can legitimately take, so a slow turn
+     * gets killed mid-thought and surfaces as a dropped connection.
+     *
+     * Widened rather than disabled. The server sends no heartbeat frame, so
+     * with no timeout at all a half-open socket would hang the turn until the
+     * user navigated away; a bound well past any plausible model latency still
+     * lets a genuinely dead connection fail.
+     */
+    @Provides
+    @Singleton
+    @Named("sse")
+    fun sseClient(@Named("api") base: OkHttpClient): OkHttpClient = base.newBuilder()
+        .readTimeout(SSE_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        // Its own dispatcher too: an open stream occupies a slot for the whole
+        // turn, so sharing the api budget would let a few streams starve
+        // ordinary requests.
+        .dispatcher(apiDispatcher())
         .build()
 
     private fun retrofit(client: OkHttpClient, baseUrl: String): Retrofit =
@@ -165,8 +208,30 @@ object NetworkModule {
     fun recommendationsApi(@Named("api") retrofit: Retrofit): RecommendationsApi =
         retrofit.create(RecommendationsApi::class.java)
 
+    /** Purchase verification rides the authenticated client — the route is Bearer-only. */
     @Provides
     @Singleton
-    fun exportApi(@Named("api") retrofit: Retrofit): ExportApi =
-        retrofit.create(ExportApi::class.java)
+    fun billingApi(@Named("api") retrofit: Retrofit): BillingApi =
+        retrofit.create(BillingApi::class.java)
+}
+
+/** Total in-flight cap for authenticated traffic (OkHttp default: 64). */
+private const val MAX_REQUESTS = 64
+
+/** Single-origin app, so this is a concurrency bound, not politeness. */
+private const val MAX_REQUESTS_PER_HOST = 16
+
+/**
+ * A dedicated dispatcher for authenticated traffic, kept off the one the
+ * refresh path uses. The per-host cap is also raised: the default of 5 is
+ * tuned for a client spreading load over many hosts, and every call this app
+ * makes goes to the same origin, so five was an arbitrary concurrency ceiling
+ * on the whole app rather than a politeness bound.
+ *
+ * Top-level rather than a member so it does not count against the module
+ * object's function budget.
+ */
+private fun apiDispatcher(): Dispatcher = Dispatcher().apply {
+    maxRequests = MAX_REQUESTS
+    maxRequestsPerHost = MAX_REQUESTS_PER_HOST
 }

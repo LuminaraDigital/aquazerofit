@@ -37,4 +37,6 @@ object DatabaseModule {
     @Provides fun progressDao(db: AzfDatabase): ProgressDao = db.progressDao()
 
     @Provides fun chatDao(db: AzfDatabase): ChatDao = db.chatDao()
+
+    @Provides fun userOverlayDao(db: AzfDatabase): UserOverlayDao = db.userOverlayDao()
 }

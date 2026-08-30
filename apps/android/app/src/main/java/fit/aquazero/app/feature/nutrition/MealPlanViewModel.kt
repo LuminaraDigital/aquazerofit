@@ -65,7 +65,7 @@ data class MealPlanUiState(
 
 /** One-shot effects. */
 sealed interface MealPlanEvent {
-    data class Message(@StringRes val messageRes: Int, val isError: Boolean = false) :
+    data class Message(@param:StringRes val messageRes: Int, val isError: Boolean = false) :
         MealPlanEvent
 }
 

@@ -26,7 +26,8 @@ data class MealLogDto(
     val id: String,
     val userId: String,
     val type: String = "mealLog",
-    val mealType: MealType,
+    /** Defaulted so a meal type added server-side does not fail the decode. */
+    val mealType: MealType = MealType.SNACK,
     val items: List<MealLogItemDto> = emptyList(),
     val totalKcal: Double = 0.0,
     val totalProteinG: Double = 0.0,
@@ -38,10 +39,19 @@ data class MealLogDto(
     val localDate: String,
 )
 
-/** Body for `POST /meal-logs` (shared `createMealLogSchema`). */
+/**
+ * Body for `POST /meal-logs` (shared `createMealLogSchema`).
+ *
+ * Unlike the other request bodies this one is also *decoded*: the outbox
+ * stores it as `payloadJson` and reads it back at delivery time, so it sits on
+ * the tolerant-decode path and its enum needs a default like any response
+ * field. Losing a queued meal outright because a downgraded build no longer
+ * knows the stored meal type is worse than delivering it as a snack. Every
+ * call site still passes [mealType] explicitly.
+ */
 @Serializable
 data class CreateMealLogRequest(
-    val mealType: MealType,
+    val mealType: MealType = MealType.SNACK,
     val items: List<MealLogItemDto>,
     val loggedAt: String? = null,
     val localDate: String,

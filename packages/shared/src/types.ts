@@ -68,8 +68,30 @@ export interface User {
   id: string;
   email: string;
   emailVerified: boolean;
-  role: UserRole;
+  /**
+   * PERMANENT tier. Only seeded and comped accounts carry `'premium'` here.
+   *
+   * A paid subscription does NOT write to this field — it sets `premiumUntil`
+   * instead, and `effectiveTier()` folds the two. The distinction is the whole
+   * point: a stored `'premium'` never expires, so a cancelled subscription
+   * that had written here would leave the account premium forever, and the
+   * only thing that could ever take it back would be a job nobody has written.
+   * Read this field through `effectiveTier`, never directly.
+   */
   tier: UserTier;
+  /**
+   * ISO instant at which a paid entitlement lapses. Absent for accounts that
+   * have never paid.
+   *
+   * Time-bounded rather than a boolean because every rail this product could
+   * use — Play Billing, Stripe, Telegram Stars — expresses a subscription as a
+   * period with an end, and renewal is a NEW end date rather than a flag being
+   * re-set. Expiry is then derived on read: there is no scheduled job to fail,
+   * and an entitlement cannot outlive the payment behind it because the server
+   * was asleep at the wrong moment.
+   */
+  premiumUntil?: string | null;
+  role: UserRole;
   displayName: string;
   tgId?: number; // unique when present (Telegram link)
   tgUsername?: string;
@@ -828,8 +850,34 @@ export interface CoachState {
   seenLevel: number;
   seenRankId: string;
   seenAchievementIds: string[];
+  /**
+   * What the last `GET /coaches/progression` actually put on screen.
+   *
+   * The acknowledgement used to re-derive this from live activity at ack time,
+   * which meant it marked a *different* set seen than the one displayed: any
+   * achievement earned between the read and the acknowledgement — an offline
+   * outbox draining while the celebration overlay is up is the ordinary case —
+   * was recorded as delivered without ever being rendered, and the one that
+   * genuinely was shown could be left unseen.
+   *
+   * Recording what was offered is not the same as consuming it: the read stays
+   * idempotent, a retry overwrites this with an identical value, and nothing is
+   * marked seen until the client explicitly acknowledges. Optional because
+   * states persisted before this field existed must still deserialize.
+   */
+  pendingDelivery?: DeliveredReactions;
   selectedAt: string;
   updatedAt: string;
+}
+
+/** The reactions one card actually displayed, recorded so the ack can mark exactly those. */
+export interface DeliveredReactions {
+  /** Level announced by a headline, or null when the card had none. */
+  level: number | null;
+  /** Rank announced by a rank-up headline, or null. */
+  rankId: string | null;
+  /** Achievement ids the card rendered. */
+  achievementIds: string[];
 }
 
 /** Append-only record of a Telegram Stars purchase (idempotent by charge id). */

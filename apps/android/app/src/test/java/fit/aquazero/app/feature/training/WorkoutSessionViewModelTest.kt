@@ -1,6 +1,7 @@
 package fit.aquazero.app.feature.training
 
 import androidx.lifecycle.SavedStateHandle
+import fit.aquazero.app.core.audio.FakeCoachVoiceEngine
 import fit.aquazero.app.core.data.PlansRepository
 import fit.aquazero.app.core.model.SessionExerciseDto
 import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
@@ -72,7 +73,12 @@ class WorkoutSessionViewModelTest {
     }
 
     private fun viewModel(handle: SavedStateHandle = SavedStateHandle()) =
-        WorkoutSessionViewModel(repository, handle).also { it.clock = { FIXED_NOW } }
+        WorkoutSessionViewModel(
+            plansRepository = repository,
+            savedStateHandle = handle,
+            coachesRepository = FakeCoachesRepository(),
+            voiceEngine = FakeCoachVoiceEngine(),
+        ).also { it.clock = { FIXED_NOW } }
 
     @Test
     fun `resolves targets from the session when the server sends no resolved document`() =
@@ -302,6 +308,86 @@ class WorkoutSessionViewModelTest {
         assertEquals(1, vm.uiState.value.completedSets)
         assertNotNull(handle.get<String>(WorkoutSessionViewModel.KEY_DRAFT))
     }
+
+    // ----- reshape while the user is mid-workout (P2-3) -----
+
+    @Test
+    fun `a reshaped session keeps sets banked against exercises that survive`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.start(SESSION_ID)
+            advanceUntilIdle()
+            vm.startSession()
+            vm.completeSet()
+            advanceUntilIdle()
+            assertEquals(1, vm.uiState.value.completedSets)
+
+            // The plan regenerates: a new exercise is inserted ahead of the
+            // two that were already there, so every index shifts by one.
+            workoutsApi.todayEnvelope = TodayWorkoutEnvelopeDto(
+                session = session.copy(
+                    exercises = listOf(
+                        SessionExerciseDto(
+                            exerciseId = "ex_squat",
+                            name = "Back squat",
+                            setsPlanned = 3,
+                            reps = 5,
+                            restSeconds = 120,
+                        ),
+                    ) + session.exercises,
+                ),
+            )
+            vm.start("session-reshaped")
+            advanceUntilIdle()
+
+            val state = vm.uiState.value
+            assertEquals(3, state.entries.size)
+            assertEquals(
+                "the banked set must follow its exercise, not its old index",
+                1,
+                state.completedSets,
+            )
+            assertEquals(0, state.setsDone[state.entries.indexOfFirst { it.exerciseId == "ex_squat" }])
+            assertEquals(1, state.setsDone[state.entries.indexOfFirst { it.exerciseId == "ex_bench" }])
+        }
+
+    @Test
+    fun `a shorter reshaped session leaves a usable exercise selected`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.start(SESSION_ID)
+        advanceUntilIdle()
+        vm.startSession()
+        vm.completeSet()
+        advanceUntilIdle()
+        vm.completeSet()
+        advanceUntilIdle()
+
+        // Everything the user was on disappears from the plan.
+        workoutsApi.todayEnvelope = TodayWorkoutEnvelopeDto(
+            session = session.copy(exercises = listOf(session.exercises.first())),
+        )
+        vm.start("session-shrunk")
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(1, state.entries.size)
+        assertNotNull("a shorter plan must not leave `current` null", state.current)
+        assertTrue(state.exerciseIndex in state.entries.indices)
+    }
+
+    @Test
+    fun `stepping a set count out of range is ignored rather than crashing`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.start(SESSION_ID)
+            advanceUntilIdle()
+            val before = vm.uiState.value.setsDone
+
+            vm.incrementSets(99)
+            vm.decrementSets(-1)
+
+            assertEquals(before, vm.uiState.value.setsDone)
+        }
 
     private companion object {
         const val SESSION_ID = "session-1"

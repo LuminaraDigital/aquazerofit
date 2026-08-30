@@ -16,6 +16,11 @@ coverage/
 .cursor/
 .windsurf/
 .aider*
+.artifacts/
+.codex/
+.gemini/
+.antigravity/
+AGENT_SCRATCH/
 
 # Editors
 .vscode/
@@ -35,7 +40,19 @@ desktop.ini
 # App data & uploads (runtime-generated)
 apps/api/.data/
 apps/api/uploads/
+# AZF_DATA_DIR is resolved relative to the process cwd, not to apps/api. Running
+# the API from the repo root — which `npm run dev` and the .env's
+# `AZF_DATA_DIR=./.data` both do — puts the live JSON store here instead, where
+# the line above does not reach it. It holds real local accounts: users.json
+# carries email addresses and password hashes, ledger.json carries credit
+# history. Ignore both locations, not just the one the default points at.
+/.data/
 *.tsbuildinfo
+
+# Loose screenshots dropped at the repo root during development. Deliberately
+# root-only (`/`), so genuine image assets under apps/, design/ and docs/ are
+# unaffected.
+/*.png
 
 # Logs & tool caches
 *.log
@@ -61,3 +78,4 @@ apps/android/captures/
 *.aab
 *.jks
 *.keystore
+keystore.properties

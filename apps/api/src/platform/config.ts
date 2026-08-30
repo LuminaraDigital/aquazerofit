@@ -11,6 +11,15 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 /** apps/api/.data by default, regardless of process cwd. */
 const defaultDataDir = path.resolve(here, '..', '..', '.data');
 
+/**
+ * Environment variable declaring how many instances of this API will run.
+ *
+ * Named as a constant because it appears in three places that must not drift:
+ * the config getter, the boot guard's error message, and the documentation
+ * (.replit, docker-compose.yml, docs/OPERATIONS.md).
+ */
+export const INSTANCE_COUNT_ENV = 'AZF_INSTANCE_COUNT';
+
 export const config = {
   get port(): number {
     return Number(process.env.PORT ?? 4000);
@@ -220,6 +229,58 @@ export const config = {
     return process.env.PLAY_INTEGRITY_PACKAGE_NAME?.trim() ?? '';
   },
 
+  /**
+   * How long one successful MFA step-up keeps the admin router open, in
+   * seconds. Default 600 (10 minutes).
+   *
+   * The number is bounded from both sides. Too short and an admin re-types a
+   * code between every request, which ends with the code taped to the monitor;
+   * too long and the step-up stops being a step-up. Ten minutes covers a
+   * realistic support task (list accounts, look one up, edit a record) in one
+   * prompt while staying inside the 15-minute access-token lifetime — the
+   * grant is bound to the presenting access token (see modules/mfa/service),
+   * so it can never outlive that token anyway, and this only shortens it.
+   *
+   * A non-positive or unparseable value falls back to the default rather than
+   * being honoured: "0" would silently mean "re-prompt on every request" for
+   * anyone who meant to disable the feature, and the way to disable it is to
+   * not enrol, not to zero the window.
+   */
+  get mfaStepUpTtlSeconds(): number {
+    const raw = process.env.MFA_STEP_UP_TTL_SECONDS?.trim();
+    if (raw) {
+      const n = Number(raw);
+      if (Number.isFinite(n) && n > 0) return Math.floor(n);
+    }
+    return 600;
+  },
+
+  /**
+   * Require every administrator to hold a confirmed second factor.
+   *
+   * OFF by default, and that default is the migration story rather than a
+   * weakening: an existing deployment whose admin has no authenticator
+   * enrolled must not be locked out of its own running system by a deploy.
+   * While it is off, an admin WITH MFA enrolled is still gated on a fresh
+   * step-up (enrolment is self-enforcing the moment it is confirmed), and an
+   * admin WITHOUT MFA is let through only after the bypass is written to the
+   * audit container and to stdout on every single request. Nothing is silent.
+   *
+   * The intended sequence is: deploy -> every admin enrols -> set
+   * MFA_REQUIRE_ADMIN=true, after which an unenrolled admin is refused
+   * outright. Until that flip, the residual risk is a password-only admin
+   * session, which is exactly the risk that existed before this feature.
+   *
+   * That sequence is a migration window, not a resting state, so production
+   * refuses to boot until the flip has happened (assertProductionSecrets
+   * below). The off-by-default only buys an existing deployment the one
+   * enrolment pass; leaving it off is a decision nobody makes on purpose.
+   */
+  get mfaRequireAdmin(): boolean {
+    const raw = process.env.MFA_REQUIRE_ADMIN?.trim().toLowerCase();
+    return raw === 'true' || raw === '1';
+  },
+
   get isTest(): boolean {
     return process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
   },
@@ -244,6 +305,100 @@ export const config = {
 
   /** Account deletion grace period (AQF-06 §6 lifecycle). */
   deletionGraceDays: 30,
+
+  /**
+   * How often expired Idempotency-Key replay records are pruned from the
+   * `logs` container (see modules/logs/service.sweepIdempotencyRecords).
+   *
+   * Six hours by default, matching the other periodic sweeps in index.ts. The
+   * records carry a 24h TTL, so this is four passes per lifetime — frequent
+   * enough that the backlog stays small, rare enough that the sweep's full
+   * container scan is nowhere near a request path.
+   *
+   * A value below one minute is ignored rather than honoured: the plausible
+   * way to get one is a unit mix-up (someone writing seconds), and the failure
+   * mode of believing it is a scan of the whole container every few
+   * milliseconds. Falling back to the default is the safe reading.
+   */
+  /**
+   * Deployment-wide ceiling on model tokens per UTC day. 0 or unset = no
+   * ceiling, which is the default and must stay the default: a deployment that
+   * has not opted in must never start serving degraded output because a
+   * setting it never chose had an opinion.
+   *
+   * Set it with headroom. `platform/aiBudget.ts` counts what providers report,
+   * and a call that dies mid-generation spends tokens nobody reports — so the
+   * figure this compares against is a floor on real spend, not a meter.
+   *
+   * A negative or unparseable value falls back to "no ceiling" rather than
+   * throwing: the budget is a cost guard, and a guard that stops the app from
+   * booting has caused a worse outage than the bill it was preventing.
+   */
+  /**
+   * Google Play service-account JSON, verbatim, for verifying purchases.
+   *
+   * Absent means this deployment cannot take Play payments, and the billing
+   * routes then answer PAYMENT_UNAVAILABLE rather than granting anything. That
+   * asymmetry is the point: a missing credential must cost a sale, never give
+   * one away.
+   */
+  get playServiceAccountJson(): string {
+    return process.env.PLAY_SERVICE_ACCOUNT_JSON?.trim() ?? '';
+  },
+
+  /** Android applicationId the purchases belong to, e.g. fit.aquazero.app. */
+  get playPackageName(): string {
+    return process.env.PLAY_PACKAGE_NAME?.trim() ?? '';
+  },
+
+  /**
+   * Shared secret Google Pub/Sub echoes on every RTDN delivery. Same fail-closed
+   * posture as TELEGRAM_WEBHOOK_SECRET: unset means the webhook trusts nobody,
+   * because an unauthenticated route that grants entitlements is a free
+   * subscription for anyone who finds the URL.
+   */
+  get playRtdnSecret(): string {
+    return process.env.PLAY_RTDN_SECRET?.trim() ?? '';
+  },
+
+  get dailyTokenBudget(): number {
+    const raw = process.env.AZF_DAILY_TOKEN_BUDGET?.trim();
+    if (!raw) return 0;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  },
+
+  get idempotencySweepIntervalMs(): number {
+    const raw = process.env.IDEMPOTENCY_SWEEP_INTERVAL_MS?.trim();
+    if (raw) {
+      const n = Number(raw);
+      if (Number.isFinite(n) && n >= 60_000) return n;
+    }
+    return 6 * 3600 * 1000;
+  },
+
+  /**
+   * How many instances of this API the operator intends to run concurrently.
+   *
+   * Declared, not detected: none of the deploy surfaces expresses an instance
+   * count this process can read. `.replit` says `deploymentTarget = "vm"`
+   * (Reserved VM, one machine) but Replit's autoscale limits live in its UI,
+   * not in the file; docker-compose has no `replicas` and is scaled with
+   * `docker compose up --scale api=N` on the command line; the Dockerfile
+   * cannot know. So the count is an explicit declaration by whoever configures
+   * the deployment, and assertSingleInstance() below refuses to boot on
+   * anything but 1.
+   *
+   * NaN means AZF_INSTANCE_COUNT was set to something that is not a positive
+   * integer. That is not treated as "probably one" — a guard that cannot read
+   * its own input has not verified anything, so it refuses.
+   */
+  get instanceCount(): number {
+    const raw = process.env[INSTANCE_COUNT_ENV]?.trim();
+    if (!raw) return 1;
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 1 ? n : Number.NaN;
+  },
 
   /**
    * Public origin of the running app, used to build links inside outbound
@@ -284,6 +439,58 @@ export function hasAnyAiProviderKey(): boolean {
 
 function isProduction(): boolean {
   return process.env.NODE_ENV === 'production';
+}
+
+/**
+ * Single-instance guard: refuse to boot when the deployment declares more than
+ * one concurrent instance of this API.
+ *
+ * WHY THIS IS FATAL RATHER THAN A WARNING. The document store keeps its whole
+ * working set in memory and hydrates it once, at boot (platform/pgStore.ts
+ * says so at length). Postgres is a durability mirror, not a source of truth
+ * for reads. Two instances therefore hold two independent copies that diverge
+ * from the first write: instance A's new meal log is invisible to instance B
+ * until B restarts, and because the flush writes whole documents, whichever
+ * instance flushes last silently overwrites the other's version of the same
+ * row. Nothing errors. Nothing logs. A user's food diary just loses entries,
+ * and which entries depends on which instance served which request.
+ *
+ * That is not a degradation an operator can notice from the outside, which is
+ * why it has to be caught here, before the first request, rather than left to
+ * a runbook. Refusing to start costs a failed deploy; the alternative costs
+ * health data that nobody can reconstruct.
+ *
+ * THE UNLOCK is the async getStore() refactor: make reads go through to
+ * Postgres instead of a per-instance memory copy. It is tracked separately
+ * because it touches ~77 call sites, and it is the only thing that makes
+ * horizontal scaling safe. Raising AZF_INSTANCE_COUNT before it lands does not
+ * make the deployment scalable, it makes the data loss legal.
+ *
+ * Skipped under test (the suite runs many workers in one repo and never boots
+ * a serving process) and satisfied silently by the default of 1, so ordinary
+ * local development never sees it.
+ */
+export function assertSingleInstance(): void {
+  if (config.isTest) return;
+  const declared = config.instanceCount;
+  if (declared === 1) return;
+
+  const raw = process.env[INSTANCE_COUNT_ENV]?.trim() ?? '';
+  const problem = Number.isNaN(declared)
+    ? `${INSTANCE_COUNT_ENV} is set to ${JSON.stringify(raw)}, which is not a positive integer`
+    : `${INSTANCE_COUNT_ENV}=${declared} declares ${declared} concurrent instances`;
+
+  throw new Error(
+    `Refusing to start: ${problem}. This API is single-instance only. Each instance ` +
+      'hydrates its own in-memory copy of the store at boot and never re-reads, so a write ' +
+      'on one instance is invisible to the others and the last flush silently overwrites ' +
+      "the other instances' version of the same document — health logs are lost with no " +
+      'error anywhere. Run exactly one instance (Replit: deploymentTarget = "vm", NOT ' +
+      'autoscale; Docker Compose: do not use --scale on the api service; Azure Container ' +
+      'Apps: min=max=1), and unset ' +
+      `${INSTANCE_COUNT_ENV} or set it to 1. Scaling out requires the async getStore() ` +
+      'refactor first, so reads go to Postgres rather than to a per-instance memory copy.',
+  );
 }
 
 /**
@@ -341,6 +548,53 @@ export function assertProductionSecrets(): void {
       'AUTH_ALLOW_CAPTCHALESS_MOBILE must not be set in production: it lets any caller sending ' +
         'the X-Client: android header register without solving the bot challenge. It is a ' +
         'closed-testing measure only; use the Play Integrity path in production.',
+    );
+  }
+
+  // Bot protection is on only when BOTH Turnstile keys are present (see
+  // config.botProtectionEnabled), and assertHuman returns early and does
+  // nothing when it is off. So a production deployment missing either key
+  // serves POST /auth/register and POST /auth/password-reset/request — the
+  // account-creation surface, where one route mints accounts and AI credits
+  // and the other mails an address the caller chose — completely unchallenged,
+  // while every response and every log line looks exactly as it does when the
+  // check is working. The only previous signal was one console.warn at boot,
+  // which is to say none.
+  //
+  // A half-configured pair is the state this most often catches: a secret with
+  // no site key, or a site key with no secret, is a setup somebody got part-way
+  // through, and it protects precisely as much as setting neither.
+  const turnstileMissing = (['TURNSTILE_SECRET_KEY', 'TURNSTILE_SITE_KEY'] as const).filter(
+    (k) => !process.env[k]?.trim(),
+  );
+  if (turnstileMissing.length > 0) {
+    throw new Error(
+      `Refusing to start in production without: ${turnstileMissing.join(', ')}. Bot protection ` +
+        'is enabled only when BOTH Turnstile keys are set, so registration and password-reset ' +
+        'request go out with no challenge at all without them and nothing says so at request ' +
+        'time — a distributed signup flood stays under every per-IP rate limit. One key on its ' +
+        'own leaves protection off exactly as if neither were set, which is the usual way this ' +
+        'happens. Take both from the Cloudflare dashboard (Turnstile -> your site) and set them ' +
+        'together.',
+    );
+  }
+
+  // Admin MFA is built and mounted, but with MFA_REQUIRE_ADMIN off an
+  // administrator who never enrolled a second factor is audited, logged and
+  // then let through anyway (see modules/mfa/middleware). The admin router
+  // reads and edits every account on the platform — every user's email,
+  // health profile, food and weight history — so an unenrolled admin means
+  // one stolen password stands between an attacker and all of it, with the
+  // audit trail recording the breach rather than preventing it. The off
+  // default exists only to give an existing deployment one window to enrol;
+  // a boot failure is the only enforcement that survives an operator
+  // forgetting to close that window.
+  if (!config.mfaRequireAdmin) {
+    throw new Error(
+      'MFA_REQUIRE_ADMIN must be set to true in production: without it an administrator with no ' +
+        'second factor enrolled is only audited, not stopped, and the admin routes expose every ' +
+        'account on the platform. Have every admin enrol an authenticator first, then set it — ' +
+        'flipping it with nobody enrolled locks you out of your own system.',
     );
   }
 

@@ -192,7 +192,7 @@ chatRouter.post(
 
     // --- Admission: tier lane + credits (before headers → JSON error envelope)
     assertLaneAllowed(user.tier, 'chatFast');
-    const reservationId = await creditLedger.reserve(user.id, 'chatTurn');
+    const reservationId = await creditLedger.reserve(user.id, 'chatTurn', user.tier);
 
     // Everything from here to the model call is fallible, and the
     // reservation is already held. A throw from preAsync, either upsertDoc
@@ -538,7 +538,7 @@ chatRouter.post(
 
     // --- Admission: lane, then credits.
     assertLaneAllowed(user.tier, 'planStructured');
-    const reservationId = await creditLedger.reserve(user.id, 'chatTurn');
+    const reservationId = await creditLedger.reserve(user.id, 'chatTurn', user.tier);
 
     try {
       // --- Input guardrail. A meal description is user text like any other.

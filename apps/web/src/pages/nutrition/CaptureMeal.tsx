@@ -99,7 +99,18 @@ export default function CaptureMeal() {
       {/* Preview / viewport layer */}
       <div className="absolute inset-0 z-0">
         {previewUrl ? (
-          <img src={previewUrl} alt="Preview of your meal photo" className="w-full h-full object-cover" />
+          // The user's own photo, straight off the camera roll as a blob: URL.
+          // It is the full-bleed viewfinder, so it is never deferred. No
+          // width/height: the intrinsic size is whatever the device shot, and
+          // the parent (`absolute inset-0`) already fixes the box, so there is
+          // nothing for a guessed ratio to improve.
+          <img
+            src={previewUrl}
+            alt="Preview of your meal photo"
+            loading="eager"
+            decoding="async"
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full bg-gradient-to-b from-surface-container-low via-surface to-black flex items-center justify-center">
             <span className="material-symbols-outlined text-outline-variant text-[96px]" aria-hidden="true">

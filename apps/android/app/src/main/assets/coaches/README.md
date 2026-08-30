@@ -1,18 +1,7 @@
-# Coach art (bundled)
+# Coach art (generated)
 
-These files are a **copy** of the generated web art, checked in so the app can
-render coaches offline with no network fetch.
-
-`node tools/coaches/build-art.mjs <source-dir>` writes to
-`apps/web/public/coaches/` **only** — it does not touch this directory. After
-regenerating, mirror the result here by hand, or the Android build will ship
-stale art while the web app shows the new renders:
-
-```
-cp -r apps/web/public/coaches/. apps/android/app/src/main/assets/coaches/
-```
-
-Do not hand-edit the images: change the source renders and re-run the script.
+Built by `node tools/coaches/build-art.mjs <source-dir>` from the character
+renders. Do not hand-edit: re-run the script instead.
 
 Each coach directory may also contain `celebrate.webp` and `encourage.webp`
 expression variants. Those are optional and are dropped in by hand — the

@@ -2,6 +2,7 @@ package fit.aquazero.app.core.database
 
 import androidx.room3.Dao
 import androidx.room3.Query
+import androidx.room3.Transaction
 import androidx.room3.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -35,4 +36,21 @@ interface ChatDao {
 
     @Query("SELECT * FROM challenges ORDER BY cachedAt DESC")
     fun challenges(): Flow<List<ChallengeEntity>>
+
+    @Query("DELETE FROM chat_messages")
+    suspend fun clearAllMessages()
+
+    @Query("DELETE FROM chat_sessions")
+    suspend fun clearAllSessions()
+
+    @Query("DELETE FROM challenges")
+    suspend fun clearAllChallenges()
+
+    @Transaction
+    suspend fun clearAllChatAndChallenges() {
+        clearAllMessages()
+        clearAllSessions()
+        clearMemoryFacts()
+        clearAllChallenges()
+    }
 }

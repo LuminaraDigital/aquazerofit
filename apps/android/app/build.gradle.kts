@@ -255,7 +255,7 @@ dependencies {
   implementation(libs.hilt.android)
   ksp(libs.hilt.compiler)
   implementation(libs.androidx.hilt.work)
-  implementation(libs.androidx.hilt.navigation.compose)
+  implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
   ksp(libs.androidx.hilt.compiler)
 
   // Database (Room 3)
@@ -293,10 +293,14 @@ dependencies {
   implementation(libs.androidx.camera.core)
   implementation(libs.androidx.camera.camera2)
   implementation(libs.androidx.camera.lifecycle)
-  implementation(libs.androidx.camera.view)
   implementation(libs.androidx.camera.compose)
   implementation(libs.androidx.camera.mlkit.vision)
   implementation(libs.mlkit.barcode.scanning)
+
+  // Google Play Billing — the premium subscription. The AAR carries its own
+  // com.android.vending.BILLING permission, <queries> entry and consumer
+  // ProGuard rules, so nothing has to be repeated in the manifest here.
+  implementation(libs.play.billing.ktx)
 
   // Firebase
   implementation(platform(libs.firebase.bom))

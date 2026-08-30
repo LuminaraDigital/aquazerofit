@@ -4,7 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import fit.aquazero.app.core.audio.CoachVoiceEngine
 import fit.aquazero.app.core.common.LocalDates
+import fit.aquazero.app.core.data.CoachesRepository
 import fit.aquazero.app.core.data.PlansRepository
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
@@ -12,6 +14,7 @@ import fit.aquazero.app.core.model.SetLogDto
 import fit.aquazero.app.core.model.WorkoutSessionDto
 import fit.aquazero.app.core.network.api.CompleteWorkoutRequest
 import fit.aquazero.app.core.network.api.CompletedExerciseInput
+import fit.aquazero.app.core.ui.CoachRoster
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -19,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -139,6 +143,8 @@ sealed interface WorkoutSessionEvent {
 class WorkoutSessionViewModel @Inject constructor(
     private val plansRepository: PlansRepository,
     private val savedStateHandle: SavedStateHandle,
+    private val coachesRepository: CoachesRepository,
+    private val voiceEngine: CoachVoiceEngine,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WorkoutSessionUiState())
@@ -190,7 +196,8 @@ class WorkoutSessionViewModel @Inject constructor(
         val index = state.exerciseIndex
         val setNumber = (state.currentSetsDone + 1).coerceAtMost(entry.sets)
 
-        val setsDone = state.setsDone.toMutableList().also { it[index] = setNumber }
+        if (index !in state.setsDone.indices) return
+        val setsDone = state.setsDone.replacingAt(index, setNumber)
         val logs = state.setLogs.map { it.toMutableList() }.toMutableList()
         logs[index].add(state.actual.toSetLog(setNumber, entry))
 
@@ -198,14 +205,17 @@ class WorkoutSessionViewModel @Inject constructor(
         val updated = state.copy(setsDone = setsDone, setLogs = logs)
         _uiState.value = when {
             finishedExercise -> updated.advanceFrom(index)
-            else -> updated.copy(
-                phase = SessionPhase.REST,
-                restLeftSeconds = entry.restSeconds,
-                restTotalSeconds = entry.restSeconds,
-                announcement = announce(
-                    SessionAnnouncement.SetDone(setNumber, entry.sets, entry.restSeconds),
-                ),
-            )
+            else -> {
+                speakCoachCue("Set $setNumber finished. Rest ${entry.restSeconds} seconds.")
+                updated.copy(
+                    phase = SessionPhase.REST,
+                    restLeftSeconds = entry.restSeconds,
+                    restTotalSeconds = entry.restSeconds,
+                    announcement = announce(
+                        SessionAnnouncement.SetDone(setNumber, entry.sets, entry.restSeconds),
+                    ),
+                )
+            }
         }
         if (_uiState.value.phase == SessionPhase.REST) startRestCountdown()
         persistDraft()
@@ -241,8 +251,9 @@ class WorkoutSessionViewModel @Inject constructor(
     /** Summary stepper: nudge one exercise's set count down (and trim its logs). */
     fun decrementSets(index: Int) {
         val state = _uiState.value
-        val next = (state.setsDone.getOrElse(index) { 0 } - 1).coerceAtLeast(0)
-        val setsDone = state.setsDone.toMutableList().also { it[index] = next }
+        if (index !in state.setsDone.indices) return
+        val next = (state.setsDone[index] - 1).coerceAtLeast(0)
+        val setsDone = state.setsDone.replacingAt(index, next)
         val logs = state.setLogs.mapIndexed { i, list ->
             if (i == index) list.take(next) else list
         }
@@ -253,8 +264,9 @@ class WorkoutSessionViewModel @Inject constructor(
     /** Summary stepper: nudge one exercise's set count up. */
     fun incrementSets(index: Int) {
         val state = _uiState.value
-        val next = (state.setsDone.getOrElse(index) { 0 } + 1).coerceAtMost(MAX_SETS)
-        val setsDone = state.setsDone.toMutableList().also { it[index] = next }
+        if (index !in state.setsDone.indices) return
+        val next = (state.setsDone[index] + 1).coerceAtMost(MAX_SETS)
+        val setsDone = state.setsDone.replacingAt(index, next)
         _uiState.value = state.copy(setsDone = setsDone)
         persistDraft()
     }
@@ -265,14 +277,9 @@ class WorkoutSessionViewModel @Inject constructor(
         persistDraft()
     }
 
-    fun openSummary() {
-        stopRest()
-        _uiState.value = _uiState.value.copy(
-            phase = SessionPhase.SUMMARY,
-            announcement = announce(SessionAnnouncement.Finished),
-        )
-        persistDraft()
-    }
+    // `openSummary()` was removed: no screen ever called it, and the SUMMARY
+    // phase is reached through `completeWorkout()`. `SessionAnnouncement
+    // .Finished` stays live — `announce` still emits it from that path.
 
     /** Elapsed session time, floored at one minute. */
     fun durationMinutes(): Int {
@@ -377,30 +384,50 @@ class WorkoutSessionViewModel @Inject constructor(
         restoreDraft(cached?.draftSetLogsJson)
     }
 
+    /**
+     * Adopt a freshly loaded session, keeping whatever the user has banked.
+     *
+     * Progress is carried across by `exerciseId`, not by position. The old
+     * test was `state.entries.size == entries.size`, so any reshape — the
+     * plan regenerating, a swapped exercise, a coach adjustment landing while
+     * the screen was open — reset `setsDone`, `skipped` and `setLogs`
+     * wholesale and silently threw away completed sets. `load()` paints from
+     * cache and clears `loading` *before* awaiting the network, so that window
+     * is exactly when a user starts training.
+     *
+     * Matching by id means an exercise that survives the reshape keeps its
+     * sets wherever it moved to, one that is gone loses only its own, and a
+     * newly added one starts empty. `exerciseIndex` follows the exercise the
+     * user was actually on rather than the ordinal it happened to occupy — a
+     * shorter plan would otherwise leave `current` null and wedge the screen.
+     */
     private fun applySession(session: WorkoutSessionDto, entries: List<ResolvedEntry>) {
         val state = _uiState.value
-        val sameShape = state.entries.size == entries.size
+        val previousIndexOf = state.entries
+            .withIndex()
+            .associate { (index, entry) -> entry.exerciseId to index }
+
+        fun <T> carry(current: List<T>, empty: T, entryIndex: Int): T {
+            val previous = previousIndexOf[entries[entryIndex].exerciseId] ?: return empty
+            return current.getOrElse(previous) { empty }
+        }
+
+        val currentExerciseId = state.entries.getOrNull(state.exerciseIndex)?.exerciseId
+        val nextIndex = entries
+            .indexOfFirst { it.exerciseId == currentExerciseId }
+            .takeIf { it >= 0 }
+            ?: state.exerciseIndex.coerceIn(0, (entries.size - 1).coerceAtLeast(0))
+
         _uiState.value = state.copy(
             loading = false,
             loadError = false,
             session = session,
             entries = entries,
-            setsDone = if (sameShape && state.setsDone.isNotEmpty()) {
-                state.setsDone
-            } else {
-                List(entries.size) { 0 }
-            },
-            skipped = if (sameShape && state.skipped.isNotEmpty()) {
-                state.skipped
-            } else {
-                List(entries.size) { false }
-            },
-            setLogs = if (sameShape && state.setLogs.isNotEmpty()) {
-                state.setLogs
-            } else {
-                List(entries.size) { emptyList() }
-            },
-        ).withPrefilledActuals(state.exerciseIndex)
+            exerciseIndex = nextIndex,
+            setsDone = List(entries.size) { carry(state.setsDone, 0, it) },
+            skipped = List(entries.size) { carry(state.skipped, false, it) },
+            setLogs = List(entries.size) { carry(state.setLogs, emptyList(), it) },
+        ).withPrefilledActuals(nextIndex)
     }
 
     /**
@@ -460,6 +487,15 @@ class WorkoutSessionViewModel @Inject constructor(
         }
     }
 
+    private fun speakCoachCue(cue: String) {
+        viewModelScope.launch {
+            try {
+                val coachId = coachesRepository.activeCoachId().first() ?: CoachRoster.DEFAULT_ID
+                voiceEngine.speak(cue, coachId)
+            } catch (_: Exception) {}
+        }
+    }
+
     private fun startRestCountdown() {
         stopRest()
         restJob = viewModelScope.launch {
@@ -471,6 +507,7 @@ class WorkoutSessionViewModel @Inject constructor(
                 if (state.phase != SessionPhase.REST) return@launch
                 val left = state.restLeftSeconds - 1
                 _uiState.value = if (left <= 0) {
+                    speakCoachCue("Rest complete. Step up for the next set.")
                     state.copy(
                         restLeftSeconds = 0,
                         phase = SessionPhase.WORK,
@@ -501,6 +538,7 @@ class WorkoutSessionViewModel @Inject constructor(
         stopRest()
         val next = index + 1
         return if (next < entries.size) {
+            speakCoachCue("Next exercise: ${entries[next].name}.")
             copy(
                 exerciseIndex = next,
                 phase = SessionPhase.WORK,
@@ -509,6 +547,7 @@ class WorkoutSessionViewModel @Inject constructor(
                 announcement = announce(SessionAnnouncement.NextExercise(entries[next].name)),
             ).withPrefilledActuals(next)
         } else {
+            speakCoachCue("Workout complete. Fantastic effort today.")
             copy(
                 phase = SessionPhase.SUMMARY,
                 restLeftSeconds = 0,
@@ -561,3 +600,17 @@ class WorkoutSessionViewModel @Inject constructor(
         private const val MAX_SETS = 20
     }
 }
+
+/**
+ * Copy of this list with [index] replaced, or the list unchanged when the
+ * index is out of bounds.
+ *
+ * The set-count lists are sized from `entries`, and every write used a raw
+ * `MutableList` index assignment while the neighbouring read used
+ * `getOrElse` — a mismatch that said the author was not sure the two could
+ * not diverge. They could not, quite, but `applySession` is what maintained
+ * that invariant and it now rebuilds the lists on every load. An out-of-range
+ * write here would be a crash mid-workout; ignoring it is the right failure.
+ */
+private fun <T> List<T>.replacingAt(index: Int, value: T): List<T> =
+    if (index in indices) toMutableList().also { it[index] = value } else this

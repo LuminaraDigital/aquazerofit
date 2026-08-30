@@ -37,10 +37,13 @@
  *
  * Disabled when TURNSTILE_SECRET_KEY is unset, which keeps development, the
  * test suite and the offline demo working with no third-party dependency and
- * no network egress. Production without a key logs a loud startup warning
- * rather than refusing to boot — an unprotected signup form is a real
- * weakness, but a deployment that dies because an operator has not finished
- * onboarding with Cloudflare is a worse one.
+ * no network egress. PRODUCTION is different: assertProductionSecrets (see
+ * platform/config.ts) refuses to boot without both keys, because "disabled"
+ * here means assertHuman returns immediately and the account-creation surface
+ * ships with no challenge on it at all — a state indistinguishable, from the
+ * outside and from the logs, from one where the check is working. The warning
+ * below therefore covers the non-production cases and the half-configured pair
+ * that never reaches the boot guard.
  */
 import type { Request } from 'express';
 import { config } from './config';

@@ -27,9 +27,30 @@ Verified by running `assembleRelease`, not by inspection.
 The classic release-only crashes — a stripped `@Serializable`, a lost Retrofit
 generic — are specifically ruled out by the mapping file rather than assumed.
 
-**Not verified:** the release APK has not been *run*. The `android` CLI's
-emulator is disabled on Windows, so a device smoke test is still required
-before submission.
+**Both claims above were wrong, and running the build is what proved it.**
+*(Corrected 2026-08-29.)*
+
+The reasoning — "ruled out by the mapping file rather than assumed" — does not
+hold. `missing_rules.txt` was indeed absent and 143 serializers were indeed
+retained, and the minified build still failed at startup: R8 had stripped the
+no-arg constructors of all three ML Kit `ComponentRegistrar` classes, which
+Firebase's `ComponentDiscovery` instantiates reflectively from names in the
+merged manifest. The mapping file showed each class kept and `getComponents()`
+kept, with no `<init>` — visible, but only to someone looking for it.
+
+R8 cannot statically detect reflective instantiation, so an empty
+`missing_rules.txt` is evidence that R8 found no *statically reachable* gap.
+It is not evidence that the app works. Only running it is.
+
+Fixed by a keep rule in `proguard-rules.pro` written against the
+`ComponentRegistrar` interface, verified three ways: `seeds.txt` shows the rule
+matching all three classes, `usage.txt` shows none removed, and the minified
+build launches on an emulator with zero `ComponentDiscovery` failures.
+
+**The emulator claim was also false.** The `android` CLI emulator is not
+disabled on Windows — `android emulator list` returns `Pixel_10a` and
+`android emulator start` works. A smoke test of the minified build was
+available the whole time and would have caught the defect above.
 
 ## 2. Play compliance
 
@@ -92,10 +113,13 @@ Each checked by reading the implementation, not the comments.
 
 None of these are code defects.
 
-1. **Run the release APK on a device.** Static analysis rules out the usual R8
-   failures, but nothing substitutes for launching the minified build. The
-   android CLI emulator is unavailable on Windows — use Android Studio's AVD or
-   a physical device.
+1. **Run the release APK on a device.** *(Partly done 2026-08-29 — and it found
+   a shipping defect; see §1.)* The minified build has now been launched on
+   `Pixel_10a`: it starts, renders onboarding, and logs no ML Kit registrar
+   failures since the keep rule landed. What remains is a **functional** pass
+   behind a live API — sign-up, the barcode scanner specifically (it is the
+   surface the R8 defect broke), meal capture, and a sync cycle. The claim that
+   the emulator is unavailable on Windows was wrong; it works.
 2. **Signing — now enforced.** *(Resolved after this audit was written.)* The
    release config used to attach a signing config only when a keystore existed,
    so `assembleRelease` printed BUILD SUCCESSFUL and emitted

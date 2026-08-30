@@ -33,10 +33,8 @@ import javax.inject.Singleton
  * that upserts Room") and the follow-up `PUT` op that the outbox and
  * `SyncWorker` already implement but nothing could enqueue.
  *
- * Reconciliation rules:
- *  - Server meal logs are keyed into Room by `serverId`; a row that still has
- *    local work pending (PENDING/FAILED) is never overwritten by a refresh.
- *  - A locally SYNCED row that has vanished server-side is removed.
+ * The meal reconciliation rules live in [MealReconciler]. The one rule that
+ * stays here, because it is about what cannot be reconciled at all:
  *  - Water is **not** written back into Room: `GET /water-logs` and the daily
  *    analytics both expose day *totals* only, so individual entries cannot be
  *    matched (plan §4.2). The server total is returned to the caller instead
@@ -51,6 +49,8 @@ class NutritionDayRepository @Inject constructor(
     private val syncScheduler: SyncScheduler,
 ) {
 
+    private val reconciler = MealReconciler(logsDao)
+
     /**
      * Pull one day from `GET /analytics/nutrition/daily` and fold its meal
      * logs into Room. Failure is non-fatal: Room keeps serving the UI.
@@ -58,7 +58,7 @@ class NutritionDayRepository @Inject constructor(
     suspend fun refreshDay(localDate: String): ApiResult<DailyNutritionDto> {
         val result = safeCall { logsApi.dailyNutrition(localDate) }
         if (result is ApiResult.Success) {
-            reconcileMeals(localDate, result.data.meals.values.flatten())
+            reconciler.reconcile(localDate, result.data.meals.values.flatten())
         }
         return result
     }
@@ -121,33 +121,47 @@ class NutritionDayRepository @Inject constructor(
     suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto> =
         safeCall { recommendationsApi.logRecommendation(recommendationId) }.map { it.mealLog }
 
-    // ----- reconciliation -----
+    private fun mealTypeOrNull(name: String): MealType? = when (name.lowercase()) {
+        "breakfast" -> MealType.BREAKFAST
+        "lunch" -> MealType.LUNCH
+        "dinner" -> MealType.DINNER
+        "snack" -> MealType.SNACK
+        else -> null
+    }
+}
 
-    private suspend fun reconcileMeals(localDate: String, serverLogs: List<MealLogDto>) {
-        val local = logsDao.mealLogsForDateOnce(localDate)
+/**
+ * Folds a server day's meal logs into Room.
+ *
+ * Split out of [NutritionDayRepository] because it is pure Room work: every
+ * decision it makes can be exercised against a `LogsDao` double, with no
+ * network, no outbox and no WorkManager standing in the way.
+ *
+ * Rules:
+ *  - Server meal logs are keyed into Room by `serverId`; a row that still has
+ *    local work pending (PENDING/FAILED) is never overwritten by a refresh.
+ *  - A row the user has soft-deleted is never written back, however healthy
+ *    the server still believes it to be.
+ *  - A locally SYNCED row that has vanished server-side is removed.
+ */
+internal class MealReconciler(private val logsDao: LogsDao) {
+
+    suspend fun reconcile(localDate: String, serverLogs: List<MealLogDto>) {
+        // Deliberately the *unfiltered* read. `mealLogsForDateOnce` hides
+        // soft-deleted rows, and a hidden row is a row this index cannot map
+        // back to its `serverId`: a meal the user deleted a second ago, whose
+        // DELETE op has not drained yet, is still returned by the server and
+        // then looks brand new here. It gets inserted a second time under a
+        // `srv-` id — the deleted meal is back on the day and back in the
+        // calorie total, and offline (where the op can never drain) it stays
+        // there. If you are tempted to reuse the filtered query here: that is
+        // exactly the bug.
+        val local = logsDao.mealLogsForDateOnceIncludingDeleted(localDate)
         val byServerId = local.filter { it.serverId != null }.associateBy { it.serverId }
         for (dto in serverLogs) {
             val existing = byServerId[dto.id]
-            // Never clobber a row that still has unsynced local work on it.
-            if (existing != null && existing.syncState != SyncState.SYNCED) continue
-            logsDao.upsertMealLog(
-                MealLogEntity(
-                    localId = existing?.localId ?: "$SERVER_ROW_PREFIX${dto.id}",
-                    serverId = dto.id,
-                    mealType = mealTypeName(dto.mealType),
-                    items = dto.items,
-                    totalKcal = dto.totalKcal,
-                    totalProteinG = dto.totalProteinG,
-                    totalCarbsG = dto.totalCarbsG,
-                    totalFatG = dto.totalFatG,
-                    source = dto.source.name.lowercase(),
-                    visionJobId = dto.visionJobId,
-                    loggedAt = dto.loggedAt,
-                    localDate = dto.localDate,
-                    syncState = SyncState.SYNCED,
-                    idempotencyKey = existing?.idempotencyKey.orEmpty(),
-                ),
-            )
+            if (existing != null && !acceptsServerCopy(existing)) continue
+            logsDao.upsertMealLog(rowFor(dto, existing))
         }
         val serverIds = serverLogs.mapTo(mutableSetOf()) { it.id }
         local.asSequence()
@@ -156,6 +170,33 @@ class NutritionDayRepository @Inject constructor(
             .forEach { logsDao.deleteMealLogRow(it.localId) }
     }
 
+    /**
+     * Whether a refresh may overwrite [row] with the server's copy.
+     *
+     * Unsynced local work always wins over the network, and a soft-delete is
+     * local work: it is a deletion the server has not applied yet. Writing the
+     * server's copy over it would clear `deleted` and undo the user's tap.
+     */
+    private fun acceptsServerCopy(row: MealLogEntity): Boolean =
+        !row.deleted && row.syncState == SyncState.SYNCED
+
+    private fun rowFor(dto: MealLogDto, existing: MealLogEntity?): MealLogEntity = MealLogEntity(
+        localId = existing?.localId ?: "$SERVER_ROW_PREFIX${dto.id}",
+        serverId = dto.id,
+        mealType = mealTypeName(dto.mealType),
+        items = dto.items,
+        totalKcal = dto.totalKcal,
+        totalProteinG = dto.totalProteinG,
+        totalCarbsG = dto.totalCarbsG,
+        totalFatG = dto.totalFatG,
+        source = dto.source.name.lowercase(),
+        visionJobId = dto.visionJobId,
+        loggedAt = dto.loggedAt,
+        localDate = dto.localDate,
+        syncState = SyncState.SYNCED,
+        idempotencyKey = existing?.idempotencyKey.orEmpty(),
+    )
+
     private fun mealTypeName(mealType: MealType): String = when (mealType) {
         MealType.BREAKFAST -> "breakfast"
         MealType.LUNCH -> "lunch"
@@ -163,15 +204,7 @@ class NutritionDayRepository @Inject constructor(
         MealType.SNACK -> "snack"
     }
 
-    private fun mealTypeOrNull(name: String): MealType? = when (name.lowercase()) {
-        "breakfast" -> MealType.BREAKFAST
-        "lunch" -> MealType.LUNCH
-        "dinner" -> MealType.DINNER
-        "snack" -> MealType.SNACK
-        else -> null
-    }
-
-    private companion object {
+    internal companion object {
         /** Local id prefix for rows that originated on the server. */
         const val SERVER_ROW_PREFIX = "srv-"
     }

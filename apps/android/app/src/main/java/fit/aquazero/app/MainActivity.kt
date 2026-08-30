@@ -5,10 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 import fit.aquazero.app.core.designsystem.AzfTheme
@@ -31,9 +30,19 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             AzfTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
+                // No root Surface. The window background is already
+                // `deep_sea_background` (themes.xml) and every screen's
+                // Scaffold paints `colorScheme.background` over it, so an
+                // opaque full-screen Surface here was a third paint of the
+                // identical colour on every frame.
+                //
+                // The one thing the Surface did provide is the content colour
+                // for anything drawn outside a Scaffold — the toast host and
+                // the pre-auth flow — so that is provided directly. It costs
+                // nothing to draw. Nothing depended on the Surface's shape or
+                // elevation: both were left at their defaults.
+                CompositionLocalProvider(
+                    LocalContentColor provides MaterialTheme.colorScheme.onBackground,
                 ) {
                     AzfNavigation()
                 }

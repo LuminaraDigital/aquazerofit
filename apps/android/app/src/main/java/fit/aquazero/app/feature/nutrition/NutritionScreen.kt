@@ -20,11 +20,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
@@ -41,6 +43,7 @@ import fit.aquazero.app.feature.dashboard.CardSkeleton
 import fit.aquazero.app.feature.dashboard.HydrationCard
 import fit.aquazero.app.feature.dashboard.NutritionFormat
 import fit.aquazero.app.feature.dashboard.rememberToastSink
+import fit.aquazero.app.feature.nutrition.barcode.prefetchBarcodeScannerModule
 
 /**
  * The nutrition day view — a port of `apps/web/src/pages/nutrition/Nutrition.tsx`.
@@ -64,6 +67,22 @@ fun NutritionScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val resources = LocalResources.current
     val toasts = rememberToastSink()
+
+    // Ask Play services for the barcode model while the user is merely
+    // looking at the nutrition tab, so the scanner is warm by the time they
+    // open it. Unbundling the scanner traded 5.8 MB of install size for a
+    // first-use download; this is what keeps that trade invisible.
+    val context = LocalContext.current
+    LaunchedEffect(Unit) { prefetchBarcodeScannerModule(context) }
+
+    // The day can roll over while this screen sits in the back stack. The
+    // ViewModel no longer caches "today", but nothing re-reads the clock on
+    // its own, so a returning user would keep seeing yesterday until their
+    // next interaction. Cheap: a no-op when the date has not changed.
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onResumed()
+        onPauseOrDispose { }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->

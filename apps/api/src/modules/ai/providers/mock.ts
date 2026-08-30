@@ -508,8 +508,11 @@ const FOCUS_BY_CATEGORY: Record<string, string> = {
  * Offline P-05 draft: rotates the pool deterministically (FNV-1a seeded),
  * prescribes by experience level, prescribes NO external load (weightKg null —
  * the conservative default), and emits simple replace-op progression rules.
- * Beginners training 4+ days get every 4th day off (AQF-11 recovery rule).
+ * Emits a full seven-day week with `daysPerWeek` training days spaced through
+ * it (AQF-11 recovery rule) — see the distribution note in the loop.
  */
+const DAYS_IN_WEEK = 7;
+
 function planDraftOffline(ctx: MockPlanGenContext): Record<string, unknown> {
   const pool = [...ctx.pool].sort((a, b) => a.id.localeCompare(b.id));
   if (pool.length === 0 || !Number.isInteger(ctx.daysPerWeek) || ctx.daysPerWeek < 1 || ctx.daysPerWeek > 7) {
@@ -526,9 +529,29 @@ function planDraftOffline(ctx: MockPlanGenContext): Record<string, unknown> {
   const progressionRules: Record<string, unknown>[] = [];
   const perDay = Math.min(4, Math.max(2, Math.ceil(usable.length / ctx.daysPerWeek)));
 
-  for (let day = 1; day <= ctx.daysPerWeek; day += 1) {
-    const isRest = experience === 'beginner' && ctx.daysPerWeek >= 4 && day % 4 === 0;
-    if (isRest) {
+  /*
+   * Seven days, of which exactly `daysPerWeek` are training days.
+   *
+   * This loop used to run to `ctx.daysPerWeek` and then mark every fourth of
+   * THOSE as rest, so it emitted too few days and too few training days at
+   * once. Both gates that consume this draft require a full week with exactly
+   * `daysPerWeek` non-rest, so nothing it produced was ever accepted — and
+   * since the offline engine is what every keyless deployment and every eval
+   * run uses, that was the common case rather than an edge one.
+   *
+   * The rest days are chosen by Bresenham distribution rather than a modulo
+   * rule: `(d - 1) * daysPerWeek % 7 < daysPerWeek` selects exactly
+   * `daysPerWeek` of the seven and spreads them, starting on day 1. That
+   * replaces the old beginner recovery rule, which met AQF-11 by quietly
+   * handing a beginner fewer sessions than they asked for; spacing the
+   * sessions achieves the same recovery without silently changing the
+   * request, and `generatePlanSchema` caps the field at 6, so a week always
+   * carries at least one rest day.
+   */
+  const isTrainingDay = (d: number): boolean => ((d - 1) * ctx.daysPerWeek) % DAYS_IN_WEEK < ctx.daysPerWeek;
+
+  for (let day = 1; day <= DAYS_IN_WEEK; day += 1) {
+    if (!isTrainingDay(day)) {
       days.push({ order: day, focus: 'Rest', isRest: true, slots: [] });
       continue;
     }

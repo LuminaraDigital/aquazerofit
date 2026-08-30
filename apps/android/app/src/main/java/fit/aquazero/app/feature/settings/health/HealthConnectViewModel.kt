@@ -28,7 +28,7 @@ data class HealthConnectUiState(
     val snapshot: HealthDaySnapshot = HealthDaySnapshot.EMPTY,
     val busy: Boolean = false,
     /** Last outcome worth saying out loud; cleared on the next refresh. */
-    @StringRes val messageRes: Int? = null,
+    @param:StringRes val messageRes: Int? = null,
 ) {
 
     /** True when there is something on this device to connect to. */

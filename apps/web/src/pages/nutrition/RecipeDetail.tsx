@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Recipe } from '@aquazerofit/shared';
 import { ApiError, api } from '@/lib/api';
+import { fetchPriorityHigh } from '@/lib/fetchPriority';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -116,9 +117,17 @@ export default function RecipeDetail() {
             <section className="px-container-margin mb-6">
               <div className="relative w-full h-[42vh] min-h-[280px] rounded-[2rem] overflow-hidden shadow-2xl">
                 {recipe.imageUrl && !imageFailed ? (
+                  // Page hero and its LCP element, so eager + high priority.
+                  // No width/height: `imageUrl` is remote content-record art of
+                  // unknown intrinsic size, and the hero box is already pinned
+                  // by the wrapper's h-[42vh] min-h-[280px], so there is no
+                  // layout shift left for an attribute to remove.
                   <img
                     src={recipe.imageUrl}
                     alt={`Plated ${recipe.name}`}
+                    loading="eager"
+                    decoding="async"
+                    {...fetchPriorityHigh()}
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={() => setImageFailed(true)}
                   />

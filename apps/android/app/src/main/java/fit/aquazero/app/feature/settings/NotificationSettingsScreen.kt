@@ -49,7 +49,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
@@ -64,15 +64,14 @@ import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.designsystem.currentLocale
+import fit.aquazero.app.core.ui.LocaleFormatters
 import fit.aquazero.app.core.ui.reminders.ReminderPrefs
 import fit.aquazero.app.core.ui.reminders.TimeOfDay
 import fit.aquazero.app.core.ui.reminders.WaterFrequency
 import fit.aquazero.app.feature.dashboard.rememberToastSink
 import java.time.DayOfWeek
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
-import java.util.Locale
 
 /** Which time control the picker dialog is currently editing. */
 private enum class TimeTarget { MEALS, WORKOUT, WEIGH_IN }
@@ -480,13 +479,19 @@ private fun frequencyLabel(frequency: WaterFrequency): Int = when (frequency) {
     WaterFrequency.EVERY_4H -> R.string.reminders_every_4h
 }
 
-/** Locale-aware clock label; the stored value stays 24h. */
+/**
+ * Locale-aware clock label; the stored value stays 24h.
+ *
+ * Both of these run inside composition, so the formatter is taken from the
+ * [LocaleFormatters] cache rather than compiled from the pattern per call.
+ */
 private fun formatTime(time: TimeOfDay): String =
-    LocalTime.of(time.hour, time.minute)
-        .format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
+    LocalTime.of(time.hour, time.minute).format(LocaleFormatters.of(CLOCK_PATTERN))
 
 private fun formatHour(hour: Int): String =
-    LocalTime.of(hour, 0).format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
+    LocalTime.of(hour, 0).format(LocaleFormatters.of(CLOCK_PATTERN))
+
+private const val CLOCK_PATTERN = "HH:mm"
 
 /** Send the user to this app's notification settings when a prompt cannot help. */
 private fun Context.openNotificationSettings() {

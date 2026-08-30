@@ -41,9 +41,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -51,7 +51,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
@@ -211,16 +211,20 @@ private fun ScanningState(modifier: Modifier = Modifier) {
     val reducedMotion = rememberReducedMotion()
     val accent = LocalAzfExtended.current.primaryFixedDim
     val transition = rememberInfiniteTransition(label = "scanning")
-    val pulse by transition.animateFloat(
+    // Deliberately NOT `by`: reading the animated value into a composition
+    // scope would invalidate this whole Column — the icon, both Text nodes and
+    // their `stringResource` lookups — at the animation's frame rate, for the
+    // entire analysis wait. Held as a State and read inside the
+    // `graphicsLayer` lambda below, the pulse only re-runs the draw phase.
+    val pulse = transition.animateFloat(
         initialValue = 0.35f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            animation = tween(durationMillis = PULSE_MILLIS, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "pulse",
     )
-    val alpha = if (reducedMotion) 0.7f else pulse
 
     Column(
         modifier = modifier
@@ -233,7 +237,7 @@ private fun ScanningState(modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier
                 .size(128.dp)
-                .alpha(alpha)
+                .graphicsLayer { alpha = if (reducedMotion) REDUCED_MOTION_ALPHA else pulse.value }
                 .clip(CircleShape)
                 .border(2.dp, accent.copy(alpha = 0.5f), CircleShape),
             contentAlignment = Alignment.Center,
@@ -289,9 +293,15 @@ private fun ReviewList(
         ),
         verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
     ) {
-        item(key = "summary") { AnalysisSummaryCard(totals = state.totals, mealType = state.mealType) }
+        // A contentType per slot: the summary card, the section header, the
+        // item cards and the gate are structurally unrelated, and the notice
+        // slots come and go. Without one Compose reuses a slot's
+        // subcomposition for the next kind that lands there and rebuilds it.
+        item(key = "summary", contentType = "summary") {
+            AnalysisSummaryCard(totals = state.totals, mealType = state.mealType)
+        }
 
-        item(key = "header") {
+        item(key = "header", contentType = "header") {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -322,7 +332,7 @@ private fun ReviewList(
         }
 
         if (state.items.isEmpty()) {
-            item(key = "empty") {
+            item(key = "empty", contentType = "empty") {
                 AzfCard(tier = AzfCardTier.Compact) {
                     Text(
                         text = stringResource(R.string.analysis_no_items),
@@ -335,7 +345,7 @@ private fun ReviewList(
             }
         }
 
-        items(state.items, key = { it.key }) { item ->
+        items(state.items, key = { it.key }, contentType = { "review-item" }) { item ->
             ReviewItemCard(
                 item = item,
                 editable = !state.confirmed,
@@ -346,7 +356,7 @@ private fun ReviewList(
         }
 
         if (state.unlinkedItemCount > 0) {
-            item(key = "unlinked") {
+            item(key = "unlinked", contentType = "notice") {
                 InlineNotice(
                     text = stringResource(R.string.analysis_unlinked_items),
                     tone = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -355,7 +365,7 @@ private fun ReviewList(
         }
 
         state.banner?.let { banner ->
-            item(key = "banner") {
+            item(key = "banner", contentType = "notice") {
                 InlineNotice(
                     text = banner.message ?: banner.messageRes?.let { stringResource(it) }.orEmpty(),
                     tone = MaterialTheme.colorScheme.error,
@@ -364,7 +374,7 @@ private fun ReviewList(
             }
         }
 
-        item(key = "gate") {
+        item(key = "gate", contentType = "gate") {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -679,6 +689,8 @@ private fun AddItemSheet(
 }
 
 private const val MAX_RESULTS = 12
+private const val PULSE_MILLIS = 1200
+private const val REDUCED_MOTION_ALPHA = 0.7f
 
 // ---------------------------------------------------------------------------
 // Previews

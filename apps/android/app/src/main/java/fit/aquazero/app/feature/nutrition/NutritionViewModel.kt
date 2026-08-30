@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Clock
 import javax.inject.Inject
 
 /** Load phase of the selected day. */
@@ -136,7 +137,7 @@ data class NutritionUiState(
 /** One-shot effects for the nutrition screen. */
 sealed interface NutritionEvent {
     /** Show a transient message. */
-    data class Message(@StringRes val messageRes: Int, val kind: ToastKind) : NutritionEvent
+    data class Message(@param:StringRes val messageRes: Int, val kind: ToastKind) : NutritionEvent
 }
 
 /**
@@ -147,19 +148,28 @@ sealed interface NutritionEvent {
  * observe fetch that reconciles the server's logs into Room. Every write —
  * add, edit, delete, copy, water — goes through the repository seam and
  * therefore through the outbox, never straight to Retrofit.
+ *
+ * "Today" is never cached. This screen sits on the back stack and outlives
+ * midnight, so [clock] is injected and re-read at every use. That matters
+ * twice over: a log made at 00:05 must carry the new date, and the forward
+ * arrow — which refuses to step past today — must stop refusing the day the
+ * user is actually in.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class NutritionViewModel @Inject constructor(
     private val data: NutritionData,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 
-    private val today = LocalDates.today()
+    /** Recomputed on every read — see the class KDoc; never store this. */
+    private val today: String get() = LocalDates.today(clock)
+
     private val selectedDate = MutableStateFlow(today)
     private val searchTerm = MutableStateFlow("")
 
     private val _uiState = MutableStateFlow(
-        NutritionUiState(today = today, selectedDate = today),
+        NutritionUiState(today = selectedDate.value, selectedDate = selectedDate.value),
     )
     val uiState: StateFlow<NutritionUiState> = _uiState.asStateFlow()
 
@@ -275,6 +285,35 @@ class NutritionViewModel @Inject constructor(
 
     // ----- day switching -----
 
+    /**
+     * Re-read the wall clock, move the screen onto the new day if it turned
+     * over, and return the day a write should land on.
+     *
+     * A session that crossed midnight is still pointed at the day that ended.
+     * Someone parked on what they believe is today is carried onto the new day
+     * — which re-keys the Room reads through `flatMapLatest` and refetches —
+     * while someone deliberately browsing history is left where they are.
+     * Either way the published `today` moves, so [NutritionUiState.isToday]
+     * and the forward arrow stop describing a day that has already passed.
+     */
+    private fun syncToToday(): String {
+        val current = today
+        val state = _uiState.value
+        if (state.today != current) {
+            if (state.selectedDate == state.today) {
+                selectDate(current)
+            } else {
+                _uiState.update { it.copy(today = current) }
+            }
+        }
+        return selectedDate.value
+    }
+
+    /** Called by the screen every time it resumes; see [syncToToday]. */
+    fun onResumed() {
+        syncToToday()
+    }
+
     /** Move the selected day by [days]; never past today. */
     fun shiftDay(days: Long) {
         val next = LocalDates.shift(selectedDate.value, days)
@@ -284,10 +323,14 @@ class NutritionViewModel @Inject constructor(
 
     /** Jump to a specific `YYYY-MM-DD`; future dates are ignored. */
     fun selectDate(date: String) {
-        if (!LocalDates.isValid(date) || date > today) return
+        val current = today
+        if (!LocalDates.isValid(date) || date > current) return
         selectedDate.value = date
         _uiState.update {
             it.copy(
+                // Republished on every move: the cap the UI draws has to be
+                // the same fresh day the guard above just applied.
+                today = current,
                 selectedDate = date,
                 calendarOpen = false,
                 serverWaterMl = 0,
@@ -313,8 +356,8 @@ class NutritionViewModel @Inject constructor(
     /** One-tap +250 ml on the selected day (optimistic, Room-first). */
     fun logWater(amountMl: Int = WATER_INCREMENT_ML) {
         if (_uiState.value.waterPending) return
+        val date = syncToToday()
         _uiState.update { it.copy(waterPending = true) }
-        val date = selectedDate.value
         viewModelScope.launch {
             val before = _uiState.value.serverWaterMl
             runCatching { data.logWater(amountMl, date) }
@@ -380,8 +423,8 @@ class NutritionViewModel @Inject constructor(
         val sheet = _uiState.value.foodSearch ?: return
         val item = sheet.preview ?: return
         if (sheet.adding) return
+        val date = syncToToday()
         _uiState.update { it.copy(foodSearch = sheet.copy(adding = true)) }
-        val date = selectedDate.value
         viewModelScope.launch {
             runCatching {
                 data.logMeal(sheet.mealType, listOf(item), date)
@@ -479,8 +522,8 @@ class NutritionViewModel @Inject constructor(
     /** Copy yesterday's meals onto the selected day. */
     fun copyPreviousDay() {
         if (_uiState.value.copying) return
+        val target = syncToToday()
         _uiState.update { it.copy(copying = true) }
-        val target = selectedDate.value
         val source = LocalDates.shift(target, -1)
         viewModelScope.launch {
             val copied = runCatching { data.copyDay(source, target) }.getOrDefault(0)

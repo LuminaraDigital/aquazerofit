@@ -188,7 +188,7 @@ progressRouter.get(
     // --- 4. Premium + consent on: reserve, narrate, guardrail, settle.
     let reservationId: string;
     try {
-      reservationId = await creditLedger.reserve(user.id, 'progressInsight');
+      reservationId = await creditLedger.reserve(user.id, 'progressInsight', user.tier);
     } catch (err) {
       // Out of credits is an expected user state, not a fault, and it is not a
       // reason to show someone nothing. Note it server-side and degrade.

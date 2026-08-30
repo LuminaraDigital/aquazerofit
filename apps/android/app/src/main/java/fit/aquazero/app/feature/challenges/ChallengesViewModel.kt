@@ -37,11 +37,11 @@ data class ChallengesUiState(
 
 /** One-shot effects. */
 sealed interface ChallengesEvent {
-    data class Message(@StringRes val messageRes: Int, val isError: Boolean = false) :
+    data class Message(@param:StringRes val messageRes: Int, val isError: Boolean = false) :
         ChallengesEvent
 
     /** A message that carries a server-supplied value, such as the new code. */
-    data class MessageWithArg(@StringRes val messageRes: Int, val arg: String) : ChallengesEvent
+    data class MessageWithArg(@param:StringRes val messageRes: Int, val arg: String) : ChallengesEvent
 
     /** Hand an invite code to the system share sheet. */
     data class ShareInvite(val code: String) : ChallengesEvent

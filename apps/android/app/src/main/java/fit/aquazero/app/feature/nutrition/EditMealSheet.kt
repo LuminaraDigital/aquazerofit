@@ -22,6 +22,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +40,7 @@ import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.feature.dashboard.NutritionFormat
+import java.util.IdentityHashMap
 
 /**
  * Edit one logged meal: rescale or remove its items, then save.
@@ -81,8 +83,13 @@ internal fun EditMealSheet(
             )
             Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
 
+            val rowKeys = rememberRowKeys(state)
             LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-                itemsIndexed(state.rows) { index, row ->
+                itemsIndexed(
+                    items = state.rows,
+                    key = { _, row -> rowKeys.keyFor(row) },
+                    contentType = { _, _ -> "edit-row" },
+                ) { index, row ->
                     EditRow(
                         row = row,
                         canRemove = state.rows.size > 1,
@@ -104,6 +111,33 @@ internal fun EditMealSheet(
         }
     }
 }
+
+/**
+ * Stable per-row identities for the lazy list.
+ *
+ * [EditRowUi] carries no id, and everything on it moves: `current` is rebuilt
+ * on every stepper tap, and the index stops meaning anything the moment a row
+ * is removed. These rows *are* removable, so an index key does not merely cost
+ * a recomposition — it re-associates the slot's remembered state with a
+ * different food.
+ *
+ * What is stable is the ORIGINAL logged item. The view model copies rows and
+ * filters the list, but never replaces `original`, so its object identity
+ * survives every edit for the sheet's lifetime. Each one is numbered the first
+ * time it is seen, by identity rather than equality — two helpings of the same
+ * food are equal to each other and must still get separate keys.
+ */
+private class RowKeys {
+    private val assigned = IdentityHashMap<MealLogItemDto, String>()
+
+    fun keyFor(row: EditRowUi): String =
+        assigned.getOrPut(row.original) { "edit-row-${assigned.size}" }
+}
+
+/** [RowKeys] for one meal; a different meal starts a fresh numbering. */
+@Composable
+private fun rememberRowKeys(state: EditMealUi): RowKeys =
+    remember(state.localId) { RowKeys() }
 
 @Composable
 private fun EditRow(

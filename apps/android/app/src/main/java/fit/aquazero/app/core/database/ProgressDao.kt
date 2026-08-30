@@ -31,4 +31,16 @@ interface ProgressDao {
         clearSeries(series)
         if (points.isNotEmpty()) upsertTrendPoints(points)
     }
+
+    @Query("DELETE FROM progress_summary")
+    suspend fun clearSummary()
+
+    @Query("DELETE FROM trend_points")
+    suspend fun clearAllTrendPoints()
+
+    @Transaction
+    suspend fun clearAllProgress() {
+        clearSummary()
+        clearAllTrendPoints()
+    }
 }

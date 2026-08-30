@@ -30,9 +30,17 @@ import {
   setRefreshCookie,
 } from './cookies';
 import { AppError } from '../../platform/errors';
+import { mfaRouter } from '../mfa/router';
 import type { AuthResponse } from '@aquazerofit/shared';
 
 export const authRouter = Router();
+
+/**
+ * Second-factor enrolment and step-up (/auth/mfa/*). Mounted here rather than
+ * as its own top-level module so it inherits the strict /auth rate lane, which
+ * is the correct lane for a surface where codes are submitted.
+ */
+authRouter.use('/mfa', mfaRouter);
 
 /**
  * Bot-protection discovery. Public and unauthenticated by necessity — it is

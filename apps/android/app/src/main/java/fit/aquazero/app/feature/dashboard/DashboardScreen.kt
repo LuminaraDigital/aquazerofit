@@ -23,7 +23,8 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
@@ -51,6 +52,15 @@ fun DashboardScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val resources = LocalResources.current
     val toasts = rememberToastSink()
+
+    // The day can roll over while this screen sits in the back stack. The
+    // ViewModel no longer caches "today", but nothing re-reads the clock on
+    // its own, so a returning user would keep seeing yesterday until their
+    // next interaction. Cheap: a no-op when the date has not changed.
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onResumed()
+        onPauseOrDispose { }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->

@@ -14,6 +14,7 @@
  * A crisis signal always wins — a user in distress must never receive diet
  * content in that turn (AQF-11 §4).
  */
+import crypto from 'node:crypto';
 import { crisisSignpostFor, KCAL_FLOOR } from '@aquazerofit/shared';
 import type { SafetyCategory } from '@aquazerofit/shared';
 
@@ -188,7 +189,11 @@ async function writeGuardrailAudit(event: GuardrailAudit): Promise<void> {
       upsert(doc: Record<string, unknown>): unknown;
     };
     await container.upsert({
-      id: `audit_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      // crypto.randomUUID, not a timestamp plus Math.random(). These rows are
+      // the record of who tripped a safety guardrail and why; an id an outsider
+      // can guess is an id they can probe for, and the previous form leaked the
+      // write time and the trigger volume in the id itself.
+      id: `audit_${crypto.randomUUID()}`,
       userId: event.userId,
       type: 'guardrailTrigger',
       action: event.stage === 'pre' ? 'inputBlocked' : 'outputBlocked',

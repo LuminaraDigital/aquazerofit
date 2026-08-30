@@ -45,7 +45,7 @@ private val Context.healthDataStore: DataStore<Preferences> by
  */
 @Singleton
 class HealthConnectConsentStore @Inject constructor(
-    @Named(HEALTH_DATASTORE) private val dataStore: DataStore<Preferences>,
+    @param:Named(HEALTH_DATASTORE) private val dataStore: DataStore<Preferences>,
 ) {
 
     /**

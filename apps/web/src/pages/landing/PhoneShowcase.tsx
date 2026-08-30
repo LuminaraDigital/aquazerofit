@@ -1,4 +1,5 @@
 import { useTilt } from './motion';
+import { fetchPriorityHigh } from '@/lib/fetchPriority';
 
 /**
  * Device frame and hero product shot.
@@ -42,6 +43,9 @@ export function DeviceFrame({
           height={SHOT_H}
           alt={alt}
           loading={priority ? 'eager' : 'lazy'}
+          // The hero device shot is the landing page's LCP element; the
+          // preload scanner finds it before the tilt script runs.
+          {...fetchPriorityHigh(priority)}
           decoding="async"
           className="block h-auto w-full"
         />

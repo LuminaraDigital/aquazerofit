@@ -41,7 +41,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
@@ -286,7 +286,15 @@ private fun RecipeBody(
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
-        itemsIndexed(recipe.ingredients) { index, ingredient ->
+        // Ingredients and method steps sit in the same lazy list, so both get a
+        // namespaced key and a contentType. Without them the slot that held
+        // ingredient 6 is handed step 1 when a shorter recipe loads, and
+        // Compose rebuilds a checkbox row as a card in place.
+        itemsIndexed(
+            items = recipe.ingredients,
+            key = { index, _ -> "ingredient-$index" },
+            contentType = { _, _ -> "ingredient" },
+        ) { index, ingredient ->
             IngredientRow(
                 ingredient = ingredient,
                 checked = index in state.checked,
@@ -303,7 +311,11 @@ private fun RecipeBody(
                     modifier = Modifier.padding(start = 4.dp),
                 )
             }
-            itemsIndexed(recipe.method) { index, step ->
+            itemsIndexed(
+                items = recipe.method,
+                key = { index, _ -> "step-$index" },
+                contentType = { _, _ -> "step" },
+            ) { index, step ->
                 AzfCard(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = stringResource(R.string.recipe_step, index + 1).uppercase(),

@@ -38,13 +38,15 @@ packages/shared    Shared types, zod validation schemas, error taxonomy, constan
 prompts/           Versioned AI prompt files P-01..P-11 (AQF-10)
 evals/             Safety evaluation sets and runner (pipeline gate)
 content/           Licensing attribution and workout-media governance
+docs/ARCHITECTURE.md  System architecture report
 docs/specs/        AQF-01..AQF-22 document set
 docs/research/     Upstream integration and licensing research tracks
 docs/plans/        Integration and delivery plans
+docs/security/     Security audit findings
 design/figma/      Screen references and the Modern Aquatic Wellness design system
 design/brand/      Brand assets
-tools/docgen/      Markdown to .docx renderer (build tooling, not a workspace)
-tools/screenshots/ Re-encodes docs/screenshots into the WebP used by the landing page
+design/cards/      Collectible card masters (card.svg per fighter)
+tools/             Asset and document generators — see tools/README.md
 ```
 
 `prompts/` and `evals/` must stay at the repository root: `apps/api/src/modules/ai/prompts.ts`
@@ -298,6 +300,13 @@ art present and each file that lands upgrades one card silently.
 ## Documentation
 
 The authoritative document set lives in `docs/specs/` (AQF-01 Charter … AQF-22 Deployment Guide). The API surface is specified in AQF-07; algorithms in AQF-09; the prompt bank and LLMOps plan in AQF-10; safety and privacy design in AQF-11; deployment and domain setup in AQF-22.
+
+Alongside the specification set:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the system architecture report: module boundaries, data flow and the reasoning behind the structural decisions.
+- [docs/security/SECURITY_AUDIT_REPORT.md](docs/security/SECURITY_AUDIT_REPORT.md) — the comprehensive security audit and its findings.
+- [docs/plans/](docs/plans/) — integration and migration plans, including the Vite 8.x upgrade.
+- [tools/README.md](tools/README.md) — the asset and document generators, and when you need them.
 
 ## Security notes
 

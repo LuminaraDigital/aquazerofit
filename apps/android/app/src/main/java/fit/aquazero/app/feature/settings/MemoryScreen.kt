@@ -14,13 +14,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Spa
-import androidx.compose.material.icons.outlined.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,7 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
@@ -120,7 +120,7 @@ fun MemoryScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
+            item(contentType = "intro") {
                 Column {
                     Text(
                         text = stringResource(R.string.memory_heading),
@@ -137,7 +137,7 @@ fun MemoryScreen(
             }
 
             if (state.loading) {
-                item {
+                item(contentType = "skeleton") {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Skeleton(modifier = Modifier.fillMaxWidth().height(96.dp))
                         Skeleton(modifier = Modifier.fillMaxWidth().height(80.dp))
@@ -148,7 +148,7 @@ fun MemoryScreen(
             }
 
             if (state.loadFailed) {
-                item {
+                item(contentType = "error") {
                     ErrorState(
                         title = stringResource(R.string.memory_title),
                         message = stringResource(R.string.memory_error),
@@ -160,7 +160,7 @@ fun MemoryScreen(
             }
 
             if (state.summary.isNotEmpty()) {
-                item {
+                item(contentType = "summary") {
                     AzfCard(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = stringResource(R.string.memory_summary_heading).uppercase(),
@@ -178,7 +178,7 @@ fun MemoryScreen(
             }
 
             if (state.isEmpty) {
-                item {
+                item(contentType = "empty") {
                     EmptyState(
                         title = stringResource(R.string.memory_empty_title),
                         message = stringResource(R.string.memory_empty_body),
@@ -188,7 +188,7 @@ fun MemoryScreen(
             }
 
             if (state.suggested.isNotEmpty()) {
-                item {
+                item(contentType = "suggested-heading") {
                     Column {
                         AzfSectionHeading(
                             stringResource(R.string.memory_suggested_heading, state.suggested.size),
@@ -202,7 +202,7 @@ fun MemoryScreen(
                         )
                     }
                 }
-                items(state.suggested, key = { it.id }) { fact ->
+                items(state.suggested, key = { it.id }, contentType = { "suggested-fact" }) { fact ->
                     SuggestedFactCard(
                         fact = fact,
                         busy = state.busy,
@@ -213,12 +213,12 @@ fun MemoryScreen(
             }
 
             if (state.confirmed.isNotEmpty()) {
-                item {
+                item(contentType = "heading") {
                     AzfSectionHeading(
                         stringResource(R.string.memory_confirmed_heading, state.confirmed.size),
                     )
                 }
-                items(state.confirmed, key = { it.id }) { fact ->
+                items(state.confirmed, key = { it.id }, contentType = { "confirmed-fact" }) { fact ->
                     ConfirmedFactCard(
                         fact = fact,
                         editing = state.editingFactId == fact.id,
@@ -234,7 +234,7 @@ fun MemoryScreen(
             }
 
             if (state.rejected.isNotEmpty()) {
-                item {
+                item(contentType = "rejected-toggle") {
                     TextButton(onClick = viewModel::toggleRejected) {
                         Text(
                             text = stringResource(
@@ -254,7 +254,7 @@ fun MemoryScreen(
                     }
                 }
                 if (state.rejectedExpanded) {
-                    items(state.rejected, key = { it.id }) { fact ->
+                    items(state.rejected, key = { it.id }, contentType = { "rejected-fact" }) { fact ->
                         RejectedFactCard(
                             fact = fact,
                             busy = state.busy,
@@ -265,9 +265,9 @@ fun MemoryScreen(
                 }
             }
 
-            item { AddFactCard(state = state, viewModel = viewModel) }
+            item(contentType = "add-fact") { AddFactCard(state = state, viewModel = viewModel) }
 
-            item {
+            item(contentType = "forget") {
                 AzfCard(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = stringResource(R.string.memory_forget_body),
@@ -464,7 +464,7 @@ private fun RejectedFactCard(
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             IconTextButton(
-                icon = Icons.Outlined.Undo,
+                icon = Icons.AutoMirrored.Outlined.Undo,
                 label = stringResource(R.string.memory_restore),
                 tint = AzfColors.PrimaryFixedDim,
                 enabled = !busy,

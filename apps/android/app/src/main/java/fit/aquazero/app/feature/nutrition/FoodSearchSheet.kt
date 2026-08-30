@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -211,7 +212,7 @@ private fun PortionPane(
             .padding(vertical = 6.dp, horizontal = 4.dp),
     ) {
         Icon(
-            imageVector = Icons.Outlined.ArrowBack,
+            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.height(18.dp),
@@ -327,11 +328,18 @@ private fun PortionPane(
  */
 @Composable
 private fun AllergenNotice(food: FoodDto) {
-    val labels = NutritionMath.allergenLabels(food)
+    val labels = remember(food) { NutritionMath.allergenLabels(food) }
     if (labels.isEmpty()) return
-    // `map` is inline, so the composable `stringResource` call is legal here;
-    // `joinToString`'s transform is not, which is why it runs in two steps.
-    val names = labels.map { stringResource(it) }.joinToString(", ")
+    // The label list is fixed per food and the joined string is fixed per
+    // (food, configuration), so both are remembered — this composable runs
+    // once per search result, and the old form allocated an intermediate list
+    // and a StringBuilder on every pass. `stringResource` cannot move into the
+    // `remember` (it is a composable read), so the configuration-aware
+    // Resources is read here and the lambda only formats with it.
+    val resources = LocalResources.current
+    val names = remember(labels, resources) {
+        labels.joinToString(", ") { resources.getString(it) }
+    }
     Row(
         modifier = Modifier
             .padding(top = 8.dp)

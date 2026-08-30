@@ -43,7 +43,7 @@ private val Context.reminderDataStore: DataStore<Preferences> by
  */
 @Singleton
 class ReminderPrefsStore @Inject constructor(
-    @Named(REMINDER_DATASTORE) private val dataStore: DataStore<Preferences>,
+    @param:Named(REMINDER_DATASTORE) private val dataStore: DataStore<Preferences>,
 ) {
 
     /** Current preferences; a corrupt or unreadable store falls back to defaults. */

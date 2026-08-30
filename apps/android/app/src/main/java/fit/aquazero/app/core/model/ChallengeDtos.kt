@@ -49,7 +49,8 @@ data class ChallengeEnvelopeDto(
 @Serializable
 data class ChallengePeekDto(
     val code: String,
-    val kind: BuddyChallengeKind,
+    /** Defaulted to match [BuddyChallengeDto]: a new kind must not break the peek. */
+    val kind: BuddyChallengeKind = BuddyChallengeKind.LOGGING_STREAK,
     val targetDays: Int,
     val durationDays: Int,
     val memberCount: Int,
@@ -63,7 +64,7 @@ data class ChallengePeekEnvelopeDto(
     val challenge: ChallengePeekDto,
 )
 
-/** Body for `POST /challenges`. */
+/** Body for `POST /challenges`. Outbound only, so [kind] stays required. */
 @Serializable
 data class CreateChallengeRequest(
     val kind: BuddyChallengeKind,

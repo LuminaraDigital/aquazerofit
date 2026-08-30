@@ -14,10 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.TrendingDown
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Balance
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.TrendingDown
-import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,7 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
@@ -242,7 +242,7 @@ private fun SetupForm(
                         body = stringResource(R.string.setup_goal_lose_body),
                         selected = state.goal == Goal.LOSE,
                         onClick = { viewModel.onGoalChange(Goal.LOSE) },
-                        icon = Icons.Outlined.TrendingDown,
+                        icon = Icons.AutoMirrored.Outlined.TrendingDown,
                     )
                     AzfOptionCard(
                         title = stringResource(R.string.setup_goal_maintain),
@@ -256,7 +256,7 @@ private fun SetupForm(
                         body = stringResource(R.string.setup_goal_gain_body),
                         selected = state.goal == Goal.GAIN,
                         onClick = { viewModel.onGoalChange(Goal.GAIN) },
-                        icon = Icons.Outlined.TrendingUp,
+                        icon = Icons.AutoMirrored.Outlined.TrendingUp,
                     )
                 }
             }
@@ -592,7 +592,7 @@ private fun SetupFormPreviewBody() {
             body = stringResource(R.string.setup_goal_lose_body),
             selected = state.goal == Goal.LOSE,
             onClick = {},
-            icon = Icons.Outlined.TrendingDown,
+            icon = Icons.AutoMirrored.Outlined.TrendingDown,
         )
     }
 }

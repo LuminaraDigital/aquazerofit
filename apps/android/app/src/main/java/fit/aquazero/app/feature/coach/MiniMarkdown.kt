@@ -42,7 +42,16 @@ import fit.aquazero.app.core.designsystem.LocalAzfExtended
 /** One run of text within a block; [bold] is the only inline mark. */
 data class MdSpan(val text: String, val bold: Boolean)
 
-/** A parsed block. */
+/**
+ * A parsed block.
+ *
+ * Both arms are `data class`es over `data class` spans, so two parses of the
+ * same source produce equal blocks. That value equality is load-bearing:
+ * `MdBlockContent` uses the block itself as a `remember` key, and a streamed
+ * reply re-parses from scratch on every token. Blocks that have already closed
+ * come back equal and keep their annotated string; only the block still being
+ * written is re-annotated.
+ */
 sealed interface MdBlock {
     /** Consecutive non-bullet lines, joined with a single space. */
     data class Paragraph(val spans: List<MdSpan>) : MdBlock
@@ -146,31 +155,45 @@ fun MiniMarkdownText(
     style: TextStyle = MaterialTheme.typography.bodyMedium,
     color: Color = MaterialTheme.colorScheme.onSurface,
 ) {
+    // A streamed reply changes `text` on every token, so this remember never
+    // hits mid-turn and the whole reply is re-parsed each time. That much is
+    // inherent to streaming markdown; the per-block annotation below is where
+    // the repeated work is actually avoidable, and is.
     val blocks = remember(text) { MiniMarkdown.parse(text) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         blocks.forEach { block -> MdBlockContent(block, style, color) }
     }
 }
 
+/**
+ * Draw one block.
+ *
+ * Annotation is memoised on the block, not left to run per recomposition:
+ * while a reply streams, every token recomposes every block, and rebuilding
+ * the [AnnotatedString] of a paragraph that finished ten tokens ago is pure
+ * waste. Keyed on the block, closed blocks are annotated exactly once.
+ */
 @Composable
 private fun ColumnScope.MdBlockContent(block: MdBlock, style: TextStyle, color: Color) {
     when (block) {
-        is MdBlock.Paragraph -> Text(
-            text = annotate(block.spans),
-            style = style,
-            color = color,
-        )
+        is MdBlock.Paragraph -> {
+            val annotated = remember(block) { annotate(block.spans) }
+            Text(text = annotated, style = style, color = color)
+        }
 
-        is MdBlock.Bullets -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            block.items.forEach { item ->
-                Row {
-                    Text(
-                        text = "•",
-                        style = style,
-                        color = LocalAzfExtended.current.primaryFixedDim,
-                        modifier = Modifier.padding(end = 8.dp),
-                    )
-                    Text(text = annotate(item), style = style, color = color)
+        is MdBlock.Bullets -> {
+            val items = remember(block) { block.items.map(::annotate) }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items.forEach { item ->
+                    Row {
+                        Text(
+                            text = "•",
+                            style = style,
+                            color = LocalAzfExtended.current.primaryFixedDim,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                        Text(text = item, style = style, color = color)
+                    }
                 }
             }
         }

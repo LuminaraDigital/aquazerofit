@@ -130,4 +130,78 @@ class DtoSerializationTest {
         )
         assertNull(decoded.details)
     }
+
+    @Test
+    fun `captcha config decodes both halves of the wire contract`() {
+        val off = AzfJson.decodeFromString(CaptchaConfigDto.serializer(), """{"enabled": false}""")
+        assertEquals(false, off.enabled)
+        assertNull(off.siteKey)
+
+        val on = AzfJson.decodeFromString(
+            CaptchaConfigDto.serializer(),
+            """{"enabled": true, "siteKey": "0x4AAAAAAA_example"}""",
+        )
+        assertTrue(on.enabled)
+        assertEquals("0x4AAAAAAA_example", on.siteKey)
+    }
+
+    @Test
+    fun `register omits captchaToken when there is none and sends it when there is`() {
+        // explicitNulls = false, so "no challenge required" must not put a null
+        // captchaToken on the wire — the server reads the field off the raw
+        // body before zod strips unknown keys.
+        val withoutToken = AzfJson.encodeToString(
+            RegisterRequest.serializer(),
+            RegisterRequest(email = "swim@aquazero.fit", password = "Sw1mming"),
+        )
+        assertTrue(withoutToken, !withoutToken.contains("captchaToken"))
+
+        val withToken = AzfJson.encodeToString(
+            RegisterRequest.serializer(),
+            RegisterRequest(
+                email = "swim@aquazero.fit",
+                password = "Sw1mming",
+                captchaToken = "cf-token",
+            ),
+        )
+        assertTrue(withToken, withToken.contains(""""captchaToken":"cf-token""""))
+    }
+
+    @Test
+    fun `password reset request carries a captcha token when given one`() {
+        val encoded = AzfJson.encodeToString(
+            PasswordResetRequest.serializer(),
+            PasswordResetRequest(email = "swim@aquazero.fit", captchaToken = "cf-token"),
+        )
+        assertTrue(encoded, encoded.contains(""""captchaToken":"cf-token""""))
+    }
+
+    @Test
+    fun `entitlements decode the banking ceiling and every priced task`() {
+        val json = """
+            {
+              "tier": "free", "dailyCredits": 50, "creditsRemaining": 62,
+              "maxBankedCredits": 100,
+              "costs": {"chatTurn": 1, "mealPhoto": 3, "planGeneration": 5,
+                        "exerciseSwap": 1, "memoryExtraction": 1},
+              "premiumLanes": ["insightBatch"]
+            }
+        """.trimIndent()
+        val decoded = AzfJson.decodeFromString(EntitlementsDto.serializer(), json)
+        assertEquals(100, decoded.maxBankedCredits)
+        assertEquals(1, decoded.costs["exerciseSwap"])
+        assertEquals(1, decoded.costs["memoryExtraction"])
+    }
+
+    @Test
+    fun `a server without a banking ceiling still decodes, and claims none`() {
+        // The plan screen reads 0 as "this server did not say" and keeps the
+        // uncapped carry-over sentence. A throw here, or any non-zero default,
+        // would put a savings ceiling on screen that nothing is enforcing.
+        val decoded = AzfJson.decodeFromString(
+            EntitlementsDto.serializer(),
+            """{"tier": "free", "dailyCredits": 50, "creditsRemaining": 62}""",
+        )
+        assertEquals(0, decoded.maxBankedCredits)
+    }
 }

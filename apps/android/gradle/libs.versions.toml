@@ -27,6 +27,7 @@ datastore = "1.2.1"
 work = "2.11.2"
 camerax = "1.6.2"
 playServicesMlkitBarcode = "18.3.1"
+playBilling = "9.1.0"
 splashscreen = "1.2.0"
 browser = "1.9.0"
 firebaseBom = "34.18.0"
@@ -67,7 +68,13 @@ hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt"
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 androidx-hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "androidxHilt" }
 androidx-hilt-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "androidxHilt" }
-androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "androidxHilt" }
+# Not hilt-navigation-compose. That artifact is the Navigation 2 integration
+# and drags navigation-common/navigation-runtime 2.x onto the classpath of an
+# app that navigates with Navigation 3. R8 strips the bytes, so the cost is not
+# size — it is that a Nav 2 API stays importable and compiles clean, which is
+# how the two libraries end up mixed. This module is the Nav-agnostic half of
+# the same 1.4.0 release and supplies the identical `hiltViewModel()`.
+androidx-hilt-lifecycle-viewmodel-compose = { module = "androidx.hilt:hilt-lifecycle-viewmodel-compose", version.ref = "androidxHilt" }
 
 # Database
 room3-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room3" }
@@ -94,7 +101,6 @@ androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version
 androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
-androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 androidx-camera-compose = { module = "androidx.camera:camera-compose", version.ref = "camerax" }
 androidx-camera-mlkit-vision = { module = "androidx.camera:camera-mlkit-vision", version.ref = "camerax" }
 # The *unbundled* barcode scanner. `com.google.mlkit:barcode-scanning` is the
@@ -104,6 +110,14 @@ androidx-camera-mlkit-vision = { module = "androidx.camera:camera-mlkit-vision",
 # feature/nutrition/barcode/BarcodeScannerSheet.kt). Keep the alias name so
 # app/build.gradle.kts does not have to change.
 mlkit-barcode-scanning = { module = "com.google.android.gms:play-services-mlkit-barcode-scanning", version.ref = "playServicesMlkitBarcode" }
+
+# Google Play Billing — the premium subscription, and the only thing this app
+# sells. The `-ktx` artifact is the same library plus suspend wrappers for
+# queryProductDetails / queryPurchasesAsync / acknowledgePurchase; without them
+# the verify-then-acknowledge order that BillingRepository depends on has to be
+# written as a callback ladder, which is exactly where that order gets lost.
+play-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "playBilling" }
+
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }

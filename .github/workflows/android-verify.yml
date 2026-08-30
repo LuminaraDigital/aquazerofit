@@ -1,0 +1,227 @@
+name: Android Verification
+
+# Split out of android-release.yml. This workflow is the one that runs on
+# pull requests, so it deliberately references NO secrets at all: a run
+# triggered by `pull_request` executes the workflow file as the contributor
+# wrote it, so anything reachable from that trigger must be assumed to be
+# attacker-controlled. The Play upload signing key lives only in
+# android-release.yml, which has no `pull_request` trigger.
+on:
+  push:
+    # A `branches` filter never matches a tag ref, so tag pushes fall through
+    # to android-release.yml and are not duplicated here.
+    branches: ['**']
+    paths:
+      - 'apps/android/**'
+      - '.github/workflows/android-verify.yml'
+      - '.github/workflows/android-release.yml'
+  pull_request:
+    paths:
+      - 'apps/android/**'
+      - '.github/workflows/android-verify.yml'
+      - '.github/workflows/android-release.yml'
+
+# Nothing in this workflow writes back to the repository: no release is cut,
+# no commit is pushed, no comment is posted, no artifact is uploaded.
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Build & Test Android App
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x apps/android/gradlew
+
+      # Static analysis and lint run BEFORE the tests, so a style or
+      # correctness regression fails in seconds rather than after the suite.
+      # Without these the 29 lint errors fixed in the readiness pass could be
+      # reintroduced by any commit and still go green.
+      - name: Static Analysis (ktlint, detekt, Android Lint)
+        working-directory: apps/android
+        run: ./gradlew ktlintCheck detekt lintRelease --no-daemon
+
+      - name: Run Unit Tests
+        working-directory: apps/android
+        run: ./gradlew test --no-daemon
+
+      # A green `test` task is not proof the suite ran. A poisoned Gradle build
+      # cache can replay a SUCCESS from a run whose test set was smaller, and a
+      # module that silently stops contributing tests looks identical to one
+      # whose tests all pass. So assert the count, not just the outcome: the
+      # floor below is committed alongside the suite and only ever moves up.
+      - name: Assert Test Count
+        working-directory: apps/android
+        env:
+          MIN_TESTS: '450'
+        run: |
+          set -euo pipefail
+          results=app/build/test-results/testDebugUnitTest
+          if [ ! -d "$results" ]; then
+            echo "::error::No test results at $results — the suite did not run."
+            exit 1
+          fi
+          total=$(grep -ho 'tests="[0-9]*"' "$results"/*.xml \
+            | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}')
+          skipped=$(grep -ho 'skipped="[0-9]*"' "$results"/*.xml \
+            | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}')
+          echo "Executed $total tests ($skipped skipped); floor is $MIN_TESTS."
+          if [ "$total" -lt "$MIN_TESTS" ]; then
+            echo "::error::Test count $total is below the floor of $MIN_TESTS."
+            echo "::error::Tests were removed or silently stopped running."
+            exit 1
+          fi
+          if [ "$skipped" -gt 0 ]; then
+            echo "::error::$skipped test(s) skipped; the suite must run in full."
+            exit 1
+          fi
+
+      # Debug, not release: this workflow has no keystore, and assembling the
+      # release variant here would either fail or quietly produce an unsigned
+      # APK. assembleDebug still proves the release-blocking parts of the
+      # build graph (resource merging, R8 input, manifest merge) are intact.
+      - name: Build Debug APK
+        working-directory: apps/android
+        run: ./gradlew assembleDebug --no-daemon
+
+  # Nothing above executes R8 output, and that is where this app has actually
+  # been bitten: `proguard-rules.pro` documents two release-only breakages
+  # (ML Kit's ComponentRegistrar constructors stripped, the @JavascriptInterface
+  # bridge renamed) that shipped past a green pipeline and were found by hand.
+  # A debug build cannot see any of it — R8 never runs.
+  #
+  # This job runs R8 for real against an ephemeral keystore generated here, so
+  # it needs no secrets and is safe on `pull_request`. It does not launch the
+  # app: an emulator smoke test is the stronger check and is tracked separately,
+  # but "R8 completed and the classes our keep rules exist to protect are still
+  # in the DEX" catches the whole NoSuchMethodException-at-startup family for a
+  # fraction of the runtime.
+  minified:
+    name: R8 Release Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x apps/android/gradlew
+
+      # Throwaway key, generated per run and never uploaded. This exists only
+      # so `packageRelease` will produce an APK; the real upload key lives in
+      # android-release.yml, which has no pull_request trigger.
+      - name: Generate Ephemeral Signing Key
+        working-directory: apps/android
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -v \
+            -keystore app/keystore.jks \
+            -alias ci \
+            -keyalg RSA -keysize 2048 -validity 1 \
+            -storepass cicicicici -keypass cicicicici \
+            -dname "CN=AquaZeroFit CI, OU=CI, O=CI, L=CI, S=CI, C=AU"
+
+      - name: Build Release APK (runs R8)
+        working-directory: apps/android
+        env:
+          AZF_KEYSTORE_PASSWORD: cicicicici
+          AZF_KEY_ALIAS: ci
+          AZF_KEY_PASSWORD: cicicicici
+        run: ./gradlew assembleRelease --no-daemon
+
+      # Keep rules that only matter at runtime fail silently at build time: R8
+      # is perfectly happy to strip a class nothing statically references. So
+      # assert the survivors directly. Class descriptors are stored as plain
+      # strings in the DEX, which makes this a cheap and reliable check.
+      - name: Assert R8 Kept What The Rules Protect
+        working-directory: apps/android
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          [ -f "$apk" ] || { echo "::error::No release APK at $apk"; exit 1; }
+          work=$(mktemp -d)
+          unzip -o -q "$apk" 'classes*.dex' -d "$work"
+          missing=0
+          # Each entry is a class whose NAME must survive R8 because something
+          # outside the bytecode looks it up as a string. Anything Kotlin
+          # references statically is deliberately NOT listed: R8 can see those
+          # call sites and is free to rename them, so asserting one would fail
+          # on a perfectly healthy build.
+          #
+          # The three mlkit *Registrar entries are the ones proguard-rules.pro
+          # actually protects. They are named as <meta-data> strings on
+          # ComponentDiscoveryService in the merged manifest and instantiated
+          # reflectively; if their no-arg constructors go, getClient() throws at
+          # runtime in release builds only. (An earlier revision of this step
+          # asserted com.google.mlkit.vision.barcode.BarcodeScanning instead —
+          # that class is called from Kotlin, is renamed on every green build,
+          # and the check could only ever fail.)
+          for descriptor in \
+            'Lfit/aquazero/app/MainActivity;' \
+            'Lfit/aquazero/app/core/database/AzfDatabase_Impl;' \
+            'Lcom/google/mlkit/common/internal/CommonComponentRegistrar;' \
+            'Lcom/google/mlkit/vision/barcode/internal/BarcodeRegistrar;' \
+            'Lcom/google/mlkit/vision/common/internal/VisionCommonRegistrar;' \
+            'Lcom/google/firebase/crashlytics/CrashlyticsRegistrar;'
+          do
+            if ! grep -qa "$descriptor" "$work"/classes*.dex; then
+              echo "::error::R8 stripped $descriptor — a keep rule regressed."
+              missing=1
+            fi
+          done
+          # The Turnstile bridge is the other documented release-only breakage.
+          # Here it is the METHOD name that has to survive, not the class: the
+          # challenge page calls AzfCaptcha.onToken(...) by name, while the
+          # class itself is injected by addJavascriptInterface and is renamed on
+          # every healthy build. onToken is the distinctive half of the pair;
+          # onError is too common a symbol to prove anything.
+          if ! grep -qa 'onToken' "$work"/classes*.dex; then
+            echo "::error::R8 renamed the @JavascriptInterface onToken method —"
+            echo "::error::the Turnstile widget will never deliver a token."
+            missing=1
+          fi
+          rm -rf "$work"
+          [ "$missing" -eq 0 ] || exit 1
+          echo "All protected classes and members survived R8."
+
+      - name: Report Release APK Size
+        working-directory: apps/android
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          bytes=$(stat -c%s "$apk")
+          echo "Release APK: $((bytes / 1024)) KiB"
+          # The bundled ML Kit scanner put 20 MB of libbarhopper_v3.so in here.
+          # Unbundling it took the universal APK to ~5.9 MB; this ceiling is a
+          # tripwire for anything that large coming back in unnoticed.
+          limit=$((12 * 1024 * 1024))
+          if [ "$bytes" -gt "$limit" ]; then
+            echo "::error::APK is $((bytes / 1024)) KiB, over the $((limit / 1024)) KiB ceiling."
+            echo "::error::Check for a newly bundled native library."
+            exit 1
+          fi

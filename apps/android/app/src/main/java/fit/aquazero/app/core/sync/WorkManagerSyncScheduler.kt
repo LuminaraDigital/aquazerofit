@@ -23,12 +23,12 @@ import javax.inject.Singleton
  */
 @Singleton
 class WorkManagerSyncScheduler @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val connectivityMonitor: ConnectivityMonitor,
 ) : SyncScheduler {
 
     /** Ask for a drain now (called after every offline write). */
-    override fun requestSync(initialDelaySeconds: Long) {
+    override fun requestSync(initialDelaySeconds: Long, queueBehindCurrent: Boolean) {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(
                 Constraints.Builder()
@@ -38,8 +38,24 @@ class WorkManagerSyncScheduler @Inject constructor(
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, Duration.ofSeconds(30))
             .setInitialDelay(Duration.ofSeconds(initialDelaySeconds))
             .build()
+
+        // KEEP is what collapses a burst of offline writes into one drain: it
+        // does nothing while work under this name is still pending, and a
+        // RUNNING worker counts as pending. That is exactly wrong for a
+        // request made *by* the running worker, which is why the worker asks
+        // to be queued behind itself instead — APPEND_OR_REPLACE chains the
+        // new request after the current run rather than discarding it.
+        val policy = if (queueBehindCurrent) {
+            ExistingWorkPolicy.APPEND_OR_REPLACE
+        } else {
+            ExistingWorkPolicy.KEEP
+        }
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, request)
+            .enqueueUniqueWork(UNIQUE_WORK_NAME, policy, request)
+    }
+
+    override fun cancelPendingSync() {
+        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
     }
 
     /**

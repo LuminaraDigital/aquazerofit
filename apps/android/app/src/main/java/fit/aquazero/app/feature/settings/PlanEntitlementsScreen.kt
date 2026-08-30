@@ -1,5 +1,6 @@
 package fit.aquazero.app.feature.settings
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,22 +18,26 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
+import fit.aquazero.app.core.data.PremiumOffer
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfChip
@@ -42,18 +47,26 @@ import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.ErrorState
+import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
+import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.EntitlementsDto
 import fit.aquazero.app.core.model.UserTier
+import fit.aquazero.app.feature.dashboard.rememberToastSink
 
 /**
- * Your plan.
+ * Your plan, and the one thing this app sells.
  *
- * Read-only by construction — there is no purchase UI anywhere in this app.
  * The position leads: tier, and the credit balance that can actually be spent
  * today. What premium changes comes from the server's `premiumLanes` and
  * `costs` maps, so a lane the server adds and this screen has not heard of
  * still renders, described generically rather than dropped.
+ *
+ * The upgrade control is the only purchase surface in the app, and it appears
+ * only when Google Play has actually quoted a price — a button that cannot
+ * open a billing flow is exactly the "button that does nothing" this screen
+ * used to refuse to show. Coach personas are still not for sale on any screen.
  */
 @Composable
 fun PlanEntitlementsScreen(
@@ -62,6 +75,21 @@ fun PlanEntitlementsScreen(
     viewModel: PlanEntitlementsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val resources = LocalResources.current
+    val toasts = rememberToastSink()
+    val activity = LocalActivity.current
+    val context = LocalContext.current
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is PlanEvent.Message -> toasts.show(
+                    resources.getString(event.messageRes),
+                    if (event.isError) ToastKind.Error else ToastKind.Success,
+                )
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -127,7 +155,13 @@ fun PlanEntitlementsScreen(
                             }
                         }
                     } else {
-                        items(entitlements.premiumLanes) { lane ->
+                        // Lane names are the server's own identifiers and
+                        // unique within the list, so they key it directly.
+                        items(
+                            items = entitlements.premiumLanes,
+                            key = { it },
+                            contentType = { "lane" },
+                        ) { lane ->
                             LaneCard(lane = lane, premium = state.premium)
                         }
                         item {
@@ -152,15 +186,34 @@ fun PlanEntitlementsScreen(
                     }
 
                     if (!state.premium) {
-                        item { NoPurchaseCard() }
+                        item {
+                            UpgradeCard(
+                                offer = state.offer,
+                                offerLoading = state.offerLoading,
+                                purchasing = state.purchasing,
+                                // A null activity means this composition is not
+                                // attached to one (a preview, a test host), and
+                                // Play's flow has nothing to launch over.
+                                onUpgrade = { activity?.let(viewModel::upgrade) },
+                            )
+                        }
                     } else {
                         item {
-                            Text(
-                                text = stringResource(R.string.plan_premium_note),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 4.dp),
-                            )
+                            Column(modifier = Modifier.padding(horizontal = 4.dp)) {
+                                Text(
+                                    text = stringResource(R.string.plan_premium_note),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
+                                // Cancelling is Play's to do, not ours, and
+                                // Play policy is that a subscriber must be able
+                                // to reach it rather than be told where to look.
+                                SecondaryButton(
+                                    text = stringResource(R.string.plan_manage_subscription),
+                                    onClick = { context.openPlaySubscriptions() },
+                                )
+                            }
                         }
                     }
                 }
@@ -231,15 +284,39 @@ private fun PositionCard(entitlements: EntitlementsDto, fraction: Float) {
         }
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = if (entitlements.dailyCredits == 1) {
-                stringResource(R.string.plan_credits_explainer_one)
-            } else {
-                stringResource(R.string.plan_credits_explainer, entitlements.dailyCredits)
-            },
+            text = creditsExplainer(entitlements),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+/**
+ * How the balance grows, in the server's own numbers.
+ *
+ * The grant tops the balance up towards `maxBankedCredits` and stops there, so
+ * the sentence has to name that ceiling — an unqualified "carries over" is the
+ * promise this app used to make and can no longer keep. A server that predates
+ * the ceiling sends no such number (see [EntitlementsDto.maxBankedCredits]);
+ * that build keeps the uncapped sentence rather than being told its savings
+ * stop at zero.
+ */
+@Composable
+private fun creditsExplainer(entitlements: EntitlementsDto): String = when {
+    entitlements.maxBankedCredits <= 0 -> if (entitlements.dailyCredits == 1) {
+        stringResource(R.string.plan_credits_explainer_uncapped_one)
+    } else {
+        stringResource(R.string.plan_credits_explainer_uncapped, entitlements.dailyCredits)
+    }
+    entitlements.dailyCredits == 1 -> stringResource(
+        R.string.plan_credits_explainer_one,
+        entitlements.maxBankedCredits,
+    )
+    else -> stringResource(
+        R.string.plan_credits_explainer,
+        entitlements.dailyCredits,
+        entitlements.maxBankedCredits,
+    )
 }
 
 @Composable
@@ -318,35 +395,71 @@ private fun CostRow(task: String, cost: Int) {
     }
 }
 
+/**
+ * The upgrade offer.
+ *
+ * Three states, and none of them is a live button that cannot open Play:
+ * while the price is loading the CTA is a skeleton; when Play quoted no price
+ * the card says so in plain words and offers nothing; only a real [offer] gets
+ * a button, labelled with Play's own formatted price so the amount on screen is
+ * the amount charged.
+ */
 @Composable
-private fun NoPurchaseCard() {
+private fun UpgradeCard(
+    offer: PremiumOffer?,
+    offerLoading: Boolean,
+    purchasing: Boolean,
+    onUpgrade: () -> Unit,
+) {
     AzfCard(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = Icons.Outlined.Schedule,
+                imageVector = Icons.Outlined.WorkspacePremium,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = AzfColors.SecondaryFixedDim,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.size(8.dp))
             Text(
-                text = stringResource(R.string.plan_no_purchase_heading).uppercase(),
+                text = stringResource(R.string.plan_upgrade_heading).uppercase(),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = stringResource(R.string.plan_no_purchase_body),
+            text = stringResource(R.string.plan_upgrade_body),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = stringResource(R.string.plan_no_purchase_body_2),
+            text = stringResource(R.string.plan_upgrade_coaches),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(modifier = Modifier.height(16.dp))
+        when {
+            offerLoading -> Skeleton(modifier = Modifier.fillMaxWidth().height(56.dp))
+            offer == null -> Text(
+                text = stringResource(R.string.plan_upgrade_unavailable),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            else -> {
+                PrimaryButton(
+                    text = stringResource(R.string.plan_upgrade_cta, offer.formattedPrice),
+                    onClick = onUpgrade,
+                    loading = purchasing,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.plan_upgrade_terms),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -367,6 +480,13 @@ private fun laneBody(lane: String): String = when (lane) {
     else -> stringResource(R.string.plan_lane_generic_body)
 }
 
+/**
+ * A priced task the app has copy for.
+ *
+ * The `else` keeps the server's raw key so a newly priced task still shows its
+ * price rather than vanishing — but it shows it as `exerciseSwap`, which is a
+ * bug, not a design. Every key the server prices belongs on this list.
+ */
 @Composable
 private fun taskLabel(task: String): String = when (task) {
     "chatTurn" -> stringResource(R.string.plan_task_chat_turn)
@@ -375,6 +495,8 @@ private fun taskLabel(task: String): String = when (task) {
     "planGeneration" -> stringResource(R.string.plan_task_plan_generation)
     "recipeGeneration" -> stringResource(R.string.plan_task_recipe_generation)
     "progressInsight" -> stringResource(R.string.plan_task_progress_insight)
+    "exerciseSwap" -> stringResource(R.string.plan_task_exercise_swap)
+    "memoryExtraction" -> stringResource(R.string.plan_task_memory_extraction)
     else -> task
 }
 
@@ -391,13 +513,19 @@ private fun PlanPreview() {
                     tier = UserTier.FREE,
                     dailyCredits = 50,
                     creditsRemaining = 32,
-                    costs = mapOf("chatTurn" to 1, "mealPhoto" to 3),
+                    maxBankedCredits = 100,
+                    costs = mapOf("chatTurn" to 1, "mealPhoto" to 3, "exerciseSwap" to 1),
                     premiumLanes = listOf("insightBatch"),
                 ),
                 fraction = 0.64f,
             )
             LaneCard(lane = "insightBatch", premium = false)
-            NoPurchaseCard()
+            UpgradeCard(
+                offer = PremiumOffer(productId = "azf_premium_monthly", formattedPrice = "£3.99"),
+                offerLoading = false,
+                purchasing = false,
+                onUpgrade = {},
+            )
         }
     }
 }

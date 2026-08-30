@@ -92,17 +92,20 @@ interface CatalogDao {
         if (media.isNotEmpty()) upsertExerciseMedia(media)
     }
 
-    // ----- achievements & coaches -----
+    // ----- coaches -----
 
-    @Upsert
-    suspend fun upsertAchievementDefinitions(definitions: List<AchievementDefinitionEntity>)
-
-    @Query("SELECT * FROM achievement_definitions")
-    fun achievementDefinitions(): Flow<List<AchievementDefinitionEntity>>
+    // The `achievement_definitions` accessors were removed: nothing ever wrote
+    // or read them — achievements come straight from the network. The entity
+    // and its table are still registered, because dropping them is a schema
+    // change and this database forbids destructive migration; that removal is
+    // a migration of its own. Deleting only the accessors costs nothing.
 
     @Upsert
     suspend fun upsertCoaches(coaches: List<CoachEntity>)
 
     @Query("SELECT * FROM coaches")
     fun coaches(): Flow<List<CoachEntity>>
+
+    @Query("SELECT * FROM coaches WHERE isActive = 1 LIMIT 1")
+    fun activeCoach(): Flow<CoachEntity?>
 }

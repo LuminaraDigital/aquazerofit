@@ -1,16 +1,16 @@
 package fit.aquazero.app.core.auth
 
+import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.RefreshRequest
 import fit.aquazero.app.core.network.RefreshOutcome
 import fit.aquazero.app.core.network.TokenRefresher
 import fit.aquazero.app.core.network.api.AuthApi
+import fit.aquazero.app.core.network.safeCall
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import retrofit2.HttpException
-import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
@@ -33,7 +33,7 @@ sealed interface AuthEvent {
  */
 @Singleton
 class RefreshCoordinator @Inject constructor(
-    @Named("authless") private val authApi: AuthApi,
+    @param:Named("authless") private val authApi: AuthApi,
     private val tokenStore: AuthTokenStore,
     private val vault: RefreshTokenVault,
 ) : TokenRefresher {
@@ -56,15 +56,32 @@ class RefreshCoordinator @Inject constructor(
             return@withLock RefreshOutcome.Rotated(current)
         }
         val refreshToken = vault.read() ?: return@withLock invalidGrant()
-        try {
-            val pair = authApi.refresh(RefreshRequest(refreshToken))
-            vault.store(pair.refreshToken)
-            tokenStore.set(pair.accessToken)
-            RefreshOutcome.Rotated(pair.accessToken)
-        } catch (e: HttpException) {
-            if (e.code() == 401 || e.code() == 403) invalidGrant() else RefreshOutcome.Transient
-        } catch (_: IOException) {
-            RefreshOutcome.Transient
+        // Routed through safeCall rather than a bare try/catch on HttpException
+        // and IOException. Those two miss the decode failures — a rotation
+        // response that is 2xx but does not match AuthTokensDto — and an
+        // uncaught SerializationException here does not fail politely: this
+        // runs on the app-start restore path, and inside OkHttp's Authenticator
+        // on every 401, so it would take the process down rather than sign the
+        // user out.
+        when (val result = safeCall { authApi.refresh(RefreshRequest(refreshToken)) }) {
+            is ApiResult.Success -> {
+                vault.store(result.data.refreshToken)
+                tokenStore.set(result.data.accessToken)
+                RefreshOutcome.Rotated(result.data.accessToken)
+            }
+            is ApiResult.Failure.Api ->
+                if (result.httpStatus == 401 || result.httpStatus == 403) {
+                    invalidGrant()
+                } else {
+                    RefreshOutcome.Transient
+                }
+            is ApiResult.Failure.Network -> RefreshOutcome.Transient
+            // Transient, not InvalidGrant: a rotation response we cannot decode
+            // says the server is wrong, not that the grant is dead. Reading it
+            // as a dead grant would sign out every user of the app over one bad
+            // deploy; reading it as transient keeps them on cached data and
+            // costs a retry.
+            is ApiResult.Failure.Malformed -> RefreshOutcome.Transient
         }
     }
 

@@ -17,6 +17,14 @@ import { api } from './api';
 
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
+/**
+ * Budget for the script fetch, matching lib/telegram's SDK timeout. A network
+ * that drops packets rather than refusing them fires no `error` event, so this
+ * is the only thing that turns "blocked forever" into a visible failure the
+ * user can retry.
+ */
+const SCRIPT_TIMEOUT_MS = 5000;
+
 export type CaptchaConfig = { enabled: false } | { enabled: true; siteKey: string };
 
 export interface TurnstileRenderOptions {
@@ -88,22 +96,60 @@ export function loadTurnstile(): Promise<TurnstileApi> {
   loader ??= new Promise<TurnstileApi>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${SCRIPT_SRC}"]`);
     const script = existing ?? document.createElement('script');
-    const onLoad = () => {
-      if (window.turnstile) resolve(window.turnstile);
-      else reject(new Error('Turnstile loaded without exposing its API'));
+
+    // A budget, for the same reason lib/telegram gives its SDK one.
+    //
+    // A blocked origin fires `error` and a 500 fires `error`, but a
+    // BLACK-HOLED one — a corporate proxy or national filter that drops the
+    // packets rather than refusing them — fires neither. Without a timeout
+    // this promise simply never settles: `failed` never flips, the "security
+    // check could not load" message never renders, and the Register button
+    // stays disabled forever beside an empty box with nothing explaining why.
+    //
+    // That path became reachable the moment Turnstile was made mandatory in
+    // production, and the /mobile/captcha page the Android WebView loads uses
+    // this same loader, so the native sign-up flow inherits the hang too.
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      fn();
     };
-    const onError = () => {
-      // Allow a later attempt: a blocked or flaky first load should not
-      // permanently poison the form for the rest of the session.
-      loader = null;
-      reject(new Error('Turnstile script failed to load'));
-    };
+    const timer = window.setTimeout(() => {
+      finish(() => {
+        // Retryable, like the error path: a slow network on one attempt must
+        // not poison the form for the rest of the session.
+        loader = null;
+        reject(new Error('Turnstile script timed out'));
+      });
+    }, SCRIPT_TIMEOUT_MS);
+
+    const onLoad = () =>
+      finish(() => {
+        if (window.turnstile) resolve(window.turnstile);
+        else reject(new Error('Turnstile loaded without exposing its API'));
+      });
+    const onError = () =>
+      finish(() => {
+        // Allow a later attempt: a blocked or flaky first load should not
+        // permanently poison the form for the rest of the session.
+        loader = null;
+        reject(new Error('Turnstile script failed to load'));
+      });
     script.addEventListener('load', onLoad, { once: true });
     script.addEventListener('error', onError, { once: true });
     if (!existing) {
       script.src = SCRIPT_SRC;
       script.async = true;
       script.defer = true;
+      // Matches lib/telegram's SDK tag. This is not integrity protection — it
+      // only makes the fetch CORS-mode, which is what lets window.onerror see
+      // a real error instead of an opaque "Script error." if Cloudflare 500s
+      // or the origin is blocked. (No SRI hash here on purpose: the URL is an
+      // unversioned rolling CDN path the vendor updates in place, so a pinned
+      // hash would break the challenge on their next push.)
+      script.crossOrigin = 'anonymous';
       document.head.appendChild(script);
     }
   });

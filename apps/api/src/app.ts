@@ -8,6 +8,7 @@ import { config } from './platform/config';
 import { errorHandler, notFoundHandler } from './platform/errors';
 import { assertTrustProxyHeaders, enforceHttps } from './platform/https';
 import { requestLogger, metrics } from './platform/telemetry';
+import { budgetSnapshot } from './platform/aiBudget';
 import { rateLimiter } from './platform/rateLimiter';
 import { getStore } from './platform/store';
 import { buildRouter } from './modules';
@@ -139,7 +140,16 @@ export function createApp() {
   // platform scraper cannot present credentials, and the payload carries no
   // user data (counts and timestamps only).
   app.get('/metrics', (_req, res) => {
-    res.json({ service: 'aquazerofit-api', version: config.version, metrics });
+    // aiBudget rides along because "how much have we spent today, and has the
+    // ceiling stopped us" is the question an operator has to be able to answer
+    // without reading a provider dashboard. `exhausted: true` means the app is
+    // serving offline output on purpose, which otherwise looks like an outage.
+    res.json({
+      service: 'aquazerofit-api',
+      version: config.version,
+      metrics,
+      aiBudget: budgetSnapshot(),
+    });
   });
 
   // Committed placeholder media (exercise art etc.) lives in assets/ and is

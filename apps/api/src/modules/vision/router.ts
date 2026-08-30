@@ -33,20 +33,53 @@ import { asyncHandler, byIdDoc, deleteDoc, getUser, localToday, newId, nowIso, r
 export const visionRouter = Router();
 visionRouter.use(requireAuth);
 
+/**
+ * One encoding of a stored photo, and the Content-Type it must be served with.
+ *
+ * The mime travels WITH the file rather than being inferred at read time. Until
+ * WebP existed here, "everything came out of sharp as JPEG" was a true global
+ * invariant and the served type could be a module constant; the moment a second
+ * encoding is written that constant becomes a lie that no longer type-errors.
+ */
+type StoredImageVariant = { path: string; mime: string };
+
 // Jobs carry a private reservation reference that is never returned to clients.
 // `aiDegraded` is recorded when the job is processed but consumed later, at
 // confirm time, because that is where this lane settles its reservation.
-type StoredVisionJob = VisionJob & { reservationId?: string; aiDegraded?: boolean };
+// `imageVariants` is the record of what was actually written to disk.
+type StoredVisionJob = VisionJob & {
+  reservationId?: string;
+  aiDegraded?: boolean;
+  imageVariants?: StoredImageVariant[];
+};
 
-// Uploads are re-encoded before they are persisted (see toStorableJpeg), so
-// the bytes on disk are always baseline JPEG whatever the client sent. Storage
-// extension and served Content-Type follow from that fact, never from the
-// client's multipart headers.
-const STORED_IMAGE_EXT = '.jpg';
-const STORED_IMAGE_MIME = 'image/jpeg';
+// Uploads are re-encoded before they are persisted (see toStorableImages), so
+// the bytes on disk are always something this process produced, whatever the
+// client sent. Storage extension and served Content-Type follow from that fact,
+// never from the client's multipart headers.
+const STORED_JPEG_EXT = '.jpg';
+const STORED_JPEG_MIME = 'image/jpeg';
+const STORED_WEBP_EXT = '.webp';
+const STORED_WEBP_MIME = 'image/webp';
 
 /**
- * Decode the upload and write a fresh JPEG from the pixels.
+ * Longest edge kept on a stored meal photo.
+ *
+ * A modern phone hands us a 12 MP capture — 4000x3000 and several megabytes —
+ * and every consumer of it is either a thumbnail in the confirm sheet or a
+ * model that downsamples aggressively before it looks at anything. Storing the
+ * full capture buys nothing and costs disk, backup volume and egress on a
+ * route that streams the file back on every view. 1600px on the long edge is
+ * comfortably above what any current screen shows this image at.
+ *
+ * `fit: 'inside'` preserves aspect ratio and `withoutEnlargement` means a small
+ * photo is passed through at its own size rather than upscaled into a blurry
+ * 1600px one.
+ */
+const STORED_IMAGE_MAX_EDGE = 1600;
+
+/**
+ * Decode the upload and write fresh images from the pixels.
  *
  * Privacy: a phone photo carries EXIF GPS at home-address precision, the
  * capture timestamp and the camera serial number. Persisting that verbatim
@@ -57,14 +90,64 @@ const STORED_IMAGE_MIME = 'image/jpeg';
  *
  * .rotate() with no argument applies the EXIF orientation to the pixels first;
  * without it, dropping the orientation tag would leave portrait photos sideways.
+ * It must stay ahead of .resize(), or the fit box is applied to the unrotated
+ * dimensions and a portrait photo comes out the wrong shape.
  *
- * Security: this is also the real upload type check. `file.mimetype` is an
- * attacker-controlled multipart header, so it proves nothing — only bytes
+ * Security: the JPEG encode is also the real upload type check. `file.mimetype`
+ * is an attacker-controlled multipart header, so it proves nothing — only bytes
  * libvips can actually decode as an image get past this call.
+ *
+ * The WebP variant is deliberately best-effort and encoded second: it is a
+ * bandwidth optimisation, and a libvips build without a WebP encoder must
+ * degrade to JPEG-only rather than reject a photo the user can see is fine.
+ * The JPEG stays the canonical fallback for exactly that reason.
  */
-async function toStorableJpeg(buffer: Buffer, declaredMime?: string): Promise<Buffer> {
+/**
+ * Decode ceiling for anything a caller uploads.
+ *
+ * The multipart limit caps the bytes on the wire, not the pixels they expand
+ * to, and those are the ones that cost memory. A ~1 MB PNG at 16000x16000 is
+ * comfortably under sharp's own 268 Mpx default — so it is NOT rejected — and
+ * decodes to roughly 1 GB of RGBA. Two pipelines run below, both inline in the
+ * request, and the rate limiter permits 20 uploads per minute per user. That
+ * is a remotely triggerable OOM, and because `assertSingleInstance` makes this
+ * process the whole API, it takes the service down for everybody.
+ *
+ * 40 Mpx is far above any real phone camera (a 48 MP sensor outputs ~12 Mpx
+ * by default, and even full-frame medium format lands under 100 MP) and far
+ * below what hurts. sharp raises a normal error over the limit, which the
+ * catch below already turns into a clean 400.
+ */
+const DECODE_LIMITS = { limitInputPixels: 40_000_000 } as const;
+
+async function toStorableImages(
+  buffer: Buffer,
+  declaredMime?: string,
+): Promise<{ jpeg: Buffer; webp?: Buffer }> {
   try {
-    return await sharp(buffer).rotate().jpeg({ quality: 82 }).toBuffer();
+    const jpeg = await sharp(buffer, DECODE_LIMITS)
+      .rotate()
+      .resize(STORED_IMAGE_MAX_EDGE, STORED_IMAGE_MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+
+    let webp: Buffer | undefined;
+    try {
+      webp = await sharp(buffer, DECODE_LIMITS)
+        .rotate()
+        .resize(STORED_IMAGE_MAX_EDGE, STORED_IMAGE_MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
+    } catch (webpErr) {
+      // The bytes already decoded once, so this is an encoder problem, not a
+      // bad upload. Warn and carry on with JPEG only.
+      // eslint-disable-next-line no-console
+      console.warn('[vision] WebP encode failed — serving JPEG only', {
+        reason: webpErr instanceof Error ? webpErr.message : 'unknown',
+      });
+    }
+
+    return { jpeg, webp };
   } catch (err) {
     // HEIC is called out separately because it is the one format whose support
     // depends on the codecs compiled into the deployed libvips rather than on
@@ -98,14 +181,66 @@ function uploadsDir(): string {
   return dir;
 }
 
-/** Best-effort removal of a job's photo file; missing files are fine. */
-function deleteJobImage(job: { imagePath?: string }): void {
-  if (!job.imagePath) return;
-  try {
-    unlinkSync(job.imagePath);
-  } catch {
-    /* already gone */
+/**
+ * Every encoding stored for a job, newest scheme first.
+ *
+ * Jobs written before the WebP variant existed have no `imageVariants` and only
+ * a `.jpg` on disk. That single legacy shape is the ONLY place a hardcoded mime
+ * is still correct, because it describes what this code provably wrote at the
+ * time: a job with no variant list predates any encoder other than JPEG.
+ */
+function storedVariants(job: { imagePath?: string; imageVariants?: StoredImageVariant[] }): StoredImageVariant[] {
+  if (job.imageVariants?.length) return job.imageVariants;
+  return job.imagePath ? [{ path: job.imagePath, mime: STORED_JPEG_MIME }] : [];
+}
+
+/**
+ * Best-effort removal of every file a job wrote; missing files are fine.
+ *
+ * Deletion has to cover the variants, not just imagePath. This function is the
+ * data-minimisation path — the failed-job cleanup, the confirm-time delete and
+ * the 24-hour TTL sweep all route through it — so a variant it forgets is a
+ * meal photo that outlives its own retention rule.
+ */
+function deleteJobImage(job: { imagePath?: string; imageVariants?: StoredImageVariant[] }): void {
+  const paths = new Set<string>();
+  if (job.imagePath) paths.add(job.imagePath);
+  for (const variant of job.imageVariants ?? []) paths.add(variant.path);
+  for (const file of paths) {
+    try {
+      unlinkSync(file);
+    } catch {
+      /* already gone */
+    }
   }
+}
+
+/**
+ * Does the client actually say it understands WebP?
+ *
+ * Deliberately stricter than req.accepts(), which treats an absent Accept
+ * header and a wildcard one as accepting anything. Both really mean "unknown
+ * client", and the answer for an unknown client is the encoding
+ * every decoder on earth handles. Only an explicit `image/webp` token — what
+ * every browser that supports it sends — opts in, and an explicit `q=0` on that
+ * token opts back out.
+ */
+function acceptsWebp(accept: string | undefined): boolean {
+  if (!accept) return false;
+  return accept.split(',').some((part) => {
+    const [type, ...params] = part.trim().split(';');
+    if ((type ?? '').trim().toLowerCase() !== STORED_WEBP_MIME) return false;
+    return !params.some((param) => /^\s*q\s*=\s*0(?:\.0+)?\s*$/i.test(param));
+  });
+}
+
+/** Content negotiation over what is actually on disk; JPEG is always the fallback. */
+function pickVariant(variants: StoredImageVariant[], accept: string | undefined): StoredImageVariant | undefined {
+  if (acceptsWebp(accept)) {
+    const webp = variants.find((v) => v.mime === STORED_WEBP_MIME);
+    if (webp) return webp;
+  }
+  return variants.find((v) => v.mime === STORED_JPEG_MIME) ?? variants[0];
 }
 
 /**
@@ -182,9 +317,16 @@ function visionCandidates(foods: Food[]): { id: string; name: string; commonServ
 }
 
 function publicJob(job: StoredVisionJob): Omit<VisionJob, 'imagePath'> {
-  // reservationId and aiDegraded are internal metering state; imagePath is a
-  // server filesystem location and must never reach the client.
-  const { reservationId: _hidden, imagePath: _path, aiDegraded: _degraded, ...rest } = job;
+  // reservationId and aiDegraded are internal metering state; imagePath and
+  // imageVariants are server filesystem locations and must never reach the
+  // client. The image is reached only through the ownership-checked route.
+  const {
+    reservationId: _hidden,
+    imagePath: _path,
+    aiDegraded: _degraded,
+    imageVariants: _variants,
+    ...rest
+  } = job;
   return rest;
 }
 
@@ -316,15 +458,27 @@ visionRouter.post(
     // Strip metadata and prove the payload really is an image *before*
     // reserving credits — a reservation made here would have no release path
     // if the decode then threw.
-    const imageBytes = await toStorableJpeg(file.buffer, file.mimetype);
+    const encoded = await toStorableImages(file.buffer, file.mimetype);
 
-    const reservationId = await creditLedger.reserve(user.id, 'mealPhoto');
+    const reservationId = await creditLedger.reserve(user.id, 'mealPhoto', user.tier);
 
     // Unguessable id: doubles as the on-disk filename, so it must never be
     // enumerable (crypto.randomUUID, not a timestamp counter).
     const jobId = `vj-${crypto.randomUUID()}`;
-    const imagePath = path.join(uploadsDir(), `${jobId}${STORED_IMAGE_EXT}`);
-    writeFileSync(imagePath, imageBytes);
+    const dir = uploadsDir();
+
+    // imagePath stays the JPEG. It is the canonical copy — the fallback the
+    // serve route falls back TO, and what processJob hashes — so the variant
+    // list records it as well rather than treating it as a separate thing.
+    const imagePath = path.join(dir, `${jobId}${STORED_JPEG_EXT}`);
+    writeFileSync(imagePath, encoded.jpeg);
+    const imageVariants: StoredImageVariant[] = [{ path: imagePath, mime: STORED_JPEG_MIME }];
+
+    if (encoded.webp) {
+      const webpPath = path.join(dir, `${jobId}${STORED_WEBP_EXT}`);
+      writeFileSync(webpPath, encoded.webp);
+      imageVariants.unshift({ path: webpPath, mime: STORED_WEBP_MIME });
+    }
 
     const job: StoredVisionJob = {
       id: jobId,
@@ -332,6 +486,7 @@ visionRouter.post(
       type: 'cvJob',
       status: 'queued',
       imagePath,
+      imageVariants,
       mealType,
       predictions: [],
       ai: null,
@@ -345,7 +500,7 @@ visionRouter.post(
       void processJob(jobId);
     }, 1200);
 
-    res.status(202).json({ jobId, status: 'queued' });
+    res.status(202).json({ jobId, status: 'queued', job: publicJob(job) });
   }),
 );
 
@@ -361,14 +516,22 @@ visionRouter.get(
     if (!job || job.type !== 'cvJob' || job.userId !== user.id) {
       throw new AppError('NOT_FOUND', 'Photo analysis job not found.');
     }
-    if (!job.imagePath || !existsSync(job.imagePath)) {
+    const available = storedVariants(job).filter((variant) => existsSync(variant.path));
+    const chosen = pickVariant(available, req.headers.accept);
+    if (!chosen) {
       throw new AppError('NOT_FOUND', 'Photo is no longer available.');
     }
-    // Every stored photo came out of sharp as JPEG, so the type is known from
-    // what we wrote — it is never echoed back from the uploader's header.
-    res.setHeader('Content-Type', STORED_IMAGE_MIME);
+    // The served type is a property of the stored record, read back from the
+    // variant we are about to stream. It is never echoed back from the
+    // uploader's header, and it is no longer a module constant — since the
+    // WebP variant landed, "it is always JPEG" stopped being true.
+    res.setHeader('Content-Type', chosen.mime);
+    // The response body genuinely differs by Accept, so any cache along the
+    // way has to key on it. Redundant next to no-store today; wrong to omit if
+    // that policy ever loosens.
+    res.setHeader('Vary', 'Accept');
     res.setHeader('Cache-Control', 'private, no-store');
-    createReadStream(job.imagePath)
+    createReadStream(chosen.path)
       .on('error', () => {
         if (!res.headersSent) res.status(404);
         res.end();

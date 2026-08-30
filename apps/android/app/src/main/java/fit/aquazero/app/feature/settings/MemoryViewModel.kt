@@ -70,7 +70,7 @@ data class MemoryUiState(
 
 /** One-shot effects. */
 sealed interface MemoryEvent {
-    data class Message(@StringRes val messageRes: Int, val isError: Boolean = false) : MemoryEvent
+    data class Message(@param:StringRes val messageRes: Int, val isError: Boolean = false) : MemoryEvent
 }
 
 /**

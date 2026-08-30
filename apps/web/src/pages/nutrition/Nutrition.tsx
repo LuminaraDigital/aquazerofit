@@ -26,6 +26,12 @@ import { AquaCalendarPicker, type DayStatus } from '@/components/ui/AquaCalendar
 import { AquaStatusline } from '@/components/ui/AquaStatusline';
 import { useDeepLinkRouter } from '@/lib/deeplink';
 import {
+  insertPendingMealLog,
+  isPendingId,
+  optimisticPatch,
+  pendingMealLog,
+} from '@/lib/optimistic';
+import {
   MEAL_ICON,
   MEAL_LABEL,
   MEAL_TYPES,
@@ -415,6 +421,27 @@ export default function Nutrition() {
     },
   });
 
+  /**
+   * Logging a meal is the app's most repeated write, so the row goes into the
+   * cache before the request leaves — but only the row.
+   *
+   * The day's totals (kcalConsumed, kcalRemaining, the macro rings) are folded
+   * by the server against the user's targets, and this is the one screen where
+   * inventing a calorie number would be read as fact. So the optimistic write
+   * is deliberately partial: the entry appears in its meal section immediately,
+   * flagged pending, while the rings hold the last figure the server actually
+   * reported until the settle-time invalidation replaces the lot.
+   */
+  const addMealPatch = optimisticPatch<DailyNutrition, { mealType: MealType; item: MealLogItem }>(
+    queryClient,
+    ['nutrition', 'daily', date],
+    (previous, { mealType, item }) =>
+      insertPendingMealLog(
+        previous,
+        pendingMealLog({ key: addKeyRef.current, mealType, items: [item], localDate: date }),
+      ),
+  );
+
   const addMeal = useMutation({
     mutationFn: ({ mealType, item }: { mealType: MealType; item: MealLogItem }) =>
       api('/meal-logs', {
@@ -422,12 +449,16 @@ export default function Nutrition() {
         body: { mealType, items: [item], localDate: date },
         idempotencyKey: addKeyRef.current,
       }),
+    ...addMealPatch,
+    onError: (_err, _vars, context) => {
+      addMealPatch.onError(context);
+      show('Could not log that food — please try again');
+    },
     onSuccess: () => {
       setAddSheetMeal(null);
       show('Meal logged');
-      invalidateLogs();
     },
-    onError: () => show('Could not log that food — please try again'),
+    onSettled: () => invalidateLogs(),
   });
 
   const updateMeal = useMutation({
@@ -898,17 +929,25 @@ export default function Nutrition() {
                         </button>
                       ) : (
                         <div className="space-y-2">
-                          {logs.map((log) => (
+                          {logs.map((log) => {
+                            // Optimistic row: on screen, but not yet a fact the
+                            // server would confirm. Say so, and do not offer
+                            // edit or delete against an id that does not exist.
+                            const pending = isPendingId(log.id);
+                            return (
                             <div
                               key={log.id}
-                              className="p-3 bg-surface-container-low border border-outline-variant rounded-2xl"
+                              aria-busy={pending || undefined}
+                              className={`p-3 bg-surface-container-low border border-outline-variant rounded-2xl ${
+                                pending ? 'opacity-60' : ''
+                              }`}
                             >
                               <div className="flex justify-between items-start mb-1">
                                 <p className="text-sm font-bold text-on-surface">
                                   {log.items.map((i) => i.name).join(', ')}
                                 </p>
                                 <span className="text-primary text-sm font-bold tabular-nums whitespace-nowrap ml-3">
-                                  {fmtInt(log.totalKcal)} kcal
+                                  {pending ? 'Saving…' : `${fmtInt(log.totalKcal)} kcal`}
                                 </span>
                               </div>
                               <p className="text-xs text-on-surface-variant tabular-nums mb-2">
@@ -932,7 +971,8 @@ export default function Nutrition() {
                                         log.items.map((i) => ({ original: i, current: { ...i } })),
                                       );
                                     }}
-                                    className="text-on-surface-variant hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                                    disabled={pending}
+                                    className="text-on-surface-variant hover:text-primary disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                                   >
                                     <span
                                       className="material-symbols-outlined text-[20px]"
@@ -945,7 +985,7 @@ export default function Nutrition() {
                                     type="button"
                                     aria-label={`Delete ${MEAL_LABEL[mealType]} entry`}
                                     onClick={() => deleteMeal.mutate(log.id)}
-                                    disabled={deleteMeal.isPending}
+                                    disabled={pending || deleteMeal.isPending}
                                     className="text-on-surface-variant hover:text-tertiary-container disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                                   >
                                     <span
@@ -958,7 +998,8 @@ export default function Nutrition() {
                                 </div>
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

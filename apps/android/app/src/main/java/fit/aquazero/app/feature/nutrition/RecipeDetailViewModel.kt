@@ -42,7 +42,7 @@ data class RecipeDetailUiState(
 
 /** One-shot effects. */
 sealed interface RecipeDetailEvent {
-    data class Message(@StringRes val messageRes: Int, val isError: Boolean = false) :
+    data class Message(@param:StringRes val messageRes: Int, val isError: Boolean = false) :
         RecipeDetailEvent
 
     /** The meal is in Room and queued for sync; the screen can close. */

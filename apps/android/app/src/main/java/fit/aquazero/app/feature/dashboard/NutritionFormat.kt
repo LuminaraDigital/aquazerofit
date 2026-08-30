@@ -12,9 +12,9 @@ import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.WorkoutSessionDto
+import fit.aquazero.app.core.ui.LocaleFormatters
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.max
@@ -167,16 +167,22 @@ object NutritionFormat {
         return max(15, (totalSets * 2.5).roundToInt())
     }
 
-    /** "Tuesday, 29 July" style label for a `YYYY-MM-DD` local date. */
+    /**
+     * "Tuesday, 29 July" style label for a `YYYY-MM-DD` local date.
+     *
+     * The formatter comes from [LocaleFormatters] rather than
+     * `DateTimeFormatter.ofPattern`: this runs inside composition, and
+     * compiling the pattern per call is pure waste.
+     */
     fun formatLocalDate(isoDate: String, locale: Locale = Locale.getDefault()): String =
         runCatching {
-            LocalDate.parse(isoDate).format(DateTimeFormatter.ofPattern("EEEE, d MMMM", locale))
+            LocalDate.parse(isoDate).format(LocaleFormatters.of(LONG_DATE_PATTERN, locale))
         }.getOrDefault(isoDate)
 
     /** Short "Tue 29 Jul" label. */
     fun formatShortDate(isoDate: String, locale: Locale = Locale.getDefault()): String =
         runCatching {
-            LocalDate.parse(isoDate).format(DateTimeFormatter.ofPattern("EEE d MMM", locale))
+            LocalDate.parse(isoDate).format(LocaleFormatters.of(SHORT_DATE_PATTERN, locale))
         }.getOrDefault(isoDate)
 
     /** Single-letter weekday initial for the weekly kcal bars. */
@@ -188,4 +194,7 @@ object NutritionFormat {
     /** Day-of-month number for the calendar grid. */
     fun dayOfMonth(isoDate: String): Int =
         runCatching { LocalDate.parse(isoDate).dayOfMonth }.getOrDefault(0)
+
+    private const val LONG_DATE_PATTERN = "EEEE, d MMMM"
+    private const val SHORT_DATE_PATTERN = "EEE d MMM"
 }

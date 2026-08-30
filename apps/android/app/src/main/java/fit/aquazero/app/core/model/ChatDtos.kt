@@ -36,7 +36,12 @@ data class ChatMessageDto(
     val sessionId: String,
     val userId: String,
     val type: String = "chatMessage",
-    val role: ChatRole,
+    /**
+     * Defaults to `assistant`: whatever the server emits under a role this
+     * build does not know, it is not something the user typed, and attributing
+     * it to them would misread the transcript.
+     */
+    val role: ChatRole = ChatRole.ASSISTANT,
     val content: String,
     val toolCalls: List<ChatToolCallDto>? = null,
     val guardrail: GuardrailDto? = null,

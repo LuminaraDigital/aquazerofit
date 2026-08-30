@@ -4,7 +4,8 @@
 import { Router } from 'express';
 import {
   CREDIT_COSTS,
-  FREE_TIER_DAILY_CREDITS,
+  dailyCreditsFor,
+  maxBankedCreditsFor,
   consentsSchema,
   profileSchema,
   setCredentialsSchema,
@@ -21,6 +22,7 @@ import { getStore } from '../../platform/store';
 import { setCredentials } from '../auth/service';
 import { validateTelegramInitData } from '../auth/telegram';
 import { memoryRouter } from '../memory/router';
+import { effectiveTier } from '../billing/entitlements';
 import {
   exportUserData,
   getConsents,
@@ -65,12 +67,19 @@ meRouter.get(
     // which on this surface reads as "you have nothing" rather than "you have
     // not started". The call is idempotent per UTC day, so doing it here just
     // moves the same grant slightly earlier.
-    await creditLedger.grantDailyIfNeeded(userId);
+    const tier = effectiveTier(user);
+    await creditLedger.grantDailyIfNeeded(userId, tier);
     const remaining = await creditLedger.balance(userId);
     res.json({
-      tier: user.tier,
-      dailyCredits: FREE_TIER_DAILY_CREDITS,
+      tier,
+      // Per tier, not the free constant: a premium account told it receives
+      // the free allowance is being shown the plan it did not buy.
+      dailyCredits: dailyCreditsFor(tier),
       creditsRemaining: remaining,
+      // The carry-over ceiling. Sent because the daily top-up stops at it, so
+      // a client that says "unspent credits carry over" without naming the
+      // limit is describing behaviour the server no longer has.
+      maxBankedCredits: maxBankedCreditsFor(tier),
       costs: CREDIT_COSTS,
       premiumLanes: PREMIUM_LANES,
     });

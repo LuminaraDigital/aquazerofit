@@ -84,10 +84,23 @@ function extractServerFieldErrors(details: unknown): FieldErrors {
         typeof issue === 'object' &&
         issue !== null &&
         'path' in issue &&
-        'message' in issue &&
-        Array.isArray((issue as { path: unknown }).path)
+        'message' in issue
       ) {
-        const field = String((issue as { path: unknown[] }).path[0] ?? '');
+        // The API sends `path` as a dot-joined STRING — `errors.ts` does
+        // `path: i.path.join('.')` on the zod issue. This used to require
+        // Array.isArray(path), which is never true against that payload, so
+        // every server-side field error was silently dropped and the user got
+        // a bare "Request validation failed" toast attached to no field. The
+        // Input primitive's whole inline-error path was unreachable on any
+        // server rejection.
+        //
+        // Both shapes are accepted rather than only the string: a nested path
+        // arrives as "profile.email", and a client-side zod issue (which does
+        // carry an array) reaches this same helper.
+        const raw = (issue as { path: unknown }).path;
+        const field = Array.isArray(raw)
+          ? String(raw[0] ?? '')
+          : String(raw ?? '').split('.')[0];
         if (field === 'email' || field === 'password' || field === 'displayName') {
           errors[field] = String((issue as { message: unknown }).message);
         }
@@ -386,7 +399,17 @@ function SignInInner() {
         {/* Auth header */}
         <header className="w-full px-container-margin py-8 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="" className="w-8 h-8 object-contain" aria-hidden="true" />
+            {/* Brand mark in the sign-in header: above the fold, never deferred. */}
+            <img
+              src="/logo.png"
+              alt=""
+              width={359}
+              height={376}
+              loading="eager"
+              decoding="async"
+              className="w-8 h-8 object-contain"
+              aria-hidden="true"
+            />
             <h1 className="font-heading font-bold tracking-tight text-2xl text-primary">
               AquaZeroFit
             </h1>

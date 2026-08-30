@@ -36,6 +36,14 @@ services:
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required - set it in .env}
       # Web hosting
       - SERVE_WEB=false
+      # SINGLE INSTANCE ONLY. The store hydrates an in-memory copy at boot and
+      # never re-reads, so two api containers diverge immediately and the last
+      # flush silently overwrites the other's documents. `docker compose up
+      # --scale api=N` is therefore unsafe, and compose has no file-level
+      # replica count to key off, so the intent is declared here instead: the
+      # API refuses to boot on anything but 1 (platform/config.ts,
+      # assertSingleInstance). See docs/OPERATIONS.md § Scaling.
+      - AZF_INSTANCE_COUNT=1
     volumes:
       # Persistent data (JSON store + uploads)
       - api_data:/data

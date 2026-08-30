@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UnitPreference, WeightLog } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
 import { useProfile } from '@/lib/queries';
+import { optimisticPatch, pendingWeightLog, upsertWeightLog } from '@/lib/optimistic';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Chip } from '@/components/ui/Chip';
@@ -94,6 +95,22 @@ export default function LogWeight() {
   const deltaVsLast =
     parsedKg !== null && latest ? parsedKg - latest.weightKg : null;
 
+  /**
+   * The weigh-in lands in the cache before the request does, so the entry is
+   * already there when this page hands over to /progress on success.
+   *
+   * Safe to show in full, which the meal path is not: the weight is the number
+   * the user just typed rather than one the server derives. What the server
+   * *does* derive from it — the recomputed daily targets — is left to the
+   * ['targets'] invalidation and is never guessed here.
+   */
+  const weightPatch = optimisticPatch<
+    WeightLog[],
+    { weightKg: number; note?: string; localDate: string }
+  >(queryClient, ['weight', '30d'], (previous, payload) =>
+    upsertWeightLog(previous, pendingWeightLog({ key: idemKeyRef.current, ...payload })),
+  );
+
   const mutation = useMutation({
     mutationFn: (payload: { weightKg: number; note?: string; localDate: string }) =>
       api<WeightLogResponse>('/weight-logs', {
@@ -101,6 +118,7 @@ export default function LogWeight() {
         body: payload,
         idempotencyKey: idemKeyRef.current,
       }),
+    ...weightPatch,
     onSuccess: (res) => {
       const hint =
         res.advisory ??
@@ -109,13 +127,16 @@ export default function LogWeight() {
           : 'Weight saved — your daily targets have been recomputed.');
       toast.success(hint);
       idemKeyRef.current = crypto.randomUUID();
+      navigate('/progress');
+    },
+    onError: (e, _vars, context) => {
+      weightPatch.onError(context);
+      toast.error(e instanceof ApiError ? e.message : 'Could not save your weigh-in');
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['weight'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
       void queryClient.invalidateQueries({ queryKey: ['targets'] });
-      navigate('/progress');
-    },
-    onError: (e) => {
-      toast.error(e instanceof ApiError ? e.message : 'Could not save your weigh-in');
     },
   });
 

@@ -13,6 +13,14 @@
 # is a single machine, so this is correct. Do not switch to autoscale until
 # the store's reads go directly to Postgres.
 #
+# This is now ENFORCED, not merely documented. The API refuses to boot when
+# AZF_INSTANCE_COUNT is set to anything but 1 (platform/config.ts,
+# assertSingleInstance) — see docs/OPERATIONS.md § Scaling. Replit's autoscale
+# instance limit lives in the deployment UI and nothing in this file can read
+# it, so if you ever move this deployment to autoscale you must ALSO raise
+# AZF_INSTANCE_COUNT, and that guard will stop you until the async getStore()
+# refactor has landed. That refusal is the point.
+#
 # PERSISTENCE: Replit's filesystem is NOT durable — it resets on every publish.
 # Nothing of value may be written to disk. Application data lives in Postgres
 # (DATABASE_URL, injected by Replit) and uploads belong in Object Storage.

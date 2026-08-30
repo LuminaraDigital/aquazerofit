@@ -2,6 +2,7 @@ package fit.aquazero.app.core.database
 
 import androidx.room3.Dao
 import androidx.room3.Query
+import androidx.room3.Transaction
 import androidx.room3.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -19,6 +20,14 @@ interface LogsDao {
 
     @Query("SELECT * FROM meal_logs WHERE localDate = :localDate AND deleted = 0 ORDER BY loggedAt")
     suspend fun mealLogsForDateOnce(localDate: String): List<MealLogEntity>
+
+    /**
+     * The whole day, soft-deleted rows included. Only reconciliation wants
+     * this: it has to *see* a row it must not resurrect (see `MealReconciler`).
+     * Anything that feeds the UI wants [mealLogsForDateOnce].
+     */
+    @Query("SELECT * FROM meal_logs WHERE localDate = :localDate ORDER BY loggedAt")
+    suspend fun mealLogsForDateOnceIncludingDeleted(localDate: String): List<MealLogEntity>
 
     @Query("SELECT * FROM meal_logs WHERE localId = :localId")
     suspend fun mealLogByLocalId(localId: String): MealLogEntity?
@@ -59,4 +68,21 @@ interface LogsDao {
 
     @Query("UPDATE weight_logs SET serverId = :serverId, syncState = :state WHERE localId = :localId")
     suspend fun markWeightLogSynced(localId: String, serverId: String?, state: SyncState)
+
+    @Query("DELETE FROM meal_logs")
+    suspend fun clearAllMealLogs()
+
+    @Query("DELETE FROM water_logs")
+    suspend fun clearAllWaterLogs()
+
+    @Query("DELETE FROM weight_logs")
+    suspend fun clearAllWeightLogs()
+
+    /** Drop every offline-writable log row (logout / different-user sign-in). */
+    @Transaction
+    suspend fun clearAllLogs() {
+        clearAllMealLogs()
+        clearAllWaterLogs()
+        clearAllWeightLogs()
+    }
 }

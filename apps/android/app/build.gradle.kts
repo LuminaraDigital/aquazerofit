@@ -102,8 +102,8 @@ android {
 
   buildTypes {
     debug {
-      buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4040/api/v1\"")
-      buildConfigField("String", "MEDIA_BASE_URL", "\"http://10.0.2.2:4040\"")
+      buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api/v1\"")
+      buildConfigField("String", "MEDIA_BASE_URL", "\"http://10.0.2.2:4000\"")
       // Legal/support pages are always the published ones: a debug build must
       // not show a privacy policy served off a dev laptop.
       buildConfigField("String", "WEB_BASE_URL", "\"https://app.aquazero.fit\"")

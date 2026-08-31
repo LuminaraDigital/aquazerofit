@@ -76,6 +76,8 @@ apps/android/local.properties
 # the monorepo a Gradle build for IDE indexing; it carries a machine-specific
 # sdk.dir and must never be committed. CI runs Gradle from apps/android.
 /local.properties
+# Same cause: the root Gradle build writes its own caches here.
+/.gradle/
 apps/android/.kotlin/
 apps/android/captures/
 *.apk

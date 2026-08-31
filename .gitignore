@@ -72,6 +72,10 @@ apps/android/.gradle/
 apps/android/build/
 apps/android/app/build/
 apps/android/local.properties
+# Root local.properties exists only because the root settings.gradle.kts makes
+# the monorepo a Gradle build for IDE indexing; it carries a machine-specific
+# sdk.dir and must never be committed. CI runs Gradle from apps/android.
+/local.properties
 apps/android/.kotlin/
 apps/android/captures/
 *.apk

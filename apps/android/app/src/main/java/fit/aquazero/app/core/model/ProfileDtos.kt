@@ -20,6 +20,7 @@ data class WellnessProfileDto(
     val allergies: List<Allergen> = emptyList(),
     val equipment: List<Equipment> = emptyList(),
     val unitPreference: UnitPreference = UnitPreference.METRIC,
+    val nutritionEmphasis: NutritionEmphasis = NutritionEmphasis.STANDARD,
     val targetWeightKg: Double? = null,
     val updatedAt: String,
 )
@@ -45,6 +46,7 @@ data class ProfileInputDto(
     val allergies: List<Allergen> = emptyList(),
     val equipment: List<Equipment> = listOf(Equipment.NONE),
     val unitPreference: UnitPreference = UnitPreference.METRIC,
+    val nutritionEmphasis: NutritionEmphasis = NutritionEmphasis.STANDARD,
     val targetWeightKg: Double? = null,
 )
 
@@ -63,6 +65,11 @@ data class DerivedTargetsDto(
     val clampReason: String? = null,
     val computedAt: String,
     val formulaVersion: String,
+    val adaptiveTdee: Double? = null,
+    val adaptationKcal: Double? = null,
+    val adaptiveConfidence: String? = null,
+    val adaptiveReasoning: String? = null,
+    val adaptiveEnabled: Boolean? = null,
 )
 
 /** Mirrors TS `ConsentState`. */

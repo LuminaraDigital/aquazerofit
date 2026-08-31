@@ -133,6 +133,15 @@ fun PlanEntitlementsScreen(
                     item { PositionCard(entitlements, state.creditFraction) }
 
                     item {
+                        Text(
+                            text = stringResource(R.string.plan_free_forever_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        )
+                    }
+
+                    item {
                         AzfSectionHeading(
                             stringResource(
                                 if (state.premium) {

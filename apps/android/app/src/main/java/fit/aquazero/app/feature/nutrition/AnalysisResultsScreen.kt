@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -54,9 +55,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
+import fit.aquazero.app.core.common.MealTrust
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
+import fit.aquazero.app.core.designsystem.AzfChip
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
@@ -64,6 +67,7 @@ import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.DataLarge
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.ErrorState
+import fit.aquazero.app.core.designsystem.FatCautionBanner
 import fit.aquazero.app.core.designsystem.GramsStepper
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
@@ -122,6 +126,7 @@ fun AnalysisResultsScreen(
             onGramsChange = viewModel::setGrams,
             onRemove = viewModel::removeItem,
             onAddItem = viewModel::openAddSheet,
+            onAddCookingFat = viewModel::addCookingFatPreset,
             onConfirm = viewModel::confirm,
             onRetry = viewModel::retry,
             onRetakePhoto = onRetakePhoto,
@@ -151,6 +156,7 @@ internal fun AnalysisContent(
     onGramsChange: (String, Int) -> Unit = { _, _ -> },
     onRemove: (String) -> Unit = {},
     onAddItem: () -> Unit = {},
+    onAddCookingFat: (MealTrust.CookingFatPreset) -> Unit = {},
     onConfirm: () -> Unit = {},
     onRetry: () -> Unit = {},
     onRetakePhoto: () -> Unit = {},
@@ -201,6 +207,7 @@ internal fun AnalysisContent(
             onGramsChange = onGramsChange,
             onRemove = onRemove,
             onAddItem = onAddItem,
+            onAddCookingFat = onAddCookingFat,
             onConfirm = onConfirm,
         )
     }
@@ -281,8 +288,10 @@ private fun ReviewList(
     onGramsChange: (String, Int) -> Unit,
     onRemove: (String) -> Unit,
     onAddItem: () -> Unit,
+    onAddCookingFat: (MealTrust.CookingFatPreset) -> Unit,
     onConfirm: () -> Unit,
 ) {
+    val showFatCaution = AnalysisReview.shouldShowFatCaution(state.items)
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -299,6 +308,28 @@ private fun ReviewList(
         // subcomposition for the next kind that lands there and rebuilds it.
         item(key = "summary", contentType = "summary") {
             AnalysisSummaryCard(totals = state.totals, mealType = state.mealType)
+        }
+
+        if (showFatCaution) {
+            item(key = "fat-caution", contentType = "notice") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FatCautionBanner()
+                    Text(
+                        text = stringResource(R.string.trust_add_cooking_fat),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MealTrust.cookingFatPresets.forEach { preset ->
+                            AzfChip(
+                                text = preset.label,
+                                selected = false,
+                                onClick = { onAddCookingFat(preset) },
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         item(key = "header", contentType = "header") {

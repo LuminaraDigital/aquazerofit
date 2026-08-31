@@ -11,7 +11,9 @@ import fit.aquazero.app.core.database.ConsentEntity
 import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
+import fit.aquazero.app.core.model.DerivedTargetsDto
 import fit.aquazero.app.core.model.DietaryPreference
+import fit.aquazero.app.core.model.NutritionEmphasis
 import fit.aquazero.app.core.model.ProfileInputDto
 import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
@@ -64,6 +66,8 @@ data class SettingsUiState(
     /** Set once deletion has been requested in this session. */
     val deletionRequestedAt: String? = null,
     val pendingOutbox: Int = 0,
+    /** Derived targets for the explain sheet. */
+    val targets: DerivedTargetsDto? = null,
     /** True while a logout drain or final sign-out is in flight. */
     val signingOut: Boolean = false,
 ) {
@@ -111,6 +115,7 @@ class SettingsViewModel @Inject constructor(
     init {
         observeUser()
         observeProfile()
+        observeTargets()
         observeConsents()
         observeOutbox()
         refresh()
@@ -138,6 +143,17 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    private fun observeTargets() = viewModelScope.launch {
+        accountRepository.targets().collect { entity ->
+            val decoded = entity?.docJson?.let { json ->
+                runCatching {
+                    AzfJson.decodeFromString(DerivedTargetsDto.serializer(), json)
+                }.getOrNull()
+            }
+            _uiState.value = _uiState.value.copy(targets = decoded)
+        }
+    }
+
     private fun observeConsents() = viewModelScope.launch {
         accountRepository.consents().collect { consents ->
             _uiState.value = _uiState.value.copy(consents = consents)
@@ -154,6 +170,7 @@ class SettingsViewModel @Inject constructor(
     fun refresh() = viewModelScope.launch {
         accountRepository.refreshMe()
         val profile = accountRepository.refreshProfile()
+        accountRepository.refreshTargets()
         accountRepository.refreshConsents()
         _uiState.value = _uiState.value.copy(
             loading = false,
@@ -207,6 +224,11 @@ class SettingsViewModel @Inject constructor(
     /** Switch the display unit. Stored weights stay canonical kilograms. */
     fun setUnitPreference(unit: UnitPreference) {
         saveProfilePatch { it.copy(unitPreference = unit) }
+    }
+
+    /** Switch dashboard ring priority between calories and protein. */
+    fun setNutritionEmphasis(emphasis: NutritionEmphasis) {
+        saveProfilePatch { it.copy(nutritionEmphasis = emphasis) }
     }
 
     /** Add or remove a dietary preference. */
@@ -430,4 +452,5 @@ fun WellnessProfileDto.toInput(): ProfileInputDto = ProfileInputDto(
     equipment = equipment,
     unitPreference = unitPreference,
     targetWeightKg = targetWeightKg,
+    nutritionEmphasis = nutritionEmphasis,
 )

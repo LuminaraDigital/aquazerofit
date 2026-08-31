@@ -114,6 +114,26 @@ const MEAL_BUDGET_SHARE: Record<string, number> = {
 /** Generic daily targets used when wellness data may not be processed. */
 const GENERIC_TARGETS = { kcal: 2000, proteinG: 110, carbsG: 230, fatG: 65 };
 
+function proteinDensity(c: Candidate): number {
+  return c.proteinG / Math.max(c.kcal, 1);
+}
+
+/** Deterministic pick: kcal budget by default, protein density when protein_first. */
+function pickDeterministicCandidate(
+  candidates: Candidate[],
+  budget: { kcal: number; proteinG: number },
+  mealType: string,
+  proteinFirst: boolean,
+): Candidate {
+  if (proteinFirst) {
+    return [...candidates].sort((a, b) => proteinDensity(b) - proteinDensity(a))[0]!;
+  }
+  const share = budget.kcal * (MEAL_BUDGET_SHARE[mealType] ?? 0.3);
+  return [...candidates].sort(
+    (a, b) => Math.abs(a.kcal - share) - Math.abs(b.kcal - share),
+  )[0]!;
+}
+
 recommendationsRouter.post(
   '/meals',
   asyncHandler(async (req, res) => {
@@ -173,11 +193,15 @@ recommendationsRouter.post(
           );
         }
 
-        // Deterministic pick: closest to this meal's share of the daily budget.
-        const share = budget.kcal * (MEAL_BUDGET_SHARE[mealType] ?? 0.3);
-        const chosen = [...candidates].sort(
-          (a, b) => Math.abs(a.kcal - share) - Math.abs(b.kcal - share),
-        )[0]!;
+        const profileForPick = wellnessOk ? await readProfile(user.id) : null;
+        const proteinFirst = profileForPick?.nutritionEmphasis === 'protein_first';
+
+        const chosen = pickDeterministicCandidate(
+          candidates,
+          budget,
+          mealType,
+          proteinFirst,
+        );
 
         const advisory = wellnessOk ? '' : ' Enable personalisation for tailored suggestions.';
         const recommendation: MealRecommendation = {
@@ -192,7 +216,9 @@ recommendationsRouter.post(
           carbsG: chosen.carbsG,
           fatG: chosen.fatG,
           ingredients: chosen.ingredients,
-          rationale: `A balanced ${mealType} option of about ${Math.round(chosen.kcal)} kcal.${advisory}`,
+          rationale: proteinFirst
+            ? `A protein-forward ${mealType} option of about ${Math.round(chosen.proteinG)} g protein.${advisory}`
+            : `A balanced ${mealType} option of about ${Math.round(chosen.kcal)} kcal.${advisory}`,
           ai: {
             provider: 'deterministic',
             model: 'consent-off-fallback',
@@ -244,6 +270,7 @@ recommendationsRouter.post(
       const foods = await whereDocs<Food>('content', (d: any) => d?.type === 'food');
 
       const prefs = profile?.dietaryPreferences ?? [];
+      const proteinFirst = profile?.nutritionEmphasis === 'protein_first';
       const restrictive = RESTRICTIVE_PREFS.filter((p) => prefs.includes(p));
       const prefFiltered = recipes.filter((r) =>
         restrictive.every((p) => (r.suitableFor ?? []).includes(p)),
@@ -279,6 +306,7 @@ recommendationsRouter.post(
           context: {
             mealType,
             remaining,
+            proteinFirst,
             candidates: safeCandidates.map((c) => ({
               id: c.id,
               name: c.name,
@@ -293,12 +321,16 @@ recommendationsRouter.post(
 
       const ranked = (result.json ?? {}) as { rankedIds?: string[]; rationale?: string };
       const safeIds = new Set(safeCandidates.map((c) => c.id));
-      const chosenId = (ranked.rankedIds ?? []).find((id) => safeIds.has(id)) ?? safeCandidates[0]!.id;
+      const chosenId =
+        (ranked.rankedIds ?? []).find((id) => safeIds.has(id)) ??
+        pickDeterministicCandidate(safeCandidates, remaining, mealType, proteinFirst).id;
       const chosen = safeCandidates.find((c) => c.id === chosenId)!;
 
       // Model-authored rationale passes the output guardrail before it can
       // reach the user; on any block the deterministic rationale substitutes.
-      const deterministicRationale = `Fits your remaining ~${Math.round(remaining.kcal)} kcal for ${mealType} and supports your protein goal.`;
+      const deterministicRationale = proteinFirst
+        ? `Prioritises protein for ${mealType}: about ${Math.round(chosen.proteinG)} g toward your ${Math.round(remaining.proteinG)} g remaining.`
+        : `Fits your remaining ~${Math.round(remaining.kcal)} kcal for ${mealType} and supports your protein goal.`;
       let rationale = ranked.rationale ?? deterministicRationale;
       if (ranked.rationale && postGuardrail(ranked.rationale, { userId: user.id }).blocked) {
         rationale = deterministicRationale;

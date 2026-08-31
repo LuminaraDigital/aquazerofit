@@ -389,6 +389,29 @@ class WorkoutSessionViewModelTest {
             assertEquals(before, vm.uiState.value.setsDone)
         }
 
+    @Test
+    fun `warmUpSets are populated on session load and PR is detected on set completion`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.start(SESSION_ID)
+        advanceUntilIdle()
+        vm.startSession()
+
+        val state = vm.uiState.value
+        // Barbell bench press at 40kg -> warmUpSets should be generated
+        assertTrue(state.warmUpSets.isNotEmpty())
+
+        // Exceed target: enter 50kg @ 10 reps (historical was 40kg @ 8 reps)
+        vm.onWeightChange("50.0")
+        vm.onRepsChange("10")
+        vm.completeSet()
+        advanceUntilIdle()
+
+        val prState = vm.uiState.value
+        assertNotNull(prState.prAlert)
+        assertTrue(prState.prAlert?.isNewPr == true)
+        assertTrue((prState.prAlert?.deltaKg ?: 0.0) > 0.0)
+    }
+
     private companion object {
         const val SESSION_ID = "session-1"
         const val FIXED_NOW = 1_756_000_000_000L

@@ -64,6 +64,7 @@ import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.ReadinessChip
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastController
@@ -167,6 +168,13 @@ private fun WorkoutLibraryContent(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item(key = "readiness") {
+                ReadinessChip(
+                    readiness = state.readiness,
+                    loading = state.readinessLoading,
+                    modifier = Modifier.revealOnEnter(0),
+                )
+            }
             // ---------- weekly plan strip ----------
             item(key = "plan-header") {
                 SectionHeader(

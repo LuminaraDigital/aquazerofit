@@ -47,7 +47,7 @@ export function captureAttributionFromUrl(search = window.location.search): Attr
     utmSource: pick(params, ['utm_source']),
     utmMedium: pick(params, ['utm_medium']),
     utmCampaign: pick(params, ['utm_campaign']),
-    challengeCode: pick(params, ['challenge', 'huddle'])?.toUpperCase() ?? null,
+    challengeCode: pick(params, ['challenge', 'code', 'huddle'])?.toUpperCase() ?? null,
     capturedAt: new Date().toISOString(),
   };
 

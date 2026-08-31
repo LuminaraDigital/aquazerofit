@@ -5,11 +5,13 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import fit.aquazero.app.core.common.LocalDailyNutrition
+import fit.aquazero.app.core.data.CoachesRepository
 import fit.aquazero.app.core.data.LogsRepository
 import fit.aquazero.app.core.data.NutritionDayRepository
 import fit.aquazero.app.core.data.PlansRepository
 import fit.aquazero.app.core.data.ProfileRepository
 import fit.aquazero.app.core.data.ProgressRepository
+import fit.aquazero.app.core.database.ProfileEntity
 import fit.aquazero.app.core.database.UserEntity
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.DailyNutritionDto
@@ -17,6 +19,8 @@ import fit.aquazero.app.core.model.MealLogDto
 import fit.aquazero.app.core.model.MealRecommendationDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.ProgressSummaryDto
+import fit.aquazero.app.core.model.ProgressionStatusDto
+import fit.aquazero.app.core.model.ReadinessAssessmentDto
 import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -37,6 +41,12 @@ interface DashboardData {
 
     /** Cached account row (drives the greeting). */
     fun user(): Flow<UserEntity?>
+
+    /** Cached wellness profile (drives nutrition emphasis). */
+    fun profile(): Flow<ProfileEntity?>
+
+    /** Cached derived targets (drives explain sheet). */
+    fun targets(): Flow<fit.aquazero.app.core.database.TargetsEntity?>
 
     /** Cached progress snapshot (weight, achievements). */
     fun progressSummary(): Flow<ProgressSummaryDto?>
@@ -64,6 +74,12 @@ interface DashboardData {
 
     /** Log a suggestion the user explicitly accepted (online-only). */
     suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto>
+
+    /** Training readiness assessment for the current week. */
+    suspend fun readiness(): ApiResult<ReadinessAssessmentDto>
+
+    /** Coach progression + ambient reactions. */
+    suspend fun progression(): ApiResult<ProgressionStatusDto>
 }
 
 /** Production [DashboardData], delegating to the Wave 1 repositories only. */
@@ -74,12 +90,18 @@ class DefaultDashboardData @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val progressRepository: ProgressRepository,
     private val plansRepository: PlansRepository,
+    private val coachesRepository: CoachesRepository,
 ) : DashboardData {
 
     override fun dailyNutrition(localDate: String): Flow<LocalDailyNutrition> =
         logsRepository.localDailyNutrition(localDate)
 
     override fun user(): Flow<UserEntity?> = profileRepository.user()
+
+    override fun profile(): Flow<ProfileEntity?> = profileRepository.profile()
+
+    override fun targets(): Flow<fit.aquazero.app.core.database.TargetsEntity?> =
+        profileRepository.targets()
 
     override fun progressSummary(): Flow<ProgressSummaryDto?> = progressRepository.summary()
 
@@ -110,6 +132,15 @@ class DefaultDashboardData @Inject constructor(
 
     override suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto> =
         nutritionDayRepository.logRecommendation(recommendationId)
+
+    override suspend fun readiness(): ApiResult<ReadinessAssessmentDto> =
+        when (val result = plansRepository.readiness()) {
+            is ApiResult.Success -> ApiResult.Success(result.data.readiness)
+            is ApiResult.Failure -> result
+        }
+
+    override suspend fun progression(): ApiResult<ProgressionStatusDto> =
+        coachesRepository.progression()
 }
 
 /** Binds the production implementation of [DashboardData]. */

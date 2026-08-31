@@ -14,6 +14,9 @@
     <string name="health_card_title">Health Connect</string>
     <string name="health_card_body">Bring steps, heart rate, sleep and energy from your phone or watch into AquaZeroFit, and send the weights you log back out.</string>
 
+    <string name="health_rationale_title">Why AquaZeroFit uses Health Connect</string>
+    <string name="health_rationale_body">AquaZeroFit reads steps, heart rate, sleep, and energy burned to show recovery-aware training and daily targets. Weight you log in the app can be written back to Health Connect if you allow it. Health data is processed on your device and is not uploaded to our servers.</string>
+
     <!-- Privacy. Shown before connecting, not after: the point is to inform
          the decision, not to reassure someone who has already made it. -->
     <string name="health_privacy_note">Your health data stays on this device. AquaZeroFit reads it to draw the figures below and never uploads it, includes it in diagnostics, or shares it.</string>

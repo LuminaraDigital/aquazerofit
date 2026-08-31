@@ -1,0 +1,61 @@
+[
+  {
+    "content-desc": "AquaZeroFit logo",
+    "center": "[375,294]",
+    "key": 3506402
+  },
+  {
+    "text": "AQUAZEROFIT",
+    "center": "[598,295]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "scrollable"
+    ],
+    "center": "[540,1085]",
+    "bounds": "[53,342][1027,1828]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[540,1996]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[540,2175]",
+    "key": 3506402
+  },
+  {
+    "text": "GENERAL WELLNESS SUPPORT ONLY",
+    "center": "[540,2300]",
+    "key": 3506402
+  },
+  {
+    "text": "YOUR AI WELLNESS COACH",
+    "center": "[540,1220]",
+    "key": 3506402
+  },
+  {
+    "text": "Nutrition, weight, and home training — powered by personalized data.",
+    "center": "[540,1362]",
+    "key": 3506402
+  },
+  {
+    "text": "Get Started",
+    "center": "[540,1996]",
+    "key": 3506402
+  },
+  {
+    "text": "I already have an account",
+    "center": "[540,2175]",
+    "key": 3506402
+  }
+]

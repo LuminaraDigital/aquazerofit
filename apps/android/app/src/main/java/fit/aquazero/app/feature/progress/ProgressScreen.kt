@@ -60,6 +60,7 @@ import fit.aquazero.app.core.model.ConsistencyStatusDto
 import fit.aquazero.app.core.model.ProgressSummaryDto
 import fit.aquazero.app.core.model.TrendPointDto
 import fit.aquazero.app.core.ui.LocaleFormatters
+import fit.aquazero.app.feature.gamification.CelebrationHost
 import java.time.LocalDate
 import java.util.Locale
 import kotlin.math.abs
@@ -98,14 +99,17 @@ fun ProgressScreen(
         }
     }
 
-    ProgressContent(
-        state = state,
-        modifier = modifier,
-        onRangeChange = viewModel::setRange,
-        onLogWeight = onLogWeight,
-        onExport = viewModel::exportData,
-        onRetry = viewModel::refresh,
-    )
+    Box(modifier = modifier.fillMaxSize()) {
+        ProgressContent(
+            state = state,
+            modifier = Modifier.fillMaxSize(),
+            onRangeChange = viewModel::setRange,
+            onLogWeight = onLogWeight,
+            onExport = viewModel::exportData,
+            onRetry = viewModel::refresh,
+        )
+        CelebrationHost()
+    }
 }
 
 @Composable
@@ -193,8 +197,14 @@ private fun ProgressContent(
                 }
             }
 
+            state.adaptiveExpenditure?.let { adaptive ->
+                item(key = "adaptive-metabolism", contentType = "adaptive-metabolism") {
+                    AdaptiveMetabolicCard(result = adaptive, modifier = Modifier.revealOnEnter(2))
+                }
+            }
+
             item(key = "weight-hero", contentType = "weight-hero") {
-                WeightHeroRow(state = state, modifier = Modifier.revealOnEnter(2))
+                WeightHeroRow(state = state, modifier = Modifier.revealOnEnter(3))
             }
 
             item(key = "weight-chart", contentType = "weight-chart") {

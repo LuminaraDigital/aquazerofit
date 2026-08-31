@@ -26,15 +26,22 @@ complexity:
     ignoreAnnotated: ['Composable']
   TooManyFunctions:
     # Raised to today's worst case in each bucket, no higher:
-    #   file 20 (NutritionSections.kt), class 27 (WorkoutSessionViewModel),
+    #   file 20 (NutritionSections.kt), class 29 (WorkoutSessionViewModel),
     #   interface 21 (CatalogDao), object 23 (NetworkModule, all @Provides).
     #
     # CatalogDao moved 20 -> 21 for `thumbnailsFor`, which the library list
     # needs to draw exercise images. It is now carrying foods, recipes,
     # exercises, achievements and coaches; the next query it grows should
     # split the exercise catalog into its own DAO rather than move this again.
+    #
+    # WorkoutSessionViewModel moved 27 -> 29 for `addRestSeconds` and
+    # `syncLiveNotification`, which the Quick Settings rest tile and the live
+    # workout notification need. Both are rest-timer state on a class that
+    # already owns the rest timer, so extracting them would put one concern in
+    # two places. The next function it grows should move the live-notification
+    # mirroring into its own collaborator rather than move this again.
     allowedFunctionsPerFile: 20
-    allowedFunctionsPerClass: 27
+    allowedFunctionsPerClass: 29
     allowedFunctionsPerInterface: 21
     allowedFunctionsPerObject: 23
 

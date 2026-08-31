@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { requireAuth } from '../../platform/auth';
 import { localeOf } from '../../platform/locale';
 import { AppError } from '../../platform/errors';
-import { chatMessageSchema, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
+import { chatMessageSchema, WELLNESS_DISCLAIMER, portionCorrectionWorthRemembering } from '@aquazerofit/shared';
 import type { Allergen, ChatMessage, ChatSession, Food, MealLogItem, MealType, User } from '@aquazerofit/shared';
 import { complete, stream, type GatewayResult } from '../ai/gateway';
 import {
@@ -38,8 +38,10 @@ import { hasConsent } from '../me/service';
 // idempotency and the source field to drift.
 import { createMealLog } from '../logs/service';
 import { extractMemoryFromTurn } from '../memory/extraction';
+import { getRememberedPortionGrams, rememberPortionCorrection } from '../memory/service';
 import { buildHistoryMessages } from './history';
 import {
+  applyRememberedPortions,
   buildDraftItems,
   CHAT_MEAL_DRAFT_TYPE,
   draftNotes,
@@ -580,7 +582,11 @@ chatRouter.post(
 
       const { allergies, consented } = await allergiesFor(user.id);
       const foods = await loadFoodCorpus();
-      const items = buildDraftItems(candidates, foods, allergies);
+      const items = applyRememberedPortions(
+        buildDraftItems(candidates, foods, allergies),
+        foods,
+        (foodId) => getRememberedPortionGrams(user.id, foodId),
+      );
       const allergyCheck: ChatMealDraft['allergyCheck'] = consented ? 'applied' : 'skippedNoConsent';
 
       const draft: ChatMealDraft = {
@@ -728,6 +734,11 @@ chatRouter.post(
       const grams = Math.round(selection.grams ?? match.grams);
       const nutrition = nutritionFor(food, grams);
       logItems.push({ foodId: food.id, name: food.name, grams, ...nutrition });
+
+      const shownGrams = Math.round(match.grams);
+      if (portionCorrectionWorthRemembering(shownGrams, grams)) {
+        rememberPortionCorrection(user.id, selection.foodId, grams);
+      }
 
       if (match.allergenConflicts.length > 0) {
         conflicts.push({

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -400,6 +401,91 @@ fun AchievementTile(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/**
+ * Adaptive Metabolic Engine Card (MacroFactor-beating feature).
+ * Displays live TDEE estimation, adaptation delta, confidence badge, and clear reasoning.
+ */
+@Composable
+fun AdaptiveMetabolicCard(
+    result: fit.aquazero.app.core.common.AdaptiveExpenditureResult,
+    modifier: Modifier = Modifier,
+) {
+    val extended = LocalAzfExtended.current
+    val confidenceBadgeColor = when (result.confidence) {
+        fit.aquazero.app.core.common.ExpenditureConfidence.HIGH -> extended.primaryFixedDim
+        fit.aquazero.app.core.common.ExpenditureConfidence.MODERATE -> extended.secondaryFixedDim
+        fit.aquazero.app.core.common.ExpenditureConfidence.LOW -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    AzfCard(tier = AzfCardTier.Hero, modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "ADAPTIVE METABOLISM",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(confidenceBadgeColor.copy(alpha = 0.15f))
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    text = "${result.confidence.name} CONFIDENCE",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = confidenceBadgeColor,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "ESTIMATED EXPENDITURE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "${result.estimatedTdeeKcal.toInt()} kcal",
+                    style = DataLarge.copy(fontSize = 24.sp),
+                    color = extended.primaryFixedDim,
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "ADAPTED TARGET",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "${result.recommendedTargetKcal.toInt()} kcal",
+                    style = DataLarge.copy(fontSize = 24.sp),
+                    color = extended.secondaryFixedDim,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            text = result.reasoning,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

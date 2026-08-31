@@ -1,11 +1,16 @@
 package fit.aquazero.app.feature.training
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import fit.aquazero.app.core.audio.CoachVoiceEngine
 import fit.aquazero.app.core.common.LocalDates
+import fit.aquazero.app.core.common.PrEvaluation
+import fit.aquazero.app.core.common.ProgressiveOverloadEngine
+import fit.aquazero.app.core.common.WarmUpSet
 import fit.aquazero.app.core.data.CoachesRepository
 import fit.aquazero.app.core.data.PlansRepository
 import fit.aquazero.app.core.model.ApiResult
@@ -14,6 +19,7 @@ import fit.aquazero.app.core.model.SetLogDto
 import fit.aquazero.app.core.model.WorkoutSessionDto
 import fit.aquazero.app.core.network.api.CompleteWorkoutRequest
 import fit.aquazero.app.core.network.api.CompletedExerciseInput
+import fit.aquazero.app.core.service.WorkoutLiveService
 import fit.aquazero.app.core.ui.CoachRoster
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -68,6 +74,7 @@ sealed interface SessionAnnouncement {
     data class NextExercise(val exerciseName: String) : SessionAnnouncement
     data class SetDone(val setNumber: Int, val totalSets: Int, val restSeconds: Int) :
         SessionAnnouncement
+    data class PrAchieved(val deltaKg: Double, val oneRmKg: Double) : SessionAnnouncement
 
     data object RestComplete : SessionAnnouncement
     data object RestSkipped : SessionAnnouncement
@@ -96,6 +103,8 @@ data class WorkoutSessionUiState(
     val completing: Boolean = false,
     val restoredFromDraft: Boolean = false,
     val announcement: AnnouncementSlot? = null,
+    val prAlert: PrEvaluation? = null,
+    val warmUpSets: List<WarmUpSet> = emptyList(),
 ) {
     val totalSets: Int get() = entries.sumOf { it.sets }
 
@@ -141,6 +150,7 @@ sealed interface WorkoutSessionEvent {
  */
 @HiltViewModel
 class WorkoutSessionViewModel @Inject constructor(
+    @ApplicationContext private val context: Context? = null,
     private val plansRepository: PlansRepository,
     private val savedStateHandle: SavedStateHandle,
     private val coachesRepository: CoachesRepository,
@@ -182,6 +192,7 @@ class WorkoutSessionViewModel @Inject constructor(
                 SessionAnnouncement.Started(state.entries.first().name),
             ),
         ).withPrefilledActuals(0)
+        syncLiveNotification()
         persistDraft()
     }
 
@@ -199,25 +210,45 @@ class WorkoutSessionViewModel @Inject constructor(
         if (index !in state.setsDone.indices) return
         val setsDone = state.setsDone.replacingAt(index, setNumber)
         val logs = state.setLogs.map { it.toMutableList() }.toMutableList()
-        logs[index].add(state.actual.toSetLog(setNumber, entry))
+        val log = state.actual.toSetLog(setNumber, entry)
+        logs[index].add(log)
+
+        val completedWeight = log.weightKg ?: entry.weightKg ?: 0.0
+        val completedReps = log.reps
+        val historical1Rm = entry.weightKg?.let { ProgressiveOverloadEngine.estimate1Rm(it, entry.reps) } ?: 0.0
+        val prEval = if (completedWeight > 0.0 && completedReps > 0 && historical1Rm > 0.0) {
+            ProgressiveOverloadEngine.evaluatePr(completedWeight, completedReps, historical1Rm).takeIf { it.isNewPr }
+        } else {
+            null
+        }
 
         val finishedExercise = setNumber >= entry.sets
-        val updated = state.copy(setsDone = setsDone, setLogs = logs)
+        val updated = state.copy(setsDone = setsDone, setLogs = logs, prAlert = prEval)
         _uiState.value = when {
             finishedExercise -> updated.advanceFrom(index)
             else -> {
-                speakCoachCue("Set $setNumber finished. Rest ${entry.restSeconds} seconds.")
+                if (prEval != null) {
+                    speakCoachCue(
+                        "Incredible! New personal record: +${prEval.deltaKg} kg estimated max. " +
+                            "Rest ${entry.restSeconds} seconds.",
+                    )
+                } else {
+                    speakCoachCue("Set $setNumber finished. Rest ${entry.restSeconds} seconds.")
+                }
                 updated.copy(
                     phase = SessionPhase.REST,
                     restLeftSeconds = entry.restSeconds,
                     restTotalSeconds = entry.restSeconds,
-                    announcement = announce(
-                        SessionAnnouncement.SetDone(setNumber, entry.sets, entry.restSeconds),
-                    ),
+                    announcement = if (prEval != null) {
+                        announce(SessionAnnouncement.PrAchieved(prEval.deltaKg, prEval.currentEstimated1RmKg))
+                    } else {
+                        announce(SessionAnnouncement.SetDone(setNumber, entry.sets, entry.restSeconds))
+                    },
                 )
             }
         }
         if (_uiState.value.phase == SessionPhase.REST) startRestCountdown()
+        syncLiveNotification()
         persistDraft()
     }
 
@@ -229,6 +260,7 @@ class WorkoutSessionViewModel @Inject constructor(
         val skipped = state.skipped.toMutableList().also { it[index] = true }
         stopRest()
         _uiState.value = state.copy(skipped = skipped).advanceFrom(index)
+        syncLiveNotification()
         persistDraft()
     }
 
@@ -239,6 +271,20 @@ class WorkoutSessionViewModel @Inject constructor(
             restLeftSeconds = 0,
             announcement = announce(SessionAnnouncement.RestSkipped),
         )
+        syncLiveNotification()
+        persistDraft()
+    }
+
+    fun addRestSeconds(seconds: Int) {
+        val state = _uiState.value
+        if (state.phase != SessionPhase.REST || seconds <= 0) return
+        stopRest()
+        _uiState.value = state.copy(
+            restLeftSeconds = state.restLeftSeconds + seconds,
+            restTotalSeconds = state.restTotalSeconds + seconds,
+        )
+        startRestCountdown()
+        syncLiveNotification()
         persistDraft()
     }
 
@@ -314,6 +360,7 @@ class WorkoutSessionViewModel @Inject constructor(
             )
             when (val result = plansRepository.completeWorkout(sessionId, request)) {
                 is ApiResult.Success -> {
+                    context?.let { WorkoutLiveService.stop(it) }
                     savedStateHandle.remove<String>(KEY_DRAFT)
                     _uiState.value = _uiState.value.copy(
                         completing = false,
@@ -344,6 +391,7 @@ class WorkoutSessionViewModel @Inject constructor(
 
     override fun onCleared() {
         stopRest()
+        context?.let { WorkoutLiveService.stop(it) }
         super.onCleared()
     }
 
@@ -465,6 +513,7 @@ class WorkoutSessionViewModel @Inject constructor(
             ),
         ).withPrefilledActuals(index)
         if (phase == SessionPhase.REST && draft.restLeftSeconds > 0) startRestCountdown()
+        syncLiveNotification()
     }
 
     private fun persistDraft() {
@@ -516,6 +565,7 @@ class WorkoutSessionViewModel @Inject constructor(
                 } else {
                     state.copy(restLeftSeconds = left)
                 }
+                syncLiveNotification()
             }
             persistDraft()
         }
@@ -557,15 +607,44 @@ class WorkoutSessionViewModel @Inject constructor(
         }
     }
 
+    private fun syncLiveNotification() {
+        val ctx = context ?: return
+        val state = _uiState.value
+        if (sessionId.isEmpty() || state.phase == SessionPhase.OVERVIEW || state.phase == SessionPhase.SUMMARY) {
+            WorkoutLiveService.stop(ctx)
+            return
+        }
+        val entry = state.current ?: run {
+            WorkoutLiveService.stop(ctx)
+            return
+        }
+        WorkoutLiveService.update(
+            context = ctx,
+            sessionId = sessionId,
+            exerciseName = entry.name,
+            setNumber = state.currentSetsDone + 1,
+            totalSets = entry.sets,
+            isResting = state.phase == SessionPhase.REST,
+            restSecondsLeft = state.restLeftSeconds,
+            restTotalSeconds = state.restTotalSeconds,
+            targetReps = entry.reps,
+            targetWeightKg = entry.weightKg ?: 0.0,
+        )
+    }
+
     /** Seed the actuals inputs from the resolved targets for [index]. */
     private fun WorkoutSessionUiState.withPrefilledActuals(index: Int): WorkoutSessionUiState {
-        val entry = entries.getOrNull(index) ?: return copy(actual = ActualInput())
+        val entry = entries.getOrNull(index) ?: return copy(actual = ActualInput(), warmUpSets = emptyList())
+        val warmUps = entry.weightKg?.let {
+            ProgressiveOverloadEngine.generateWarmUpSets(it)
+        } ?: emptyList()
         return copy(
             actual = ActualInput(
                 weightKg = entry.weightKg?.let { TrainingFormat.number(it) }.orEmpty(),
                 reps = entry.reps.takeIf { it > 0 }?.toString().orEmpty(),
                 rir = entry.rir?.let { TrainingFormat.number(it) }.orEmpty(),
             ),
+            warmUpSets = warmUps,
         )
     }
 

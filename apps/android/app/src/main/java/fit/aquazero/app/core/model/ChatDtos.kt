@@ -90,6 +90,7 @@ data class ChatMealMatchDto(
     val proteinG: Double = 0.0,
     val carbsG: Double = 0.0,
     val fatG: Double = 0.0,
+    val score: Int = 0,
     val allergenConflicts: List<Allergen> = emptyList(),
 )
 

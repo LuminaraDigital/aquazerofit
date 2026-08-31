@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDates
+import fit.aquazero.app.core.common.MealTrust
 import fit.aquazero.app.core.data.CatalogRepository
 import fit.aquazero.app.core.data.VisionRepository
 import fit.aquazero.app.core.model.ApiResult
@@ -139,6 +140,34 @@ object AnalysisReview {
                 fatG = food.per100g.fatG / 100.0,
             ),
             confidence = null,
+        )
+    }
+
+    /** User-applied cooking fat from a preset chip (never auto-injected). */
+    fun fromCookingFatPreset(preset: MealTrust.CookingFatPreset, key: String): ReviewItem {
+        val grams = preset.grams.roundToInt().coerceIn(MIN_GRAMS, MAX_GRAMS)
+        val base = preset.grams.coerceAtLeast(1.0)
+        return ReviewItem(
+            key = key,
+            foodId = null,
+            name = preset.label,
+            grams = grams,
+            perGram = PerGram(
+                kcal = preset.kcal / base,
+                proteinG = 0.0,
+                carbsG = 0.0,
+                fatG = preset.fatG / base,
+            ),
+            confidence = null,
+        )
+    }
+
+    fun shouldShowFatCaution(items: List<ReviewItem>): Boolean {
+        val totals = totals(items)
+        return MealTrust.shouldShowFatCaution(
+            items.map { it.name },
+            totals.kcal,
+            totals.fatG,
         )
     }
 
@@ -462,6 +491,22 @@ class AnalysisResultsViewModel @Inject constructor(
         )
         _state.value = _state.value.copy(items = items + item, addSheet = null)
         viewModelScope.launch { runCatching { catalogRepository.touchFood(food.id) } }
+    }
+
+    /** Append a cooking-fat preset the user tapped (still nothing logged). */
+    fun addCookingFatPreset(preset: MealTrust.CookingFatPreset) {
+        val items = _state.value.items
+        if (items.size >= AnalysisReview.MAX_ITEMS) {
+            _state.value = _state.value.copy(
+                banner = AnalysisBanner(messageRes = R.string.analysis_too_many_items),
+            )
+            return
+        }
+        val item = AnalysisReview.fromCookingFatPreset(
+            preset = preset,
+            key = "fat-${preset.id}-${System.currentTimeMillis()}",
+        )
+        _state.value = _state.value.copy(items = items + item)
     }
 
     // ----- the gate -----

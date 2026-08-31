@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Shield
@@ -41,6 +42,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -74,12 +78,14 @@ import fit.aquazero.app.core.model.ActivityLevel
 import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.DietaryPreference
 import fit.aquazero.app.core.model.Goal
+import fit.aquazero.app.core.model.NutritionEmphasis
 import fit.aquazero.app.core.model.Sex
 import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
 import fit.aquazero.app.core.ui.LocaleFormatters
 import fit.aquazero.app.core.ui.SetupUnits
 import fit.aquazero.app.core.ui.TargetsNotSetCard
+import fit.aquazero.app.feature.dashboard.TargetExplainSheet
 import fit.aquazero.app.feature.dashboard.rememberToastSink
 import java.time.YearMonth
 import kotlin.math.roundToInt
@@ -105,6 +111,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenNotifications: () -> Unit = {},
+    onOpenHealth: () -> Unit = {},
     onOpenMemory: () -> Unit = {},
     onOpenPlan: () -> Unit = {},
     onOpenChallenges: () -> Unit = {},
@@ -116,6 +123,7 @@ fun SettingsScreen(
     val resources = LocalResources.current
     val toasts = rememberToastSink()
     val linkFailed = stringResource(R.string.settings_link_failed)
+    var showTargetExplain by remember { mutableStateOf(false) }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
@@ -186,6 +194,28 @@ fun SettingsScreen(
                     AzfSectionHeading(stringResource(R.string.settings_preferences_heading))
                 }
                 item(contentType = "preferences") { PreferenceCards(state, viewModel) }
+            }
+
+            if (state.targets != null) {
+                item(contentType = "nav-row") {
+                    AzfNavigationRow(
+                        title = stringResource(R.string.target_explain_title),
+                        body = stringResource(R.string.settings_target_explain_body),
+                        onClick = { showTargetExplain = true },
+                        icon = Icons.AutoMirrored.Outlined.HelpOutline,
+                        trailing = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    )
+                }
+            }
+
+            item(contentType = "nav-row") {
+                AzfNavigationRow(
+                    title = stringResource(R.string.health_card_title),
+                    body = stringResource(R.string.health_card_body),
+                    onClick = onOpenHealth,
+                    icon = Icons.Outlined.MonitorHeart,
+                    trailing = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                )
             }
 
             item(contentType = "nav-row") {
@@ -326,6 +356,12 @@ fun SettingsScreen(
             }
         }
     }
+
+    TargetExplainSheet(
+        targets = state.targets,
+        visible = showTargetExplain,
+        onDismiss = { showTargetExplain = false },
+    )
 
     SettingsDialogs(state = state, viewModel = viewModel)
 }
@@ -506,6 +542,37 @@ private fun PreferenceCards(state: SettingsUiState, viewModel: SettingsViewModel
                 ),
                 selected = profile.unitPreference,
                 onSelect = { if (state.profileEditable) viewModel.setUnitPreference(it) },
+            )
+        }
+        AzfCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.settings_nutrition_emphasis_heading),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.settings_nutrition_emphasis_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            AzfSegmented(
+                label = stringResource(R.string.settings_nutrition_emphasis_heading),
+                options = listOf(
+                    AzfSegmentOption(
+                        NutritionEmphasis.STANDARD,
+                        stringResource(R.string.settings_nutrition_emphasis_standard),
+                    ),
+                    AzfSegmentOption(
+                        NutritionEmphasis.PROTEIN_FIRST,
+                        stringResource(R.string.settings_nutrition_emphasis_protein),
+                    ),
+                ),
+                selected = profile.nutritionEmphasis,
+                onSelect = {
+                    if (state.profileEditable) viewModel.setNutritionEmphasis(it)
+                },
             )
         }
         AzfCard(modifier = Modifier.fillMaxWidth()) {

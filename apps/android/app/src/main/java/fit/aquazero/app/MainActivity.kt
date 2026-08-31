@@ -1,5 +1,6 @@
 package fit.aquazero.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -11,6 +12,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.navigation.DeepLinkStore
+import javax.inject.Inject
 import android.graphics.Color as AndroidColor
 
 /**
@@ -19,9 +22,15 @@ import android.graphics.Color as AndroidColor
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var deepLinkStore: DeepLinkStore
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        deepLinkStore.parseJoinChallengeIntent(intent)?.let(deepLinkStore::publish)
+        deepLinkStore.parseShortcutIntent(intent)?.let(deepLinkStore::publish)
 
         // Dark-only theme: force dark scrims regardless of system setting.
         enableEdgeToEdge(
@@ -48,5 +57,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        deepLinkStore.parseJoinChallengeIntent(intent)?.let(deepLinkStore::publish)
+        deepLinkStore.parseShortcutIntent(intent)?.let(deepLinkStore::publish)
     }
 }

@@ -82,6 +82,8 @@ import fit.aquazero.app.core.designsystem.TabularNumbers
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.pressScale
 import fit.aquazero.app.core.model.WorkoutSessionDto
+import fit.aquazero.app.core.service.WorkoutLiveService
+import fit.aquazero.app.core.service.WorkoutLiveService.LiveWorkoutAction
 
 /**
  * The guided workout session: overview → work → rest → … → summary.
@@ -104,6 +106,17 @@ fun WorkoutSessionScreen(
     val view = LocalView.current
 
     LaunchedEffect(sessionId) { viewModel.start(sessionId) }
+
+    LaunchedEffect(viewModel) {
+        WorkoutLiveService.actionEvents.collect { action ->
+            when (val event = action) {
+                is LiveWorkoutAction.AddRest -> viewModel.addRestSeconds(event.seconds)
+                LiveWorkoutAction.SkipRest -> viewModel.skipRest()
+                null -> return@collect
+            }
+            WorkoutLiveService.resetAction()
+        }
+    }
 
     // Hold the display awake while a set or a rest timer is running, and
     // release it the moment the session leaves those phases.
@@ -888,6 +901,9 @@ private fun Resources.announcementText(announcement: SessionAnnouncement): Strin
 
         SessionAnnouncement.Finished ->
             getString(R.string.session_announce_finished)
+
+        is SessionAnnouncement.PrAchieved ->
+            "New personal record! Plus %.1f kg estimated max.".format(announcement.deltaKg)
 
         is SessionAnnouncement.Restored -> getString(
             R.string.session_announce_restored,

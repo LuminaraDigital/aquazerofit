@@ -10,7 +10,13 @@ import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.model.AzfJson
+import fit.aquazero.app.core.model.DerivedTargetsDto
 import fit.aquazero.app.core.model.MealRecommendationDto
+import fit.aquazero.app.core.model.NutritionEmphasis
+import fit.aquazero.app.core.model.ProgressionStatusDto
+import fit.aquazero.app.core.model.ReadinessAssessmentDto
+import fit.aquazero.app.core.model.WellnessProfileDto
 import fit.aquazero.app.core.model.WorkoutSessionStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
@@ -24,6 +30,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
 import javax.inject.Inject
+
+private val AMBIENT_REACTION_KINDS = setOf(
+    "greeting",
+    "steady",
+    "returning",
+    "restDay",
+    "resting",
+)
 
 /** Coarse load phase of the day's nutrition (skeleton / content / retry). */
 enum class DashboardPhase { Loading, Ready, Error }
@@ -88,7 +102,19 @@ data class DashboardUiState(
     val workoutLoading: Boolean = true,
     val suggestion: SuggestionUi? = null,
     val suggestionPhase: SuggestionPhase = SuggestionPhase.Idle,
+    /** When true, the hero ring prioritises protein over calories. */
+    val proteinFirst: Boolean = false,
+    /** Server-derived targets for the explain sheet. */
+    val targets: DerivedTargetsDto? = null,
+    val readiness: fit.aquazero.app.core.model.ReadinessAssessmentDto? = null,
+    val readinessLoading: Boolean = true,
+    /** Ambient coach line from progression (not celebration kinds). */
+    val coachLine: String? = null,
 ) {
+    /** Merges offline session burn with the server day total. */
+    val effectiveKcalBurned: Double
+        get() = maxOf(nutrition?.kcalBurned ?: 0.0, kcalBurned)
+
     /** Millilitres to render in the hydration card. */
     val waterConsumedMl: Int
         get() = maxOf(nutrition?.waterConsumedMl ?: 0, serverWaterMl)
@@ -182,6 +208,13 @@ class DashboardViewModel @Inject constructor(
     }
 
     private fun observeRoom() {
+        observeNutrition()
+        observeAccount()
+        observeProgress()
+    }
+
+    /** The day's nutrition roll-up; arriving content also clears a stale fetch error. */
+    private fun observeNutrition() {
         viewModelScope.launch {
             observedDay.flatMapLatest { data.dailyNutrition(it) }.collect { nutrition ->
                 _uiState.update { state ->
@@ -196,6 +229,10 @@ class DashboardViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /** Identity, profile emphasis and derived targets. */
+    private fun observeAccount() {
         viewModelScope.launch {
             data.user().collect { user ->
                 val firstName = user?.displayName?.trim()
@@ -204,6 +241,30 @@ class DashboardViewModel @Inject constructor(
                 _uiState.update { it.copy(firstName = firstName) }
             }
         }
+        viewModelScope.launch {
+            data.profile().collect { entity ->
+                val proteinFirst = entity?.docJson?.let { json ->
+                    runCatching {
+                        AzfJson.decodeFromString(WellnessProfileDto.serializer(), json)
+                    }.getOrNull()?.nutritionEmphasis == NutritionEmphasis.PROTEIN_FIRST
+                } ?: false
+                _uiState.update { it.copy(proteinFirst = proteinFirst) }
+            }
+        }
+        viewModelScope.launch {
+            data.targets().collect { entity ->
+                val decoded = entity?.docJson?.let { json ->
+                    runCatching {
+                        AzfJson.decodeFromString(DerivedTargetsDto.serializer(), json)
+                    }.getOrNull()
+                }
+                _uiState.update { it.copy(targets = decoded) }
+            }
+        }
+    }
+
+    /** Progress snapshot: weight, achievements and the weight sparkline window. */
+    private fun observeProgress() {
         viewModelScope.launch {
             data.progressSummary().collect { summary ->
                 _uiState.update { state ->
@@ -231,6 +292,18 @@ class DashboardViewModel @Inject constructor(
     /** Refresh-on-observe: pull the day, the account and the progress snapshot. */
     fun refresh() {
         val localDate = syncToToday()
+        refreshDay(localDate)
+        viewModelScope.launch { data.refreshProfile() }
+        refreshReadinessAndCoachLine()
+        viewModelScope.launch {
+            data.refreshProgress()
+            _uiState.update { it.copy(achievementsLoading = false) }
+        }
+        refreshTodayWorkout()
+    }
+
+    /** The day roll-up. A failure only surfaces when Room has nothing to show. */
+    private fun refreshDay(localDate: String) {
         viewModelScope.launch {
             when (val day = data.refreshDay(localDate)) {
                 is ApiResult.Success -> _uiState.update {
@@ -247,11 +320,31 @@ class DashboardViewModel @Inject constructor(
                 }
             }
         }
-        viewModelScope.launch { data.refreshProfile() }
+    }
+
+    /** Readiness score and the ambient coach line; both fail quietly. */
+    private fun refreshReadinessAndCoachLine() {
         viewModelScope.launch {
-            data.refreshProgress()
-            _uiState.update { it.copy(achievementsLoading = false) }
+            _uiState.update { it.copy(readinessLoading = true) }
+            when (val result = data.readiness()) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(readiness = result.data, readinessLoading = false)
+                }
+                is ApiResult.Failure -> _uiState.update { it.copy(readinessLoading = false) }
+            }
         }
+        viewModelScope.launch {
+            when (val result = data.progression()) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(coachLine = ambientCoachLine(result.data))
+                }
+                is ApiResult.Failure -> Unit
+            }
+        }
+    }
+
+    /** Today's session card, including the several ways a day counts as rest. */
+    private fun refreshTodayWorkout() {
         viewModelScope.launch {
             when (val envelope = data.todayWorkout()) {
                 is ApiResult.Success -> {
@@ -376,3 +469,7 @@ class DashboardViewModel @Inject constructor(
         const val WEIGHT_WINDOW = 14
     }
 }
+
+private fun ambientCoachLine(status: ProgressionStatusDto): String? =
+    status.reactions.firstOrNull { it.kind in AMBIENT_REACTION_KINDS }?.text
+        ?.takeIf { it.isNotBlank() }

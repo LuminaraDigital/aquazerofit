@@ -55,6 +55,13 @@ object NetworkModule {
     /** Read-gap bound for the SSE chat stream; see [sseClient]. */
     private const val SSE_READ_TIMEOUT_SECONDS = 180L
 
+    /**
+     * Outer bound on one whole call, including retries and the 401 refresh the
+     * authenticator performs mid-call. Not inherited by [sseClient], which
+     * overrides it — see there.
+     */
+    private const val CALL_TIMEOUT_SECONDS = 60L
+
     @Provides
     @Singleton
     @Named("apiBaseUrl")
@@ -72,6 +79,20 @@ object NetworkModule {
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            // Whole-call ceiling, inherited by the api client below.
+            //
+            // connect/read/write bound individual PHASES; none of them bounds a
+            // call that is making slow progress forever, or one parked before a
+            // socket is ever touched — which is exactly the shape the dispatcher
+            // deadlock had. Separate dispatchers make that particular deadlock
+            // structurally impossible, and this makes "hangs forever" not a
+            // state this client can reach at all. Defence in depth, deliberately
+            // redundant with the fix above.
+            //
+            // Deliberately larger than connect + read so an ordinary slow
+            // request is still governed by the specific timeout that describes
+            // it, and this only fires for something genuinely stuck.
+            .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .addInterceptor(headerInterceptor)
             .also(NetworkLogging::apply)
             .build()
@@ -107,6 +128,13 @@ object NetworkModule {
     @Named("sse")
     fun sseClient(@Named("api") base: OkHttpClient): OkHttpClient = base.newBuilder()
         .readTimeout(SSE_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        // The one client that must NOT have a whole-call ceiling. A chat turn
+        // is a single call held open for its entire duration, so the inherited
+        // callTimeout would guillotine long answers mid-sentence at a fixed
+        // wall-clock age regardless of how healthy the stream was. Liveness
+        // here is the read timeout above — a gap between tokens — which is the
+        // right question to ask of a stream.
+        .callTimeout(0, TimeUnit.SECONDS)
         // Its own dispatcher too: an open stream occupies a slot for the whole
         // turn, so sharing the api budget would let a few streams starve
         // ordinary requests.

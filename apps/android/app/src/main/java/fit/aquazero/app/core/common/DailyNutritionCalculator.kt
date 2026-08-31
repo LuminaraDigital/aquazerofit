@@ -24,6 +24,8 @@ data class NutritionTargets(
 data class LocalDailyNutrition(
     val kcalTarget: Double,
     val kcalConsumed: Double,
+    val kcalBurned: Double = 0.0,
+    val kcalNet: Double = kcalConsumed,
     val kcalRemaining: Double,
     val proteinConsumed: Double,
     val proteinTarget: Double,
@@ -43,20 +45,26 @@ data class LocalDailyNutrition(
  */
 object DailyNutritionCalculator {
 
-    /** Fold meal totals + water against targets into ring-ready numbers. */
+    /** Fold meal totals + water + optional burn against targets into ring-ready numbers. */
     fun compute(
         meals: List<MealTotals>,
         waterMl: Int,
         targets: NutritionTargets,
+        kcalBurned: Double = 0.0,
     ): LocalDailyNutrition {
         val kcal = round1(meals.sumOf { it.kcal })
         val protein = round1(meals.sumOf { it.proteinG })
         val carbs = round1(meals.sumOf { it.carbsG })
         val fat = round1(meals.sumOf { it.fatG })
+        val burned = round1(kcalBurned.coerceAtLeast(0.0))
+        val net = round1(kcal - burned)
+        val remaining = round1(max(0.0, targets.kcalTarget - net))
         return LocalDailyNutrition(
             kcalTarget = targets.kcalTarget,
             kcalConsumed = kcal,
-            kcalRemaining = round1(max(0.0, targets.kcalTarget - kcal)),
+            kcalBurned = burned,
+            kcalNet = net,
+            kcalRemaining = remaining,
             proteinConsumed = protein,
             proteinTarget = targets.proteinG,
             carbsConsumed = carbs,

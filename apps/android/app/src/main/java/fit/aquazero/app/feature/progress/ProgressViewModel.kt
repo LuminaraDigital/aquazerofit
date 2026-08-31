@@ -54,6 +54,7 @@ data class ProgressUiState(
     val macros: MacroAverages = MacroAverages(),
     val insight: ProgressInsightDto? = null,
     val insightLoading: Boolean = true,
+    val adaptiveExpenditure: fit.aquazero.app.core.common.AdaptiveExpenditureResult? = null,
 ) {
     val currentWeightKg: Double? get() = summary?.currentWeightKg
 
@@ -120,11 +121,15 @@ class ProgressViewModel @Inject constructor(
     private var cachedProteinSeries: List<TrendPointDto> = emptyList()
     private var cachedCarbsSeries: List<TrendPointDto> = emptyList()
     private var cachedFatSeries: List<TrendPointDto> = emptyList()
+    private var cachedSex: fit.aquazero.app.core.model.Sex = fit.aquazero.app.core.model.Sex.UNSPECIFIED
+    private var cachedTdee: Double = 2000.0
+    private var cachedAdaptiveEnabled: Boolean = false
 
     init {
         observeSummary()
         observeSeries()
         observeTargets()
+        observeProfile()
         refresh()
     }
 
@@ -228,7 +233,35 @@ class ProgressViewModel @Inject constructor(
     private fun observeTargets() {
         viewModelScope.launch {
             profileRepository.targets().collect { targets ->
+                targets?.let {
+                    val decoded = runCatching {
+                        fit.aquazero.app.core.model.AzfJson.decodeFromString(
+                            fit.aquazero.app.core.model.DerivedTargetsDto.serializer(),
+                            it.docJson,
+                        )
+                    }.getOrNull()
+                    cachedTdee = decoded?.tdee ?: it.kcalTarget
+                    cachedAdaptiveEnabled = decoded?.adaptiveEnabled == true
+                }
                 _uiState.value = _uiState.value.copy(kcalTarget = targets?.kcalTarget)
+                recompute()
+            }
+        }
+    }
+
+    private fun observeProfile() {
+        viewModelScope.launch {
+            profileRepository.profile().collect { profile ->
+                profile?.let {
+                    val decoded = runCatching {
+                        fit.aquazero.app.core.model.AzfJson.decodeFromString(
+                            fit.aquazero.app.core.model.WellnessProfileDto.serializer(),
+                            it.docJson,
+                        )
+                    }.getOrNull()
+                    cachedSex = decoded?.sex ?: fit.aquazero.app.core.model.Sex.UNSPECIFIED
+                }
+                recompute()
             }
         }
     }
@@ -248,9 +281,17 @@ class ProgressViewModel @Inject constructor(
 
     private fun recompute() {
         val range = _uiState.value.range
+        val adaptive = adaptiveExpenditureIfEnabled(
+            adaptiveEnabled = cachedAdaptiveEnabled,
+            weightHistory = cachedWeightSeries,
+            calorieHistory = cachedKcalSeries,
+            baselineTdee = cachedTdee,
+            sex = cachedSex,
+        )
         _uiState.value = _uiState.value.copy(
             weightSeries = cutToRange(cachedWeightSeries, range),
             kcalSeries = cutToRange(cachedKcalSeries, range),
+            adaptiveExpenditure = adaptive,
         )
         recomputeMacros()
     }

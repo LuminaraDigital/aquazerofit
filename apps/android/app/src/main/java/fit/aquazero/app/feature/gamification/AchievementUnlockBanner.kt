@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -73,6 +74,7 @@ fun AchievementUnlockBanner(
     visible: Boolean,
     onShown: (Celebration) -> Unit,
     onDismiss: () -> Unit,
+    onShare: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val reducedMotion = rememberReducedMotion()
@@ -147,6 +149,15 @@ fun AchievementUnlockBanner(
                 )
             }
             CoachAvatar(persona = persona, size = 32.dp, contentDescription = null)
+            if (onShare != null) {
+                IconButton(onClick = onShare) {
+                    Icon(
+                        imageVector = Icons.Outlined.IosShare,
+                        contentDescription = stringResource(R.string.achievement_share_cd),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
             IconButton(onClick = onDismiss) {
                 Icon(
                     imageVector = Icons.Outlined.Close,

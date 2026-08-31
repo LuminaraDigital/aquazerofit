@@ -7,10 +7,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.core.model.ExperienceStatusDto
+import fit.aquazero.app.core.ui.CoachRoster
 
 /**
  * Drop-in celebration layer.
@@ -37,10 +39,25 @@ fun CelebrationHost(
     viewModel: CelebrationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     CelebrationLayer(
         state = state,
         onShown = viewModel::onShown,
         onDismiss = viewModel::dismissCurrent,
+        onShareAchievement = { celebration ->
+            val experience = state.experience ?: ExperienceStatusDto()
+            val data = BragCardData(
+                userDisplayName = "",
+                coach = CoachRoster.resolve(celebration.coachId),
+                level = experience.level,
+                consistencyDays = 0,
+                totalWorkouts = 0,
+                recentPr = celebration.reaction,
+            )
+            context.startActivity(
+                BragCardGenerator.createShareIntent(data),
+            )
+        },
         modifier = modifier,
     )
 }
@@ -51,6 +68,7 @@ fun CelebrationLayer(
     state: CelebrationUiState,
     onShown: (Celebration) -> Unit,
     onDismiss: () -> Unit,
+    onShareAchievement: ((Celebration.Achievement) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val current = state.current ?: return
@@ -70,6 +88,7 @@ fun CelebrationLayer(
                 visible = true,
                 onShown = onShown,
                 onDismiss = onDismiss,
+                onShare = onShareAchievement?.let { share -> { share(current) } },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(horizontal = 16.dp, vertical = 12.dp),

@@ -8,6 +8,9 @@ import fit.aquazero.app.core.model.MealLogDto
 import fit.aquazero.app.core.model.MealRecommendationDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.ProgressSummaryDto
+import fit.aquazero.app.core.model.ProgressionStatusDto
+import fit.aquazero.app.core.model.ReadinessAssessmentDto
+import fit.aquazero.app.core.model.ReadinessMode
 import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +23,8 @@ class FakeDashboardData : DashboardData {
     val userFlow = MutableStateFlow<UserEntity?>(null)
     val summaryFlow = MutableStateFlow<ProgressSummaryDto?>(null)
     val weightFlow = MutableStateFlow<List<Double>>(emptyList())
+    val profileFlow = MutableStateFlow<fit.aquazero.app.core.database.ProfileEntity?>(null)
+    val targetsFlow = MutableStateFlow<fit.aquazero.app.core.database.TargetsEntity?>(null)
 
     var dayResult: ApiResult<DailyNutritionDto> = ApiResult.Failure.Network(IOException("offline"))
     var progressResult: ApiResult<ProgressSummaryDto> = ApiResult.Success(ProgressSummaryDto())
@@ -35,9 +40,18 @@ class FakeDashboardData : DashboardData {
     val suggestedFor = mutableListOf<MealType>()
     var profileRefreshes = 0
 
+    var readinessResult: ApiResult<ReadinessAssessmentDto> =
+        ApiResult.Success(ReadinessAssessmentDto(mode = ReadinessMode.MAINTAIN, score = 50, headline = "Steady week"))
+    var progressionResult: ApiResult<ProgressionStatusDto> =
+        ApiResult.Success(ProgressionStatusDto())
+
     override fun dailyNutrition(localDate: String): Flow<LocalDailyNutrition> = nutritionFlow
 
     override fun user(): Flow<UserEntity?> = userFlow
+
+    override fun profile(): Flow<fit.aquazero.app.core.database.ProfileEntity?> = profileFlow
+
+    override fun targets(): Flow<fit.aquazero.app.core.database.TargetsEntity?> = targetsFlow
 
     override fun progressSummary(): Flow<ProgressSummaryDto?> = summaryFlow
 
@@ -65,6 +79,10 @@ class FakeDashboardData : DashboardData {
 
     override suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto> =
         logRecommendationResult
+
+    override suspend fun readiness(): ApiResult<ReadinessAssessmentDto> = readinessResult
+
+    override suspend fun progression(): ApiResult<ProgressionStatusDto> = progressionResult
 
     companion object {
         val EMPTY_DAY = LocalDailyNutrition(

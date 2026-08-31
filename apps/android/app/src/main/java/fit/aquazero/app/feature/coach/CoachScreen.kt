@@ -112,6 +112,7 @@ fun CoachScreen(
     val proposeFailed = stringResource(R.string.draft_propose_failed)
     val mealLogged = stringResource(R.string.meal_logged)
     val draftRestored = stringResource(R.string.draft_restored)
+    val aiDegraded = stringResource(R.string.ai_degraded_notice)
 
     // rememberSaveable, not remember: dictation writes here, and losing a
     // spoken message to a backgrounded app means saying it all again.
@@ -179,13 +180,16 @@ fun CoachScreen(
                         CoachToast.ProposeFailed -> proposeFailed
                         CoachToast.MealLogged -> mealLogged
                         CoachToast.DraftRestored -> draftRestored
+                        CoachToast.AiDegraded -> aiDegraded
                     }
                     val kind = when (event.message) {
                         CoachToast.ReportFailed,
                         CoachToast.DraftFailed,
                         CoachToast.ProposeFailed,
                         -> ToastKind.Error
-                        CoachToast.DraftRestored -> ToastKind.Info
+                        CoachToast.DraftRestored,
+                        CoachToast.AiDegraded,
+                        -> ToastKind.Info
                         else -> ToastKind.Success
                     }
                     toasts.show(message, kind)

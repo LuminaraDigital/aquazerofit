@@ -82,8 +82,8 @@ sealed interface TabKey : NavKey
 /** Coach character select. */
 @Serializable data object CoachSelectKey : NavKey
 
-/** Buddy challenges. */
-@Serializable data object ChallengesKey : NavKey
+/** Buddy challenges. [joinCode] pre-fills the join field from a deep link. */
+@Serializable data class ChallengesKey(val joinCode: String? = null) : NavKey
 
 /** Settings root. */
 @Serializable data object SettingsKey : NavKey
@@ -96,3 +96,6 @@ sealed interface TabKey : NavKey
 
 /** Plan / entitlements read-only screen. */
 @Serializable data object PlanEntitlementsKey : NavKey
+
+/** Health Connect permissions and sync. */
+@Serializable data object HealthConnectKey : NavKey

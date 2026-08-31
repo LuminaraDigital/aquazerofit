@@ -429,6 +429,15 @@ export const config = {
     if (override === 'false' || override === '0') return false;
     return hasAnyAiProviderKey();
   },
+
+  /**
+   * When true, derived targets incorporate adaptive expenditure from logged
+   * weight and food once at least seven qualifying days exist.
+   */
+  get adaptiveTargets(): boolean {
+    const raw = process.env.ADAPTIVE_TARGETS?.trim().toLowerCase();
+    return raw === 'true' || raw === '1';
+  },
 };
 
 /** True when at least one configured AI provider has a non-empty API key. */

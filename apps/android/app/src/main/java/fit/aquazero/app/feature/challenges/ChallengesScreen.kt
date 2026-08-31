@@ -75,6 +75,7 @@ import fit.aquazero.app.feature.dashboard.rememberToastSink
 @Composable
 fun ChallengesScreen(
     onBack: () -> Unit,
+    initialJoinCode: String? = null,
     modifier: Modifier = Modifier,
     viewModel: ChallengesViewModel = hiltViewModel(),
 ) {
@@ -83,6 +84,12 @@ fun ChallengesScreen(
     val resources = LocalResources.current
     val toasts = rememberToastSink()
     val copied = stringResource(R.string.challenges_code_copied)
+
+    LaunchedEffect(initialJoinCode) {
+        if (!initialJoinCode.isNullOrBlank()) {
+            viewModel.prefillJoinCode(initialJoinCode)
+        }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
@@ -383,9 +390,10 @@ private fun statusLabel(status: BuddyChallengeStatus): Int = when (status) {
     BuddyChallengeStatus.EXPIRED -> R.string.challenges_status_expired
 }
 
-/** Share an invite as plain text — the code is the whole payload. */
+/** Share an invite as plain text with deep link URL and code. */
 private fun Context.shareInvite(code: String) {
-    val text = getString(R.string.challenges_share_text, code)
+    val url = fit.aquazero.app.core.navigation.DeepLinkStore.joinChallengeUrl(code)
+    val text = getString(R.string.challenges_share_text, url, code)
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, text)

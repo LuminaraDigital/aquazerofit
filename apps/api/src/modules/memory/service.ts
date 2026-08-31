@@ -300,3 +300,61 @@ export async function getMemoryForPrompt(
   if (summary.length === 0 && confirmedFacts.length === 0) return null;
   return { summary, confirmedFacts };
 }
+
+/** Plain-language portion facts store grams only; refId is the foodId. */
+function parsePortionGrams(text: string): number | null {
+  const match = normaliseFactText(text).match(/^(\d+(?:\.\d+)?)\s*g$/i);
+  if (!match) return null;
+  const grams = Math.round(Number(match[1]));
+  return Number.isFinite(grams) && grams > 0 ? grams : null;
+}
+
+/**
+ * Last confirmed portion for [foodId], if the user corrected one before.
+ * Reads only; never lazy-creates a memory doc.
+ */
+export function getRememberedPortionGrams(userId: string, foodId: string): number | null {
+  const memory = getStore().byId<MemoryDoc>('ai', memoryId(userId));
+  if (!memory) return null;
+  const fact = memory.facts
+    .filter(
+      (f) =>
+        f.category === 'preference' &&
+        f.status === 'confirmed' &&
+        f.source.refId === foodId,
+    )
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  if (!fact) return null;
+  return parsePortionGrams(fact.text);
+}
+
+/** Persist a portion the user chose on confirm (preference facts keyed by foodId). */
+export function rememberPortionCorrection(userId: string, foodId: string, grams: number): MemoryDoc {
+  const rounded = Math.round(grams);
+  if (rounded <= 0) {
+    throw new AppError('VALIDATION_FAILED', 'Portion grams must be positive.');
+  }
+  const text = `${rounded} g`;
+  return mutateMemory(userId, (memory) => {
+    const existing = memory.facts.find(
+      (f) => f.category === 'preference' && f.source.refId === foodId,
+    );
+    const now = nowIso();
+    if (existing) {
+      existing.text = text;
+      existing.status = 'confirmed';
+      existing.source = { kind: 'log', refId: foodId };
+      existing.updatedAt = now;
+      return;
+    }
+    memory.facts.push({
+      id: newId('mem'),
+      text,
+      category: 'preference',
+      status: 'confirmed',
+      source: { kind: 'log', refId: foodId },
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
+}

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -110,6 +111,10 @@ internal fun GreetingHeader(
 @Composable
 internal fun CalorieHeroCard(
     nutrition: LocalDailyNutrition,
+    kcalBurned: Double = 0.0,
+    proteinFirst: Boolean = false,
+    onExplainTarget: (() -> Unit)? = null,
+    showDerivationRow: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val extended = LocalAzfExtended.current
@@ -117,24 +122,34 @@ internal fun CalorieHeroCard(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.dashboard_nutrition_title).uppercase(),
+                    text = stringResource(
+                        if (proteinFirst) R.string.dashboard_protein_title else R.string.dashboard_nutrition_title,
+                    ).uppercase(),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = stringResource(R.string.dashboard_daily_goal),
+                    text = stringResource(
+                        if (proteinFirst) R.string.dashboard_protein_goal else R.string.dashboard_daily_goal,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = stringResource(R.string.dashboard_consumed).uppercase(),
+                    text = stringResource(
+                        if (proteinFirst) R.string.dashboard_protein_consumed else R.string.dashboard_consumed,
+                    ).uppercase(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = NutritionFormat.fmtInt(nutrition.kcalConsumed),
+                    text = if (proteinFirst) {
+                        NutritionFormat.fmt1(nutrition.proteinConsumed)
+                    } else {
+                        NutritionFormat.fmtInt(nutrition.kcalConsumed)
+                    },
                     style = DataSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -143,11 +158,29 @@ internal fun CalorieHeroCard(
 
         Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
 
-        val ringDescription = stringResource(
-            R.string.dashboard_calories_cd,
-            NutritionFormat.fmtInt(nutrition.kcalConsumed),
-            NutritionFormat.fmtInt(nutrition.kcalTarget),
-        )
+        val ringProgress = if (proteinFirst) {
+            NutritionFormat.clampFraction(nutrition.proteinConsumed, nutrition.proteinTarget)
+        } else {
+            NutritionFormat.clampFraction(nutrition.kcalConsumed, nutrition.kcalTarget)
+        }
+        val ringRemaining = if (proteinFirst) {
+            nutrition.proteinTarget - nutrition.proteinConsumed
+        } else {
+            nutrition.kcalRemaining
+        }
+        val ringDescription = if (proteinFirst) {
+            stringResource(
+                R.string.dashboard_protein_cd,
+                NutritionFormat.fmt1(nutrition.proteinConsumed),
+                NutritionFormat.fmt1(nutrition.proteinTarget),
+            )
+        } else {
+            stringResource(
+                R.string.dashboard_calories_cd,
+                NutritionFormat.fmtInt(nutrition.kcalConsumed),
+                NutritionFormat.fmtInt(nutrition.kcalTarget),
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -155,25 +188,29 @@ internal fun CalorieHeroCard(
             contentAlignment = Alignment.Center,
         ) {
             RingProgress(
-                progress = NutritionFormat.clampFraction(
-                    nutrition.kcalConsumed,
-                    nutrition.kcalTarget,
-                ),
+                progress = ringProgress,
                 size = 180.dp,
                 strokeWidth = 8.dp,
+                color = if (proteinFirst) extended.secondaryFixedDim else extended.primaryFixedDim,
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.clearAndSetSemantics { },
                 ) {
                     Text(
-                        text = NutritionFormat.fmtInt(nutrition.kcalRemaining.coerceAtLeast(0.0)),
+                        text = if (proteinFirst) {
+                            NutritionFormat.fmt1(ringRemaining.coerceAtLeast(0.0))
+                        } else {
+                            NutritionFormat.fmtInt(ringRemaining.coerceAtLeast(0.0))
+                        },
                         style = DataLarge,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = if (proteinFirst) extended.secondaryFixedDim else MaterialTheme.colorScheme.primary,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = stringResource(R.string.dashboard_kcal_left).uppercase(),
+                        text = stringResource(
+                            if (proteinFirst) R.string.dashboard_protein_left else R.string.dashboard_kcal_left,
+                        ).uppercase(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -182,6 +219,23 @@ internal fun CalorieHeroCard(
         }
 
         Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
+
+        if (!proteinFirst && showDerivationRow) {
+            CalorieDerivationRow(
+                nutrition = nutrition,
+                kcalBurned = kcalBurned,
+            )
+            if (onExplainTarget != null) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onExplainTarget) {
+                    Text(
+                        text = stringResource(R.string.target_explain_link),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+            Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
+        }
 
         MacroRow(
             label = stringResource(R.string.macro_protein),
@@ -202,6 +256,86 @@ internal fun CalorieHeroCard(
             consumed = nutrition.fatConsumed,
             target = nutrition.fatTarget,
             color = extended.coral,
+        )
+        if (proteinFirst) {
+            Spacer(Modifier.height(12.dp))
+            MacroRow(
+                label = stringResource(R.string.macro_calories),
+                consumed = nutrition.kcalConsumed,
+                target = nutrition.kcalTarget,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+/** Goal minus food plus exercise equals remaining (matches Nutrition day view). */
+@Composable
+internal fun CalorieDerivationRow(
+    nutrition: LocalDailyNutrition,
+    kcalBurned: Double,
+    modifier: Modifier = Modifier,
+) {
+    val formulaDescription = stringResource(
+        R.string.nutrition_formula_cd,
+        NutritionFormat.fmtInt(nutrition.kcalTarget),
+        NutritionFormat.fmtInt(nutrition.kcalConsumed),
+        NutritionFormat.fmtInt(kcalBurned),
+        NutritionFormat.fmtInt(nutrition.kcalRemaining),
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = formulaDescription },
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        DerivationCell(
+            value = NutritionFormat.fmtInt(nutrition.kcalTarget),
+            label = stringResource(R.string.nutrition_goal),
+            modifier = Modifier.weight(1f),
+        )
+        DerivationCell(
+            value = "− ${NutritionFormat.fmtInt(nutrition.kcalConsumed)}",
+            label = stringResource(R.string.nutrition_food),
+            modifier = Modifier.weight(1f),
+        )
+        DerivationCell(
+            value = "+ ${NutritionFormat.fmtInt(kcalBurned)}",
+            label = stringResource(R.string.nutrition_exercise),
+            modifier = Modifier.weight(1f),
+        )
+        DerivationCell(
+            value = NutritionFormat.fmtInt(nutrition.kcalRemaining),
+            label = stringResource(R.string.nutrition_remaining),
+            accent = true,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun DerivationCell(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    accent: Boolean = false,
+) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = DataSmall,
+            color = if (accent) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+        )
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 2.dp),
         )
     }
 }
@@ -674,7 +808,9 @@ private val previewNutrition = LocalDailyNutrition(
 @Composable
 private fun CalorieHeroCardPreview() {
     AzfTheme {
-        Column(Modifier.padding(16.dp)) { CalorieHeroCard(previewNutrition) }
+        Column(Modifier.padding(16.dp)) {
+            CalorieHeroCard(previewNutrition, kcalBurned = 320.0)
+        }
     }
 }
 

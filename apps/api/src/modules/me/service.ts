@@ -17,8 +17,16 @@ import { config } from '../../platform/config';
 import { getStore, newId, type ContainerName } from '../../platform/store';
 import { revokeAllForUser, sha256Hex } from '../../platform/auth';
 import { computeTargets } from './targets';
+import {
+  ADAPTIVE_FORMULA_VERSION,
+  calculateAdaptiveExpenditure,
+  goalAdjustmentKcal,
+} from './adaptive';
 import { removeUserFromChallenges } from '../challenges/service';
 import { effectiveTier } from '../billing/entitlements';
+import { addDays } from '../../platform/dates';
+import type { TrendPoint } from '@aquazerofit/shared';
+import { mealLogsForDate, weightLogsInRange } from '../logs/service';
 
 export type ProfileDoc = WellnessProfile & { id: string; type: 'wellnessProfile' };
 export type TargetsDoc = DerivedTargets & { id: string; type: 'derivedTargets' };
@@ -34,6 +42,85 @@ export const profileId = (userId: string): string => `profile-${userId}`;
 export const targetsId = (userId: string): string => `targets-${userId}`;
 export const consentId = (userId: string): string => `consent-${userId}`;
 export const credentialsId = (userId: string): string => `cred-${userId}`;
+
+const ADAPTIVE_LOOKBACK_DAYS = 30;
+
+/** Build daily kcal totals from meal logs over a local-date range (inclusive). */
+function calorieHistoryForUser(userId: string, fromDate: string, toDate: string): TrendPoint[] {
+  const points: TrendPoint[] = [];
+  let cursor = fromDate;
+  while (cursor <= toDate) {
+    const logs = mealLogsForDate(userId, cursor);
+    const total = logs.reduce((s, l) => s + (l.totalKcal ?? 0), 0);
+    if (total > 0) points.push({ date: cursor, value: total });
+    cursor = addDays(cursor, 1);
+  }
+  return points;
+}
+
+/** Weight series as TrendPoints for adaptive expenditure. */
+function weightHistoryForUser(userId: string, fromDate: string, toDate: string): TrendPoint[] {
+  return weightLogsInRange(userId, fromDate, toDate).map((w) => ({
+    date: w.localDate,
+    value: w.weightKg,
+  }));
+}
+
+/**
+ * Optionally layer adaptive expenditure on baseline targets when enabled and
+ * enough logging history exists.
+ */
+function withAdaptiveTargets(profile: ProfileDoc, base: DerivedTargets, today: string): DerivedTargets {
+  if (!config.adaptiveTargets) return base;
+
+  const fromDate = addDays(today, -(ADAPTIVE_LOOKBACK_DAYS - 1));
+  const weightHistory = weightHistoryForUser(profile.userId, fromDate, today);
+  const calorieHistory = calorieHistoryForUser(profile.userId, fromDate, today);
+
+  const goalAdj = goalAdjustmentKcal(profile, base.tdee, base.kcalTarget);
+  const adaptive = calculateAdaptiveExpenditure(
+    weightHistory,
+    calorieHistory,
+    base.tdee,
+    profile.sex,
+    goalAdj,
+  );
+
+  if (adaptive.confidence === 'low' && adaptive.adaptationKcal === 0) {
+    return {
+      ...base,
+      adaptiveEnabled: false,
+      adaptiveReasoning: adaptive.reasoning,
+    };
+  }
+
+  const kcalTarget = Math.round(adaptive.recommendedTargetKcal);
+  const proteinG = base.proteinG;
+  const fatKcal = kcalTarget * 0.2;
+  const fatG = Math.round(fatKcal / 9);
+  const carbsKcal = kcalTarget - proteinG * 4 - fatKcal;
+  const carbsG = carbsKcal > 0 ? Math.round(carbsKcal / 4) : 0;
+
+  return {
+    ...base,
+    tdee: Math.round(adaptive.estimatedTdeeKcal),
+    kcalTarget,
+    carbsG,
+    fatG,
+    formulaVersion: ADAPTIVE_FORMULA_VERSION,
+    adaptiveTdee: adaptive.estimatedTdeeKcal,
+    adaptationKcal: adaptive.adaptationKcal,
+    adaptiveConfidence: adaptive.confidence,
+    adaptiveReasoning: adaptive.reasoning,
+    adaptiveEnabled: true,
+  };
+}
+
+function buildTargets(profile: ProfileDoc, now: Date = new Date()): DerivedTargets {
+  const today = now.toISOString().slice(0, 10);
+  const base = computeTargets(profile, now);
+  return withAdaptiveTargets(profile, base, today);
+}
 
 export function getProfile(userId: string): ProfileDoc | undefined {
   return getStore().byId<ProfileDoc>('profiles', profileId(userId));
@@ -107,7 +194,7 @@ export function saveProfile(userId: string, input: ProfileInput): { profile: Pro
   const targets: TargetsDoc = {
     id: targetsId(userId),
     type: 'derivedTargets',
-    ...computeTargets(profile),
+    ...buildTargets(profile),
   };
   store.upsert('profiles', targets);
   return { profile, targets };
@@ -136,7 +223,7 @@ export function getTargets(userId: string): TargetsDoc {
   const targets: TargetsDoc = {
     id: targetsId(userId),
     type: 'derivedTargets',
-    ...computeTargets(profile),
+    ...buildTargets(profile),
   };
   store.upsert('profiles', targets);
   return targets;

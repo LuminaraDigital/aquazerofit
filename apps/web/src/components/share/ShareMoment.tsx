@@ -17,6 +17,7 @@ import {
   type ShareCardPayload,
 } from '@/lib/shareCard';
 import { buildShareUrl, getAttribution, inviteRefFromUserId } from '@/lib/attribution';
+import { joinChallengeUrl } from '@/lib/challenges';
 import { trackGrowth } from '@/lib/growth';
 import { haptic, openTelegramLink } from '@/lib/telegram';
 
@@ -70,6 +71,9 @@ export function ShareMoment({
   }, [open, payload, toast]);
 
   const shareUrl = (): string => {
+    if (challengeCode && payload?.kind === 'challenge') {
+      return joinChallengeUrl(challengeCode);
+    }
     const attr = getAttribution();
     return buildShareUrl(invitePath, {
       ref: userId ? inviteRefFromUserId(userId) : attr.ref,

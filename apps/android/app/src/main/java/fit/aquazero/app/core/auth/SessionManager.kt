@@ -1,5 +1,6 @@
 package fit.aquazero.app.core.auth
 
+import fit.aquazero.app.core.common.backgroundFailureHandler
 import fit.aquazero.app.core.data.LocalCachePurger
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.LoginRequest
@@ -44,7 +45,10 @@ class SessionManager @Inject constructor(
     private val refreshCoordinator: RefreshCoordinator,
     private val localCachePurger: LocalCachePurger,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // See AzfApplication: SupervisorJob alone does not stop an exception at the
+    // top of a coroutine from reaching the default uncaught handler.
+    private val scope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Default + backgroundFailureHandler)
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Unknown)
 

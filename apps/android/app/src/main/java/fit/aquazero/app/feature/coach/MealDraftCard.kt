@@ -34,11 +34,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
+import fit.aquazero.app.core.common.MealTrust
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfChip
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.ConfidenceBandChip
 import fit.aquazero.app.core.designsystem.DataSmall
+import fit.aquazero.app.core.designsystem.FatCautionBanner
 import fit.aquazero.app.core.designsystem.GramsStepper
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
@@ -51,6 +54,19 @@ import fit.aquazero.app.core.model.ChatMealItemStatus
 import fit.aquazero.app.core.model.ChatMealMatchDto
 import fit.aquazero.app.core.model.GramsBasis
 import fit.aquazero.app.core.model.MealType
+import kotlin.math.roundToInt
+
+/** A user-applied cooking-fat line (never auto-injected by the server). */
+private data class CookingFatLine(
+    val key: String,
+    val preset: MealTrust.CookingFatPreset,
+    val grams: Int,
+)
+
+private fun projectPresetKcal(preset: MealTrust.CookingFatPreset, grams: Int): Int {
+    if (preset.grams <= 0.0) return 0
+    return (preset.kcal * grams / preset.grams).roundToInt()
+}
 
 /** What the card hands back when the user commits. */
 data class MealDraftConfirmation(
@@ -89,10 +105,33 @@ fun MealDraftCard(
     }
     // Never pre-ticked, and reset whenever the selection changes underneath it.
     var acknowledged by remember(draft.id) { mutableStateOf(false) }
+    var fatAdditives by remember(draft.id) { mutableStateOf(emptyList<CookingFatLine>()) }
 
     val selections = MealDraftModel.selections(draft, choices)
     val conflicts = MealDraftModel.conflicts(draft, choices)
-    val totalKcal = MealDraftModel.totalKcal(draft, choices)
+    val draftKcal = MealDraftModel.totalKcal(draft, choices)
+    val additiveKcal = fatAdditives.sumOf { projectPresetKcal(it.preset, it.grams) }
+    val totalKcal = draftKcal + additiveKcal
+    val includedNames = draft.items.mapNotNull { item ->
+        val choice = choices[item.id] ?: return@mapNotNull null
+        if (!choice.included) return@mapNotNull null
+        MealDraftModel.matchOf(item, choice.foodId)?.name ?: item.phrase
+    } + fatAdditives.map { it.preset.label }
+    val draftFatG = draft.items.sumOf { item ->
+        val choice = choices[item.id] ?: return@sumOf 0.0
+        if (!choice.included) return@sumOf 0.0
+        val match = MealDraftModel.matchOf(item, choice.foodId) ?: return@sumOf 0.0
+        val grams = MealDraftModel.gramsOf(item, choice) ?: match.grams.toInt()
+        if (match.grams <= 0.0) 0.0 else match.fatG * grams / match.grams
+    }
+    val additiveFatG = fatAdditives.sumOf { line ->
+        if (line.preset.grams <= 0.0) 0.0 else line.preset.fatG * line.grams / line.preset.grams
+    }
+    val showFatCaution = MealTrust.shouldShowFatCaution(
+        includedNames,
+        totalKcal.toDouble(),
+        draftFatG + additiveFatG,
+    )
     val canConfirm = MealDraftModel.canConfirm(draft, choices, acknowledged) && !pending
     val awaitingChoice = MealDraftModel.awaitingChoice(draft, choices)
 
@@ -130,6 +169,36 @@ fun MealDraftCard(
 
         Spacer(Modifier.height(14.dp))
 
+        if (showFatCaution) {
+            FatCautionBanner()
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.trust_add_cooking_fat),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 6.dp),
+            ) {
+                MealTrust.cookingFatPresets.forEach { preset ->
+                    AzfChip(
+                        text = preset.label,
+                        selected = false,
+                        onClick = {
+                            fatAdditives = fatAdditives + CookingFatLine(
+                                key = "fat-${preset.id}-${System.currentTimeMillis()}",
+                                preset = preset,
+                                grams = preset.grams.roundToInt(),
+                            )
+                            acknowledged = false
+                        },
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
         draft.items.forEach { item ->
             DraftItemRow(
                 item = item,
@@ -147,6 +216,23 @@ fun MealDraftCard(
                 },
                 onGramsChange = { grams -> update(item.id) { it.copy(grams = grams) } },
                 onLogManually = onLogManually,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        }
+
+        fatAdditives.forEach { line ->
+            CookingFatRow(
+                line = line,
+                onGramsChange = { grams ->
+                    fatAdditives = fatAdditives.map {
+                        if (it.key == line.key) it.copy(grams = grams) else it
+                    }
+                    acknowledged = false
+                },
+                onRemove = {
+                    fatAdditives = fatAdditives.filter { it.key != line.key }
+                    acknowledged = false
+                },
                 modifier = Modifier.padding(bottom = 10.dp),
             )
         }
@@ -190,9 +276,20 @@ fun MealDraftCard(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = stringResource(R.string.draft_kcal, totalKcal),
+                text = stringResource(
+                    R.string.draft_kcal,
+                    if (fatAdditives.isEmpty()) totalKcal else draftKcal,
+                ),
                 style = DataSmall,
                 color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        if (fatAdditives.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.trust_fat_total_hint, totalKcal),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
 
@@ -298,10 +395,23 @@ private fun DraftItemRow(
 
         if (match != null) {
             if (item.status == ChatMealItemStatus.RESOLVED) {
-                Text(
-                    text = match.name,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(
+                    modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = match.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (match.score > 0) {
+                        ConfidenceBandChip(score = match.score)
+                    }
+                }
+            } else if (match.score > 0) {
+                ConfidenceBandChip(
+                    score = match.score,
                     modifier = Modifier.padding(top = 6.dp, start = 4.dp),
                 )
             }
@@ -403,6 +513,61 @@ private fun FoodPicker(
                     )
                 }
             }
+        }
+    }
+}
+
+/** Editable cooking-fat row the user appended from a preset chip. */
+@Composable
+private fun CookingFatRow(
+    line: CookingFatLine,
+    onGramsChange: (Int) -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(AzfShapes.Inner)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                AzfShapes.Inner,
+            )
+            .padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = line.preset.label,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = stringResource(R.string.trust_cooking_fat_remove),
+                style = MaterialTheme.typography.labelLarge,
+                color = LocalAzfExtended.current.primaryFixedDim,
+                modifier = Modifier.clickable(onClick = onRemove),
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GramsStepper(
+                grams = line.grams,
+                onGramsChange = onGramsChange,
+                min = MealDraftModel.MIN_GRAMS,
+                max = MealDraftModel.MAX_GRAMS,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = stringResource(R.string.draft_kcal, projectPresetKcal(line.preset, line.grams)),
+                style = DataSmall,
+                color = LocalAzfExtended.current.primaryFixedDim,
+            )
         }
     }
 }

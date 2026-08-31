@@ -12,6 +12,7 @@ export type Goal = 'lose' | 'maintain' | 'gain';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'veryActive';
 export type ExerciseExperience = 'beginner' | 'intermediate' | 'advanced';
 export type UnitPreference = 'metric' | 'imperial';
+export type NutritionEmphasis = 'standard' | 'protein_first';
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type UserRole = 'user' | 'admin';
 export type UserTier = 'free' | 'premium';
@@ -123,6 +124,8 @@ export interface WellnessProfile {
   allergies: Allergen[];
   equipment: Equipment[];
   unitPreference: UnitPreference;
+  /** When `protein_first`, meal suggestions and the dashboard ring prioritise protein. */
+  nutritionEmphasis?: NutritionEmphasis;
   targetWeightKg?: number;
   updatedAt: string;
 }
@@ -140,6 +143,12 @@ export interface DerivedTargets {
   clampReason: string | null;
   computedAt: string;
   formulaVersion: string;
+  /** Present when adaptive expenditure was applied server-side. */
+  adaptiveTdee?: number;
+  adaptationKcal?: number;
+  adaptiveConfidence?: 'high' | 'moderate' | 'low';
+  adaptiveReasoning?: string;
+  adaptiveEnabled?: boolean;
 }
 
 // ---------- content container ----------

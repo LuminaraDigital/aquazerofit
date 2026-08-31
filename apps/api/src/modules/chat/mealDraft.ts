@@ -47,6 +47,8 @@ export interface ChatMealMatch {
   gramsBasis: GramsBasis;
   /** The `commonServings` label the grams came from, when one was used. */
   servingLabel: string | null;
+  /** Corpus match score 0-100 from `scoreFood`; surfaced for trust UI. */
+  score: number;
   kcal: number;
   proteinG: number;
   carbsG: number;
@@ -513,6 +515,7 @@ export function buildMatch(
   quantity: number,
   unit: string,
   allergies: readonly Allergen[],
+  matchScore: number,
 ): ChatMealMatch {
   const { grams, basis, servingLabel } = gramsFor(food, quantity, unit);
   return {
@@ -521,6 +524,7 @@ export function buildMatch(
     grams,
     gramsBasis: basis,
     servingLabel,
+    score: matchScore,
     ...nutritionFor(food, grams),
     allergenConflicts: allergenConflictsFor(food, allergies),
   };
@@ -532,8 +536,11 @@ export function buildDraftItems(
   allergies: readonly Allergen[],
 ): ChatMealItem[] {
   return candidates.slice(0, MAX_DRAFT_ITEMS).map((candidate, index) => {
+    const queryTokens = tokensOf(candidate.foodName);
     const matched = matchCorpus(candidate.foodName, foods);
-    const matches = matched.map((food) => buildMatch(food, candidate.quantity, candidate.unit, allergies));
+    const matches = matched.map((food) =>
+      buildMatch(food, candidate.quantity, candidate.unit, allergies, scoreFood(queryTokens, food)),
+    );
     const status: ChatMealItemStatus =
       matches.length === 0 ? 'unmatched' : matches.length === 1 ? 'resolved' : 'ambiguous';
     return {
@@ -546,6 +553,37 @@ export function buildDraftItems(
       matches,
       suggestedFoodId: status === 'resolved' ? (matches[0] as ChatMealMatch).foodId : null,
     };
+  });
+}
+
+/**
+ * Prefer a remembered portion when the user corrected this food before.
+ * Nutrition is recomputed from the corpus; allergens are unchanged.
+ */
+export function applyRememberedPortions(
+  items: readonly ChatMealItem[],
+  foods: readonly Food[],
+  rememberedGrams: (foodId: string) => number | null | undefined,
+): ChatMealItem[] {
+  const foodById = new Map(foods.map((f) => [f.id, f]));
+  return items.map((item) => {
+    const matches = item.matches.map((match) => {
+      const remembered = rememberedGrams(match.foodId);
+      if (remembered == null) return match;
+      const food = foodById.get(match.foodId);
+      if (!food) return match;
+      const grams = Math.round(remembered);
+      return {
+        ...match,
+        grams,
+        gramsBasis: 'assumed' as GramsBasis,
+        servingLabel: null,
+        ...nutritionFor(food, grams),
+      };
+    });
+    const suggestedFoodId =
+      item.status === 'resolved' && matches[0] ? matches[0].foodId : item.suggestedFoodId;
+    return { ...item, matches, suggestedFoodId };
   });
 }
 

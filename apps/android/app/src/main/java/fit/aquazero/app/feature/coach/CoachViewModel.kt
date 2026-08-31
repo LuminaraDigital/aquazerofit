@@ -94,6 +94,7 @@ enum class CoachToast {
     ProposeFailed,
     MealLogged,
     DraftRestored,
+    AiDegraded,
 }
 
 /**
@@ -353,8 +354,12 @@ class CoachViewModel @Inject constructor(
                 sessionId = _uiState.value.sessionId,
             )
             _uiState.value = when (result) {
-                is ApiResult.Success ->
+                is ApiResult.Success -> {
+                    if (result.data.draft.ai?.degraded == true) {
+                        _events.send(CoachEvent.Toast(CoachToast.AiDegraded))
+                    }
                     _uiState.value.copy(proposingDraft = false, draft = result.data.draft)
+                }
                 is ApiResult.Failure -> {
                     _events.send(CoachEvent.Toast(CoachToast.ProposeFailed))
                     _uiState.value.copy(proposingDraft = false)

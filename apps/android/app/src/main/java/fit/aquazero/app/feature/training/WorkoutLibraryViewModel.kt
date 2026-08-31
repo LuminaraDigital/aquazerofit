@@ -92,6 +92,8 @@ data class WorkoutLibraryUiState(
     val generateDaysPerWeek: Int = 4,
     val generateFocus: String = FOCUS_GENERAL,
     val generating: Boolean = false,
+    val readiness: fit.aquazero.app.core.model.ReadinessAssessmentDto? = null,
+    val readinessLoading: Boolean = true,
 ) {
     val hasMore: Boolean get() = exercises.size < totalMatches
 
@@ -218,6 +220,18 @@ class WorkoutLibraryViewModel @Inject constructor(
         viewModelScope.launch { refreshPlan() }
         viewModelScope.launch { refreshToday() }
         viewModelScope.launch { refreshCatalog() }
+        viewModelScope.launch { refreshReadiness() }
+    }
+
+    private suspend fun refreshReadiness() {
+        _uiState.value = _uiState.value.copy(readinessLoading = true)
+        when (val result = plansRepository.readiness()) {
+            is ApiResult.Success -> _uiState.value = _uiState.value.copy(
+                readiness = result.data.readiness,
+                readinessLoading = false,
+            )
+            is ApiResult.Failure -> _uiState.value = _uiState.value.copy(readinessLoading = false)
+        }
     }
 
     fun onSearchChange(value: String) = updateFilters { it.copy(search = value) }

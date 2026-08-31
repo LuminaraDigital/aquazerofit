@@ -74,7 +74,25 @@ class ChallengesViewModel @Inject constructor(
     val events: Flow<ChallengesEvent> = _events.receiveAsFlow()
 
     init {
+        observeCached()
         load()
+    }
+
+    private fun observeCached() {
+        viewModelScope.launch {
+            challengesRepository.cachedChallenges().collect { cached ->
+                if (cached.isNotEmpty()) {
+                    _uiState.value = _uiState.value.copy(
+                        challenges = cached,
+                        loading = false,
+                    )
+                }
+            }
+        }
+    }
+
+    fun prefillJoinCode(code: String) {
+        _uiState.value = _uiState.value.copy(joinCode = ChallengesRepository.normaliseCode(code))
     }
 
     /** Refresh the roster; safe to call again from the retry affordance. */

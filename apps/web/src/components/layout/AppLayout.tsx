@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { BottomNav } from '../ui/BottomNav';
 import { AppBackground } from './AppBackground';
+import { DesktopAmbient } from './DesktopAmbient';
 import { ErrorBoundary } from './ErrorBoundary';
 
 /**
@@ -20,6 +21,7 @@ export function AppLayout() {
         </ErrorBoundary>
         <BottomNav />
       </div>
+      <DesktopAmbient />
     </>
   );
 }

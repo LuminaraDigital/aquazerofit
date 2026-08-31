@@ -135,6 +135,10 @@ private class DayKeyedDashboardData : DashboardData {
 
     override fun user(): Flow<UserEntity?> = MutableStateFlow(null)
 
+    override fun profile(): Flow<fit.aquazero.app.core.database.ProfileEntity?> = MutableStateFlow(null)
+
+    override fun targets(): Flow<fit.aquazero.app.core.database.TargetsEntity?> = MutableStateFlow(null)
+
     override fun progressSummary(): Flow<ProgressSummaryDto?> = MutableStateFlow(null)
 
     override fun weightSeries(): Flow<List<Double>> = MutableStateFlow(emptyList())
@@ -161,4 +165,16 @@ private class DayKeyedDashboardData : DashboardData {
 
     override suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto> =
         ApiResult.Failure.Network(IOException("offline"))
+
+    override suspend fun readiness(): ApiResult<fit.aquazero.app.core.model.ReadinessAssessmentDto> =
+        ApiResult.Success(
+            fit.aquazero.app.core.model.ReadinessAssessmentDto(
+                score = 80,
+                headline = "Ready to train",
+                mode = fit.aquazero.app.core.model.ReadinessMode.PROGRESS,
+            ),
+        )
+
+    override suspend fun progression(): ApiResult<fit.aquazero.app.core.model.ProgressionStatusDto> =
+        ApiResult.Success(fit.aquazero.app.core.model.ProgressionStatusDto())
 }

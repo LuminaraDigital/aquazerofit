@@ -6,10 +6,12 @@ import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.common.MealTotals
 import fit.aquazero.app.core.common.NutritionTargets
+import fit.aquazero.app.core.common.kcalBurnedFromSession
 import fit.aquazero.app.core.database.LogsDao
 import fit.aquazero.app.core.database.MealLogEntity
 import fit.aquazero.app.core.database.OutboxEntityTypes
 import fit.aquazero.app.core.database.SyncState
+import fit.aquazero.app.core.database.TrainingDao
 import fit.aquazero.app.core.database.UserDao
 import fit.aquazero.app.core.database.WaterLogEntity
 import fit.aquazero.app.core.database.WeightLogEntity
@@ -35,6 +37,7 @@ import javax.inject.Singleton
 class LogsRepository @Inject constructor(
     private val logsDao: LogsDao,
     private val userDao: UserDao,
+    private val trainingDao: TrainingDao,
     private val outboxRepository: OutboxRepository,
     private val syncScheduler: SyncScheduler,
 ) {
@@ -60,7 +63,8 @@ class LogsRepository @Inject constructor(
         logsDao.mealLogsForDate(localDate),
         logsDao.waterTotalForDate(localDate),
         userDao.targets(),
-    ) { meals, waterMl, targets ->
+        trainingDao.sessionForDate(localDate),
+    ) { meals, waterMl, targets, session ->
         DailyNutritionCalculator.compute(
             meals = meals.map { MealTotals(it.totalKcal, it.totalProteinG, it.totalCarbsG, it.totalFatG) },
             waterMl = waterMl,
@@ -71,6 +75,7 @@ class LogsRepository @Inject constructor(
                 fatG = targets?.fatG ?: 0.0,
                 waterMl = targets?.waterMl ?: 0.0,
             ),
+            kcalBurned = kcalBurnedFromSession(session),
         )
     }
 

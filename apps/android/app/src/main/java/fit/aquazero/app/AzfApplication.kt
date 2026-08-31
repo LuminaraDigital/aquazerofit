@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import fit.aquazero.app.core.common.backgroundFailureHandler
 import fit.aquazero.app.core.data.PlayPurchaseRecovery
 import fit.aquazero.app.core.sync.WorkManagerSyncScheduler
 import fit.aquazero.app.core.telemetry.TelemetryConsentGate
@@ -35,7 +36,13 @@ class AzfApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var playPurchaseRecovery: PlayPurchaseRecovery
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // backgroundFailureHandler, not just SupervisorJob: the supervisor stops a
+    // failing child cancelling its siblings, but an exception reaching the top
+    // of one of these coroutines still falls through to the thread's default
+    // uncaught handler and kills the process. Everything started below runs
+    // here, at startup, with no screen waiting on it.
+    private val appScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Default + backgroundFailureHandler)
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()

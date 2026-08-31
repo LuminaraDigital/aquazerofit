@@ -33,6 +33,20 @@ class DailyNutritionCalculatorTest {
     }
 
     @Test
+    fun `remaining includes burned calories like the server dailyNutrition`() {
+        val result = DailyNutritionCalculator.compute(
+            meals = listOf(MealTotals(kcal = 1500.0, proteinG = 100.0, carbsG = 150.0, fatG = 50.0)),
+            waterMl = 0,
+            targets = targets,
+            kcalBurned = 320.0,
+        )
+        assertEquals(1500.0, result.kcalConsumed, 1e-9)
+        assertEquals(320.0, result.kcalBurned, 1e-9)
+        assertEquals(1180.0, result.kcalNet, 1e-9)
+        assertEquals(820.0, result.kcalRemaining, 1e-9)
+    }
+
+    @Test
     fun `remaining clamps at zero when over target`() {
         val result = DailyNutritionCalculator.compute(
             meals = listOf(MealTotals(kcal = 2400.0, proteinG = 100.0, carbsG = 200.0, fatG = 90.0)),

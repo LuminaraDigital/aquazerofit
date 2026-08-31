@@ -174,6 +174,7 @@ export default function Setup() {
       equipment: profile?.equipment ?? ['none'],
       dietaryPreferences: profile?.dietaryPreferences ?? [],
       allergies: profile?.allergies ?? [],
+      nutritionEmphasis: profile?.nutritionEmphasis ?? 'standard',
       ...(profile?.targetWeightKg != null ? { targetWeightKg: profile.targetWeightKg } : {}),
     };
     const parsed = profileSchema.safeParse(input);

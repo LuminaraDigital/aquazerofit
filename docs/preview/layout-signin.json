@@ -1,0 +1,92 @@
+[
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[85,227]",
+    "key": 3506402
+  },
+  {
+    "text": "WELCOME BACK",
+    "center": "[608,226]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "AquaZeroFit logo",
+    "center": "[540,425]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable",
+      "long-clickable"
+    ],
+    "center": "[540,653]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable",
+      "long-clickable",
+      "password"
+    ],
+    "center": "[540,867]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable"
+    ],
+    "center": "[540,1094]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[540,1243]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[540,1390]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Back",
+    "center": "[84,226]",
+    "key": 3506402
+  },
+  {
+    "text": "Email",
+    "center": "[153,665]",
+    "key": 3506402
+  },
+  {
+    "text": "Password",
+    "center": "[200,879]",
+    "key": 3506402
+  },
+  {
+    "text": "Sign in",
+    "center": "[540,1094]",
+    "key": 3506402
+  },
+  {
+    "text": "Forgot your password?",
+    "center": "[540,1242]",
+    "key": 3506402
+  },
+  {
+    "text": "New here? Create an account",
+    "center": "[540,1389]",
+    "key": 3506402
+  }
+]

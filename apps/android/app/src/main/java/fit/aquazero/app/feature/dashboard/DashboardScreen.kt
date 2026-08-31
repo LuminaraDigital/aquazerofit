@@ -1,5 +1,6 @@
 package fit.aquazero.app.feature.dashboard
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -33,7 +37,9 @@ import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
+import fit.aquazero.app.core.designsystem.ReadinessChip
 import fit.aquazero.app.core.designsystem.revealOnEnter
+import fit.aquazero.app.feature.gamification.CelebrationHost
 
 /**
  * Home. A port of `apps/web/src/pages/dashboard/Dashboard.tsx`, with the
@@ -52,6 +58,7 @@ fun DashboardScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val resources = LocalResources.current
     val toasts = rememberToastSink()
+    var showTargetExplain by remember { mutableStateOf(false) }
 
     // The day can roll over while this screen sits in the back stack. The
     // ViewModel no longer caches "today", but nothing re-reads the clock on
@@ -73,16 +80,30 @@ fun DashboardScreen(
         }
     }
 
-    DashboardContent(
-        state = state,
-        onRetry = viewModel::refresh,
-        onLogWater = { viewModel.logWater() },
-        onSuggestMeal = viewModel::suggestMeal,
-        onLogSuggestion = viewModel::logSuggestion,
-        onCaptureMeal = onCaptureMeal,
-        onOpenWorkout = onOpenWorkout,
-        onOpenProgress = onOpenProgress,
-        modifier = modifier,
+    Box(modifier = modifier.fillMaxSize()) {
+        DashboardContent(
+            state = state,
+            onRetry = viewModel::refresh,
+            onLogWater = { viewModel.logWater() },
+            onSuggestMeal = viewModel::suggestMeal,
+            onLogSuggestion = viewModel::logSuggestion,
+            onCaptureMeal = onCaptureMeal,
+            onOpenWorkout = onOpenWorkout,
+            onOpenProgress = onOpenProgress,
+            onExplainTarget = if (state.targets != null) {
+                { showTargetExplain = true }
+            } else {
+                null
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+        CelebrationHost()
+    }
+
+    TargetExplainSheet(
+        targets = state.targets,
+        visible = showTargetExplain,
+        onDismiss = { showTargetExplain = false },
     )
 }
 
@@ -97,6 +118,7 @@ fun DashboardContent(
     onCaptureMeal: () -> Unit,
     onOpenWorkout: (String?) -> Unit,
     onOpenProgress: () -> Unit,
+    onExplainTarget: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -142,6 +164,16 @@ fun DashboardContent(
 
             Spacer(Modifier.height(AzfSpacing.Gutter))
 
+            ReadinessChip(
+                readiness = state.readiness,
+                loading = state.readinessLoading,
+                modifier = Modifier.revealOnEnter(1),
+            )
+
+            if (state.readiness != null || state.readinessLoading) {
+                Spacer(Modifier.height(AzfSpacing.Gutter))
+            }
+
             when {
                 state.phase == DashboardPhase.Error && !state.hasContent -> {
                     ErrorState(
@@ -159,9 +191,24 @@ fun DashboardContent(
                 }
 
                 else -> {
+                    if (!state.proteinFirst) {
+                        DailyEnergyLoopCard(
+                            nutrition = state.nutrition,
+                            kcalBurned = state.effectiveKcalBurned,
+                            targets = state.targets,
+                            coachLine = state.coachLine,
+                            onExplainTarget = onExplainTarget,
+                            modifier = Modifier.revealOnEnter(2),
+                        )
+                        Spacer(Modifier.height(AzfSpacing.Gutter))
+                    }
                     CalorieHeroCard(
                         nutrition = state.nutrition,
-                        modifier = Modifier.revealOnEnter(1),
+                        kcalBurned = state.effectiveKcalBurned,
+                        proteinFirst = state.proteinFirst,
+                        onExplainTarget = if (state.proteinFirst) onExplainTarget else null,
+                        showDerivationRow = state.proteinFirst,
+                        modifier = Modifier.revealOnEnter(if (state.proteinFirst) 2 else 3),
                     )
                     Spacer(Modifier.height(AzfSpacing.Gutter))
                     HydrationCard(
@@ -169,7 +216,7 @@ fun DashboardContent(
                         targetMl = state.nutrition.waterTargetMl,
                         pending = state.waterPending,
                         onLogWater = onLogWater,
-                        modifier = Modifier.revealOnEnter(2),
+                        modifier = Modifier.revealOnEnter(if (state.proteinFirst) 3 else 4),
                     )
                 }
             }

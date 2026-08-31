@@ -12,6 +12,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +39,8 @@ import fit.aquazero.app.core.designsystem.AzfTab
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.ToastHost
 import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.navigation.DeepLinkStore
+import fit.aquazero.app.core.navigation.PendingDeepLink
 import fit.aquazero.app.feature.challenges.ChallengesScreen
 import fit.aquazero.app.feature.coach.CoachScreen
 import fit.aquazero.app.feature.coach.CoachSelectScreen
@@ -58,6 +61,7 @@ import fit.aquazero.app.feature.settings.MemoryScreen
 import fit.aquazero.app.feature.settings.NotificationSettingsScreen
 import fit.aquazero.app.feature.settings.PlanEntitlementsScreen
 import fit.aquazero.app.feature.settings.SettingsScreen
+import fit.aquazero.app.feature.settings.health.HealthConnectScreen
 import fit.aquazero.app.feature.training.WorkoutLibraryScreen
 import fit.aquazero.app.feature.training.WorkoutSessionScreen
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -93,6 +97,7 @@ class RootViewModel @Inject constructor(
 @HiltViewModel
 class ShellViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
+    val deepLinkStore: DeepLinkStore,
 ) : ViewModel() {
 
     private val _hasProfile = MutableStateFlow<Boolean?>(null)
@@ -173,6 +178,7 @@ private fun MainShell(
 ) {
     val backStack = rememberNavBackStack(DashboardKey)
     val hasProfile by shellViewModel.hasProfile.collectAsStateWithLifecycle()
+    val pendingDeepLink by shellViewModel.deepLinkStore.pending.collectAsStateWithLifecycle()
     val currentKey = backStack.lastOrNull()
     val onTab = currentKey is TabKey
     val selectedTab = when (currentKey) {
@@ -198,6 +204,27 @@ private fun MainShell(
 
     fun pop() {
         backStack.removeLastOrNull()
+    }
+
+    LaunchedEffect(pendingDeepLink) {
+        when (val link = pendingDeepLink) {
+            is PendingDeepLink.JoinChallenge -> {
+                backStack.add(ChallengesKey(joinCode = link.code))
+                shellViewModel.deepLinkStore.consume()
+            }
+            is PendingDeepLink.ShortcutDestination -> {
+                when (link.destination) {
+                    "nutrition" -> switchTab(AzfTab.Nutrition)
+                    "workouts" -> switchTab(AzfTab.Workouts)
+                    "log_weight" -> backStack.add(LogWeightKey)
+                    "capture" -> backStack.add(CaptureMealKey)
+                    "barcode" -> backStack.add(BarcodeKey)
+                    "coach" -> switchTab(AzfTab.Coach)
+                }
+                shellViewModel.deepLinkStore.consume()
+            }
+            null -> Unit
+        }
     }
 
     /** Return to the nutrition day view, dropping whatever sits above it. */
@@ -347,17 +374,21 @@ private fun MainShell(
                             LogWeightScreen(onBack = ::pop, toastController = toastController)
                         }
                         entry<CoachSelectKey> { CoachSelectScreen(onBack = ::pop) }
-                        entry<ChallengesKey> { ChallengesScreen(onBack = ::pop) }
+                        entry<ChallengesKey> { key ->
+                            ChallengesScreen(onBack = ::pop, initialJoinCode = key.joinCode)
+                        }
                         entry<SettingsKey> {
                             SettingsScreen(
                                 onBack = ::pop,
                                 onOpenNotifications = { backStack.add(NotificationSettingsKey) },
+                                onOpenHealth = { backStack.add(HealthConnectKey) },
                                 onOpenMemory = { backStack.add(MemoryKey) },
                                 onOpenPlan = { backStack.add(PlanEntitlementsKey) },
-                                onOpenChallenges = { backStack.add(ChallengesKey) },
+                                onOpenChallenges = { backStack.add(ChallengesKey()) },
                                 onEditBiometrics = { backStack.add(SetupKey) },
                             )
                         }
+                        entry<HealthConnectKey> { HealthConnectScreen(onBack = ::pop) }
                         entry<NotificationSettingsKey> { NotificationSettingsScreen(onBack = ::pop) }
                         entry<MemoryKey> {
                             MemoryScreen(

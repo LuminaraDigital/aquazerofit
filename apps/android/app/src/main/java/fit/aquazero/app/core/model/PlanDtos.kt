@@ -10,6 +10,8 @@ data class AiMetadataDto(
     val promptVersion: String = "",
     val confidence: Double? = null,
     val generatedAt: String = "",
+    /** True when output came from the offline engine after provider failure. */
+    val degraded: Boolean? = null,
 )
 
 /** Mirrors TS `SlotEntry`. */

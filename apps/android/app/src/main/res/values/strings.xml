@@ -364,17 +364,30 @@
     <string name="dashboard_greeting">Hey</string>
     <string name="dashboard_greeting_named">Hey, %1$s</string>
     <string name="dashboard_nutrition_title">Nutrition</string>
+    <string name="dashboard_protein_title">Protein</string>
     <string name="dashboard_daily_goal">Daily goal</string>
+    <string name="dashboard_protein_goal">Protein target</string>
     <string name="dashboard_consumed">Consumed</string>
+    <string name="dashboard_protein_consumed">Protein logged</string>
     <string name="dashboard_kcal_left">kcal left</string>
+    <string name="dashboard_protein_left">g left</string>
+    <string name="dashboard_protein_cd">Daily protein: %1$s of %2$s grams consumed</string>
     <string name="dashboard_error_title">Today didn\'t load</string>
     <string name="dashboard_error_message">Everything you log is safe on this device and syncs when you\'re back online.</string>
     <string name="dashboard_calories_cd">Daily calories: %1$s of %2$s kilocalories consumed</string>
     <string name="dashboard_mascot">Akin, your training companion</string>
     <string name="fab_capture_meal">Scan a meal with your camera</string>
+    <string name="target_explain_link">Why this target?</string>
+    <string name="target_explain_title">Why this target</string>
+    <string name="target_explain_bmr">Basal metabolic rate (BMR)</string>
+    <string name="target_explain_tdee">Total daily energy (TDEE)</string>
+    <string name="target_explain_goal">Your calorie target</string>
+    <string name="target_explain_adaptive">Adaptive adjustment</string>
+    <string name="target_explain_close">Got it</string>
 
     <!-- Macro semantics are fixed: protein green, carbs aqua, fat coral -->
     <string name="macro_protein">Protein</string>
+    <string name="macro_calories">Calories</string>
     <string name="macro_carbs">Carbs</string>
     <string name="macro_fat">Fat</string>
     <string name="macro_progress_cd">%1$s: %2$d of %3$d grams</string>
@@ -649,6 +662,7 @@
     <string name="draft_title">Ready to log</string>
     <string name="draft_source">From “%1$s”. Nothing is saved until you tap Log meal.</string>
     <string name="draft_restored">You have a meal waiting to be confirmed.</string>
+    <string name="ai_degraded_notice">Using offline estimates. No credits were used for this draft.</string>
     <string name="draft_empty_body">I couldn\'t read a meal out of that. Try naming the foods and roughly how much, like “two eggs on toast and a flat white”.</string>
     <string name="draft_log_manually">Log it manually</string>
     <string name="draft_dismiss">Not this</string>
@@ -671,6 +685,16 @@
     <string name="draft_propose_failed">Could not read that as a meal. Please try again.</string>
     <string name="draft_pick_food_first">Pick a food for each line you want logged.</string>
     <string name="draft_grams_cd">Grams of %1$s</string>
+
+    <!-- Confirm-first trust layer -->
+    <string name="trust_fat_caution">Photo and AI estimates often miss cooking oil and sauces. Add fat if needed and confirm portions.</string>
+    <string name="trust_fat_caution_cd">Important: photo and AI meal estimates often miss cooking oil and sauces. Review fat and portions before you confirm this log.</string>
+    <string name="trust_confidence_band">%1$s · %2$d</string>
+    <string name="trust_confidence_cd">Match confidence: %1$s, score %2$d</string>
+    <string name="trust_add_cooking_fat">Add cooking fat if needed:</string>
+    <string name="trust_cooking_fat_remove">Remove</string>
+    <string name="trust_fat_total_hint">With cooking fat estimates: %1$d kcal (adjust matched foods before logging)</string>
+    <string name="barcode_trust_copy">Label values are per 100 g. Confirm your portion before logging.</string>
 
     <!-- ===================================================================
          Character select
@@ -994,6 +1018,7 @@
     <string name="settings_weight_metric">%1$s kg</string>
     <string name="settings_weight_imperial">%1$s lb</string>
     <string name="settings_preferences_heading">Preferences</string>
+    <string name="settings_target_explain_body">See how BMR, activity, and adaptive adjustments set your calorie target.</string>
     <string name="settings_units">Units</string>
     <string name="settings_notifications">Notifications &amp; reminders</string>
     <string name="settings_notifications_body">Meal, water, workout and weigh-in nudges.</string>
@@ -1190,6 +1215,7 @@
     <string name="plan_difference_heading">What premium changes</string>
     <string name="plan_difference_heading_premium">What premium gives you</string>
     <string name="plan_no_lanes">Nothing is held back from the free plan at the moment — every feature in the app is available to you.</string>
+    <string name="plan_free_forever_note">Logging meals, water, weight and workouts, your targets, training plans and coach chat stay free forever. Premium only adds optional AI lanes — it never takes away what you already use.</string>
     <string name="plan_lane_on">On</string>
     <string name="plan_lane_locked">Premium</string>
     <string name="plan_lane_insight_title">A coach-written weekly note</string>
@@ -1254,7 +1280,17 @@
     <string name="challenges_copy_code">Copy code</string>
     <string name="challenges_code_copied">Code copied.</string>
     <string name="challenges_share_code">Share invite</string>
-    <string name="challenges_share_text">Join my AquaZeroFit huddle with the code %1$s</string>
+    <string name="challenges_share_text">Join my AquaZeroFit huddle:\n%1$s\nCode: %2$s</string>
+
+    <!-- Readiness (Protect / Maintain / Progress) -->
+    <string name="readiness_mode_protect">Protect</string>
+    <string name="readiness_mode_maintain">Maintain</string>
+    <string name="readiness_mode_progress">Progress</string>
+    <string name="readiness_week_label">%1$s week</string>
+    <string name="readiness_show_why">Why</string>
+    <string name="readiness_hide_why">Hide</string>
+    <string name="energy_loop_adaptive_delta">Adaptive adjustment: %1$s%2$s kcal this week</string>
+    <string name="achievement_share_cd">Share achievement</string>
     <string name="challenges_created">Huddle %1$s is ready — share the code.</string>
     <string name="challenges_create_failed">Could not create the huddle. Please try again.</string>
     <string name="challenges_joined">Joined the huddle.</string>
@@ -1323,6 +1359,10 @@
 
     <!-- Settings: profile preference chips -->
     <string name="settings_dietary_heading">Dietary preferences</string>
+    <string name="settings_nutrition_emphasis_heading">Dashboard focus</string>
+    <string name="settings_nutrition_emphasis_body">Protein-first puts your protein ring front and centre on Home and steers meal suggestions toward higher-protein options.</string>
+    <string name="settings_nutrition_emphasis_standard">Calories</string>
+    <string name="settings_nutrition_emphasis_protein">Protein first</string>
     <string name="settings_allergies_heading">Allergies</string>
     <string name="settings_allergies_body">Selected allergens are strictly excluded from every suggestion.</string>
     <string name="diet_vegetarian">Vegetarian</string>

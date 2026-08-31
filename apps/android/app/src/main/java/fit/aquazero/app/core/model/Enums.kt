@@ -54,6 +54,12 @@ enum class UnitPreference {
 }
 
 @Serializable
+enum class NutritionEmphasis {
+    @SerialName("standard") STANDARD,
+    @SerialName("protein_first") PROTEIN_FIRST,
+}
+
+@Serializable
 enum class MealType {
     @SerialName("breakfast") BREAKFAST,
     @SerialName("lunch") LUNCH,

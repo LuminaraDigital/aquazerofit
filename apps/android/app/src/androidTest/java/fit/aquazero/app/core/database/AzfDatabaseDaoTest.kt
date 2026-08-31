@@ -108,7 +108,7 @@ class AzfDatabaseDaoTest {
 
     @Test
     fun catalogSearchMatchesOnSubstringAndFiltersByCategory() = runTest {
-        val dao = db.catalogDao()
+        val dao = db.exerciseCatalogDao()
         dao.upsertExercises(
             listOf(
                 exercise(id = "ex_bench", name = "Barbell bench press", category = "strength"),
@@ -117,20 +117,26 @@ class AzfDatabaseDaoTest {
             ),
         )
 
-        val all = dao.exercisesPage(query = "", category = null, limit = 50, offset = 0).first()
+        val all = dao
+            .exercisesPage(query = "", category = null, muscle = null, equipment = null, limit = 50, offset = 0)
+            .first()
         assertEquals(3, all.size)
         assertEquals(3, dao.exerciseCount())
 
-        val cardio = dao.exercisesPage(query = "", category = "cardio", limit = 50, offset = 0).first()
+        val cardio = dao
+            .exercisesPage(query = "", category = "cardio", muscle = null, equipment = null, limit = 50, offset = 0)
+            .first()
         assertEquals(listOf("ex_run"), cardio.map { it.id })
 
-        val searched = dao.exercisesPage(query = "bench", category = null, limit = 50, offset = 0).first()
+        val searched = dao
+            .exercisesPage(query = "bench", category = null, muscle = null, equipment = null, limit = 50, offset = 0)
+            .first()
         assertEquals(listOf("ex_bench"), searched.map { it.id })
     }
 
     @Test
     fun thumbnailPickIsStableAndImageOnly() = runTest {
-        val dao = db.catalogDao()
+        val dao = db.exerciseCatalogDao()
         dao.upsertExercises(listOf(exercise(id = "ex_bench", name = "Bench press")))
         dao.upsertExerciseMedia(
             listOf(
@@ -151,7 +157,7 @@ class AzfDatabaseDaoTest {
 
     @Test
     fun replaceExercisesSwapsMediaWithoutOrphaningTheOldRows() = runTest {
-        val dao = db.catalogDao()
+        val dao = db.exerciseCatalogDao()
         dao.replaceExercises(
             exercises = listOf(exercise(id = "ex_bench", name = "Bench press")),
             media = listOf(media("ex_bench", kind = "image", url = "/media/old.png")),
@@ -178,18 +184,21 @@ class AzfDatabaseDaoTest {
         assertEquals(2, dao.foodById("food_rice")!!.useCount)
     }
 
+    /**
+     * The `achievement_definitions` half of this test went with the DAO
+     * accessors it exercised — nothing ever wrote or read that table, so the
+     * accessors were deleted as dead code. The entity and its table are still
+     * registered (dropping them is a schema change this database forbids doing
+     * destructively), so there is nothing left here to assert about them.
+     */
     @Test
-    fun recipesAndAchievementsAndCoachesRoundTrip() = runTest {
+    fun recipesAndCoachesRoundTrip() = runTest {
         val dao = db.catalogDao()
         dao.upsertRecipes(listOf(RecipeEntity(id = "r1", name = "Oat bowl", docJson = "{}")))
-        dao.upsertAchievementDefinitions(
-            listOf(AchievementDefinitionEntity(id = "a1", name = "First log")),
-        )
         dao.upsertCoaches(listOf(CoachEntity(coachId = "akin", unlocked = true)))
 
         assertEquals("Oat bowl", dao.recipeById("r1")!!.name)
         assertEquals(1, dao.recipes().first().size)
-        assertEquals(1, dao.achievementDefinitions().first().size)
         assertTrue(dao.coaches().first().single().unlocked)
     }
 

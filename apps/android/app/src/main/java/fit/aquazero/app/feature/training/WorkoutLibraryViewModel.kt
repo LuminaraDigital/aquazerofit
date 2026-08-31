@@ -146,40 +146,66 @@ class WorkoutLibraryViewModel @Inject constructor(
     private val pagesLoaded = MutableStateFlow(1)
 
     /**
-     * All cached exercises matching the *SQL-expressible* part of the filter
-     * (debounced free text + category). Muscle and equipment are CSV columns,
-     * so they are applied in memory below.
+     * The visible slice, straight out of SQL.
+     *
+     * Every filter — including muscle and equipment, which used to be CSV
+     * columns post-filtered in memory — is now a predicate in the query, so
+     * this reads exactly the rows the screen draws instead of a fixed 2000-row
+     * window of the corpus. Growing the list re-queries with a larger LIMIT
+     * rather than slicing a cached list, which is what lets the library survive
+     * a corpus bigger than that window.
      */
-    private val cachedMatches: StateFlow<List<ExerciseEntity>> = filters
-        .debounce { if (it.search.isEmpty()) 0L else SEARCH_DEBOUNCE_MS }
+    private val visibleRows: StateFlow<List<ExerciseEntity>> = combine(
+        filters.debounce { if (it.search.isEmpty()) 0L else SEARCH_DEBOUNCE_MS },
+        pagesLoaded,
+    ) { active, pages -> active to pages }
         .distinctUntilChanged()
-        .flatMapLatest { active ->
-            catalogRepository
-                .exercisesPage(
-                    query = active.search.trim(),
-                    category = active.category.ifBlank { null },
-                    limit = CACHE_WINDOW,
-                    offset = 0,
-                )
-                .map { rows -> rows.filter { it.matches(active) } }
+        .flatMapLatest { (active, pages) ->
+            catalogRepository.exercisesPage(
+                query = active.search.trim(),
+                category = active.category.ifBlank { null },
+                muscle = active.muscle.ifBlank { null },
+                equipment = active.equipment.ifBlank { null },
+                limit = pages * PAGE_SIZE,
+                offset = 0,
+            )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
+    /**
+     * How many rows match, counted by SQL over the whole table.
+     *
+     * This used to be `matches.size` over the fetched window, so past 2000 rows
+     * the screen under-reported the total and `hasMore` went false while
+     * matches were still unread — the list simply stopped, with no way to reach
+     * the rest.
+     */
+    private val matchCount: StateFlow<Int> = filters
+        .debounce { if (it.search.isEmpty()) 0L else SEARCH_DEBOUNCE_MS }
+        .distinctUntilChanged()
+        .flatMapLatest { active ->
+            catalogRepository.exercisesMatching(
+                query = active.search.trim(),
+                category = active.category.ifBlank { null },
+                muscle = active.muscle.ifBlank { null },
+                equipment = active.equipment.ifBlank { null },
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
+
     init {
         viewModelScope.launch {
-            combine(filters, pagesLoaded, cachedMatches) { active, pages, matches ->
-                Triple(active, pages, matches)
-            }.collect { (active, pages, matches) ->
-                // Thumbnails are looked up for the visible slice only. The
-                // whole corpus is cached and paged in memory, so resolving
-                // media for every match would read the media table for up to
-                // CACHE_WINDOW rows on each keystroke to draw one page.
-                val visible = matches.take(pages * PAGE_SIZE)
-                val thumbnails = catalogRepository.exerciseThumbnails(visible.map { it.id })
+            combine(filters, visibleRows, matchCount) { active, rows, total ->
+                Triple(active, rows, total)
+            }.collect { (active, rows, total) ->
+                // Bounded by the page LIMIT now, rather than by taking a slice
+                // of a corpus-sized list, so this reads media for what is on
+                // screen and nothing more.
+                val thumbnails = catalogRepository.exerciseThumbnails(rows.map { it.id })
                 _uiState.value = _uiState.value.copy(
                     filters = active,
-                    exercises = visible.map { it.toCard(thumbnails[it.id]) },
-                    totalMatches = matches.size,
+                    exercises = rows.map { it.toCard(thumbnails[it.id]) },
+                    totalMatches = total,
                 )
             }
         }
@@ -342,23 +368,15 @@ class WorkoutLibraryViewModel @Inject constructor(
         val result = catalogRepository.refreshExercises(pageSize = CATALOG_PAGE_SIZE)
         _uiState.value = _uiState.value.copy(
             loadingLibrary = false,
-            catalogEmpty = result is ApiResult.Failure && cachedMatches.value.isEmpty(),
+            catalogEmpty = result is ApiResult.Failure && visibleRows.value.isEmpty(),
         )
     }
 
-    private fun ExerciseEntity.matches(active: LibraryFilters): Boolean {
-        if (active.muscle.isNotBlank() &&
-            csvValues(primaryMusclesCsv).none { it.equals(active.muscle, ignoreCase = true) }
-        ) {
-            return false
-        }
-        if (active.equipment.isNotBlank() &&
-            equipmentFromCsv(equipmentCsv).none { it.name == active.equipment }
-        ) {
-            return false
-        }
-        return true
-    }
+    // `matches()` lived here and applied the muscle and equipment filters in
+    // memory, re-splitting both CSV columns for every cached row on every
+    // keystroke. Both predicates are in the page and count queries now, so the
+    // work happens once per page in SQLite instead of once per row per
+    // keystroke, and the corpus no longer has to be resident to be filtered.
 
     private fun ExerciseEntity.toCard(thumbnail: ExerciseThumbnail?): ExerciseCard = ExerciseCard(
         id = id,
@@ -375,8 +393,11 @@ class WorkoutLibraryViewModel @Inject constructor(
         /** Page size for the library list, matching the web's 24. */
         const val PAGE_SIZE = 24
 
-        /** Rows pulled from Room per filter change (whole corpus, plan §4.1). */
-        const val CACHE_WINDOW = 2000
+        // CACHE_WINDOW (2000) is gone. It was the number of rows pulled from
+        // Room on every filter change so that muscle and equipment could be
+        // filtered in memory, and it was a hard ceiling: past 2000 rows the
+        // total under-reported and the tail of the corpus was unreachable.
+        // Filtering happens in SQL now, so the query reads a page.
 
         /** Page size used when bulk-caching the catalog (server cap is 200). */
         const val CATALOG_PAGE_SIZE = 200

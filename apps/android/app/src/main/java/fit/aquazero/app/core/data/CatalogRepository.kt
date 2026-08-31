@@ -1,6 +1,7 @@
 package fit.aquazero.app.core.data
 
 import fit.aquazero.app.core.database.CatalogDao
+import fit.aquazero.app.core.database.ExerciseCatalogDao
 import fit.aquazero.app.core.database.ExerciseEntity
 import fit.aquazero.app.core.database.ExerciseMediaEntity
 import fit.aquazero.app.core.database.ExerciseThumbnail
@@ -30,6 +31,7 @@ import javax.inject.Singleton
 @Singleton
 class CatalogRepository @Inject constructor(
     private val catalogDao: CatalogDao,
+    private val exerciseCatalogDao: ExerciseCatalogDao,
     private val foodsApi: FoodsApi,
     private val exercisesApi: ExercisesApi,
     private val recipesApi: RecipesApi,
@@ -70,28 +72,41 @@ class CatalogRepository @Inject constructor(
     fun exercisesPage(
         query: String = "",
         category: String? = null,
+        muscle: String? = null,
+        equipment: String? = null,
         limit: Int = 50,
         offset: Int = 0,
-    ): Flow<List<ExerciseEntity>> = catalogDao.exercisesPage(query, category, limit, offset)
+    ): Flow<List<ExerciseEntity>> =
+        exerciseCatalogDao.exercisesPage(query, category, muscle, equipment, limit, offset)
+
+    /** Total rows matching the same filters, for the list's "load more" cue. */
+    fun exercisesMatching(
+        query: String = "",
+        category: String? = null,
+        muscle: String? = null,
+        equipment: String? = null,
+    ): Flow<Int> = exerciseCatalogDao.exercisesMatching(query, category, muscle, equipment)
 
     /** Cached exercise + media for the detail sheet. */
     suspend fun exerciseWithMedia(id: String): Pair<ExerciseEntity, List<ExerciseMediaEntity>>? {
-        val exercise = catalogDao.exerciseById(id) ?: return null
-        return exercise to catalogDao.mediaFor(id)
+        val exercise = exerciseCatalogDao.exerciseById(id) ?: return null
+        return exercise to exerciseCatalogDao.mediaFor(id)
     }
 
     /**
      * Thumbnails for the exercises currently on screen, keyed by exercise id.
      *
-     * Deliberately id-scoped rather than folded into [exercisesPage]: the
-     * library caches the whole corpus and pages it in memory, so a join would
-     * read media for every cached row on every keystroke to draw one page.
+     * Still id-scoped rather than folded into [exercisesPage] as a join, but
+     * for a different reason now that the page query returns only what is on
+     * screen: one exercise can carry several media rows, so joining would
+     * multiply the page out into duplicate exercise rows that the caller would
+     * have to collapse again. A second keyed read is the simpler shape.
      */
     suspend fun exerciseThumbnails(ids: List<String>): Map<String, ExerciseThumbnail> =
         if (ids.isEmpty()) {
             emptyMap()
         } else {
-            catalogDao.thumbnailsFor(ids).associateBy { it.exerciseId }
+            exerciseCatalogDao.thumbnailsFor(ids).associateBy { it.exerciseId }
         }
 
     /**
@@ -99,6 +114,12 @@ class CatalogRepository @Inject constructor(
      * (a few pages cover the corpus; plan §4.1). Returns pages fetched.
      */
     suspend fun refreshExercises(pageSize: Int = 200): ApiResult<Int> {
+        // One stamp for the whole pass, taken before the first request. Every
+        // row this refresh touches carries it, so "older than this" is exactly
+        // "the server did not send it this time" — see pruneExercisesStaleBefore.
+        // Reading the clock per row instead would make the boundary a moving
+        // target and prune rows the same pass had just written.
+        val generation = System.currentTimeMillis()
         var offset = 0
         var pages = 0
         while (true) {
@@ -107,13 +128,21 @@ class CatalogRepository @Inject constructor(
                 is ApiResult.Failure -> return if (pages > 0) ApiResult.Success(pages) else page
                 is ApiResult.Success -> {
                     val items = page.data.items
-                    catalogDao.replaceExercises(
-                        exercises = items.map { it.toEntity() },
+                    exerciseCatalogDao.replaceExercises(
+                        exercises = items.map { it.toEntity(generation) },
                         media = items.flatMap { dto -> dto.media.map { it.toEntity(dto.id) } },
                     )
                     pages++
                     offset += pageSize
-                    if (offset >= page.data.total || items.isEmpty()) return ApiResult.Success(pages)
+                    if (offset >= page.data.total || items.isEmpty()) {
+                        // Only after a pass that ran to completion. A refresh
+                        // that gave up part-way (the Failure branch above
+                        // returns early) has seen only a prefix of the corpus,
+                        // and pruning on it would delete every exercise the
+                        // pages it never fetched would have refreshed.
+                        exerciseCatalogDao.pruneExercisesStaleBefore(generation)
+                        return ApiResult.Success(pages)
+                    }
                 }
             }
         }
@@ -156,7 +185,11 @@ class CatalogRepository @Inject constructor(
     private fun FoodEntity.decode(): FoodDto? =
         runCatching { AzfJson.decodeFromString(FoodDto.serializer(), docJson) }.getOrNull()
 
-    private fun ExerciseDto.toEntity(): ExerciseEntity = ExerciseEntity(
+    /**
+     * [generation] is the refresh pass's stamp, not "now": it is what makes the
+     * retired-row prune able to tell this pass's rows from the previous one's.
+     */
+    private fun ExerciseDto.toEntity(generation: Long): ExerciseEntity = ExerciseEntity(
         id = id,
         name = name,
         category = category,
@@ -166,7 +199,7 @@ class CatalogRepository @Inject constructor(
         licence = licence,
         licenceAuthor = licenceAuthor,
         docJson = AzfJson.encodeToString(ExerciseDto.serializer(), this),
-        cachedAt = System.currentTimeMillis(),
+        cachedAt = generation,
     )
 
     private fun ExerciseDto.difficultyName(): String = when (difficulty) {

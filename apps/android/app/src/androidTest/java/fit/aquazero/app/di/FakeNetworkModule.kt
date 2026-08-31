@@ -8,11 +8,11 @@ import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.network.NetworkModule
 import fit.aquazero.app.core.network.api.AccountApi
 import fit.aquazero.app.core.network.api.AuthApi
+import fit.aquazero.app.core.network.api.BillingApi
 import fit.aquazero.app.core.network.api.ChallengesApi
 import fit.aquazero.app.core.network.api.ChatApi
 import fit.aquazero.app.core.network.api.CoachesApi
 import fit.aquazero.app.core.network.api.ExercisesApi
-import fit.aquazero.app.core.network.api.ExportApi
 import fit.aquazero.app.core.network.api.FoodsApi
 import fit.aquazero.app.core.network.api.LogsApi
 import fit.aquazero.app.core.network.api.MeApi
@@ -157,9 +157,21 @@ object FakeNetworkModule {
     fun recommendationsApi(@Named("api") retrofit: Retrofit): RecommendationsApi =
         retrofit.create(RecommendationsApi::class.java)
 
+    // `exportApi` was removed here to match NetworkModule, which dropped it
+    // when ExportApi was deleted — export runs through AccountApi.export().
+    // This binding outlived the interface it provided, so the whole androidTest
+    // source set stopped compiling; nothing noticed because CI builds the debug
+    // APK and the JVM tests, and neither touches androidTest.
+
+    // This module @TestInstallIn-replaces NetworkModule wholesale, so every
+    // binding NetworkModule gains has to be mirrored here or the test graph
+    // loses it. BillingApi arrived with Play Billing and was not, which failed
+    // the androidTest Hilt graph rather than the Kotlin compile — a later stage
+    // than the source-set rot above, and a separate reason the suite was red.
     @Provides
     @Singleton
-    fun exportApi(@Named("api") retrofit: Retrofit): ExportApi = retrofit.create(ExportApi::class.java)
+    fun billingApi(@Named("api") retrofit: Retrofit): BillingApi =
+        retrofit.create(BillingApi::class.java)
 }
 
 /** The settings/account lane's Retrofit bindings, on the same fake client. */

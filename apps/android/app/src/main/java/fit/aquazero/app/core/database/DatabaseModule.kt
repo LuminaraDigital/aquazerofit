@@ -30,6 +30,9 @@ object DatabaseModule {
 
     @Provides fun catalogDao(db: AzfDatabase): CatalogDao = db.catalogDao()
 
+    @Provides
+    fun exerciseCatalogDao(db: AzfDatabase): ExerciseCatalogDao = db.exerciseCatalogDao()
+
     @Provides fun userDao(db: AzfDatabase): UserDao = db.userDao()
 
     @Provides fun trainingDao(db: AzfDatabase): TrainingDao = db.trainingDao()

@@ -99,6 +99,22 @@ jobs:
         working-directory: apps/android
         run: ./gradlew assembleDebug --no-daemon
 
+      # The instrumented suite needs a device to RUN, but it only needs to be
+      # BUILT to prove it has not rotted — and it had. Deleting ExportApi and
+      # the achievement DAO accessors left FakeNetworkModule and
+      # AzfDatabaseDaoTest referencing symbols that no longer existed, and Play
+      # Billing added a BillingApi binding the test module never mirrored. Every
+      # step above stayed green throughout, because none of them look here.
+      #
+      # Assemble rather than merely compile: those two failures happen at
+      # different stages. The deleted symbols broke the Kotlin compile, but the
+      # missing Hilt binding broke Dagger's graph instead, which is only
+      # resolved when the test APK is built — `compileDebugAndroidTestKotlin`
+      # was perfectly green for it.
+      - name: Assemble Instrumented Tests
+        working-directory: apps/android
+        run: ./gradlew assembleDebugAndroidTest --no-daemon
+
   # Nothing above executes R8 output, and that is where this app has actually
   # been bitten: `proguard-rules.pro` documents two release-only breakages
   # (ML Kit's ComponentRegistrar constructors stripped, the @JavascriptInterface

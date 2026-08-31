@@ -180,6 +180,7 @@ class WorkoutLibraryScreenTest {
         db = createInMemoryDatabase()
         val catalog = CatalogRepository(
             catalogDao = db.catalogDao(),
+            exerciseCatalogDao = db.exerciseCatalogDao(),
             foodsApi = FakeFoodsApi(),
             exercisesApi = FakeExercisesApi(corpus = corpus),
             recipesApi = FakeRecipesApi(),

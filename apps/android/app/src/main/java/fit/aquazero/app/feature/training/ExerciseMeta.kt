@@ -89,6 +89,14 @@ fun equipmentIcon(equipment: Equipment): ImageVector = when (equipment) {
 fun csvValues(csv: String): List<String> =
     csv.split(',').map { it.trim() }.filter { it.isNotEmpty() }
 
+/**
+ * Enum lookup by name, built once.
+ *
+ * `Equipment.entries.firstOrNull { it.name == name }` walked up to 14 entries
+ * per CSV value, and `Equipment.entries` allocates a fresh list on every access.
+ */
+private val EQUIPMENT_BY_NAME: Map<String, Equipment> = Equipment.entries.associateBy { it.name }
+
 /** Equipment enum values decoded from the cached `equipmentCsv` column. */
 fun equipmentFromCsv(csv: String): List<Equipment> =
-    csvValues(csv).mapNotNull { name -> Equipment.entries.firstOrNull { it.name == name } }
+    csvValues(csv).mapNotNull(EQUIPMENT_BY_NAME::get)

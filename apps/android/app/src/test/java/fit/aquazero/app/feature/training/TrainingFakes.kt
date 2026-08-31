@@ -182,23 +182,6 @@ class FakeCoachesRepository : fit.aquazero.app.core.data.CoachesRepository(
             emptyList<fit.aquazero.app.core.database.RecipeEntity>(),
         )
         override suspend fun recipeById(id: String) = null
-        override suspend fun upsertExercises(exercises: List<fit.aquazero.app.core.database.ExerciseEntity>) = Unit
-        override suspend fun upsertExerciseMedia(media: List<fit.aquazero.app.core.database.ExerciseMediaEntity>) = Unit
-        override suspend fun clearMediaFor(exerciseIds: List<String>) = Unit
-        override fun exercisesPage(
-            query: String,
-            category: String?,
-            limit: Int,
-            offset: Int,
-        ) = kotlinx.coroutines.flow.flowOf(emptyList<fit.aquazero.app.core.database.ExerciseEntity>())
-        override suspend fun exerciseById(id: String) = null
-        override suspend fun mediaFor(
-            exerciseId: String,
-        ) = emptyList<fit.aquazero.app.core.database.ExerciseMediaEntity>()
-        override suspend fun thumbnailsFor(
-            exerciseIds: List<String>,
-        ) = emptyList<fit.aquazero.app.core.database.ExerciseThumbnail>()
-        override suspend fun exerciseCount() = 0
         override suspend fun upsertCoaches(coaches: List<fit.aquazero.app.core.database.CoachEntity>) = Unit
         override fun coaches() = kotlinx.coroutines.flow.flowOf(emptyList<fit.aquazero.app.core.database.CoachEntity>())
         override fun activeCoach() = kotlinx.coroutines.flow.flowOf(null)

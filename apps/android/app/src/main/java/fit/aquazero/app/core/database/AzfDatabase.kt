@@ -53,6 +53,7 @@ abstract class AzfDatabase : RoomDatabase() {
     abstract fun logsDao(): LogsDao
     abstract fun outboxDao(): OutboxDao
     abstract fun catalogDao(): CatalogDao
+    abstract fun exerciseCatalogDao(): ExerciseCatalogDao
     abstract fun userDao(): UserDao
     abstract fun trainingDao(): TrainingDao
     abstract fun progressDao(): ProgressDao

@@ -45,7 +45,7 @@ AquaZeroFit is a production-grade, AI-powered wellness platform delivering **two
 | | jsdom | 26.1.0 | DOM environment for tests |
 | **Build/CI** | npm workspaces | — | Monorepo management |
 | | ESLint / Prettier | — | Code quality (implied) |
-| **Deployment** | Single-origin (API serves SPA) / Replit / Azure Container Apps | — | Production targets |
+| **Deployment** | Single-origin (API serves SPA) / managed PaaS / Azure Container Apps | — | Production targets |
 | **Design** | Figma (Modern Aquatic Wellness design system) | — | Source of truth for tokens |
 | | Custom WebGL shaders | — | Hero orb, aurora background |
 
@@ -138,7 +138,7 @@ Request → Helmet (CSP) → CORS → JSON body parser → Request Logger
 | Backing | When Used | Persistence |
 |---------|-----------|-------------|
 | `JsonStore` | Dev, tests, `DATABASE_URL` unset | One JSON file/container under `config.dataDir` (tmp+rename atomic writes) |
-| `PostgresStore` | `DATABASE_URL` set (Replit, prod) | Single `documents(container, id, doc jsonb)` table; write-through from in-memory working set |
+| `PostgresStore` | `DATABASE_URL` set (managed host, prod) | Single `documents(container, id, doc jsonb)` table; write-through from in-memory working set |
 
 **Critical invariant**: `getStore()` is synchronous. Postgres hydration is async (`initStore()` awaited at boot before `app.listen()`). Single-instance durability only — scale-out requires moving reads off local copy (AQF-04, AQF-22).
 
@@ -511,7 +511,7 @@ npm run verify     # typecheck → test → eval (exact CI pipeline)
 
 | Target | Strategy |
 |--------|----------|
-| **Replit** | Single-origin (API serves SPA), `DATABASE_URL` → PostgresStore, persistent volume for `UPLOADS_DIR` |
+| **Single-instance managed PaaS** | Single-origin (API serves SPA), `DATABASE_URL` → PostgresStore, persistent volume for `UPLOADS_DIR` |
 | **Azure Container Apps** | Same; `TRUST_PROXY=1` for ingress; HSTS preload |
 | **Static Web App + API** | `SERVE_WEB=false`, split origins, configure `CORS_ORIGINS`, `VITE_API_BASE_URL` |
 
@@ -542,7 +542,7 @@ npm run verify     # typecheck → test → eval (exact CI pipeline)
 | AQF-19 | Final Report | Project closure |
 | AQF-20 | Traceability Matrix | Req → code → test |
 | AQF-21 | Azure Production Readiness | Infra, scaling, monitoring |
-| AQF-22 | Replit Deployment & Domain Guide | Platform-specific ops |
+| AQF-22 | Deployment & Domain Guide | Platform-specific ops |
 
 ---
 
@@ -700,7 +700,7 @@ AquaZeroFit demonstrates **production-grade engineering** across the full stack:
 - **Operations**: Graceful shutdown, background sweeps, configuration guards, single-origin deployment simplicity
 - **Transparency**: AGPL licensing, open constants, real screenshots, no invented metrics
 
-The codebase is **ready for production deployment** on Replit or Azure with the documented configuration, and the AQF document set provides full traceability for maintenance and evolution.
+The codebase is **ready for production deployment** on Azure or a comparable managed host with the documented configuration, and the AQF document set provides full traceability for maintenance and evolution.
 
 ---
 

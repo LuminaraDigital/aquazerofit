@@ -225,7 +225,7 @@ app.aquazerofit.com
 ```
 
 **Fix.** Enumerate every record on both zones and delete any `CNAME`/`A`
-pointing at a decommissioned host — old Vercel, Azure, Replit, S3 or Zendesk
+pointing at a decommissioned host — old Vercel, Azure, S3 or Zendesk
 targets are the usual finds. `app.aquazerofit.com` is worth particular
 attention: it appears in the codebase alongside `app.aquazero.fit`, which
 suggests one of the two is a migration leftover.

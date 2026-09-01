@@ -24,7 +24,6 @@ node_modules
 .codex
 .gemini
 .antigravity
-.replit
 
 # Runtime content - mounted via volumes at runtime, never baked in
 data/

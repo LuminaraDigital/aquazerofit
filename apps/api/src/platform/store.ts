@@ -10,8 +10,8 @@
  *   - JsonStore    — one JSON file per container under config.dataDir. Local
  *                    dev and the whole test suite run on this.
  *   - PostgresStore — a single `documents` table (see ./pgStore). Selected when
- *                    DATABASE_URL is present outside tests, because Replit's
- *                    published filesystem is wiped on every publish.
+ *                    DATABASE_URL is present outside tests, because the managed
+ *                    host's filesystem is wiped on every deploy.
  *
  * The synchronous read API is the reason for the split: getStore() is called
  * from ~77 sites and converting them to async is a separate piece of work.

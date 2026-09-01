@@ -219,7 +219,7 @@ At the project review, each member demonstrates the work attributed to them and 
 | Shared rules | A shared validation package | The rules for what counts as valid data are written once and used by both the interface and the server, so they can never disagree |
 | Database | PostgreSQL | A well-proven database. Chosen when research showed file storage would be erased by the host |
 | AI | A gateway in front of several AI providers, plus an offline engine | If one provider fails, another is tried. If none are available, the offline engine keeps the app working |
-| Hosting | Replit Reserved VM, one address for the whole product | Simplest reliable setup: the server also delivers the interface, so there is one address and one security certificate |
+| Hosting | A single reserved VM on a managed host, one address for the whole product | Simplest reliable setup: the server also delivers the interface, so there is one address and one security certificate |
 | Domain | Registered at Hostinger, pointed at the host | Keeps the existing registration and simply directs traffic to the app |
 
 ## 5.2 How the pieces fit together

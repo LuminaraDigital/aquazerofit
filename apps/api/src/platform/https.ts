@@ -8,7 +8,7 @@
  * to answer it. That refusal is what this file adds.
  *
  * Behind a TLS-terminating ingress (Azure Container Apps, App Service, Front
- * Door, Replit) the socket reaching Node is plaintext on every request, so
+ * Door, managed PaaS) the socket reaching Node is plaintext on every request, so
  * `req.secure` alone would redirect forever. Express derives `req.secure` from
  * X-Forwarded-Proto only for hops covered by `trust proxy`, which app.ts sets
  * from config.trustProxy — so `req.secure` is the correct signal here provided

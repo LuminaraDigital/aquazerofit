@@ -1,6 +1,6 @@
 # AquaZeroFit Operations: Observability & Alerting
 
-This document defines the production observability surface of the AquaZeroFit API and the alerting rules an operator should configure on top of it. It is written for a single-instance or small-fleet deployment on Azure Container Apps (or Replit); anything that requires a Prometheus fleet is called out as future work.
+This document defines the production observability surface of the AquaZeroFit API and the alerting rules an operator should configure on top of it. It is written for a single-instance or small-fleet deployment on Azure Container Apps (or a comparable managed PaaS); anything that requires a Prometheus fleet is called out as future work.
 
 ## Endpoints
 
@@ -50,7 +50,7 @@ The single exception is refresh-token rotation, which runs a genuine atomic `UPD
 
 ### The declaration: `AZF_INSTANCE_COUNT`
 
-None of the deploy surfaces expresses an instance count the process can read — Replit's autoscale limit lives in its UI, Compose is scaled with `--scale` on the command line, and the Dockerfile cannot know. So the count is declared explicitly:
+None of the deploy surfaces expresses an instance count the process can read — a managed PaaS keeps its autoscale limit in its own dashboard, Compose is scaled with `--scale` on the command line, and the Dockerfile cannot know. So the count is declared explicitly:
 
 | Value | Effect |
 | --- | --- |
@@ -62,7 +62,7 @@ Enforced by `assertSingleInstance()` in `apps/api/src/platform/config.ts`, calle
 
 Per platform:
 
-- **Replit** — `deploymentTarget = "vm"` (Reserved VM, one machine). Not autoscale. See the comment block in `.replit`.
+- **Managed PaaS** — pin the deployment to a single reserved VM (one machine), never autoscale, and record that choice in whatever deployment manifest the host reads.
 - **Docker Compose** — `AZF_INSTANCE_COUNT=1` is set in `docker-compose.yml`. Do not use `docker compose up --scale api=N`.
 - **Azure Container Apps** — set min and max replicas both to 1.
 
@@ -165,7 +165,7 @@ The only end-to-end proof is a real Stars purchase completing after the rotation
 These are unresolved, and the procedure above deliberately does not pretend otherwise.
 
 1. **No dual-secret cutover exists.** `secretMatches` compares against one configured value, so the "accept old *or* new for a bounded period" pattern that would make this rotation seamless is not implemented. Adding it (e.g. a `TELEGRAM_WEBHOOK_SECRET_PREVIOUS` accepted for one deploy cycle) is a code change to `router.ts`, and an unmade decision.
-2. **Whether the environment can change without replacing the process.** `config.telegramWebhookSecret` is a getter that re-reads `process.env` on every call, so the *process* needs no restart to see a new value. Whether Replit or Azure Container Apps can apply an environment change in place, rather than by rolling a new revision, is not visible from this repository. If it can, the window shrinks to the time between two commands — but nobody has run it that way.
+2. **Whether the environment can change without replacing the process.** `config.telegramWebhookSecret` is a getter that re-reads `process.env` on every call, so the *process* needs no restart to see a new value. Whether the managed host or Azure Container Apps can apply an environment change in place, rather than by rolling a new revision, is not visible from this repository. If it can, the window shrinks to the time between two commands — but nobody has run it that way.
 3. **How long Telegram retries a refused update, and with what backoff.** The route's design assumes redelivery of non-2xx; the retry duration is not recorded anywhere here. If it is shorter than the rotation window, updates in that window are lost outright rather than delayed, and the `successful_payment` row of the cost table above becomes optimistic.
 4. **This procedure has not been executed against production.** Rehearse the first run against a staging bot with its own token and webhook URL before doing it live.
 

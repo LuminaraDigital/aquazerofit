@@ -33,7 +33,7 @@ assertSingleInstance();
 warnIfBotProtectionUnconfigured();
 
 // Build the store before anything reads it. Under the Postgres backing
-// (DATABASE_URL set, e.g. Replit) hydration is async while getStore() stays
+// (DATABASE_URL set by a managed host) hydration is async while getStore() stays
 // synchronous, so the singleton has to exist before the boot sweeps below and
 // before the first request is accepted — getStore() throws otherwise rather
 // than hand out an empty store that would look like a fresh database.

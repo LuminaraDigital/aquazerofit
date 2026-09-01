@@ -13,7 +13,7 @@ Last verified: **2026-08-17**, against `main`.
 | Control | Status | Where |
 |---|---|---|
 | HTTPS enforcement | **Enforced** | `apps/api/src/platform/https.ts` — plaintext GET redirects 308, plaintext POST refused 403, probes and ACME exempt. HSTS one year, `includeSubDomains`, `preload` via helmet in `app.ts`. |
-| TLS certificate rotation | **Platform-managed** | Certificates are issued and rotated by the hosting ingress (Azure Container Apps / App Service managed certificates, or Replit's). Nothing in this repo pins or terminates TLS. Verify renewal is on in the portal after every domain change — see §7. |
+| TLS certificate rotation | **Platform-managed** | Certificates are issued and rotated by the hosting ingress (Azure Container Apps / App Service managed certificates, or the equivalent on another managed host). Nothing in this repo pins or terminates TLS. Verify renewal is on in the portal after every domain change — see §7. |
 | Password hashing | **bcrypt, cost 12** | `apps/api/src/modules/auth/service.ts`. Cost 4 under vitest for suite speed only. Hashes live in a `credentials` document keyed separately from the user record. |
 | Session and token expiry | **15 min / 30 days** | Access JWT 15 minutes (`config.accessTtlSeconds`), refresh 30 days, single-use with rotation and family revocation on reuse (`platform/auth.ts`). Refresh tokens stored as SHA-256 only. |
 | Protected routes | **All routers guarded** | Every module router calls `requireAuth`. The three deliberate exceptions are `/auth/*`, `/analytics/events` and `/challenges/peek` (public invite preview), plus `/telegram/webhook` which authenticates by shared secret. |
@@ -97,8 +97,8 @@ is rebuildable: the container image comes from the registry, seed content from
 **How.**
 
 1. Enable the provider's automated backups with a **7-day** point-in-time
-   retention window (Azure Database for PostgreSQL: Backup blade; Replit: managed
-   automatically). This alone meets the 24-hour RPO.
+   retention window (Azure Database for PostgreSQL: Backup blade; other managed
+   providers usually handle it automatically). This alone meets the 24-hour RPO.
 2. Take a weekly logical dump to storage in a **different region** from the
    database, so a regional outage does not take the backups with it:
    ```bash
@@ -145,14 +145,9 @@ are single-line JSON warnings that mean a required setting is missing or wrong.
 
 ---
 
-## Deployment drift
+## Edge TLS and duplicate HSTS
 
-The live deployment at aquazerofit.com contains work that is in no commit in
-this repository. See **`docs/REPLIT_DRIFT.md`** for the evidence, what has been
-reconciled, and what still needs the Replit source. Until that is resolved,
-neither copy is a complete picture of the product.
-
-Note that the Replit edge already performs the HTTP→HTTPS redirect itself and
+A managed host's edge typically performs the HTTP→HTTPS redirect itself and
 adds its own HSTS header, so a response carries **two** `Strict-Transport-Security`
 headers. Per RFC 6797 a browser honours the first and ignores the rest, so the
 edge's `max-age=63072000` (no `preload`) wins and the app's `preload` directive

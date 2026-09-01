@@ -1,5 +1,5 @@
 /**
- * MEAL-PHOTO UPLOAD SECURITY SUITE (security review, pre-Replit deployment).
+ * MEAL-PHOTO UPLOAD SECURITY SUITE (security review, pre-deployment).
  *
  * Meal photos are health-adjacent personal data, so the upload path carries
  * two obligations that the rest of the vision suite does not cover:

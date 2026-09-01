@@ -1,10 +1,10 @@
 /**
  * PostgresStore: durable backing for the in-memory document store.
  *
- * WHY THIS EXISTS. Replit's published apps do not have a persistent
- * filesystem — it "resets every time you publish". JsonStore's per-container
+ * WHY THIS EXISTS. The managed host gives a deployed app no persistent
+ * filesystem — it resets on every deploy. JsonStore's per-container
  * files therefore vanish on every deploy, taking users, health logs, chat and
- * AI memory with them. Replit injects DATABASE_URL for its managed Postgres,
+ * AI memory with them. The host injects DATABASE_URL for its managed Postgres,
  * so the same working set is mirrored into a single `documents` table instead.
  *
  * WHAT THIS DOES NOT ACHIEVE — read before scaling the deployment:
@@ -22,11 +22,11 @@
  *   produce exactly one success — the loser sees zero rows and revokes the
  *   family. Session anti-theft is multi-instance safe; app data reads are not.
  *
- * Driver: the plain `pg` package, not @neondatabase/serverless — Replit
+ * Driver: the plain `pg` package, not @neondatabase/serverless — the host
  * migrated its managed database off Neon, so the serverless HTTP driver is the
  * wrong client for it now. The pool is deliberately small (max 5): a single
  * app instance flushes writes through one serialized queue and never needs
- * more, and Replit's database has a modest connection cap.
+ * more, and the managed database has a modest connection cap.
  */
 import type { Pool } from 'pg';
 import {
@@ -122,7 +122,7 @@ export function isLoopbackConnectionString(connectionString: string): boolean {
  * True when the URL either targets loopback or negotiates TLS with the
  * server. Non-loopback URLs must carry an sslmode that is not `disable` /
  * `allow` / `prefer` (those all permit plaintext fallback), or `ssl=true`,
- * which managed offerings (Replit, Cosmos) use when their certificates are
+ * which managed offerings (Cosmos, and others) use when their certificates are
  * not publicly anchored and `verify-full` would fail validation.
  */
 export function isSecureConnectionString(connectionString: string): boolean {
@@ -167,14 +167,14 @@ export class PostgresStore extends MemoryBackedStore {
    *
    * Pool shape is deliberately conservative: max 5 connections (one instance
    * flushes through a single serialized queue and never needs more, and
-   * Replit's database has a modest cap), idle clients reaped after 30s, and a
+   * the managed database has a modest cap), idle clients reaped after 30s, and a
    * 15s statement timeout so a wedged query fails a request instead of
    * pinning a pooled connection forever.
    *
    * TLS is enforced at the connection-string level: a plain `postgres://` URL
    * to a non-loopback host is accepted only when it carries an sslmode that
    * verifies (`verify-ca` / `verify-full`), or `ssl=true` for managed
-   * offerings (Replit, Cosmos) whose certs are not publicly anchored. An
+   * offerings (Cosmos and others) whose certs are not publicly anchored. An
    * off-host URL with no SSL is rejected outright — credentials and refresh
    * tokens must never cross the network in cleartext.
    */

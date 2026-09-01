@@ -213,7 +213,7 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 
 ### Production database (`DATABASE_URL`)
 
-Production boot fails fast without `DATABASE_URL`; the JSON file store is dev-only. Point it at managed Postgres (Azure Cosmos DB for PostgreSQL, Azure Database for PostgreSQL, Replit Postgres): the schema (`documents` table) is created idempotently at boot, no separate migration step. Requirements:
+Production boot fails fast without `DATABASE_URL`; the JSON file store is dev-only. Point it at managed Postgres (Azure Cosmos DB for PostgreSQL, Azure Database for PostgreSQL): the schema (`documents` table) is created idempotently at boot, no separate migration step. Requirements:
 
 - TLS: use `sslmode=verify-full` (public CA) or `ssl=true` for managed offerings without publicly anchored certs. Plaintext `postgres://` to a non-loopback host is rejected at boot. Loopback/plaintext stays allowed for local dev only.
 - Least-privilege role: the runtime role needs only CONNECT plus SELECT/INSERT/UPDATE/DELETE on the `documents` table; it does not need superuser, replication, or DDL beyond `CREATE TABLE IF NOT EXISTS` in its own schema.

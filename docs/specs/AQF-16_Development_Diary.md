@@ -57,7 +57,7 @@ This is the team's development diary for AquaZeroFit. It is the supporting evide
 
 **What this is:** before writing any features, the team had to decide how the code would be organised. Getting this wrong makes everything afterwards slower and makes it impossible to tell who wrote what.
 
-**Files and areas:** `package.json`, `tsconfig.base.json`, `.gitignore`, `.env.example`, `apps/api/src/platform/config.ts`, `.replit`, `.github/workflows/ci.yml`
+**Files and areas:** `package.json`, `tsconfig.base.json`, `.gitignore`, `.env.example`, `apps/api/src/platform/config.ts`, the host deployment manifest, `.github/workflows/ci.yml`
 
 | Date | Member | Record |
 |---|---|---|
@@ -208,7 +208,7 @@ This is the team's development diary for AquaZeroFit. It is the supporting evide
 
 **What this is:** where the app's information actually lives, and what is required to put the app on the internet. This section contains the most significant problem found during the week.
 
-**Files:** `apps/api/src/platform/store.ts`, `pgStore.ts`, `apps/api/src/index.ts`, `apps/api/src/app.ts`, `.replit`
+**Files:** `apps/api/src/platform/store.ts`, `pgStore.ts`, `apps/api/src/index.ts`, `apps/api/src/app.ts`, the host deployment manifest
 
 | Date | Member | Record |
 |---|---|---|

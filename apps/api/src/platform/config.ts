@@ -16,7 +16,7 @@ const defaultDataDir = path.resolve(here, '..', '..', '.data');
  *
  * Named as a constant because it appears in three places that must not drift:
  * the config getter, the boot guard's error message, and the documentation
- * (.replit, docker-compose.yml, docs/OPERATIONS.md).
+ * (docker-compose.yml, docs/OPERATIONS.md).
  */
 export const INSTANCE_COUNT_ENV = 'AZF_INSTANCE_COUNT';
 
@@ -38,7 +38,7 @@ export const config = {
   /**
    * Built SPA directory, served by the API when present.
    *
-   * Single-origin hosting (one Replit deployment, one domain) is the simplest
+   * Single-origin hosting (one deployment, one domain) is the simplest
    * production shape: no CORS, no split origins, one certificate. In dev the
    * directory does not exist and Vite serves the app on :5173 instead, so this
    * resolves to a path that simply is not there and static serving is skipped.
@@ -101,7 +101,7 @@ export const config = {
    * Where meal photographs are written while a vision job is in flight.
    *
    * Defaults to apps/api/uploads. On a host whose filesystem is ephemeral —
-   * Replit resets it on every publish — point UPLOADS_DIR at a mounted
+   * many managed hosts reset it on every deploy — point UPLOADS_DIR at a mounted
    * persistent volume, or in-flight photos vanish on redeploy. The blast
    * radius is deliberately small (the sweep deletes them within 24 hours
    * anyway and a missing file is tolerated everywhere it is read), but a lost
@@ -381,8 +381,8 @@ export const config = {
    * How many instances of this API the operator intends to run concurrently.
    *
    * Declared, not detected: none of the deploy surfaces expresses an instance
-   * count this process can read. `.replit` says `deploymentTarget = "vm"`
-   * (Reserved VM, one machine) but Replit's autoscale limits live in its UI,
+   * count this process can read. A managed PaaS host's deploy manifest can pin
+   * it to a single machine, but the autoscale limits live in the host's UI,
    * not in the file; docker-compose has no `replicas` and is scaled with
    * `docker compose up --scale api=N` on the command line; the Dockerfile
    * cannot know. So the count is an explicit declaration by whoever configures
@@ -494,7 +494,7 @@ export function assertSingleInstance(): void {
       'hydrates its own in-memory copy of the store at boot and never re-reads, so a write ' +
       'on one instance is invisible to the others and the last flush silently overwrites ' +
       "the other instances' version of the same document — health logs are lost with no " +
-      'error anywhere. Run exactly one instance (Replit: deploymentTarget = "vm", NOT ' +
+      'error anywhere. Run exactly one instance (managed PaaS: one dedicated machine, NOT ' +
       'autoscale; Docker Compose: do not use --scale on the api service; Azure Container ' +
       'Apps: min=max=1), and unset ' +
       `${INSTANCE_COUNT_ENV} or set it to 1. Scaling out requires the async getStore() ` +

@@ -176,7 +176,7 @@ export function scrubLogFields(value: unknown, depth = 0, seen = new WeakSet<obj
 /**
  * In-process counters for the operator-facing snapshot at GET /metrics.
  * Deliberately not Prometheus: the target platforms (Azure Container Apps,
- * Replit) scrape stdout and probe endpoints, and a pull-format dependency
+ * managed PaaS) scrape stdout and probe endpoints, and a pull-format dependency
  * buys nothing there. If a Prometheus fleet ever appears, these same
  * counters back it.
  */

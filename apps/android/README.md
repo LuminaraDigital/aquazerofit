@@ -63,8 +63,25 @@ The four gates CI runs, in the order it runs them:
 | --- | --- |
 | `ktlintCheck` | Formatting and import order. `./gradlew ktlintFormat` fixes most of it. |
 | `detekt` | Complexity and code smells, configured in [`config/detekt/detekt.yml`](config/detekt/detekt.yml) with a recorded reason beside every raised threshold. |
-| `lintDebug` | Android Lint. Currently **0 issues**. |
+| `lintDebug` | Android Lint. **0 errors**; 156 warnings — see below. |
 | `testDebugUnitTest` | **518 JVM unit tests** across 63 classes. |
+
+Lint's warning count is not zero and is not being quietly ignored. The
+breakdown, from `app/build/reports/lint-results-debug.sarif`:
+
+| Count | Rule | Standing |
+| --- | --- | --- |
+| 60 | `UnusedResources` | Strings superseded by later naming. Deliberately not deleted: `isShrinkResources = true` strips them from release builds, and removing user-facing copy is a product decision, not a refactor one. The modularisation plan files them by feature prefix in Phase 3. |
+| 36 | `PluralsCandidate` | Real, and worth fixing before any locale beyond `en` is added — `%d` formatting breaks in languages with more than two plural forms. Tracked, not urgent while the app ships English only. |
+| 25 | `UseKtx` | Suggestions to swap platform calls for `androidx.core` KTX equivalents. Cosmetic. |
+| 10 | `GradleDependency`, `NewerVersionAvailable`, `AndroidGradlePluginVersion` | "A newer version exists" notices, which appear the day after any pin. |
+| 25 | assorted | `ModifierParameter`, `ObsoleteSdkInt`, `ExifInterface`, `ConstantLocale` and others in single digits. |
+
+`abortOnError` is at its default, so an **error**-severity finding fails the
+build and CI. That is what happened to `StartActivityAndCollapseDeprecated` in
+the Quick Settings tile, and it is why that suppression names the lint id
+rather than using `@Suppress("DEPRECATION")` — a Kotlin suppression does not
+reach an Error-severity lint issue.
 
 Instrumented tests (55, needing a device or emulator):
 
@@ -73,7 +90,8 @@ Instrumented tests (55, needing a device or emulator):
 ```
 
 They cover the Room DAOs and the outbox state machine, schema-migration
-readiness against the exported `app/schemas/1.json`, navigation through the
+readiness against the exported
+`app/schemas/fit.aquazero.app.core.database.AzfDatabase/1.json`, navigation through the
 signed-in and pre-auth shells, the workout library screen, and the
 purge-on-user-switch path.
 
@@ -95,7 +113,7 @@ graph:
 ```
 core/model          Pure Kotlin DTOs, ApiResult — no Android, no Retrofit
 core/common         Calculators: energy, nutrition, overload, session burn
-core/database       Room 3 — 23 entities, exported schemas, migration tests
+core/database       Room 3 - 23 entities, exported schemas, migration tests
 core/network        Retrofit + OkHttp, three clients, SSE, token refresh
 core/auth           Keystore-backed refresh-token vault, session lifecycle
 core/sync           Outbox + WorkManager replay, connectivity monitor
@@ -127,7 +145,7 @@ features (coach, photo analysis, meal plans) are online-only by design.
 
 ### Dependency injection
 
-Hilt throughout — **15 modules, 25 `@HiltViewModel`s, 73 files using
+Hilt throughout — **14 `@Module`s, 25 `@HiltViewModel`s, 73 files using
 `@Inject`**, all constructor injection. There is no service locator and no
 static singleton anywhere in the app.
 

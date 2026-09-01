@@ -113,8 +113,8 @@ Start `npm run api` first — the emulator reaches the host API through
 | | |
 | --- | --- |
 | Stack | Kotlin 2.3.20, Compose (BOM 2026.08.00), Navigation 3, Room 3, Hilt 2.60.1, Retrofit/OkHttp |
-| Scope | 21 screens, 25 ViewModels, 19 repositories, ~62k lines of Kotlin |
-| DI | Hilt end to end — 15 modules, 73 files injecting, constructor injection only, no service locator |
+| Scope | 21 screens, 25 ViewModels, 16 repositories; ~50k lines of production Kotlin, ~62k with tests |
+| DI | Hilt end to end — 14 modules, 25 `@HiltViewModel`s, 73 files injecting; constructor injection only, no service locator |
 | Offline | Room as source of truth, outbox + WorkManager replay with `Idempotency-Key` |
 | Tests | 518 JVM unit tests in 63 classes, plus 55 instrumented; Android Lint clean |
 | Platform | `minSdk` 26, `targetSdk` 36, R8-minified signed release, AAB pipeline for Play |

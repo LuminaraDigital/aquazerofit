@@ -6,8 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.R
+import fit.aquazero.app.core.common.CoachNudgeContext
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.common.LocalDates
+import fit.aquazero.app.core.common.proactiveCoachNudges
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
@@ -18,6 +20,7 @@ import fit.aquazero.app.core.model.ProgressionStatusDto
 import fit.aquazero.app.core.model.ReadinessAssessmentDto
 import fit.aquazero.app.core.model.WellnessProfileDto
 import fit.aquazero.app.core.model.WorkoutSessionStatus
+import fit.aquazero.app.core.ui.CoachRoster
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -108,8 +111,9 @@ data class DashboardUiState(
     val targets: DerivedTargetsDto? = null,
     val readiness: fit.aquazero.app.core.model.ReadinessAssessmentDto? = null,
     val readinessLoading: Boolean = true,
-    /** Ambient coach line from progression (not celebration kinds). */
-    val coachLine: String? = null,
+    /** Ambient coach card: persona, bond, XP ladder, and proactive nudges. */
+    val coachAmbient: CoachAmbientUi? = null,
+    val coachAmbientLoading: Boolean = true,
 ) {
     /** Merges offline session burn with the server day total. */
     val effectiveKcalBurned: Double
@@ -219,13 +223,12 @@ class DashboardViewModel @Inject constructor(
             observedDay.flatMapLatest { data.dailyNutrition(it) }.collect { nutrition ->
                 _uiState.update { state ->
                     val next = state.copy(nutrition = nutrition)
-                    // Content arriving from Room clears an earlier fetch error:
-                    // there is now something true to show.
-                    if (state.phase == DashboardPhase.Error && !next.hasContent) {
+                    val withPhase = if (state.phase == DashboardPhase.Error && !next.hasContent) {
                         next
                     } else {
                         next.copy(phase = DashboardPhase.Ready)
                     }
+                    withPhase.copy(coachAmbient = rebuildCoachAmbient(withPhase))
                 }
             }
         }
@@ -322,23 +325,32 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    /** Readiness score and the ambient coach line; both fail quietly. */
+    /** Readiness score and the ambient coach card; both fail quietly. */
     private fun refreshReadinessAndCoachLine() {
         viewModelScope.launch {
             _uiState.update { it.copy(readinessLoading = true) }
             when (val result = data.readiness()) {
                 is ApiResult.Success -> _uiState.update {
                     it.copy(readiness = result.data, readinessLoading = false)
+                        .let { state -> state.copy(coachAmbient = rebuildCoachAmbient(state)) }
                 }
-                is ApiResult.Failure -> _uiState.update { it.copy(readinessLoading = false) }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(readinessLoading = false)
+                        .let { state -> state.copy(coachAmbient = rebuildCoachAmbient(state)) }
+                }
             }
         }
         viewModelScope.launch {
+            _uiState.update { it.copy(coachAmbientLoading = true) }
             when (val result = data.progression()) {
                 is ApiResult.Success -> _uiState.update {
-                    it.copy(coachLine = ambientCoachLine(result.data))
+                    it.copy(coachAmbientLoading = false)
+                        .let { state -> state.copy(coachAmbient = coachAmbientFrom(state, result.data)) }
                 }
-                is ApiResult.Failure -> Unit
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(coachAmbientLoading = false)
+                        .let { state -> state.copy(coachAmbient = rebuildCoachAmbient(state)) }
+                }
             }
         }
     }
@@ -365,7 +377,7 @@ class DashboardViewModel @Inject constructor(
                                     session == null ||
                                     session.focus.contains("rest", ignoreCase = true),
                             ),
-                        )
+                        ).let { state -> state.copy(coachAmbient = rebuildCoachAmbient(state)) }
                     }
                 }
                 is ApiResult.Failure -> _uiState.update { it.copy(workoutLoading = false) }
@@ -473,3 +485,52 @@ class DashboardViewModel @Inject constructor(
 private fun ambientCoachLine(status: ProgressionStatusDto): String? =
     status.reactions.firstOrNull { it.kind in AMBIENT_REACTION_KINDS }?.text
         ?.takeIf { it.isNotBlank() }
+
+private fun coachAmbientFrom(state: DashboardUiState, status: ProgressionStatusDto): CoachAmbientUi {
+    val coachLine = ambientCoachLine(status)
+    val nutrition = state.nutrition
+    val proteinRemaining = nutrition?.let {
+        (it.proteinTarget - it.proteinConsumed).takeIf { gap -> gap > 0.0 }
+    }
+    val workout = state.workout
+    return CoachAmbientUi(
+        persona = CoachRoster.resolve(status.activeCoachId),
+        coachLine = coachLine,
+        bondLevel = status.bondLevel,
+        bondXp = status.bondXp,
+        level = status.experience.level,
+        rankName = status.experience.rank.name,
+        levelProgress = status.experience.levelProgress.toFloat(),
+        earnedToday = status.experience.earnedToday,
+        nudges = proactiveCoachNudges(
+            CoachNudgeContext(
+                proteinRemainingG = proteinRemaining,
+                readinessMode = state.readiness?.mode,
+                hasWorkoutToday = workout != null && !workout.rest && !workout.completed,
+                workoutFocus = workout?.focus,
+                coachLinePresent = !coachLine.isNullOrBlank(),
+            ),
+        ),
+    )
+}
+
+private fun rebuildCoachAmbient(state: DashboardUiState): CoachAmbientUi? {
+    val existing = state.coachAmbient ?: return null
+    val nutrition = state.nutrition
+    val proteinRemaining = nutrition?.let {
+        (it.proteinTarget - it.proteinConsumed).takeIf { gap -> gap > 0.0 }
+    }
+    val workout = state.workout
+    val coachLine = existing.coachLine
+    return existing.copy(
+        nudges = proactiveCoachNudges(
+            CoachNudgeContext(
+                proteinRemainingG = proteinRemaining,
+                readinessMode = state.readiness?.mode,
+                hasWorkoutToday = workout != null && !workout.rest && !workout.completed,
+                workoutFocus = workout?.focus,
+                coachLinePresent = !coachLine.isNullOrBlank(),
+            ),
+        ),
+    )
+}

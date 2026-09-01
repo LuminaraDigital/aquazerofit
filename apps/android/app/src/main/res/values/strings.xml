@@ -212,6 +212,7 @@
     <string name="session_skip_exercise">Skip exercise</string>
     <string name="session_rest">Rest</string>
     <string name="session_rest_body">Breathe. Next set of %1$s.</string>
+    <string name="session_rest_coach_line">%1$s says: use this rest. Breathe, reset, then go again.</string>
     <string name="session_rest_remaining_cd">%1$d seconds of rest remaining</string>
     <string name="session_skip_rest">Skip rest</string>
     <string name="session_next_up">Next up</string>
@@ -232,6 +233,8 @@
     <string name="session_decrease_cd">Decrease sets completed for %1$s</string>
     <string name="session_increase_cd">Increase sets completed for %1$s</string>
     <string name="session_finish_save">Finish &amp; save</string>
+    <string name="session_ask_coach">Ask %1$s about this session</string>
+    <string name="session_coach_summary_prompt">%1$s, I just finished my workout. How did it look and what should I do next?</string>
     <string name="session_saving">Saving…</string>
     <string name="session_back_to_workout">Back to workout</string>
     <string name="session_saved">Workout complete — great session.</string>
@@ -717,6 +720,20 @@
     <string name="coach_locked_toast">%1$s joins you at level %2$d. Keep logging — you are on your way.</string>
     <string name="coach_bond">Bond %1$d · %2$s XP together</string>
     <string name="coach_portrait_cd">%1$s portrait</string>
+
+    <!-- Dashboard ambient coach -->
+    <string name="dashboard_coach_heading">Your corner</string>
+    <string name="dashboard_coach_open_chat">Open coach chat</string>
+    <string name="dashboard_coach_card_cd">Coach %1$s. Open chat.</string>
+    <string name="dashboard_coach_nudge_protein">Close protein gap</string>
+    <string name="dashboard_coach_nudge_recovery">Recovery check-in</string>
+    <string name="dashboard_coach_nudge_push">Push day advice</string>
+    <string name="dashboard_coach_nudge_workout">Today\'s session</string>
+    <string name="dashboard_coach_nudge_chat">Ask a question</string>
+    <string name="dashboard_coach_prompt_protein">How much protein do I still need today, and what is a simple way to get there?</string>
+    <string name="dashboard_coach_prompt_recovery">My readiness is low this week. How should I adjust training and nutrition?</string>
+    <string name="dashboard_coach_prompt_push">I am in a progress week. What should I prioritise today?</string>
+    <string name="dashboard_coach_prompt_workout">%1$s, talk me through today\'s workout and what to focus on.</string>
 
     <!-- Personas (proper nouns stay in code; prose lives here) -->
     <string name="coach_akin_tagline">Show up. Stay kind. Go again.</string>

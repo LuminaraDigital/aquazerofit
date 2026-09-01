@@ -14,6 +14,7 @@ import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.ChatMealDraftDto
 import fit.aquazero.app.core.model.ChatMealDraftStatus
 import fit.aquazero.app.core.model.ChatMessageDto
+import fit.aquazero.app.core.navigation.CoachPromptStore
 import fit.aquazero.app.core.network.ChatStreamEvent
 import fit.aquazero.app.core.network.api.ConfirmMealDraftRequest
 import fit.aquazero.app.core.network.api.MealDraftSelection
@@ -78,6 +79,9 @@ sealed interface CoachEvent {
     /** A meal was logged; the celebration layer wants a look at progression. */
     data object MealLogged : CoachEvent
 
+    /** Pre-fill the composer after a dashboard or workout nudge. */
+    data class PrefillPrompt(val text: String) : CoachEvent
+
     // `OpenManualLogging` was removed along with the `openManualLogging()` that
     // was its only sender. Nothing called that function: CoachScreen wires the
     // "log it manually" affordance straight to its own `onOpenManualLogging`
@@ -121,6 +125,7 @@ class CoachViewModel @Inject constructor(
     private val coachesRepository: CoachesRepository,
     private val voiceEngine: CoachVoiceEngine,
     private val logsRepository: LogsRepository,
+    private val coachPromptStore: CoachPromptStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CoachUiState())
@@ -152,6 +157,19 @@ class CoachViewModel @Inject constructor(
         bootstrap()
         loadActiveCoach()
         restorePendingDraft()
+        consumeQueuedPrompt()
+    }
+
+    private fun consumeQueuedPrompt() {
+        viewModelScope.launch {
+            val pending = coachPromptStore.consume() ?: return@launch
+            uiState.first { it.sessionId != null && !it.loading }
+            if (pending.autoSend) {
+                send(pending.prompt)
+            } else {
+                _events.send(CoachEvent.PrefillPrompt(pending.prompt))
+            }
+        }
     }
 
     // -----------------------------------------------------------------------

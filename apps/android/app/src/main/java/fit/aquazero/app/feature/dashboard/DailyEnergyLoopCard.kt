@@ -18,30 +18,19 @@ import fit.aquazero.app.core.model.DerivedTargetsDto
 import kotlin.math.abs
 
 /**
- * Daily Energy Loop: coach context + energy equation + adaptive delta.
+ * Daily Energy Loop: energy equation + adaptive delta.
  *
- * Connects readiness narrative, session burn, and adaptive targets into one
- * card above the hero ring. Numbers remain code-calculated; coach narrates only.
+ * Coach voice moved to [DashboardCoachCard]. Numbers remain code-calculated.
  */
 @Composable
 internal fun DailyEnergyLoopCard(
     nutrition: LocalDailyNutrition,
     kcalBurned: Double,
     targets: DerivedTargetsDto?,
-    coachLine: String?,
     onExplainTarget: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     AzfCard(modifier = modifier.fillMaxWidth()) {
-        coachLine?.takeIf { it.isNotBlank() }?.let { line ->
-            Text(
-                text = line,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
-        }
-
         if (targets?.adaptiveEnabled == true && targets.adaptationKcal != null) {
             val delta = targets.adaptationKcal
             val sign = if (delta >= 0) "+" else "−"

@@ -39,6 +39,7 @@ import fit.aquazero.app.core.designsystem.AzfTab
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.ToastHost
 import fit.aquazero.app.core.model.ApiResult
+import fit.aquazero.app.core.navigation.CoachPromptStore
 import fit.aquazero.app.core.navigation.DeepLinkStore
 import fit.aquazero.app.core.navigation.PendingDeepLink
 import fit.aquazero.app.feature.challenges.ChallengesScreen
@@ -98,6 +99,7 @@ class RootViewModel @Inject constructor(
 class ShellViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     val deepLinkStore: DeepLinkStore,
+    val coachPromptStore: CoachPromptStore,
 ) : ViewModel() {
 
     private val _hasProfile = MutableStateFlow<Boolean?>(null)
@@ -202,6 +204,14 @@ private fun MainShell(
         backStack.add(key)
     }
 
+    /** Switch to the coach tab, optionally queueing a pre-filled prompt. */
+    fun openCoach(prompt: String? = null, autoSend: Boolean = false) {
+        if (!prompt.isNullOrBlank()) {
+            shellViewModel.coachPromptStore.publish(prompt, autoSend)
+        }
+        switchTab(AzfTab.Coach)
+    }
+
     fun pop() {
         backStack.removeLastOrNull()
     }
@@ -219,7 +229,7 @@ private fun MainShell(
                     "log_weight" -> backStack.add(LogWeightKey)
                     "capture" -> backStack.add(CaptureMealKey)
                     "barcode" -> backStack.add(BarcodeKey)
-                    "coach" -> switchTab(AzfTab.Coach)
+                    "coach" -> openCoach()
                 }
                 shellViewModel.deepLinkStore.consume()
             }
@@ -263,7 +273,7 @@ private fun MainShell(
                                 false -> FirstRunScreen(
                                     onSetUpTargets = { backStack.add(SetupKey) },
                                     onBrowseWorkouts = { switchTab(AzfTab.Workouts) },
-                                    onAskCoach = { switchTab(AzfTab.Coach) },
+                                    onAskCoach = { openCoach() },
                                     onLogWeight = { backStack.add(LogWeightKey) },
                                 )
                                 true -> DashboardScreen(
@@ -276,6 +286,7 @@ private fun MainShell(
                                         }
                                     },
                                     onOpenProgress = { switchTab(AzfTab.Progress) },
+                                    onOpenCoach = { prompt -> openCoach(prompt) },
                                 )
                             }
                         }
@@ -312,7 +323,7 @@ private fun MainShell(
                             FirstRunScreen(
                                 onSetUpTargets = { backStack.add(SetupKey) },
                                 onBrowseWorkouts = { switchTab(AzfTab.Workouts) },
-                                onAskCoach = { switchTab(AzfTab.Coach) },
+                                onAskCoach = { openCoach() },
                                 onLogWeight = { backStack.add(LogWeightKey) },
                             )
                         }
@@ -367,6 +378,10 @@ private fun MainShell(
                             WorkoutSessionScreen(
                                 sessionId = key.sessionId,
                                 onBack = ::pop,
+                                onAskCoach = { prompt ->
+                                    pop()
+                                    openCoach(prompt)
+                                },
                                 toastController = toastController,
                             )
                         }

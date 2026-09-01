@@ -105,6 +105,7 @@ data class WorkoutSessionUiState(
     val announcement: AnnouncementSlot? = null,
     val prAlert: PrEvaluation? = null,
     val warmUpSets: List<WarmUpSet> = emptyList(),
+    val coachId: String = CoachRoster.DEFAULT_ID,
 ) {
     val totalSets: Int get() = entries.sumOf { it.sets }
 
@@ -174,6 +175,10 @@ class WorkoutSessionViewModel @Inject constructor(
     fun start(sessionId: String) {
         if (this.sessionId == sessionId && !_uiState.value.loading) return
         this.sessionId = sessionId
+        viewModelScope.launch {
+            val coachId = coachesRepository.activeCoachId().first() ?: CoachRoster.DEFAULT_ID
+            _uiState.value = _uiState.value.copy(coachId = coachId)
+        }
         viewModelScope.launch { load(sessionId) }
     }
 

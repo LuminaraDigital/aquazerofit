@@ -195,6 +195,7 @@ fun CoachScreen(
                     toasts.show(message, kind)
                 }
                 CoachEvent.MealLogged -> Unit
+                is CoachEvent.PrefillPrompt -> input = event.text
             }
         }
     }

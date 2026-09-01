@@ -84,6 +84,8 @@ import fit.aquazero.app.core.designsystem.pressScale
 import fit.aquazero.app.core.model.WorkoutSessionDto
 import fit.aquazero.app.core.service.WorkoutLiveService
 import fit.aquazero.app.core.service.WorkoutLiveService.LiveWorkoutAction
+import fit.aquazero.app.core.ui.CoachAvatar
+import fit.aquazero.app.core.ui.CoachRoster
 
 /**
  * The guided workout session: overview → work → rest → … → summary.
@@ -97,6 +99,7 @@ fun WorkoutSessionScreen(
     sessionId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onAskCoach: (String) -> Unit = {},
     viewModel: WorkoutSessionViewModel = hiltViewModel(),
     toastController: ToastController? = null,
 ) {
@@ -178,6 +181,7 @@ fun WorkoutSessionScreen(
         onIncrementSets = viewModel::incrementSets,
         onBackToWorkout = viewModel::backToWorkout,
         onFinish = viewModel::completeWorkout,
+        onAskCoach = onAskCoach,
     )
 }
 
@@ -199,6 +203,7 @@ private fun WorkoutSessionContent(
     onIncrementSets: (Int) -> Unit,
     onBackToWorkout: () -> Unit,
     onFinish: () -> Unit,
+    onAskCoach: (String) -> Unit,
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -263,6 +268,7 @@ private fun WorkoutSessionContent(
                 onIncrementSets = onIncrementSets,
                 onBackToWorkout = onBackToWorkout,
                 onFinish = onFinish,
+                onAskCoach = onAskCoach,
             )
         }
     }
@@ -639,7 +645,24 @@ private fun RestCard(
     onSkipRest: () -> Unit,
 ) {
     val remaining = stringResource(R.string.session_rest_remaining_cd, state.restLeftSeconds)
+    val persona = CoachRoster.resolve(state.coachId)
     AzfCard(tier = AzfCardTier.Hero, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CoachAvatar(
+                persona = persona,
+                size = 40.dp,
+            )
+            Text(
+                text = stringResource(R.string.session_rest_coach_line, persona.firstName),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = AzfSpacing.ElementGapSmall),
+            )
+        }
+        Spacer(modifier = Modifier.height(AzfSpacing.ElementGapSmall))
         Text(
             text = stringResource(R.string.session_rest).uppercase(),
             style = MaterialTheme.typography.labelSmall,
@@ -683,7 +706,10 @@ private fun SummaryBody(
     onIncrementSets: (Int) -> Unit,
     onBackToWorkout: () -> Unit,
     onFinish: () -> Unit,
+    onAskCoach: (String) -> Unit,
 ) {
+    val persona = CoachRoster.resolve(state.coachId)
+    val coachPrompt = stringResource(R.string.session_coach_summary_prompt, persona.firstName)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -787,6 +813,12 @@ private fun SummaryBody(
         }
 
         Spacer(modifier = Modifier.height(AzfSpacing.SectionGap))
+        SecondaryButton(
+            text = stringResource(R.string.session_ask_coach, persona.firstName),
+            onClick = { onAskCoach(coachPrompt) },
+            enabled = !state.completing,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
         PrimaryButton(
             text = if (state.completing) {
                 stringResource(R.string.session_saving)
@@ -956,6 +988,7 @@ private fun WorkoutSessionWorkPreview() {
             onIncrementSets = {},
             onBackToWorkout = {},
             onFinish = {},
+            onAskCoach = {},
         )
     }
 }
@@ -990,6 +1023,7 @@ private fun WorkoutSessionRestPreview() {
             onIncrementSets = {},
             onBackToWorkout = {},
             onFinish = {},
+            onAskCoach = {},
         )
     }
 }

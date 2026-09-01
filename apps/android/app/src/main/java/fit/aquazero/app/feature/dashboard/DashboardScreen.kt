@@ -53,6 +53,7 @@ fun DashboardScreen(
     onCaptureMeal: () -> Unit = {},
     onOpenWorkout: (String?) -> Unit = {},
     onOpenProgress: () -> Unit = {},
+    onOpenCoach: (String?) -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -90,6 +91,7 @@ fun DashboardScreen(
             onCaptureMeal = onCaptureMeal,
             onOpenWorkout = onOpenWorkout,
             onOpenProgress = onOpenProgress,
+            onOpenCoach = onOpenCoach,
             onExplainTarget = if (state.targets != null) {
                 { showTargetExplain = true }
             } else {
@@ -118,6 +120,7 @@ fun DashboardContent(
     onCaptureMeal: () -> Unit,
     onOpenWorkout: (String?) -> Unit,
     onOpenProgress: () -> Unit,
+    onOpenCoach: (String?) -> Unit = {},
     onExplainTarget: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -196,7 +199,6 @@ fun DashboardContent(
                             nutrition = state.nutrition,
                             kcalBurned = state.effectiveKcalBurned,
                             targets = state.targets,
-                            coachLine = state.coachLine,
                             onExplainTarget = onExplainTarget,
                             modifier = Modifier.revealOnEnter(2),
                         )
@@ -219,6 +221,16 @@ fun DashboardContent(
                         modifier = Modifier.revealOnEnter(if (state.proteinFirst) 3 else 4),
                     )
                 }
+            }
+
+            if (state.hasContent || state.coachAmbientLoading) {
+                Spacer(Modifier.height(AzfSpacing.Gutter))
+                DashboardCoachCard(
+                    ambient = state.coachAmbient,
+                    loading = state.coachAmbientLoading,
+                    onOpenCoach = onOpenCoach,
+                    modifier = Modifier.revealOnEnter(4),
+                )
             }
 
             Spacer(Modifier.height(AzfSpacing.Gutter))

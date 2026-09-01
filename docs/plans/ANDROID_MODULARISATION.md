@@ -1,6 +1,8 @@
 # Android modularisation plan
 
-Status: **Phases 0, 1 and 2 landed; Phases 3 and 4 blocked pending a quiet tree.**
+Status: **Phases 0 and 1 landed; Phase 2 written, reviewed and reverted — its
+artefacts live in git history, not on disk; Phases 3 and 4 blocked pending a
+quiet tree.**
 
 Phase 1 closed on 2026-09-01: every feature-to-feature import is gone and the
 layer graph is now strictly one-way (`:feature:* -> :core:*`), enforced for now
@@ -102,9 +104,9 @@ into a CI assertion.
    `ApiResult` (11 uses), `AzfJson` (3), `ChatStreamEvent` (2) and three request
    types misfiled in `api/`. The `ApiResult` sealed interface is pure — only
    `safeCall` needs Retrofit. Split that one file and features depend on
-   `:core:data` and never see the HTTP layer. `AndroidFeatureConventionPlugin`
-   encodes this: it grants `:core:model`, `:core:common`, `:core:designsystem`,
-   `:core:ui` and `:core:data`, and nothing else.
+   `:core:data` and never see the HTTP layer. The feature convention plugin
+   must encode this: it grants `:core:model`, `:core:common`,
+   `:core:designsystem`, `:core:ui` and `:core:data`, and nothing else.
 
 ### Target graph
 
@@ -168,6 +170,46 @@ Small and simple:
   `VIBRATE` are feature-specific; splitting them into per-feature manifests is
   optional and not worth the churn at this size.
 
+## Why Phase 2's artefacts are not on disk
+
+Phase 2 produced `build-logic/` — the `azf.android.*` and `azf.jvm.library`
+convention plugins — and a `build.gradle.kts` for each of the 17 planned
+`core/` and `feature/` modules. All of it was written, reviewed, and then
+removed from the working tree. It is not lost. Every file is recoverable from
+git history:
+
+```bash
+git show <commit>^:apps/android/build-logic/convention/src/main/kotlin/AndroidFeatureConventionPlugin.kt
+```
+
+where `<commit>` is the commit that removed them; the same form recovers any of
+the other 27 files, path for path.
+
+The reasoning is recorded here because the same temptation returns at Phase 3.
+A build file for a module that contains no source is dead weight in a
+professional repository:
+
+- **It cannot be validated.** `settings.gradle.kts` included only `:app`, so
+  Gradle never configured any of those projects. A typo in a dependency
+  coordinate, a plugin id that does not resolve, a `projects.*` accessor naming
+  a module that was later renamed — none of it would have been caught by a
+  build, by a test, or by CI. `./gradlew projects` listed exactly one module
+  with those files present, and exactly one with them gone.
+- **It misleads the reader.** A `core/` and `feature/` tree full of
+  `build.gradle.kts` files reads as a multi-module build. It was not one. The
+  first thing a newcomer learned about this build was false.
+- **The design is already here.** Everything those files encoded — the target
+  graph, `:core:model` as a JVM module rather than an Android library, the
+  feature allowlist that deliberately withholds `:core:network` — is specified
+  in this document, which is the durable form. Prose survives an AGP or Kotlin
+  upgrade; an unconfigured build file quietly rots against one.
+
+Recreating them at Phase 3 from the target graph above is short and mechanical,
+and it happens at the moment each module gains source and `settings.gradle.kts`
+starts including it — which is also the first moment the build can tell you
+whether they are correct. Keeping unvalidated build files on disk for months
+buys none of that and costs the two problems above.
+
 ## Execution order
 
 Each step ends green before the next begins. Do not batch them.
@@ -179,22 +221,32 @@ Nothing about the Gradle structure changed, so each step stayed independently
 reviewable and revertable — which is the whole reason this phase runs before
 the build is touched. The graph is one-way as of 2026-09-01.
 
-**Phase 2 — convention plugins.** *Already written*: `build-logic/` providing
-`azf.android.application`, `azf.android.library`, `azf.android.compose`,
-`azf.android.feature`, `azf.android.hilt`, `azf.android.room` and
-`azf.jvm.library`, plus all 17 module build files. Inert until
-`settings.gradle.kts` includes them. Wiring it up also needs version-catalog
+**Phase 2 — convention plugins. Written, reviewed, then reverted.**
+`build-logic/` provided `azf.android.application`, `azf.android.library`,
+`azf.android.compose`, `azf.android.feature`, `azf.android.hilt`,
+`azf.android.room` and `azf.jvm.library`, plus all 17 module build files.
+Nothing ever included them, so nothing ever configured or validated them, and
+they have been removed from the working tree — see `Why Phase 2's artefacts are
+not on disk` for the recovery command and the reasoning. This phase is now
+deferred into Phase 3, where the build files land alongside the source that
+makes them checkable. Whatever recreates them still needs version-catalog
 entries for the AGP / Kotlin / KSP / Hilt / Compose Gradle plugins, and
 `enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")` for the `projects.*`
-accessors the module files already use.
+accessors the module build files use.
 
 **Phase 3 — extract modules bottom-up**, following the graph: `:core:model`,
 then `common`, `designsystem`, `network`, `auth`, `database`, `sync`, `data`,
-`ui`, then the features, then `:app`. Use `git mv` so history survives.
-Partition the strings in one central pass *before* the feature modules split,
-because `strings.xml` is a single shared file and cannot be edited
-concurrently. Move `app/src/debug/.../core/network/NetworkLogging.kt` into the
-`:core:network` debug source set, and `app/schemas/` with `:core:database`.
+`ui`, then the features, then `:app`. This phase now owns the Phase 2 work as
+well: write `build-logic/` and the convention plugins first, then, for each
+module in turn, write its `build.gradle.kts`, `git mv` its source in (so
+history survives), add it to `settings.gradle.kts`, and build green before
+moving to the next. Recovering a file from history as a starting point is fine;
+what is not fine is landing a build file ahead of the source and the
+`include` that would exercise it. Partition the strings in one central pass
+*before* the feature modules split, because `strings.xml` is a single shared
+file and cannot be edited concurrently. Move
+`app/src/debug/.../core/network/NetworkLogging.kt` into the `:core:network`
+debug source set, and `app/schemas/` with `:core:database`.
 
 **Phase 4 — quality gates.** ktlint and detekt via a convention plugin applied
 to every module. Create the `androidTest` source set — its dependencies are

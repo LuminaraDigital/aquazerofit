@@ -213,11 +213,18 @@ needs none. No location, no storage, no exact alarms, no `QUERY_ALL_PACKAGES`.
 
 ## Modularisation
 
-`build-logic/` and the 17 module build files under `core/` and `feature/` are
-real, reviewed, and **intentionally inert**: nothing includes them, so
-`./gradlew projects` lists exactly one module. They are Phase 2 of
+The app is one Gradle module layered by package. Splitting it into per-layer
+Gradle modules is planned and specified in
 [`docs/plans/ANDROID_MODULARISATION.md`](../../docs/plans/ANDROID_MODULARISATION.md),
-staged and waiting on Phase 3.
+which carries the measured dependency graph and the execution order.
+
+The build files for that split are deliberately **not** kept on disk ahead of
+the move. A build file for a module with no source is never configured by
+Gradle, so nothing validates it — a typo would sit there undetected — and its
+presence misrepresents a single-module build as a multi-module one.
+`./gradlew projects` lists exactly one module, and the tree says so too. The
+design is the durable artefact and it lives in the plan; the build files are
+cheap to write when the sources actually move.
 
 Phase 1 — removing every feature-to-feature import so the graph is one-way
 before the build is restructured — is **done**. Until the compiler enforces it,
@@ -231,6 +238,9 @@ for f in feature/*/; do
 done
 grep -rn "import fit\.aquazero\.app\.feature" core/
 ```
+
+The second line matters as much as the first: a `core -> feature` edge is worse
+than the `feature -> feature` edges Phase 1 removed.
 
 ## Toolchain
 

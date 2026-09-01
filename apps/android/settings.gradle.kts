@@ -31,25 +31,19 @@ plugins {
 
 rootProject.name = "AquaZeroFit"
 
-// One module, deliberately — for now.
+// One module.
 //
-// The app is a single `:app` module whose layering is by package:
-// `core/*` below `feature/*`, with no feature importing another and nothing
-// under `core` importing a feature. That invariant currently holds by
-// convention and a grep, not by the compiler.
+// The app is a single `:app` module whose layering is by package: `core/*`
+// below `feature/*`, with no feature importing another and nothing under
+// `core` importing a feature. That invariant currently holds by convention and
+// a grep rather than by the compiler — see the README's Architecture section
+// for the check.
 //
-// `build-logic/` and the 17 module build files under `core/` and `feature/`
-// are Phase 2 of docs/plans/ANDROID_MODULARISATION.md: written, reviewed and
-// intentionally INERT until the sources move. They are not dead code and not
-// an abandoned refactor — they are the next phase, staged. Nothing here
-// includes them, so they cost nothing at configuration time; `./gradlew
-// projects` lists exactly one module.
-//
-// Turning them on is not a one-line change: it needs the sources extracted
-// bottom-up per that document's graph, the 1,244-entry string table
-// partitioned in one pass (library modules cannot see `fit.aquazero.app.R`),
-// version-catalog entries for the AGP/Kotlin/KSP/Hilt/Compose Gradle plugins,
-// and `enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")` for the `projects.*`
-// accessors those build files already use. Doing it halfway is worse than not
-// starting, so it waits for a tree nobody else is writing to.
+// Splitting it into per-layer Gradle modules is planned and fully specified in
+// docs/plans/ANDROID_MODULARISATION.md, which carries the measured dependency
+// graph and the execution order. The build files for that split are NOT kept
+// on disk in the meantime: build files for modules with no source are never
+// configured, so nothing validates them, and they misrepresent a single-module
+// build as a multi-module one. They are cheap to write from the plan when the
+// sources actually move.
 include(":app")

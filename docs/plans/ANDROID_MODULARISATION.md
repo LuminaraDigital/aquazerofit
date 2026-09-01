@@ -179,10 +179,10 @@ removed from the working tree. It is not lost. Every file is recoverable from
 git history:
 
 ```bash
-git show <commit>^:apps/android/build-logic/convention/src/main/kotlin/AndroidFeatureConventionPlugin.kt
+git show 6fb3aec^:apps/android/build-logic/convention/src/main/kotlin/AndroidFeatureConventionPlugin.kt
 ```
 
-where `<commit>` is the commit that removed them; the same form recovers any of
+where `6fb3aec` is the commit that removed them; the same form recovers any of
 the other 27 files, path for path.
 
 The reasoning is recorded here because the same temptation returns at Phase 3.

@@ -1,0 +1,14 @@
+# Code owners for AquaZeroFit.
+#
+# The last matching pattern wins, so the catch-all comes first and the
+# path-specific lines below it refine — they do not override ownership, they
+# document where review attention belongs as the project takes on more hands.
+#
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+*                   @LuminaraDigital
+
+/apps/android/      @LuminaraDigital
+/apps/api/          @LuminaraDigital
+/apps/web/          @LuminaraDigital
+/docs/              @LuminaraDigital

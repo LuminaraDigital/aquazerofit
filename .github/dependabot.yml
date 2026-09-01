@@ -29,7 +29,14 @@ updates:
       interval: monthly
     open-pull-requests-limit: 2
 
+  # Every `uses:` in .github/workflows is pinned to a full commit SHA, which is
+  # immutable but also frozen: a pinned action never picks up its own security
+  # fixes. Weekly rather than monthly because the pin is the only thing standing
+  # between us and a compromised upstream tag, and an unmaintained pin is its
+  # own risk. Dependabot rewrites both the SHA and the trailing `# vX.Y.Z`
+  # comment, so the comment stays honest about what the SHA actually is.
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
+    open-pull-requests-limit: 5

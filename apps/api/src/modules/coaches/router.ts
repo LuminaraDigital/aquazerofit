@@ -22,7 +22,7 @@ import { timezoneOf, todayFor } from '../../platform/dates';
 import { getStore } from '../../platform/store';
 import { getProgressSummary } from '../progress/service';
 import { createCoachInvoice, starsAvailable } from '../payments/stars';
-import { acknowledgeReactions, buildReactions } from './reactions';
+import { acknowledgeReactions, buildReactions, recordDelivery } from './reactions';
 import {
   activeCoachFor,
   bondXpFor,
@@ -113,6 +113,9 @@ coachesRouter.get('/progression', (req, res) => {
       completedWorkoutOn(userId, today),
     ),
   };
+  // Record what this card is about to show, so the acknowledgement marks
+  // exactly that. Nothing is consumed here — see recordDelivery.
+  saveCoachState(recordDelivery(state, experience, summary));
   res.json(body);
 });
 
@@ -123,10 +126,10 @@ coachesRouter.get('/progression', (req, res) => {
  */
 coachesRouter.post('/reactions/ack', (req, res) => {
   const userId = userIdOf(req);
-  const state = getCoachState(userId);
-  const experience = experienceOf(userId, timezoneOf(req));
-  const summary = getProgressSummary(userId, todayFor(req));
-  saveCoachState(acknowledgeReactions(state, experience, summary));
+  // Deliberately does NOT re-derive experience or the progress summary. What
+  // was displayed was recorded by the read; anything earned since then has not
+  // been shown to anyone and must not be marked seen.
+  saveCoachState(acknowledgeReactions(getCoachState(userId)));
   res.status(204).end();
 });
 

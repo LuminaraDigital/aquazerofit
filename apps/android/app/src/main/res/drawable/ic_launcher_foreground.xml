@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AquaZeroFit launcher mark: an aqua droplet inside a ring, on Deep Sea. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Ring -->
+    <path
+        android:pathData="M54,54m-26,0a26,26 0 1,0 52,0a26,26 0 1,0 -52,0"
+        android:strokeColor="#2FD9F4"
+        android:strokeWidth="3"
+        android:strokeAlpha="0.55"
+        android:fillColor="#00000000" />
+    <!-- Droplet body -->
+    <path
+        android:fillColor="#2FD9F4"
+        android:pathData="M54,36
+            C54,36 43,50.5 43,58.5
+            C43,64.8 47.9,69.5 54,69.5
+            C60.1,69.5 65,64.8 65,58.5
+            C65,50.5 54,36 54,36Z" />
+    <!-- Highlight -->
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M49.5,58
+            C49.5,55.5 51,52.5 52.5,50.5
+            C51,54 50.8,56 51.2,58.2
+            C51.5,60 50.9,61 50.2,60.6
+            C49.7,60.2 49.5,59.2 49.5,58Z" />
+</vector>

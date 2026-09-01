@@ -14,7 +14,8 @@
  * A crisis signal always wins — a user in distress must never receive diet
  * content in that turn (AQF-11 §4).
  */
-import { CRISIS_SIGNPOST, KCAL_FLOOR } from '@aquazerofit/shared';
+import crypto from 'node:crypto';
+import { crisisSignpostFor, KCAL_FLOOR } from '@aquazerofit/shared';
 import type { SafetyCategory } from '@aquazerofit/shared';
 
 // ---------------------------------------------------------------------------
@@ -146,10 +147,16 @@ const EXTREME_DIET_SIGNPOST = `I can’t support that — very low intakes, prol
 const OUT_OF_SCOPE_SIGNPOST =
   'That’s outside what I can help with — I stick to everyday wellness: nutrition, hydration, movement and progress. For legal, financial or mental-health treatment questions, a qualified professional is the right person to ask. Happy to help with your wellness goals any time.';
 
-export function refusalMessageFor(category: SafetyCategory): string {
+/**
+ * `locale` is the caller's Accept-Language string (see platform/locale.ts).
+ * Only the crisis branch reads it: that is the one refusal whose usefulness
+ * depends on the number in it being dialable from where the user is. Omitted,
+ * it yields the AU wording the product shipped with.
+ */
+export function refusalMessageFor(category: SafetyCategory, locale?: string): string {
   switch (category) {
     case 'crisis':
-      return CRISIS_SIGNPOST;
+      return crisisSignpostFor(locale);
     case 'medical':
       return MEDICAL_SIGNPOST;
     case 'extremeDiet':
@@ -182,7 +189,11 @@ async function writeGuardrailAudit(event: GuardrailAudit): Promise<void> {
       upsert(doc: Record<string, unknown>): unknown;
     };
     await container.upsert({
-      id: `audit_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      // crypto.randomUUID, not a timestamp plus Math.random(). These rows are
+      // the record of who tripped a safety guardrail and why; an id an outsider
+      // can guess is an id they can probe for, and the previous form leaked the
+      // write time and the trigger volume in the id itself.
+      id: `audit_${crypto.randomUUID()}`,
       userId: event.userId,
       type: 'guardrailTrigger',
       action: event.stage === 'pre' ? 'inputBlocked' : 'outputBlocked',
@@ -211,7 +222,7 @@ export interface GuardrailDecision {
   message: string | null;
 }
 
-export function pre(text: string, ctx?: { userId?: string }): GuardrailDecision {
+export function pre(text: string, ctx?: { userId?: string; locale?: string }): GuardrailDecision {
   const result = classify(text);
   if (result.category === 'safe') {
     return { blocked: false, category: 'safe', jailbreak: false, message: null };
@@ -227,7 +238,7 @@ export function pre(text: string, ctx?: { userId?: string }): GuardrailDecision 
     blocked: true,
     category: result.category,
     jailbreak: result.jailbreak,
-    message: refusalMessageFor(result.category),
+    message: refusalMessageFor(result.category, ctx?.locale),
   };
 }
 
@@ -250,6 +261,8 @@ const VALID_SAFETY_CATEGORIES = new Set<SafetyCategory>([
 
 export interface PreAsyncOptions {
   userId?: string;
+  /** Accept-Language of the request, so a crisis signpost names a local line. */
+  locale?: string;
   /** Force the LLM classifier even when config/heuristics would skip it (tests). */
   forceLlm?: boolean;
   /** Skip the LLM classifier entirely (tests). */
@@ -328,7 +341,7 @@ export async function preAsync(text: string, opts?: PreAsyncOptions): Promise<Gu
       blocked: true,
       category,
       jailbreak: syncClass.jailbreak,
-      message: refusalMessageFor(category),
+      message: refusalMessageFor(category, opts?.locale),
     };
   } catch (err) {
     console.warn(

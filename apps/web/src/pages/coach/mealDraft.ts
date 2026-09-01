@@ -17,6 +17,7 @@ export interface ChatMealMatch {
   grams: number;
   gramsBasis: GramsBasis;
   servingLabel: string | null;
+  score: number;
   kcal: number;
   proteinG: number;
   carbsG: number;

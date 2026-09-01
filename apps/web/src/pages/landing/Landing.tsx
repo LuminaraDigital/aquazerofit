@@ -48,7 +48,7 @@ function Hero() {
         <div>
           <Reveal>
             <div className="mb-6 max-w-[13.5rem]">
-              <AkinStage size="hero" />
+              <AkinStage size="hero" priority />
             </div>
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/90">
               <span className="h-1.5 w-1.5 rounded-full bg-secondary shadow-[0_0_10px_#45dfa4]" />

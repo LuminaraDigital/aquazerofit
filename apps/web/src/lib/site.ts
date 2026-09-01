@@ -196,6 +196,9 @@ export const NON_INDEXABLE_PREFIXES: readonly string[] = [
   '/uploads/',
   '/sign-in',
   '/welcome',
+  /* Host surfaces for the native app (the WebView challenge page). They are
+     not pages a human navigates to and they carry no content to rank. */
+  '/mobile/',
   '/setup',
   '/onboarding',
   '/nutrition',

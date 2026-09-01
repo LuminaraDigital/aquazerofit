@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Auto Backup rules (API < 31 path). The auth DataStore holds the encrypted
+     refresh token; restoring it onto another device would desync it from the
+     Keystore key that encrypted it (and copies a credential), so it is
+     excluded. -->
+<full-backup-content>
+    <exclude domain="file" path="datastore/azf_auth.preferences_pb" />
+    <!-- Wellness cache (meals, chat, profile, etc.) must not leave the device
+         via cloud backup or device transfer; refresh tokens are already
+         excluded above and are useless off-device without the Keystore key. -->
+    <exclude domain="database" path="azf.db" />
+    <exclude domain="database" path="azf.db-wal" />
+    <exclude domain="database" path="azf.db-shm" />
+</full-backup-content>

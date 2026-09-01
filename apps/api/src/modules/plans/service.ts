@@ -30,6 +30,16 @@ import { AppError } from '../../platform/errors';
 import { getStore, newId } from '../../platform/store';
 import { addDays } from '../../platform/dates';
 import { assessReadiness } from './readiness';
+/*
+ * The ledger is a static import where the plan engine is a dynamic one, and
+ * the difference is deliberate: `loadPlanEngine` defers because planEngine
+ * drags in the whole AI gateway and must be able to be absent, whereas the
+ * ledger is bookkeeping over the same store this file already uses. There is
+ * no cycle — creditLedger reaches only platform/store, platform/errors and
+ * the shared package.
+ */
+import { creditLedger } from '../ai/creditLedger';
+import { tierOf } from '../billing/entitlements';
 
 const EXPERIENCE_RANK: Record<ExerciseExperience, number> = {
   beginner: 0,
@@ -384,13 +394,30 @@ export interface PlanEngineModule {
     profile: WellnessProfile;
     pool: Exercise[];
     daysPerWeek: number;
-  }): Promise<{ draft: AiPlanDraft; ai: AiMetadata } | null>;
+  }): Promise<{
+    /**
+     * `degraded` is the gateway's own flag, declared here because the value
+     * has always been present at runtime — planEngine returns the gateway's
+     * meta object verbatim — while the plain shared `AiMetadata` type hid it.
+     * Billing needs it: offline template output served after every real
+     * provider failed is a plan the user can keep, but not one to charge for.
+     * Widened locally rather than by importing GatewayMeta, so this module
+     * still has no compile-time dependency on the AI lane.
+     */
+    ai: AiMetadata & { degraded?: boolean };
+    draft: AiPlanDraft;
+  } | null>;
   suggestExerciseSwap(req: {
     exercise: Exercise;
     pool: Exercise[];
     profile: WellnessProfile;
     reason?: string;
-  }): Promise<{ exerciseIds: string[]; rationale: string } | null>;
+  }): Promise<{
+    exerciseIds: string[];
+    rationale: string;
+    /** See the note on tryGenerateAiPlan's `ai` — same flag, same reason. */
+    ai: AiMetadata & { degraded?: boolean };
+  } | null>;
 }
 
 export async function loadPlanEngine(): Promise<PlanEngineModule | null> {
@@ -600,8 +627,37 @@ export async function generatePlanForUser(
   // deterministic engine uses. The draft is zod- and contract-validated; any
   // failure falls back to buildPlan unchanged.
   let plan: TrainingPlan | null = null;
+  /** Set only when a real provider produced a plan we kept — the commit case. */
+  let billableAi = false;
   const engine = await loadPlanEngine();
+
+  /*
+   * The hold is taken HERE — inside the service, immediately before the model
+   * call — and not in the router, because only this function knows whether a
+   * model was consulted at all. `POST /plans/generate` looks identical from
+   * the outside whether the AI lane runs or `buildPlan` serves the request
+   * deterministically, and this lane is the most expensive call in the
+   * product (planStructured, 4096 output tokens). It shipped charging nothing:
+   * CREDIT_COSTS.planGeneration was defined and then referenced by no reserve
+   * call anywhere, so the plumbing existed and was never connected.
+   *
+   * Out of credits does not fail the request. The reserve throws
+   * CREDITS_INSUFFICIENT, we swallow it, and `buildPlan` serves a real plan
+   * below — the same posture as every other AI failure in this file, and the
+   * product principle that an AI feature may fail without taking a core user
+   * journey with it. The user gets their training plan; they just do not get
+   * the model's opinion on it.
+   */
+  let reservationId: string | null = null;
   if (engine) {
+    try {
+      reservationId = await creditLedger.reserve(userId, 'planGeneration', tierOf(userId));
+    } catch {
+      reservationId = null;
+    }
+  }
+
+  if (engine && reservationId) {
     try {
       const pool = buildExercisePool(exercises, profile);
       const result = await engine.tryGenerateAiPlan({
@@ -612,9 +668,29 @@ export async function generatePlanForUser(
       if (result && result.draft && result.ai && aiDraftIsValid(result.draft, pool, input.daysPerWeek)) {
         const adjusted = applyReadinessToDraft(result.draft, readiness.volumeMultiplier);
         plan = planFromAiDraft(userId, adjusted, result.ai, startDate, now);
+        // Degraded output is the offline template engine standing in for
+        // providers that all failed. Usable, so we keep the plan; not the
+        // model's work, so we do not bill it. Same stance as the chat and
+        // recommendation lanes.
+        billableAi = result.ai.degraded !== true;
       }
     } catch {
       plan = null; // model failure must never break plan generation
+      billableAi = false;
+    }
+
+    /*
+     * Settled on the outcome, not on the attempt. Every route to the
+     * deterministic fallback refunds: the engine returning null (provider
+     * error, unparseable JSON, a draft the contract rejected), a draft that
+     * failed aiDraftIsValid, and a throw out of the block above. The model
+     * burning tokens on output we then discarded is our cost to absorb, not
+     * the user's — they are holding a plan that no model wrote.
+     */
+    if (plan && billableAi) {
+      await creditLedger.commit(reservationId);
+    } else {
+      await creditLedger.release(reservationId);
     }
   }
   if (!plan) {

@@ -11,6 +11,7 @@ import type { User, UserRole, UserTier } from '@aquazerofit/shared';
 import { config } from './config';
 import { AppError } from './errors';
 import { getStore, newId } from './store';
+import { effectiveTier } from '../modules/billing/entitlements';
 
 export interface AuthUser {
   id: string;
@@ -46,8 +47,11 @@ export interface RefreshTokenRecord {
 
 // ----- access tokens -----
 
-export function signAccess(user: Pick<User, 'id' | 'role' | 'tier'>): string {
-  return jwt.sign({ role: user.role, tier: user.tier }, config.jwtAccessSecret, {
+export function signAccess(user: Pick<User, 'id' | 'role' | 'tier' | 'premiumUntil'>): string {
+  // effectiveTier, not the raw field: a token minted from a lapsed
+  // subscription would otherwise claim premium for its whole 15-minute life on
+  // any path that trusts the claim rather than re-reading the document.
+  return jwt.sign({ role: user.role, tier: effectiveTier(user) }, config.jwtAccessSecret, {
     subject: user.id,
     expiresIn: config.accessTtlSeconds,
   });
@@ -214,8 +218,15 @@ export const requireAuth: RequestHandler = (req: Request, _res: Response, next: 
     if (!user || (user as { type?: string }).type === 'refreshToken') {
       throw new AppError('AUTH_INVALID', 'Account no longer exists');
     }
-    // Role/tier reflect the current user record, not stale token claims.
-    req.user = { id: user.id, role: user.role, tier: user.tier };
+    /*
+     * Role/tier reflect the current user record, not stale token claims — and
+     * tier goes through `effectiveTier`, which folds an expired `premiumUntil`
+     * back to free. This is the load-bearing call: `assertLaneAllowed` reads
+     * `req.user.tier` and nothing else, so a lapsed subscription that were
+     * read straight off the document would keep its premium lanes open until
+     * somebody noticed.
+     */
+    req.user = { id: user.id, role: user.role, tier: effectiveTier(user) };
     next();
   } catch (err) {
     next(err);

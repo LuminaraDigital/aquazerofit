@@ -9,10 +9,25 @@ import { requireAdmin, requireAuth } from '../../platform/auth';
 import { AppError } from '../../platform/errors';
 import { getStore } from '../../platform/store';
 import { getWgerImportStatus, runWgerImport } from '../../data/wger/importer';
+import { requireFreshMfa } from '../mfa/middleware';
 import { getProfile, auditDataAccess } from '../me/service';
+import {
+  effectiveTier,
+  entitlementHistory,
+  grantPremium,
+  revokePremium,
+} from '../billing/entitlements';
 
 export const adminRouter = Router();
-adminRouter.use(requireAuth, requireAdmin);
+/**
+ * Order matters: identify (requireAuth), then authorise (requireAdmin), then
+ * re-prove possession of the second factor (requireFreshMfa). The role alone
+ * used to be enough, and GET /users below returns every account on the
+ * platform, so the step-up is what stops one phished password from being the
+ * whole user table. See modules/mfa/middleware for the unenrolled-admin
+ * posture.
+ */
+adminRouter.use(requireAuth, requireAdmin, requireFreshMfa);
 
 function isUserDoc(d: { id: string }): d is User {
   const t = (d as { type?: string }).type;
@@ -36,7 +51,7 @@ adminRouter.get('/users', (req, res) => {
       email: user.email,
       displayName: user.displayName,
       role: user.role,
-      tier: user.tier,
+      tier: effectiveTier(user),
       emailVerified: user.emailVerified,
       telegramLinked: user.tgId !== undefined && user.tgId !== null,
       hasProfile: getProfile(user.id) !== undefined,
@@ -133,4 +148,76 @@ adminRouter.post('/exercises/import', (req, res) => {
 /** Last-run stats for the wger import (counts, duration, errors, wgerVersion). */
 adminRouter.get('/exercises/import/status', (_req, res) => {
   res.json(getWgerImportStatus());
+});
+
+// ---------------------------------------------------------------------------
+// Paid entitlements
+// ---------------------------------------------------------------------------
+
+/**
+ * Grant or revoke premium by hand.
+ *
+ * This is the ONLY route in the product that can change a paid entitlement,
+ * and it is deliberately behind requireAdmin + requireFreshMfa rather than
+ * exposed to the account holder: a self-serve tier flip with no payment behind
+ * it is an entitlement any caller could grant themselves, which is the reason
+ * `/me` has never had one.
+ *
+ * It exists before any payment rail does, for three reasons that outlast the
+ * rails: comping a user after a support failure, testing the whole premium
+ * path end to end without a sandbox purchase, and reversing a chargeback that
+ * the provider's own webhook did not carry.
+ *
+ * `days` rather than an absolute date: an admin acting on a support ticket is
+ * thinking in "give them a month", and a date field invites a typo that reads
+ * as a valid year.
+ */
+const premiumGrantSchema = z.object({
+  action: z.enum(['grant', 'revoke']),
+  days: z.number().int().min(1).max(3660).optional(),
+  reason: z.string().min(1).max(500),
+});
+
+adminRouter.post('/users/:id/premium', (req, res) => {
+  const input = premiumGrantSchema.parse(req.body ?? {});
+  const userId = String(req.params.id ?? '');
+  const store = getStore();
+  const user = store.byId<User>('users', userId);
+  if (!user || !isUserDoc(user)) throw new AppError('NOT_FOUND', 'Account not found');
+
+  // The admin's own id is part of the idempotency key and the audit trail:
+  // "who comped this account, and why" is the question a refund dispute asks.
+  const actor = req.user!.id;
+
+  if (input.action === 'revoke') {
+    revokePremium(userId, 'admin', `admin:${actor}:${Date.now()}`, input.reason);
+    auditDataAccess(actor, 'admin.premium.revoke', { userId, reason: input.reason });
+    res.json({ user: { id: userId, tier: 'free', premiumUntil: null } });
+    return;
+  }
+
+  if (input.days === undefined) {
+    throw new AppError('VALIDATION_FAILED', 'days is required when granting premium.');
+  }
+  const until = new Date(Date.now() + input.days * 24 * 3600 * 1000).toISOString();
+  const outcome = grantPremium({
+    userId,
+    source: 'admin',
+    externalId: `admin:${actor}:${Date.now()}`,
+    premiumUntil: until,
+    reason: input.reason,
+  });
+  auditDataAccess(actor, 'admin.premium.grant', {
+    userId,
+    days: input.days,
+    reason: input.reason,
+  });
+  res.json({ user: { id: userId, tier: 'premium', premiumUntil: outcome.premiumUntil } });
+});
+
+/** Entitlement history for one account — what support reads on a billing query. */
+adminRouter.get('/users/:id/premium', (req, res) => {
+  const userId = String(req.params.id ?? '');
+  auditDataAccess(req.user!.id, 'admin.premium.history', { userId });
+  res.json({ grants: entitlementHistory(userId) });
 });

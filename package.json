@@ -19,7 +19,12 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "eval": "tsx evals/runner.ts",
     "verify": "npm run typecheck && npm run test && npm run eval",
-    "start": "npm run start --workspace apps/api"
+    "start": "npm run start --workspace apps/api",
+    "assets:coaches": "node tools/coaches/build-art.mjs",
+    "assets:cards": "node tools/cards/build-card.mjs",
+    "screenshots:optimise": "node tools/screenshots/optimise.mjs",
+    "docs:setup": "npm --prefix tools/docgen install",
+    "docs:build": "node tools/docgen/md-to-docx.js"
   },
   "engines": {
     "node": ">=20"

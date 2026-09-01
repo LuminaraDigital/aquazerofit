@@ -29,6 +29,8 @@ import type {
 import { AppError } from '../../platform/errors';
 import { getStore } from '../../platform/store';
 import { addDays } from '../../platform/dates';
+import { creditLedger } from '../ai/creditLedger';
+import { tierOf } from '../billing/entitlements';
 import {
   buildExercisePool,
   equipmentAllows,
@@ -565,39 +567,71 @@ export async function swapExercise(
   // Optional AI ranking (P-06) for the muscle-match tier: the model proposes,
   // code disposes — any AI pick must pass the deterministic equipment/muscle
   // constraints (same primary muscle, pool membership, not already in session).
-  if (!replacement) {
-    const engine = await loadPlanEngine();
-    if (engine) {
-      try {
-        const suggestion = await engine.suggestExerciseSwap({
-          exercise: outgoing,
-          pool,
-          profile: profile as WellnessProfile,
-          reason: opts.reason,
-        });
-        replacement = (suggestion?.exerciseIds ?? [])
-          .map((exerciseId) => pool.find((ex) => ex.id === exerciseId))
-          .find((ex): ex is Exercise => ex !== undefined && isValidSwapCandidate(ex, outgoing, inSession));
-      } catch {
-        // Model failure never blocks the deterministic swap.
+  let reservationId: string | null = null;
+  try {
+    if (!replacement) {
+      const engine = await loadPlanEngine();
+      if (engine) {
+        // The hold is taken here rather than on entry because everything above
+        // answers the swap without a model: a group sibling, or an unavailable
+        // AI lane, costs nothing to serve and so must cost the user nothing.
+        try {
+          reservationId = await creditLedger.reserve(userId, 'exerciseSwap', tierOf(userId));
+        } catch {
+          // An empty balance (CREDITS_INSUFFICIENT) costs the user the ranking,
+          // not the substitution: skip the model and let the deterministic
+          // fallback below answer, exactly as it does when the model fails.
+        }
+        if (reservationId) {
+          try {
+            const suggestion = await engine.suggestExerciseSwap({
+              exercise: outgoing,
+              pool,
+              profile: profile as WellnessProfile,
+              reason: opts.reason,
+            });
+            replacement = (suggestion?.exerciseIds ?? [])
+              .map((exerciseId) => pool.find((ex) => ex.id === exerciseId))
+              .find((ex): ex is Exercise => ex !== undefined && isValidSwapCandidate(ex, outgoing, inSession));
+            // Billed only for a pick that survived the constraints — a null
+            // suggestion, or one the constraints threw out, leaves the user on
+            // the deterministic fallback, which is free on every other path.
+            // Degraded output is the offline template engine answering for
+            // providers that all failed: the pick is usable, so it stands, but
+            // it is not a model's work and is not charged for. Same stance as
+            // the chat and meal-recommendation lanes.
+            if (replacement && suggestion?.ai.degraded !== true) {
+              await creditLedger.commit(reservationId);
+            }
+          } catch {
+            // Model failure never blocks the deterministic swap.
+          }
+        }
       }
     }
-  }
 
-  // Deterministic fallback (pre-Phase-2 behaviour): same primary muscle.
-  replacement ??= pool.find(
-    (ex) =>
-      !inSession.has(ex.id) &&
-      ex.primaryMuscles.some((m) => outgoing.primaryMuscles.includes(m)),
-  );
+    // Deterministic fallback (pre-Phase-2 behaviour): same primary muscle.
+    replacement ??= pool.find(
+      (ex) =>
+        !inSession.has(ex.id) &&
+        ex.primaryMuscles.some((m) => outgoing.primaryMuscles.includes(m)),
+    );
 
-  if (!replacement) {
-    throw new AppError('CONFLICT', 'No suitable substitute matches your equipment for this muscle group');
+    if (!replacement) {
+      throw new AppError('CONFLICT', 'No suitable substitute matches your equipment for this muscle group');
+    }
+    const current = session.exercises[idx]!;
+    const exercises = [...session.exercises];
+    exercises[idx] = { ...current, exerciseId: replacement.id, name: replacement.name };
+    const updated: WorkoutSession = { ...session, exercises };
+    store.upsert('plans', updated);
+    return { session: updated, replacement };
+  } finally {
+    // Anything that is not a committed AI pick hands the credit back: a refused
+    // suggestion, a thrown model call, or the CONFLICT raised when no candidate
+    // survives at all. Once committed the ledger has settled the reservation and
+    // this second attempt is a documented no-op, so the safety net needs no flag
+    // tracking which way the branch above went.
+    if (reservationId) await creditLedger.release(reservationId);
   }
-  const current = session.exercises[idx]!;
-  const exercises = [...session.exercises];
-  exercises[idx] = { ...current, exerciseId: replacement.id, name: replacement.name };
-  const updated: WorkoutSession = { ...session, exercises };
-  store.upsert('plans', updated);
-  return { session: updated, replacement };
 }

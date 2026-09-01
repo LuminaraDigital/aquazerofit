@@ -17,6 +17,15 @@
  * from ~77 sites and converting them to async is a separate piece of work.
  * Only the persistence backing changes here.
  *
+ * READ PATH. `where()` materialises the whole container and scans it, which is
+ * fine for containers that are read whole and hopeless for the ones that are
+ * read a slice at a time. The `logs` container is the latter: it holds every
+ * meal, water, weight, workout-session, buddy-challenge and idempotency record
+ * for every user, and "one user's meals on one day" walked all of it. Hence
+ * SECONDARY_INDEXES below — maintained in-process, exact-match on a composite
+ * key, and always re-checked against the caller's predicate so an index that
+ * ever went wrong can only ever be slow, never wrong. See whereIndexed().
+ *
  * AZF_DATA_DIR overrides the data directory (used by integration tests).
  */
 import fs from 'node:fs';
@@ -77,6 +86,103 @@ export function newId(prefix?: string): string {
   return prefix ? `${prefix}-${id}` : id;
 }
 
+// ----- secondary indexes -----
+
+/**
+ * Compose an index key from its parts.
+ *
+ * The parts are escaped before joining because an unescaped delimiter is how
+ * composite keys collide: ('a|b', 'c') and ('a', 'b|c') would produce the same
+ * string and one user's day would answer for another's. Nothing we index today
+ * can contain a pipe (ids are UUIDs, dates are YYYY-MM-DD, types are literals),
+ * but a key builder that is only correct because of what its callers happen to
+ * pass is a trap for the next caller. The escape makes it injective outright.
+ */
+export function indexKey(...parts: string[]): string {
+  return parts.map((p) => p.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')).join('|');
+}
+
+/**
+ * One maintained lookup over one container.
+ *
+ * `key` returns undefined for a document the index does not cover — that
+ * document simply is not filed, and a lookup can never return it. Every doc in
+ * the `logs` container that is not a user-dated record (there are none today,
+ * but nothing enforces that) falls out this way rather than being filed under
+ * a half-formed key.
+ */
+export interface SecondaryIndexSpec {
+  readonly name: string;
+  readonly container: ContainerName;
+  readonly key: (doc: StoredDoc) => string | undefined;
+}
+
+/** Shape the log indexes read. Everything is optional: docs are opaque here. */
+interface UserDatedDoc extends StoredDoc {
+  type?: unknown;
+  userId?: unknown;
+  localDate?: unknown;
+}
+
+/** Exact-match index: one user, one record type, one local date. */
+export const LOGS_BY_USER_TYPE_DATE = 'logs.userId+type+localDate';
+
+/**
+ * Coarser index: one user, one record type, all dates.
+ *
+ * This exists because weightLogsInRange asks a RANGE question, and a hash
+ * index on an exact composite key cannot answer one — you would have to
+ * enumerate every date in the range and probe each, which is wrong the moment
+ * a caller asks for an open-ended or very wide window. Scanning this bucket
+ * instead is honest: it is O(that user's weight logs) rather than O(every log
+ * of every user), which is the reduction that actually mattered.
+ */
+export const LOGS_BY_USER_TYPE = 'logs.userId+type';
+
+function userTypeDateKey(doc: StoredDoc): string | undefined {
+  const d = doc as UserDatedDoc;
+  if (typeof d.userId !== 'string' || typeof d.type !== 'string') return undefined;
+  if (typeof d.localDate !== 'string') return undefined;
+  return indexKey(d.userId, d.type, d.localDate);
+}
+
+function userTypeKey(doc: StoredDoc): string | undefined {
+  const d = doc as UserDatedDoc;
+  if (typeof d.userId !== 'string' || typeof d.type !== 'string') return undefined;
+  return indexKey(d.userId, d.type);
+}
+
+/**
+ * Declared indexes, built by every backing at construction.
+ *
+ * Kept to the `logs` container deliberately. Each index costs a Map entry per
+ * key plus a Set entry per document plus one extractor call per write, so they
+ * are worth it only where reads are both hot and selective. Adding one for
+ * another container is a one-line change here — but measure the read first.
+ */
+export const SECONDARY_INDEXES: readonly SecondaryIndexSpec[] = [
+  { name: LOGS_BY_USER_TYPE_DATE, container: 'logs', key: userTypeDateKey },
+  { name: LOGS_BY_USER_TYPE, container: 'logs', key: userTypeKey },
+];
+
+/** Runtime state of one declared index. */
+interface SecondaryIndex {
+  readonly spec: SecondaryIndexSpec;
+  /** key -> the ids currently filed under it. */
+  readonly buckets: Map<string, Set<string>>;
+  /**
+   * id -> the key it was last filed under.
+   *
+   * This is what makes an UPDATE THAT CHANGES THE KEY correct, and it is the
+   * whole reason the index does not re-derive the old key from the old
+   * document: by the time upsert() runs, the caller may already hold a
+   * document that differs from the filed one, and re-deriving would remove the
+   * wrong bucket entry and strand the old one forever. Remembering where we
+   * actually put it cannot be wrong.
+   */
+  readonly filedAs: Map<string, string>;
+}
+
 /**
  * In-memory working set + the write-coalescing machinery. Subclasses supply
  * only `persist()` — how a batch of dirty ids reaches durable storage.
@@ -98,11 +204,22 @@ export abstract class MemoryBackedStore {
   private dirty = new Map<ContainerName, ContainerDelta>();
   private writeQueue: Promise<void> = Promise.resolve();
   private flushScheduled = false;
+  /** container -> index name -> index. Empty for containers with no indexes. */
+  private readonly indexes = new Map<ContainerName, Map<string, SecondaryIndex>>();
 
   protected constructor(dataDir: string) {
     this.dataDir = dataDir;
     fs.mkdirSync(this.dataDir, { recursive: true });
     for (const name of CONTAINERS) this.data.set(name, new Map());
+    // Built before any hydration so every path into memory — JsonStore's
+    // constructor, PostgresStore.hydrate(), and every later write — files
+    // through the same maintenance code. An index that is attached after the
+    // fact is an index that is already missing rows.
+    for (const spec of SECONDARY_INDEXES) {
+      let forContainer = this.indexes.get(spec.container);
+      if (!forContainer) this.indexes.set(spec.container, (forContainer = new Map()));
+      forContainer.set(spec.name, { spec, buckets: new Map(), filedAs: new Map() });
+    }
   }
 
   protected container(name: ContainerName): Map<string, StoredDoc> {
@@ -115,8 +232,78 @@ export abstract class MemoryBackedStore {
   protected hydrateContainer(name: ContainerName, docs: Iterable<StoredDoc>): void {
     const map = this.container(name);
     for (const doc of docs) {
-      if (doc && typeof doc.id === 'string') map.set(doc.id, doc);
+      if (doc && typeof doc.id === 'string') {
+        map.set(doc.id, doc);
+        this.indexPut(name, doc);
+      }
     }
+  }
+
+  /**
+   * Write a document into memory and its indexes WITHOUT marking it dirty.
+   *
+   * For the one caller that has already durably written the change itself and
+   * must only reconcile the local copy: compareAndSwapRefreshToken, which
+   * updates the row in Postgres and then folds the result back in. Going
+   * through here rather than `container(name).set(...)` is what stops that
+   * path from silently bypassing index maintenance if `users` is ever indexed.
+   */
+  protected setWithoutDirty(name: ContainerName, doc: StoredDoc): void {
+    this.container(name).set(doc.id, doc);
+    this.indexPut(name, doc);
+  }
+
+  // ----- index maintenance -----
+
+  /**
+   * File (or re-file) one document in every index over its container.
+   *
+   * The re-file case is the one that matters: when the extracted key changes,
+   * the id must leave its OLD bucket. Dropping that step is the classic
+   * secondary-index bug — the stale entry stays behind and the old key keeps
+   * answering with a document that no longer belongs to it.
+   */
+  private indexPut(name: ContainerName, doc: StoredDoc): void {
+    const forContainer = this.indexes.get(name);
+    if (!forContainer) return;
+    for (const index of forContainer.values()) {
+      const next = index.spec.key(doc);
+      const previous = index.filedAs.get(doc.id);
+      if (previous === next) continue;
+      if (previous !== undefined) this.detach(index, previous, doc.id);
+      if (next === undefined) {
+        index.filedAs.delete(doc.id);
+      } else {
+        index.filedAs.set(doc.id, next);
+        let bucket = index.buckets.get(next);
+        if (!bucket) index.buckets.set(next, (bucket = new Set()));
+        bucket.add(doc.id);
+      }
+    }
+  }
+
+  /** Remove one id from every index over its container. */
+  private indexDrop(name: ContainerName, id: string): void {
+    const forContainer = this.indexes.get(name);
+    if (!forContainer) return;
+    for (const index of forContainer.values()) {
+      const previous = index.filedAs.get(id);
+      if (previous === undefined) continue;
+      this.detach(index, previous, id);
+      index.filedAs.delete(id);
+    }
+  }
+
+  /**
+   * Drop an id from one bucket, dropping the bucket itself when it empties —
+   * otherwise a long-lived process accumulates one empty Set per key it has
+   * ever seen, which for a per-user-per-day key is unbounded growth.
+   */
+  private detach(index: SecondaryIndex, key: string, id: string): void {
+    const bucket = index.buckets.get(key);
+    if (!bucket) return;
+    bucket.delete(id);
+    if (bucket.size === 0) index.buckets.delete(key);
   }
 
   // ----- synchronous read/write API (unchanged contract) -----
@@ -140,22 +327,91 @@ export abstract class MemoryBackedStore {
     return undefined;
   }
 
+  /**
+   * Indexed equivalent of `where()`: the documents filed under `key` in
+   * `index` that also satisfy `pred`.
+   *
+   * TWO SAFETY PROPERTIES, both deliberate, because this serves health data
+   * and a wrong total is worse than a slow one:
+   *
+   *  1. `pred` is applied to every candidate the index returns. The index
+   *     narrows the search; the predicate decides the answer. So the result is
+   *     always a SUBSET of what `where(name, pred)` would return — an index
+   *     that somehow over-files can only cost time, never change an answer.
+   *  2. An index that is not declared for this container is not an error; the
+   *     call degrades to the full scan it replaced. Deleting a line from
+   *     SECONDARY_INDEXES makes the app slower, not wrong.
+   *
+   * What neither property covers is an index that UNDER-files — a document
+   * that should be in the bucket and is not. That is the only failure mode
+   * left, and it is exactly what the maintenance in indexPut/indexDrop and the
+   * tests in __tests__/storeIndexes.test.ts exist to rule out.
+   *
+   * `pred` must be the same predicate the unindexed call would have used, so
+   * the two are interchangeable at the call site.
+   */
+  whereIndexed<T extends StoredDoc>(
+    name: ContainerName,
+    index: string,
+    key: string,
+    pred: (doc: T) => boolean,
+  ): T[] {
+    const found = this.indexes.get(name)?.get(index);
+    if (!found) return this.where<T>(name, pred);
+    const ids = found.buckets.get(key);
+    if (!ids) return [];
+    const container = this.container(name);
+    const out: T[] = [];
+    for (const id of ids) {
+      const doc = container.get(id) as T | undefined;
+      if (doc && pred(doc)) out.push(doc);
+    }
+    return out;
+  }
+
+  /** True when `index` is declared over `name`. */
+  hasIndex(name: ContainerName, index: string): boolean {
+    return this.indexes.get(name)?.has(index) === true;
+  }
+
+  /**
+   * Raw contents of one index bucket, unfiltered by any predicate.
+   *
+   * Exposed so tests can assert on the index itself rather than on what
+   * whereIndexed's predicate re-check happens to hide: a stale entry left by a
+   * key change is invisible through whereIndexed and plainly visible here.
+   */
+  indexedIds(name: ContainerName, index: string, key: string): string[] {
+    const bucket = this.indexes.get(name)?.get(index)?.buckets.get(key);
+    return bucket ? [...bucket] : [];
+  }
+
   upsert<T extends StoredDoc>(name: ContainerName, doc: T): T {
     this.container(name).set(doc.id, doc);
+    // Before markDirty, so a persist() that reads memory can never observe a
+    // document whose index entry has not caught up.
+    this.indexPut(name, doc);
     this.markDirty(name, doc.id, 'write');
     return doc;
   }
 
   delete(name: ContainerName, id: string): boolean {
     const removed = this.container(name).delete(id);
-    if (removed) this.markDirty(name, id, 'delete');
+    if (removed) {
+      this.indexDrop(name, id);
+      this.markDirty(name, id, 'delete');
+    }
     return removed;
   }
 
   deleteWhere<T extends StoredDoc>(name: ContainerName, pred: (doc: T) => boolean): number {
+    // Still a full scan: deleteWhere takes an arbitrary predicate that no
+    // single index can answer, and it is a sweep/erasure path rather than a
+    // request path. Correctness over cleverness here.
     const doomed = this.where<T>(name, pred).map((d) => d.id);
     for (const id of doomed) {
       this.container(name).delete(id);
+      this.indexDrop(name, id);
       this.markDirty(name, id, 'delete');
     }
     return doomed.length;
@@ -258,7 +514,7 @@ export abstract class MemoryBackedStore {
     if (rec.tokenHash !== tokenHash) return undefined;
     if (rec.usedAt !== null || rec.revokedAt !== null) return undefined;
     const updated = { ...rec, usedAt };
-    this.container('users').set(tokenId, updated);
+    this.setWithoutDirty('users', updated);
     this.markDirty('users', tokenId, 'write');
     return updated;
   }

@@ -37,6 +37,7 @@ import { AppError } from '../../platform/errors';
 import { logAiCall } from '../../platform/telemetry';
 import type { AiMetadata, ModelGroup } from '@aquazerofit/shared';
 import { mockComplete, type MockMessage } from './providers/mock';
+import { budgetExhausted, recordSuppressed } from '../../platform/aiBudget';
 import { promptVersionFor, type PromptId } from './prompts';
 
 export interface GatewayMessage {
@@ -69,7 +70,7 @@ export interface GatewayOptions {
 }
 
 /** Why a result came from the offline engine instead of a real model. */
-export type DegradedReason = 'provider_failure' | 'deadline_exceeded';
+export type DegradedReason = 'provider_failure' | 'deadline_exceeded' | 'budget_exhausted';
 
 /**
  * Additive extension of AiMetadata. Optional so existing callers (and the eval
@@ -491,7 +492,21 @@ export async function complete(
   let realProviderInPlay = false;
   let deadlineExceeded = false;
 
-  outer: for (const provider of PROVIDERS) {
+  /*
+   * The deployment-wide kill switch. Past the day's token budget the provider
+   * chain is not entered at all and the offline engine answers instead —
+   * which every caller already handles, because it is the same path a total
+   * provider outage takes. The app keeps working; the spending stops.
+   *
+   * Empty-array iteration rather than an `if` around the loop: it keeps the
+   * `outer:` label and the `realProviderInPlay` bookkeeping below exactly as
+   * they were, so the budget cannot change what "degraded" means on any other
+   * path by accident.
+   */
+  const budgetStopped = budgetExhausted();
+  if (budgetStopped) recordSuppressed();
+
+  outer: for (const provider of budgetStopped ? [] : PROVIDERS) {
     const credentialed = !!process.env[provider.keyEnv];
     if (!credentialed && !provider.keyOptional) continue;
     // Counted before the breaker check: a provider skipped because it is
@@ -578,11 +593,16 @@ export async function complete(
   // never retried and never timed out: the eval runner and test suite depend on
   // its output being byte-identical.
   const started = Date.now();
-  const degraded = realProviderInPlay;
+  // Budget-stopped counts as degraded so callers release credit holds: the
+  // user asked for a model answer, got template output, and must not be
+  // charged for the operator's ceiling.
+  const degraded = realProviderInPlay || budgetStopped;
   const degradedReason: DegradedReason | undefined = degraded
-    ? deadlineExceeded
-      ? 'deadline_exceeded'
-      : 'provider_failure'
+    ? budgetStopped
+      ? 'budget_exhausted'
+      : deadlineExceeded
+        ? 'deadline_exceeded'
+        : 'provider_failure'
     : undefined;
   try {
     const result = mockComplete(task, messages as MockMessage[], {
@@ -667,7 +687,14 @@ export async function complete(
     let realProviderInPlay = false;
     let deadlineExceeded = false;
 
-    outer: for (const provider of PROVIDERS) {
+    // Same kill switch as complete(). Chat streams over an already-open SSE
+    // socket, and it is the highest-volume lane in the product — a budget
+    // that covered only the non-streaming path would be watching the smaller
+    // half of the spend.
+    const budgetStopped = budgetExhausted();
+    if (budgetStopped) recordSuppressed();
+
+    outer: for (const provider of budgetStopped ? [] : PROVIDERS) {
       const credentialed = !!process.env[provider.keyEnv];
       if (!credentialed && !provider.keyOptional) continue;
       realProviderInPlay = realProviderInPlay || credentialed;
@@ -810,13 +837,15 @@ export async function complete(
 
     // Fallback to mock engine
     const started = Date.now();
-    const degraded = realProviderInPlay;
+    const degraded = realProviderInPlay || budgetStopped;
     const degradedReason: DegradedReason | undefined = degraded
-      ? deadlineExceeded
-        ? 'deadline_exceeded'
-        : 'provider_failure'
+      ? budgetStopped
+        ? 'budget_exhausted'
+        : deadlineExceeded
+          ? 'deadline_exceeded'
+          : 'provider_failure'
       : undefined;
-  
+
     try {
       const result = mockComplete(task, messages as MockMessage[], {
         context: opts.context,

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "592686987043",
+    "project_id": "aquazerofit",
+    "storage_bucket": "aquazerofit.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:592686987043:android:8b15c575fcc85492697e96",
+        "android_client_info": {
+          "package_name": "fit.aquazero.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-5Xzb2zlKjrVSFTG02QqX4xO2H24QY8E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

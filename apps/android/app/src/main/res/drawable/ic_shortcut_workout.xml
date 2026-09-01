@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut: today's workout. Dumbbell, drawn as five rectangles so
+     it survives being scaled down and masked. Palette as ic_shortcut_meal. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#1A2122"
+        android:pathData="M24,24m-24,0a24,24 0 1,0 48,0a24,24 0 1,0 -48,0" />
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M10,20 h3.4 v8 h-3.4 z" />
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M14.4,16.5 h4 v15 h-4 z" />
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M18.4,21.8 h11.2 v4.4 h-11.2 z" />
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M29.6,16.5 h4 v15 h-4 z" />
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M34.6,20 h3.4 v8 h-3.4 z" />
+</vector>

@@ -18,8 +18,16 @@ export interface ShareCardPayload {
   catchphrase?: string;
 }
 
-const W = 1080;
-const H = 1350;
+/**
+ * Canvas size of every rendered card. Exported so the preview `<img>` can
+ * reserve the exact box the blob will decode into — the sheet swaps a fixed
+ * placeholder for the image, and without the real ratio that swap is a jump.
+ */
+export const SHARE_CARD_W = 1080;
+export const SHARE_CARD_H = 1350;
+
+const W = SHARE_CARD_W;
+const H = SHARE_CARD_H;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {

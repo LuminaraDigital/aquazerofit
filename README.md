@@ -2,13 +2,14 @@
 
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 [![Licence: AGPL v3](https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue.svg)](LICENSE)
+[![Android](https://img.shields.io/badge/android-Kotlin%20%2B%20Compose-3DDC84.svg)](apps/android/README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 
 AI-powered wellness platform under the **AquaZero** brand. Users build a wellness profile, log meals manually or by photograph, and receive personalised calorie targets, meal suggestions and home training plans that adapt to measured progress. A conversational assistant ("Aqua Coach") answers nutrition and fitness questions inside strict safety boundaries.
 
 > AquaZeroFit provides general wellness and fitness support only. It does not provide medical diagnosis, treatment or professional healthcare advice. This boundary is a product requirement, not a disclaimer (AQF-02 §1).
 
-One React codebase delivers **two targets**: a responsive web application (the assessed surface) and a **Telegram Mini App** (theme binding + native controls when launched inside Telegram).
+The platform ships **three clients against one backend**. A single React codebase delivers two of them — a responsive web application and a **Telegram Mini App** (theme binding + native controls when launched inside Telegram) — and a **native Android app** (Kotlin + Jetpack Compose) is the third. The Android client is not a wrapper: it is a separate offline-first client speaking the same frozen `/api/v1` contract, and it has [its own README](apps/android/README.md).
 
 ## The product
 
@@ -32,19 +33,22 @@ Also captured: [welcome](docs/screenshots/01-welcome.png), [sign-in](docs/screen
 ## Repository layout
 
 ```
-apps/web           React 18 + TypeScript + Vite + Tailwind — both delivery targets
+apps/web           React 18 + TypeScript + Vite + Tailwind — web + Telegram Mini App
+apps/android       Native Android client: Kotlin, Jetpack Compose, Room, Hilt
 apps/api           Node.js + TypeScript API implementing the /api/v1 contract (AQF-07)
 packages/shared    Shared types, zod validation schemas, error taxonomy, constants
 prompts/           Versioned AI prompt files P-01..P-11 (AQF-10)
 evals/             Safety evaluation sets and runner (pipeline gate)
 content/           Licensing attribution and workout-media governance
+docs/ARCHITECTURE.md  System architecture report
 docs/specs/        AQF-01..AQF-22 document set
 docs/research/     Upstream integration and licensing research tracks
 docs/plans/        Integration and delivery plans
+docs/security/     Security audit findings
 design/figma/      Screen references and the Modern Aquatic Wellness design system
 design/brand/      Brand assets
-tools/docgen/      Markdown to .docx renderer (build tooling, not a workspace)
-tools/screenshots/ Re-encodes docs/screenshots into the WebP used by the landing page
+design/cards/      Collectible card masters (card.svg per fighter)
+tools/             Asset and document generators — see tools/README.md
 ```
 
 `prompts/` and `evals/` must stay at the repository root: `apps/api/src/modules/ai/prompts.ts`
@@ -87,6 +91,42 @@ deterministic offline mock until an AI provider key is set (see
 > protocol=tcp` lists them). Start Vite on any free port instead:
 > `npm run dev --workspace apps/web -- --port 5300` (the `--` must come after
 > the workspace flag so the port reaches Vite rather than npm).
+
+## The Android app
+
+`apps/android` is a native Kotlin client, not a WebView and not a port of the
+React code. It talks to the same `/api/v1` the web app does, and it is the
+surface where the offline story actually matters — a gym has no signal.
+
+**Full documentation: [`apps/android/README.md`](apps/android/README.md).**
+
+```bash
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"   # no `java` on PATH
+cd apps/android
+./gradlew assembleDebug                                          # debug points at 10.0.2.2:4000
+./gradlew ktlintCheck detekt lintDebug testDebugUnitTest          # the gates CI runs
+```
+
+Start `npm run api` first — the emulator reaches the host API through
+`10.0.2.2`.
+
+| | |
+| --- | --- |
+| Stack | Kotlin 2.3.20, Compose (BOM 2026.08.00), Navigation 3, Room 3, Hilt 2.60.1, Retrofit/OkHttp |
+| Scope | 21 screens, 25 ViewModels, 19 repositories, ~62k lines of Kotlin |
+| DI | Hilt end to end — 15 modules, 73 files injecting, constructor injection only, no service locator |
+| Offline | Room as source of truth, outbox + WorkManager replay with `Idempotency-Key` |
+| Tests | 518 JVM unit tests in 63 classes, plus 55 instrumented; Android Lint clean |
+| Platform | `minSdk` 26, `targetSdk` 36, R8-minified signed release, AAB pipeline for Play |
+
+Native-only capabilities the web client has no equivalent for: ML Kit barcode
+scanning, CameraX meal capture, Health Connect (steps/heart rate/sleep in,
+weight out), a Glance home-screen widget with app shortcuts, a Quick Settings
+rest-timer tile, a foreground live-workout notification, and Google Play
+Billing for the premium subscription.
+
+Architecture, the DI rationale, the release-signing guard and the
+modularisation plan are all covered in the Android README.
 
 ## Two surfaces: web is marketing, Telegram is the product
 
@@ -298,6 +338,16 @@ art present and each file that lands upgrades one card silently.
 ## Documentation
 
 The authoritative document set lives in `docs/specs/` (AQF-01 Charter … AQF-22 Deployment Guide). The API surface is specified in AQF-07; algorithms in AQF-09; the prompt bank and LLMOps plan in AQF-10; safety and privacy design in AQF-11; deployment and domain setup in AQF-22.
+
+Alongside the specification set:
+
+- [apps/android/README.md](apps/android/README.md) — the Android client: architecture, dependency injection, testing approach, release pipeline.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the system architecture report: module boundaries, data flow and the reasoning behind the structural decisions.
+- [docs/security/SECURITY_AUDIT_REPORT.md](docs/security/SECURITY_AUDIT_REPORT.md) — the comprehensive security audit and its findings.
+- [docs/plans/ANDROID_MODULARISATION.md](docs/plans/ANDROID_MODULARISATION.md) — the measured dependency graph behind the Android layering, and the phased plan to make the compiler enforce it.
+- [docs/PLAY_STORE_RELEASE_GUIDE.md](docs/PLAY_STORE_RELEASE_GUIDE.md) — signing, versioning and the tagged-release workflow.
+- [docs/plans/](docs/plans/) — integration and migration plans, including the Vite 8.x upgrade.
+- [tools/README.md](tools/README.md) — the asset and document generators, and when you need them.
 
 ## Security notes
 

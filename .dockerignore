@@ -17,6 +17,13 @@ node_modules
 .gitattributes
 .github
 .claude
+.cursor
+.windsurf
+.aider*
+.artifacts
+.codex
+.gemini
+.antigravity
 .replit
 
 # Runtime content - mounted via volumes at runtime, never baked in
@@ -50,3 +57,8 @@ tools/
 .DS_Store
 Thumbs.db
 *.log
+
+# The Android app. Gradle build, never COPYed by apps/api/Dockerfile, and
+# ~326 MB of sources, build output and 209 MB of exercise media that was
+# being streamed to the Docker daemon as build context on every single build.
+apps/android/

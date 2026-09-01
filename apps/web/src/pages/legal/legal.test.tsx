@@ -21,6 +21,7 @@ vi.mock('../../lib/telegram', () => ({ isTMA: mocks.isTMA }));
 import PrivacyPage from './Privacy';
 import TermsPage from './Terms';
 import SupportPage from './Support';
+import AccountDeletionPage from './AccountDeletion';
 import { isPublished, OPERATOR } from './operator';
 
 function renderAt(path: string, element: React.ReactNode) {
@@ -61,6 +62,7 @@ describe('legal pages', () => {
       ['/privacy', <PrivacyPage key="p" />],
       ['/terms', <TermsPage key="t" />],
       ['/support', <SupportPage key="s" />],
+      ['/account/deletion', <AccountDeletionPage key="d" />],
     ] as const) {
       renderAt(path, element);
       expect(screen.getByText(/draft — not yet in force/i)).toBeTruthy();
@@ -100,6 +102,44 @@ describe('privacy notice', () => {
     expect(
       screen.getByText(new RegExp(`accepts ages from\\s+${RANGES.age.min}`, 'i')),
     ).toBeTruthy();
+  });
+});
+
+/**
+ * Play requires a public URL where an account can be deleted without the app
+ * installed, and requires it to state what deletion actually does. These
+ * assertions are against the semantics in apps/api/src/modules/me/service.ts —
+ * two steps, a 30-day grace period, an anonymised remainder — because a page
+ * that describes a different flow than the code runs is the failure mode this
+ * requirement exists to prevent.
+ */
+describe('account deletion page', () => {
+  it('gives the in-app route and the browser route', () => {
+    renderAt('/account/deletion', <AccountDeletionPage />);
+
+    expect(screen.getAllByText(/Settings/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: /deleting from a browser/i })).toBeTruthy();
+  });
+
+  it('describes the two-step deletion and the grace period the server enforces', () => {
+    renderAt('/account/deletion', <AccountDeletionPage />);
+
+    expect(screen.getByText(/30-day grace period starts/i)).toBeTruthy();
+    expect(screen.getByText(/erased immediately/i)).toBeTruthy();
+    expect(screen.getByText(/every six hours/i)).toBeTruthy();
+  });
+
+  it('says what survives deletion, and links the retention table', () => {
+    const { container } = renderAt('/account/deletion', <AccountDeletionPage />);
+
+    expect(screen.getAllByText(/anonymised/i).length).toBeGreaterThan(0);
+    expect(container.querySelector('a[href="/privacy#retention"]')).toBeTruthy();
+  });
+
+  it('offers the export before the irreversible step', () => {
+    renderAt('/account/deletion', <AccountDeletionPage />);
+
+    expect(screen.getByText(/Export my data/)).toBeTruthy();
   });
 });
 

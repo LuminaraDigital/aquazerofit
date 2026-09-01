@@ -68,10 +68,90 @@ export const CREDIT_COSTS = {
   planGeneration: 5,
   recipeGeneration: 2,
   progressInsight: 1,
+  /**
+   * One swap suggestion on the planStructured lane. Priced at 1 rather than
+   * near planGeneration because it reasons over a single slot, not a week —
+   * and because it is charged only on the branch that actually calls the
+   * model: a swap served from the deterministic variation group is free.
+   */
+  exerciseSwap: 1,
+  /**
+   * The fact-extraction pass that runs after a coach turn, plus its amortised
+   * rolling-summary refresh. Charged separately from chatTurn rather than
+   * folded into it, because it runs only for accounts with aiPersonalisation
+   * consent on — pricing it into every turn would bill the users who opted
+   * out for a model call their consent setting prevents.
+   */
+  memoryExtraction: 1,
 } as const;
 export type CreditTask = keyof typeof CREDIT_COSTS;
 
-export const FREE_TIER_DAILY_CREDITS = 50;
+/**
+ * The free daily allowance — and the actual paywall.
+ *
+ * Ten credits is three meal-photo scans, or ten coach messages, or two AI
+ * training plans. That is deliberately enough to experience every feature and
+ * not enough to live on, which is the shape that converts: nothing is removed
+ * from the free tier, so the app never has to take something away from
+ * somebody who already had it, and the limit a user meets is one they can see
+ * coming and fix.
+ *
+ * It was 50, which at three scans a day is a fortnight of AI for every signup
+ * on an unfunded product, and gave a paying user nothing to buy.
+ */
+export const FREE_TIER_DAILY_CREDITS = 10;
+
+/**
+ * The paid daily allowance. Fifteen times the free tier.
+ *
+ * Sized against the margin rather than against a round number. A chat turn on
+ * the 70B lane costs roughly $0.0015 all-in, so a subscriber who genuinely
+ * spent this every day for a month runs to about $7 — against a $9.99
+ * subscription that nets nearer $8.49 after the store's cut. That is thin but
+ * positive. At the 300 this started as, the same user costs about $14 and the
+ * plan loses money on precisely the people most likely to buy it: a cap only
+ * matters for the heaviest users, so it has to be set where the heaviest user
+ * is still profitable, not where the median one is.
+ *
+ * Deliberately the conservative direction of travel. Raising a published
+ * allowance is a pleasant announcement; lowering one is a broken promise, and
+ * the users who notice are the subscribers.
+ *
+ * Not the only ceiling: this bounds one account, and the deployment-level
+ * AZF_DAILY_TOKEN_BUDGET bounds the aggregate. Neither substitutes for the
+ * other — a thousand well-behaved subscribers are still a bill nobody capped.
+ */
+export const PREMIUM_TIER_DAILY_CREDITS = 150;
+
+/** Daily allowance for a tier. The single source both the grant and the UI read. */
+export function dailyCreditsFor(tier: 'free' | 'premium'): number {
+  return tier === 'premium' ? PREMIUM_TIER_DAILY_CREDITS : FREE_TIER_DAILY_CREDITS;
+}
+
+/**
+ * Ceiling on a carried-over balance.
+ *
+ * Unspent credits carry over, and the balance is a plain fold with no upper
+ * bound — so an account that opened the plan screen daily for a month without
+ * spending banked a month of grants and could then discharge the lot in one
+ * sitting, throttled only by the per-minute lane. The daily grant is what
+ * bounds cost per user per day; without a ceiling it bounded nothing but the
+ * long-run average.
+ *
+ * Two days' worth: enough that skipping a day is not punished, not enough to
+ * stockpile. The grant tops up TOWARD this figure and never past it.
+ */
+export function maxBankedCreditsFor(tier: 'free' | 'premium'): number {
+  return dailyCreditsFor(tier) * 2;
+}
+
+/**
+ * Kept as the free-tier figure because that is what every existing caller
+ * meant by it. New code should ask `maxBankedCreditsFor(tier)` — a premium
+ * account clamped to the free ceiling would lose most of what it bought on the
+ * first day it did not spend.
+ */
+export const MAX_BANKED_CREDITS = maxBankedCreditsFor('free');
 
 /**
  * Consistency model (recovery-aware streak, AQF-11 §6 weight-neutral copy).
@@ -160,8 +240,106 @@ export const WELLNESS_DISCLAIMER =
  */
 export const SOURCE_CODE_URL = 'https://github.com/LuminaraDigital/aquazerofit';
 
-export const CRISIS_SIGNPOST =
-  'It sounds like you may be going through something serious. AquaZeroFit is not able to help with this, but you deserve real support: please reach out to a healthcare professional, or contact Lifeline on 13 11 14 (Australia) or your local crisis service.';
+/**
+ * Crisis signposting (AQF-11 §4).
+ *
+ * The refusal itself is the same everywhere — what changes is the number at
+ * the end of it. A person in Manchester told to ring an Australian landline
+ * has been given a refusal dressed as help, which is worse than a refusal, and
+ * Play's health-content policy reads it the same way.
+ *
+ * The map is deliberately small and factual: national, free, staffed lines
+ * only. Anything not listed gets the directory rather than a guess, because a
+ * wrong number is the one failure mode this feature exists to prevent.
+ */
+const CRISIS_LEAD =
+  'It sounds like you may be going through something serious. AquaZeroFit is not able to help with this, but you deserve real support: please reach out to a healthcare professional, or ';
+
+export interface CrisisHelpline {
+  /** How the service is named to the user. */
+  name: string;
+  /** The number to dial, formatted as that country writes it. */
+  phone: string;
+  /** Country label shown in parentheses. */
+  region: string;
+}
+
+/** ISO 3166-1 alpha-2 region → national crisis line. */
+export const CRISIS_HELPLINES: Readonly<Record<string, CrisisHelpline>> = {
+  AU: { name: 'Lifeline', phone: '13 11 14', region: 'Australia' },
+  US: { name: 'the 988 Suicide & Crisis Lifeline', phone: '988', region: 'United States' },
+  CA: { name: 'the 988 Suicide & Crisis Helpline', phone: '988', region: 'Canada' },
+  GB: { name: 'Samaritans', phone: '116 123', region: 'United Kingdom' },
+  IE: { name: 'Samaritans', phone: '116 123', region: 'Ireland' },
+  NZ: { name: 'Need to talk?', phone: '1737', region: 'New Zealand' },
+  IN: { name: 'Tele-MANAS', phone: '14416', region: 'India' },
+} as const;
+
+/** Where an unmapped region is sent: a maintained, country-aware directory. */
+export const CRISIS_HELPLINE_DIRECTORY_URL = 'https://findahelpline.com';
+
+/** Region used when the caller told us nothing — the product's home market. */
+export const CRISIS_DEFAULT_REGION = 'AU';
+
+/**
+ * Pull the ISO 3166-1 alpha-2 region out of a locale-ish string.
+ *
+ * Accepts everything a client might actually send: a BCP 47 tag (`en-AU`), a
+ * POSIX-flavoured one (`en_GB`), a tag carrying a script subtag
+ * (`zh-Hant-TW`), and a whole Accept-Language header with quality values
+ * (`en-GB,en;q=0.9`). Case and separator are irrelevant.
+ *
+ * Tags are scanned in the order sent — browsers order Accept-Language by
+ * descending preference — and the first region subtag found wins. Returns null
+ * when there is no region to find, which is a different answer from "a region
+ * we have no line for": the first falls back to AU, the second to the
+ * directory.
+ */
+export function regionFromLocale(locale: string | null | undefined): string | null {
+  if (typeof locale !== 'string' || locale.trim() === '') return null;
+
+  for (const entry of locale.split(',')) {
+    // Drop the q-value, normalise the POSIX underscore.
+    const tag = entry.split(';')[0]!.trim().replace(/_/g, '-');
+    if (tag === '' || tag === '*') continue;
+
+    // subtags[0] is the language; a 2-alpha subtag after it is the region.
+    // 4-alpha is a script (Hant), 3-alpha an extlang, 5+ a variant.
+    const subtags = tag.split('-').slice(1);
+    for (const subtag of subtags) {
+      if (/^[A-Za-z]{2}$/.test(subtag)) return subtag.toUpperCase();
+    }
+  }
+  return null;
+}
+
+/** The helpline for a locale, or null when its region is not one we map. */
+export function crisisHelplineFor(locale: string | null | undefined): CrisisHelpline | null {
+  const region = regionFromLocale(locale) ?? CRISIS_DEFAULT_REGION;
+  return CRISIS_HELPLINES[region] ?? null;
+}
+
+/**
+ * The crisis refusal, pointed at the caller's own country.
+ *
+ * No region (or an unparseable locale) yields the AU wording byte-for-byte —
+ * `CRISIS_SIGNPOST` below is defined as this function's output for exactly
+ * that reason, so the two can never drift.
+ */
+export function crisisSignpostFor(locale: string | null | undefined): string {
+  const helpline = crisisHelplineFor(locale);
+  if (!helpline) {
+    return `${CRISIS_LEAD}find a crisis line in your country at ${CRISIS_HELPLINE_DIRECTORY_URL}.`;
+  }
+  return `${CRISIS_LEAD}contact ${helpline.name} on ${helpline.phone} (${helpline.region}) or your local crisis service.`;
+}
+
+/**
+ * Unlocalised signpost, kept for back-compat with call sites that have no
+ * locale to hand (the marketing and support pages, which are served from an
+ * AU-registered product). Identical to `crisisSignpostFor(undefined)`.
+ */
+export const CRISIS_SIGNPOST = crisisSignpostFor(undefined);
 
 /**
  * Aqua character kit (growth P0). The hero character is Akin with interactive

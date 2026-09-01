@@ -84,3 +84,32 @@ export function useSeo(path: string, overrides: SeoInput = {}): void {
     setMeta('name', 'twitter:image', image);
   }, [path, titleOverride, descriptionOverride]);
 }
+
+/**
+ * Mark the current document `noindex, nofollow`.
+ *
+ * `NON_INDEXABLE_PREFIXES` already keeps these paths out of robots.txt and the
+ * sitemap, but neither is a directive about the *page* — robots.txt asks a
+ * crawler not to fetch a URL, and a URL that is linked or submitted from
+ * somewhere else can still be indexed without being fetched. A meta robots tag
+ * is the statement that survives that, and it is the one thing the two
+ * build-time mechanisms cannot say.
+ *
+ * Written once on mount and deliberately removed on unmount: this is a
+ * single-document SPA, so a tag left behind by a page the user has navigated
+ * away from would go on suppressing a marketing route that wants indexing.
+ */
+export function useNoIndex(): void {
+  useEffect(() => {
+    const existing = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    const el = existing ?? document.createElement('meta');
+    const previous = existing?.getAttribute('content') ?? null;
+    el.setAttribute('name', 'robots');
+    el.setAttribute('content', 'noindex, nofollow');
+    if (!existing) document.head.appendChild(el);
+    return () => {
+      if (previous === null) el.remove();
+      else el.setAttribute('content', previous);
+    };
+  }, []);
+}

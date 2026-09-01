@@ -39,6 +39,7 @@ import { asList, estimateKcal, estimateMinutes, ExerciseImage, unwrapSession } f
 import { ShareMoment } from '@/components/share/ShareMoment';
 import type { ShareCardPayload } from '@/lib/shareCard';
 import { todayWorkoutQuery, useMe } from '@/lib/queries';
+import { applyCompletedSession, optimisticPatch, patchTodaySession } from '@/lib/optimistic';
 import { AQUA_CHARACTER } from '@aquazerofit/shared';
 
 type Phase = 'overview' | 'work' | 'rest' | 'summary';
@@ -257,18 +258,34 @@ export default function WorkoutDetail() {
   });
 
   // ---- complete workout ----
+  /**
+   * The only set-related write that touches the network. Completing an
+   * individual set is local state (`setsDone` / `setLogs`) and already paints
+   * instantly; the whole session is posted once, here, at the end — which is
+   * where the user waits, and so where the optimistic write belongs.
+   *
+   * The cached value must stay the raw ['workout','today'] envelope, because
+   * the dashboard and the library read the same key and carve their own slices
+   * with `select` (see the INVARIANT on todayWorkoutQuery). patchTodaySession
+   * therefore reaches inside the envelope rather than replacing it. Server
+   * work — `kcalBurned`, achievements, plan progression — is left to the
+   * settle-time invalidation.
+   */
+  const completePatch = optimisticPatch<
+    unknown,
+    { exercises: CompleteExerciseInput[]; durationMinutes: number; localDate: string }
+  >(queryClient, todayWorkoutQuery.queryKey, (previous, payload) =>
+    patchTodaySession(previous, (s) => applyCompletedSession(s, payload)),
+  );
+
   const completeMutation = useMutation({
     mutationFn: (payload: {
       exercises: CompleteExerciseInput[];
       durationMinutes: number;
       localDate: string;
     }) => api<WorkoutSession>(`/workouts/${sessionId}/complete`, { method: 'POST', body: payload }),
+    ...completePatch,
     onSuccess: async () => {
-      void queryClient.invalidateQueries({ queryKey: ['workout'] });
-      void queryClient.invalidateQueries({ queryKey: ['plan'] });
-      void queryClient.invalidateQueries({ queryKey: ['progress'] });
-      void queryClient.invalidateQueries({ queryKey: ['workout-stats'] });
-      void queryClient.invalidateQueries({ queryKey: ['challenges'] });
       toast.success('Workout complete - great session!');
       const mins = durationMinutes();
       setSharePayload({
@@ -297,7 +314,17 @@ export default function WorkoutDetail() {
         // achievements toast is best-effort only
       }
     },
-    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Could not save the workout'),
+    onError: (e, _vars, context) => {
+      completePatch.onError(context);
+      toast.error(e instanceof ApiError ? e.message : 'Could not save the workout');
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workout'] });
+      void queryClient.invalidateQueries({ queryKey: ['plan'] });
+      void queryClient.invalidateQueries({ queryKey: ['progress'] });
+      void queryClient.invalidateQueries({ queryKey: ['workout-stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['challenges'] });
+    },
   });
 
   const submitSummary = () => {

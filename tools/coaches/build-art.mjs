@@ -53,6 +53,25 @@ const SOURCES = {
   uthman: ['Uthman Nurmakhmedov', 'uthman'],
   sanzo: ['Sanzō', 'Sanzo', 'sanzo'],
   mataemon: ['Mataemon Aoki', 'mataemon'],
+  carlos: ['Carlos Mendez', 'Carlos_Mendez', 'carlos'],
+  craig: ['Craig Beast', 'Craig_Beast', 'craig'],
+  danial: ['Danial Nickal', 'Danial_Nickal', 'Daniel_Nickal', 'danial'],
+  dmitry: ['Dmitry Volkov', 'Dmitry_Volkov', 'dmitry'],
+  fabio: ['Fabio Guedes', 'Fabio_Guedes', 'fabio'],
+  frank: ['Frank Mason', 'Frank_Mason', 'frank'],
+  gaius: ['Gaius Marcus', 'Gaius_Marcus', 'gaius'],
+  george: ['George Saint', 'George_Saint', 'george'],
+  kwon: ['Kwon Won-Ri', 'Kwon_Won_Ri', 'kwon'],
+  mike: ['Mike Takayama', 'Mike_Takayama', 'mike'],
+  paul: ['Paul Thomas', 'Paul_Thomas', 'paul'],
+  randall: ['Randall Stevens', 'Randall_Stevens', 'randall'],
+  reinier: ['Reinier Jansen', 'Reinier_Jansen', 'reinier'],
+  rolando: ['Rolando Fitch', 'Rolando_Fitch', 'rolando'],
+  ryoto: ['Ryoto Katou', 'Ry_to_Katou', 'Ryoto_Katou', 'ryoto'],
+  sergio: ['Sergio Newton', 'Sergio_Newton', 'sergio'],
+  terry: ['Terry Crawford', 'Terry_Crawford', 'terry'],
+  usman: ['Usman Sergei Magomedov', 'Usman_Sergei_Magomedov', 'usman'],
+  zhang: ['Zhang Kai', 'Zhang_Kai', 'zhang'],
 };
 
 /**
@@ -104,13 +123,25 @@ const sourceDir = process.argv[2]
   ? path.resolve(process.argv[2])
   : path.join(process.env.USERPROFILE ?? process.env.HOME ?? '.', 'Downloads');
 
-/** Case- and extension-insensitive lookup over the source directory. */
+function normalizeName(str) {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/** Case-, accent-, and delimiter-insensitive lookup over recursive source directory files. */
 function findSource(files, candidates) {
-  for (const candidate of candidates) {
-    const match = files.find(
-      (file) => path.parse(file).name.toLowerCase() === candidate.toLowerCase(),
-    );
-    if (match) return match;
+  const normCandidates = candidates.map(normalizeName);
+  for (const file of files) {
+    const base = path.parse(file).name;
+    const normBase = normalizeName(base);
+    if (normCandidates.some(c => normBase === c || normBase.startsWith(c + ' ') || normBase.endsWith(' ' + c))) {
+      return file;
+    }
   }
   return null;
 }
@@ -190,7 +221,7 @@ async function buildVariant(id, files, outDir) {
 async function main() {
   let files;
   try {
-    files = await readdir(sourceDir);
+    files = await readdir(sourceDir, { recursive: true });
   } catch {
     console.error(`Source directory not readable: ${sourceDir}`);
     process.exit(1);

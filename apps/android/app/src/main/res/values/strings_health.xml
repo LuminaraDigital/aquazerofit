@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Health Connect strings.
+
+  A separate file rather than more lines on the end of strings.xml: Android
+  merges every file under res/values into one namespace, so R.string.health_*
+  resolves identically, and keeping this feature's copy in its own file means
+  two people adding strings at the same time cannot silently drop each other's
+  work. Every key here is prefixed `health_`.
+-->
+<resources>
+
+    <string name="health_heading">Health Connect</string>
+    <string name="health_card_title">Health Connect</string>
+    <string name="health_card_body">Bring steps, heart rate, sleep and energy from your phone or watch into AquaZeroFit, and send the weights you log back out.</string>
+
+    <string name="health_rationale_title">Why AquaZeroFit uses Health Connect</string>
+    <string name="health_rationale_body">AquaZeroFit reads steps, heart rate, sleep, and energy burned to show recovery-aware training and daily targets. Weight you log in the app can be written back to Health Connect if you allow it. Health data is processed on your device and is not uploaded to our servers.</string>
+
+    <!-- Privacy. Shown before connecting, not after: the point is to inform
+         the decision, not to reassure someone who has already made it. -->
+    <string name="health_privacy_note">Your health data stays on this device. AquaZeroFit reads it to draw the figures below and never uploads it, includes it in diagnostics, or shares it.</string>
+
+    <!-- Availability states. -->
+    <string name="health_unavailable_title">Not available on this device</string>
+    <string name="health_unavailable_body">Health Connect needs Android 8 or newer, and the Health Connect app on Android 13 and below.</string>
+    <string name="health_install_title">Health Connect isn\'t installed</string>
+    <string name="health_install_body">On Android 13 and below, Health Connect is a separate free app from Google.</string>
+    <string name="health_install_action">Get Health Connect</string>
+    <string name="health_update_title">Health Connect needs updating</string>
+    <string name="health_update_body">The version on this device is older than AquaZeroFit can talk to.</string>
+    <string name="health_update_action">Update Health Connect</string>
+
+    <!-- Connection. -->
+    <string name="health_connect_action">Connect</string>
+    <string name="health_disconnect_action">Disconnect</string>
+    <string name="health_manage_action">Manage in Health Connect</string>
+    <string name="health_permissions_partial">AquaZeroFit needs all five permissions to show these figures. You can review them in Health Connect.</string>
+    <string name="health_permissions_denied">Nothing was connected. You can try again whenever you like.</string>
+    <string name="health_connected_message">Connected. Today\'s figures are below.</string>
+    <string name="health_disconnected_message">Disconnected. AquaZeroFit has stopped reading your health data.</string>
+    <string name="health_disconnect_note">Disconnecting stops AquaZeroFit reading straight away. To withdraw the permissions themselves, use Health Connect.</string>
+
+    <!-- Today's figures. -->
+    <string name="health_today_heading">Today</string>
+    <string name="health_steps_label">Steps</string>
+    <string name="health_heart_rate_label">Average heart rate</string>
+    <string name="health_resting_label">Lowest heart rate</string>
+    <string name="health_sleep_label">Sleep last night</string>
+    <string name="health_energy_label">Total energy burned</string>
+    <string name="health_energy_note">Total energy includes the calories your body burns at rest, so it is higher than the \"active\" figure a workout tracker shows. It is not a number to subtract from your food target.</string>
+    <string name="health_empty">Nothing recorded yet today.</string>
+
+    <!-- Value formats. A dash, not a zero: no reading is not a reading of nothing. -->
+    <string name="health_value_none">—</string>
+    <string name="health_value_bpm">%1$d bpm</string>
+    <string name="health_value_kcal">%1$d kcal</string>
+    <string name="health_value_sleep_hours_minutes">%1$dh %2$dm</string>
+    <string name="health_value_sleep_minutes">%1$dm</string>
+
+    <!-- Accessibility. -->
+    <string name="health_refresh_action">Refresh health figures</string>
+
+</resources>

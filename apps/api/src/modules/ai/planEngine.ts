@@ -39,7 +39,13 @@ import {
   setsSchema,
   weightKgLoadSchema,
 } from '@aquazerofit/shared';
-import { complete, type GatewayMessage, type GatewayOptions, type GatewayResult } from './gateway';
+import {
+  complete,
+  type GatewayMessage,
+  type GatewayMeta,
+  type GatewayOptions,
+  type GatewayResult,
+} from './gateway';
 import { post as postGuardrail } from './guardrails';
 import { loadPrompt } from './prompts';
 
@@ -85,6 +91,13 @@ export interface PlanEngineDeps {
 // Deterministic safety rules (duplicated locally per the team boundary — the
 // AI lane never imports another team's service; mirrors plans/service.ts)
 // ---------------------------------------------------------------------------
+
+/**
+ * A draft always describes a calendar week, so this is a fixed 7 rather than
+ * anything derived from the request. `daysPerWeek` selects how many of these
+ * days are training days; it never changes how many days there are.
+ */
+const DAYS_IN_WEEK = 7;
 
 const EXPERIENCE_RANK: Record<ExerciseExperience, number> = {
   beginner: 0,
@@ -336,9 +349,36 @@ export function validatePlanDraft(
   if (typeof raw.rationale !== 'string' || raw.rationale.trim().length === 0 || raw.rationale.length > 2000) {
     return { error: 'rationale missing or too long' };
   }
-  if (!Array.isArray(raw.days) || raw.days.length !== req.daysPerWeek) {
+  /*
+   * A draft is a whole calendar week: seven days, with `daysPerWeek` of them
+   * training days and the rest marked `isRest`. It is NOT a list of sessions.
+   *
+   * This used to demand `days.length === req.daysPerWeek`, matching P-05 1.1.0
+   * and nothing else. The second gate — `plans/service.aiDraftIsValid`, which
+   * mirrors the deterministic `buildPlan` whose shape the app actually renders
+   * — has always required seven days with `daysPerWeek` non-rest. No draft can
+   * satisfy both unless `daysPerWeek === 7`, and `generatePlanSchema` caps the
+   * field at 6. So this lane spent a planStructured call on every single
+   * `POST /plans/generate`, had the result rejected downstream, and fell back
+   * to `buildPlan` — every time, since the day it shipped. The evals never
+   * caught it because they exercise this function directly and stop before the
+   * gate that disagreed.
+   *
+   * The non-rest count is checked here as well as downstream deliberately:
+   * a draft that fails it is one this lane can still describe precisely, and
+   * an error naming the real mismatch beats a generic rejection two files away.
+   */
+  if (!Array.isArray(raw.days) || raw.days.length !== DAYS_IN_WEEK) {
     return {
-      error: `days length ${Array.isArray(raw.days) ? raw.days.length : 'n/a'} != daysPerWeek ${req.daysPerWeek}`,
+      error: `days length ${Array.isArray(raw.days) ? raw.days.length : 'n/a'} != ${DAYS_IN_WEEK} (a draft is a full calendar week)`,
+    };
+  }
+  const trainingDayCount = (raw.days as unknown[]).filter(
+    (d) => isRecord(d) && d.isRest === false,
+  ).length;
+  if (trainingDayCount !== req.daysPerWeek) {
+    return {
+      error: `training days ${trainingDayCount} != daysPerWeek ${req.daysPerWeek}`,
     };
   }
 
@@ -348,8 +388,20 @@ export function validatePlanDraft(
 
   for (const rawDay of raw.days as unknown[]) {
     if (!isRecord(rawDay)) return { error: 'day is not an object' };
-    if (!Number.isInteger(rawDay.order) || seenDayOrders.has(rawDay.order as number)) {
-      return { error: 'day order missing or duplicated' };
+    /*
+     * Orders are 1..7 with no gaps and no repeats. The range half matters as
+     * much as the uniqueness half: seven distinct orders of 1,2,3,4,5,6,99
+     * would satisfy a bare uniqueness check here and then be rejected by
+     * `aiDraftIsValid` downstream, which is the exact class of gate-1-passes /
+     * gate-2-rejects waste this validator was just corrected for.
+     */
+    if (
+      !Number.isInteger(rawDay.order) ||
+      (rawDay.order as number) < 1 ||
+      (rawDay.order as number) > DAYS_IN_WEEK ||
+      seenDayOrders.has(rawDay.order as number)
+    ) {
+      return { error: `day order missing, out of range 1–${DAYS_IN_WEEK}, or duplicated` };
     }
     seenDayOrders.add(rawDay.order as number);
     if (typeof rawDay.focus !== 'string' || rawDay.focus.trim().length === 0) {
@@ -521,7 +573,7 @@ export async function tryGenerateAiPlan(
 export async function suggestExerciseSwap(
   req: SwapRequest,
   deps?: PlanEngineDeps,
-): Promise<{ exerciseIds: string[]; rationale: string } | null> {
+): Promise<{ exerciseIds: string[]; rationale: string; ai: GatewayMeta } | null> {
   try {
     if (req.pool.length === 0) return null;
 
@@ -598,7 +650,11 @@ export async function suggestExerciseSwap(
     if (exerciseIds.length === 0) return null;
     if (postGuardrail(rationale).blocked) return null;
 
-    return { exerciseIds, rationale };
+    // `ai` rides along for the same reason tryGenerateAiPlan returns it: the
+    // caller bills this lane, and `meta.degraded` is the difference between a
+    // provider answering and the offline template engine standing in for one
+    // that did not. Without it the swap lane had to charge for both.
+    return { exerciseIds, rationale, ai: result.meta };
   } catch (err) {
     console.error('[ai-plan-engine] P-06 swap suggestion failed', err);
     return null;

@@ -151,6 +151,35 @@ export default function Dashboard() {
                         </div>
                       </RingProgress>
                     </div>
+                    <div
+                      className="w-full grid grid-cols-4 text-center tabular-nums mb-6"
+                      aria-label={`Goal ${fmtInt(daily.kcalTarget)} minus food ${fmtInt(daily.kcalConsumed)} plus exercise ${fmtInt(daily.kcalBurned)} equals ${fmtInt(daily.kcalRemaining)} remaining`}
+                    >
+                      <div>
+                        <p className="text-base font-bold text-on-surface">{fmtInt(daily.kcalTarget)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">Goal</p>
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-on-surface">
+                          − {fmtInt(daily.kcalConsumed)}
+                        </p>
+                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">Food</p>
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-on-surface">
+                          + {fmtInt(daily.kcalBurned)}
+                        </p>
+                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">
+                          Exercise
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-primary">{fmtInt(daily.kcalRemaining)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">
+                          Remaining
+                        </p>
+                      </div>
+                    </div>
                     <div className="w-full grid grid-cols-3 gap-3">
                       <MacroBar
                         label="Protein"

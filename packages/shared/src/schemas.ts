@@ -87,6 +87,7 @@ export const profileSchema = z.object({
   allergies: z.array(z.enum(ALLERGENS)).default([]),
   equipment: z.array(z.enum(EQUIPMENT)).default(['none']),
   unitPreference: z.enum(['metric', 'imperial']).default('metric'),
+  nutritionEmphasis: z.enum(['standard', 'protein_first']).default('standard'),
   targetWeightKg: z
     .number()
     .min(RANGES.weightKg.min)

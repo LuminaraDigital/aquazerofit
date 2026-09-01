@@ -66,6 +66,14 @@ export interface Entitlements {
   tier: UserTier;
   dailyCredits: number;
   creditsRemaining: number;
+  /**
+   * Ceiling on a carried-over balance: the daily grant tops up toward this and
+   * never past it. Optional because a deployment running an API from before
+   * the ceiling shipped omits it, and the plan copy has to read correctly
+   * against both — present, it names the limit; absent, it falls back to the
+   * old unlimited-carry-over sentence, which for that server is still true.
+   */
+  maxBankedCredits?: number;
   costs: Record<CreditTask, number>;
   premiumLanes: ModelGroup[];
 }

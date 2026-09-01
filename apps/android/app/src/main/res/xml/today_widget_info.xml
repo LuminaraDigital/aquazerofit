@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sizing for the "Today" widget.
+
+  4x2 is the smallest cell budget the content actually fits: one line of
+  calories with a workout status beside it, a progress bar, and a hydration
+  row whose button holds the 48dp touch target the design system asks for.
+  minWidth/minHeight repeat that budget in dp for API 26–30, which sizes
+  widgets by dimension rather than by cell.
+
+  updatePeriodMillis is 30 minutes, which the platform silently floors to its
+  own minimum of 30 minutes anyway; asking for less would not produce a faster
+  widget, only a rounded-up request. It is the floor rather than something
+  slower because the numbers here move several times a day and a stale
+  glanceable surface is worse than no glanceable surface. Everything the user
+  does through the widget itself redraws immediately via updateAll, so this
+  schedule only has to catch writes made elsewhere.
+
+  initialLayout is Glance's own loading layout: the system needs a real
+  RemoteViews to show between the drop and the first composition.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:maxResizeWidth="400dp"
+    android:maxResizeHeight="220dp"
+    android:previewImage="@drawable/ic_widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

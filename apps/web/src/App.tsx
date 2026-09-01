@@ -15,6 +15,14 @@ const SafetyPage = lazy(() => import('./pages/landing/Safety'));
 const PrivacyPage = lazy(() => import('./pages/legal/Privacy'));
 const TermsPage = lazy(() => import('./pages/legal/Terms'));
 const SupportPage = lazy(() => import('./pages/legal/Support'));
+/* Public account-deletion instructions. Play requires this reachable WITHOUT the
+   app installed and without signing in, so it sits with the legal pages rather
+   than behind RequireAuth. */
+const AccountDeletionPage = lazy(() => import('./pages/legal/AccountDeletion'));
+/* Turnstile challenge surface for the native Android client's WebView. Public
+   and session-less by necessity: it serves registration and password reset,
+   both of which happen before an account exists. */
+const MobileCaptchaPage = lazy(() => import('./pages/auth/MobileCaptcha'));
 const Welcome = lazy(() => import('./pages/auth/Welcome'));
 const SignIn = lazy(() => import('./pages/auth/SignIn'));
 /* Wellness essentials — asked when a target is wanted, not before the app opens. */
@@ -83,8 +91,10 @@ export default function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/support" element={<SupportPage />} />
+        <Route path="/account/deletion" element={<AccountDeletionPage />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/sign-in" element={<SignIn />} />
+        <Route path="/mobile/captcha" element={<MobileCaptchaPage />} />
 
         {/* `publicIndex` makes `/` the marketing front door for signed-out web
             visitors while leaving it the app's home for everyone else — see

@@ -12,9 +12,12 @@ import { useToast } from '@/components/ui/Toast';
 import {
   blobToObjectUrl,
   renderShareCard,
+  SHARE_CARD_H,
+  SHARE_CARD_W,
   type ShareCardPayload,
 } from '@/lib/shareCard';
 import { buildShareUrl, getAttribution, inviteRefFromUserId } from '@/lib/attribution';
+import { joinChallengeUrl } from '@/lib/challenges';
 import { trackGrowth } from '@/lib/growth';
 import { haptic, openTelegramLink } from '@/lib/telegram';
 
@@ -68,6 +71,9 @@ export function ShareMoment({
   }, [open, payload, toast]);
 
   const shareUrl = (): string => {
+    if (challengeCode && payload?.kind === 'challenge') {
+      return joinChallengeUrl(challengeCode);
+    }
     const attr = getAttribution();
     return buildShareUrl(invitePath, {
       ref: userId ? inviteRefFromUserId(userId) : attr.ref,
@@ -155,7 +161,17 @@ export function ShareMoment({
               Building your card…
             </div>
           ) : (
-            <img src={previewUrl} alt="Share preview" className="w-full object-cover" />
+            // Already decoded in memory (a blob: URL from the canvas) and the
+            // reason the sheet was opened, so it is never deferred.
+            <img
+              src={previewUrl}
+              alt="Share preview"
+              width={SHARE_CARD_W}
+              height={SHARE_CARD_H}
+              loading="eager"
+              decoding="async"
+              className="block h-auto w-full object-cover"
+            />
           )}
         </div>
 

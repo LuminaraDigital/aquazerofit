@@ -16,6 +16,11 @@ export const ERROR_CODES = {
   NOT_FOUND: 404,
   CONFLICT: 409,
   CREDITS_INSUFFICIENT: 402,
+  // The store did not recognise the purchase, or it is in a state that holds
+  // no entitlement. Distinct from PAYMENT_UNAVAILABLE because this one is
+  // final: retrying the same token will fail the same way, so a client must
+  // stop rather than back off. Also the forged-token path — never grant on it.
+  PURCHASE_INVALID: 402,
   SAFETY_INPUT: 422,
   SAFETY_OUTPUT: 422,
   RATE_LIMITED: 429,

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release config: cleartext is never permitted. Debug builds override this
+     file (src/debug/res/xml) to allow cleartext to the emulator loopback only. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

@@ -1,0 +1,45 @@
+# Android workspace.
+#
+# `root = true` stops the lookup here: the repository root .editorconfig is
+# tuned for the TypeScript workspaces (2-space everything), and Kotlin sources
+# in this module are 4-space. Gradle scripts stay 2-space, matching how they
+# were written.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+# `intellij_idea` is ktlint's name for the Kotlin coding conventions that
+# `kotlin.code.style=official` in gradle.properties already selects, so ktlint
+# and the IDE agree on what a file should look like.
+ktlint_code_style = intellij_idea
+max_line_length = 120
+
+# Compose. `@Composable` functions that emit UI are PascalCase by convention
+# (AzfCard, DashboardScreen); ktlint's function-naming rule wants camelCase and
+# has no way to tell the two apart.
+ktlint_standard_function-naming = disabled
+
+# These two rules collapse a declaration onto one line whenever it fits. This
+# codebase deliberately writes Compose signatures one parameter per line with a
+# trailing comma, so that adding a parameter is a one-line diff. Everything
+# these rules would otherwise catch (spacing, wrapping, indent, max line
+# length) is still enforced by the rules that stay on.
+ktlint_standard_function-signature = disabled
+ktlint_standard_class-signature = disabled
+
+[*.kts]
+indent_size = 2
+
+[*.{xml,yml,yaml,json}]
+indent_size = 2
+
+[*.md]
+# Trailing double-space is a hard line break in Markdown.
+trim_trailing_whitespace = false

@@ -23,6 +23,8 @@ import {
   MEMORY_SUMMARY_REFRESH_FACT_DELTA,
 } from '@aquazerofit/shared';
 import { complete } from '../ai/gateway';
+import { creditLedger } from '../ai/creditLedger';
+import { tierOf } from '../billing/entitlements';
 import { loadPrompt } from '../ai/prompts';
 import { hasConsent } from '../me/service';
 import { getStore } from '../../platform/store';
@@ -55,7 +57,47 @@ export interface TurnForExtraction {
 export async function extractMemoryFromTurn(userId: string, turn: TurnForExtraction): Promise<void> {
   if (!hasConsent(userId, 'aiPersonalisation')) return;
 
+  /*
+   * This pass is a model call, so it costs a credit — and it is charged HERE
+   * rather than folded into CREDIT_COSTS.chatTurn because it runs only for
+   * accounts with aiPersonalisation on. Pricing it into the turn would bill
+   * every user who opted out for a call their own consent setting prevents.
+   *
+   * Running out of credits skips the extraction; it never fails the turn. The
+   * chat reply has already been streamed by the time this runs (the router
+   * calls it with `void`), and the stance of this whole module is that a
+   * missed memory is acceptable where a broken turn is not. A user on their
+   * last credit spends it on the answer, not on remembering the answer.
+   */
+  let reservationId: string;
+  try {
+    reservationId = await creditLedger.reserve(userId, 'memoryExtraction', tierOf(userId));
+  } catch {
+    return;
+  }
+
+  /*
+   * Every path out of here below this point settles the hold: the success
+   * path commits, and the `finally` releases. The release is unconditional
+   * because `release` after `commit` is a documented no-op — the ledger
+   * settles a reservation once and returns false for any later attempt — so
+   * one line covers every early return, throw and revocation without a flag
+   * to keep in sync.
+   */
+  try {
+    await extractAndCommit(userId, turn, reservationId);
+  } finally {
+    await creditLedger.release(reservationId);
+  }
+}
+
+async function extractAndCommit(
+  userId: string,
+  turn: TurnForExtraction,
+  reservationId: string,
+): Promise<void> {
   let parsed: z.infer<typeof extractionSchema>;
+  let degraded = false;
   try {
     const prompt = loadPrompt('P-10');
     const result = await complete(
@@ -75,6 +117,9 @@ export async function extractMemoryFromTurn(userId: string, turn: TurnForExtract
         context: { userMessage: turn.userMessage, assistantReply: turn.assistantReply },
       },
     );
+    // Offline template output after the real providers failed. Still used —
+    // the same stance as the chat and recommendation lanes — but not billed.
+    degraded = result.meta.degraded === true;
     const check = extractionSchema.safeParse(result.json);
     if (!check.success) {
       console.warn('[memory-extraction] response failed schema; skipping turn', userId);
@@ -106,6 +151,12 @@ export async function extractMemoryFromTurn(userId: string, turn: TurnForExtract
       console.warn('[memory-extraction] addFact rejected a fact', err instanceof Error ? err.message : err);
     }
   }
+
+  // The facts are written, so the call earned its credit. Committed before the
+  // summary refresh deliberately: that refresh is a second model call, rare
+  // (it fires only on confirmed-fact drift) and priced into this same credit
+  // rather than charged again — see CREDIT_COSTS.memoryExtraction.
+  if (!degraded) await creditLedger.commit(reservationId);
 
   await maybeRefreshSummary(userId);
 }

@@ -3,6 +3,8 @@
  * Kept local to avoid cross-team file conflicts; platform owns the global
  * express Request augmentation, so we read req.user through getUser().
  */
+import crypto from 'node:crypto';
+import { computeTargets } from '../me/targets';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { AppError } from '../../platform/errors';
 import { store } from '../../platform/store';
@@ -44,12 +46,18 @@ export function asyncHandler(
   };
 }
 
-let idCounter = 0;
+/**
+ * Ids for chat sessions, messages and meal-log rows.
+ *
+ * Unguessable: crypto.randomUUID, not a timestamp plus a counter. The previous
+ * shape was Date.now() in base36, a module-level sequence and four base36
+ * characters of Math.random() — roughly twenty bits of non-cryptographic
+ * entropy hung off a value the caller already knows, with the counter leaking
+ * how much traffic the process had served. These ids address rows a request
+ * can name, so they must not be enumerable.
+ */
 export function newId(prefix: string): string {
-  idCounter = (idCounter + 1) % 1_679_616; // 36^4
-  return `${prefix}_${Date.now().toString(36)}${idCounter.toString(36).padStart(4, '0')}${Math.random()
-    .toString(36)
-    .slice(2, 6)}`;
+  return `${prefix}_${crypto.randomUUID()}`;
 }
 
 export function nowIso(): string {
@@ -130,36 +138,36 @@ const DEFAULT_TARGETS: TargetsLike = {
   waterMl: 2000,
 };
 
+/**
+ * The coach's view of a user's targets — the SAME numbers the dashboard shows.
+ *
+ * This used to be a second implementation of the formula in
+ * `modules/me/targets.ts`, and the two had drifted three ways: 'unspecified'
+ * took the female sex offset instead of its own, `lose` used the top of the
+ * 0.5–1.0 %/wk band instead of the midpoint, and `gain` was a flat +250
+ * instead of the computed surplus. Up to ~220 kcal/day apart.
+ *
+ * That divergence was not cosmetic. `readTargets` feeds coach chat, batch
+ * insights and recommendations, so the coach could tell a user to eat one
+ * number while their own dashboard showed another — and the coach is the
+ * surface people are most likely to believe. Delegating means there is one
+ * formula, and `FORMULA_VERSION` continues to describe it honestly.
+ *
+ * `computeTargets` returns a superset of [TargetsLike]; the extra fields
+ * (bmr, tdee, clamp reason, formula version) are for the profile screen and
+ * are dropped here on purpose rather than leaked into model context.
+ */
 export function deriveTargetsFromProfile(profile: WellnessProfile): TargetsLike {
-  const { weightKg, heightCm, age, sex, goal, activityLevel } = profile;
-  const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
-  const bmr = sex === 'male' ? base + 5 : base - 161; // 'unspecified' uses the conservative female offset
-  const tdee = bmr * (ACTIVITY_FACTORS[activityLevel] ?? ACTIVITY_FACTORS.moderate);
-
-  let kcalTarget = tdee;
-  if (goal === 'lose') {
-    const weeklyLossKg = weightKg * WEEKLY_LOSS_FRACTION.max;
-    kcalTarget = tdee - (weeklyLossKg * KCAL_PER_KG) / 7;
-  } else if (goal === 'gain') {
-    kcalTarget = tdee + 250;
-  }
-  const floor = KCAL_FLOOR[sex] ?? KCAL_FLOOR.unspecified;
-  if (kcalTarget < floor) kcalTarget = floor; // safety clamp (FR-031)
-
-  const proteinG = weightKg * (PROTEIN_G_PER_KG[goal] ?? PROTEIN_G_PER_KG.maintain);
-  const fatG = (kcalTarget * FAT_KCAL_FRACTION_MIN) / KCAL_PER_G.fat;
-  const carbsKcal = Math.max(0, kcalTarget - proteinG * KCAL_PER_G.protein - fatG * KCAL_PER_G.fat);
-  const carbsG = carbsKcal / KCAL_PER_G.carbs;
-  const waterMl = Math.min(WATER_ML_MAX, Math.max(WATER_ML_MIN, weightKg * WATER_ML_PER_KG));
-
+  const targets = computeTargets(profile);
   return {
-    kcalTarget: Math.round(kcalTarget),
-    proteinG: Math.round(proteinG),
-    carbsG: Math.round(carbsG),
-    fatG: Math.round(fatG),
-    waterMl: Math.round(waterMl),
+    kcalTarget: targets.kcalTarget,
+    proteinG: targets.proteinG,
+    carbsG: targets.carbsG,
+    fatG: targets.fatG,
+    waterMl: targets.waterMl,
   };
 }
+
 
 export async function readProfile(userId: string): Promise<WellnessProfile | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

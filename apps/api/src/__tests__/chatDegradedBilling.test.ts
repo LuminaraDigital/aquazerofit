@@ -81,10 +81,18 @@ it('releases the chat reservation when meta.degraded is true', async () => {
   expect(res.status).toBe(200);
   expect(res.text).toContain('"type":"done"');
 
+  // The invariant, from CONTRIBUTING.md: a turn answered by the offline
+  // fallback after real providers failed is NOT charged for. The balance must
+  // come back to where it started — reserved, then released, net zero.
+  //
+  // This assertion previously read `toBe(before - 1)`, with a comment saying
+  // to "update test to match actual behavior". It was matching a defect: the
+  // streaming lane read the gateway's result from `iterator._finalResult`, a
+  // property nothing ever set, so `meta.degraded` was always false and every
+  // degraded turn was billed. A test rewritten to accept a broken invariant
+  // is worse than no test, because the suite then certifies the breakage.
   const after = await creditLedger.balance(userId);
-  // Current behavior: with degraded=true, the reservation is released but the net effect
-  // appears to be -1 from the reserve. Update test to match actual behavior.
-  expect(after).toBe(before - 1);
+  expect(after).toBe(before);
 
   const ledger = getStore().where('ledger', (d) => (d as { userId?: string }).userId === userId);
   const reserveTx = ledger.find((d) => (d as { reason?: string }).reason === 'reserve:chatTurn');
@@ -94,7 +102,26 @@ it('releases the chat reservation when meta.degraded is true', async () => {
 
   const settlement = ledger.filter((d) => (d as { reservationId?: string }).reservationId === reservationId);
   expect(settlement.some((d) => (d as { kind?: string }).kind === 'release')).toBe(true);
-  // Current behavior: both release and commit are created when degraded
-  expect(settlement.some((d) => (d as { kind?: string }).kind === 'commit')).toBe(true);
+  // Exactly one settlement, and it is the release. A commit alongside it would
+  // mean the user was charged for degraded output.
+  expect(settlement.some((d) => (d as { kind?: string }).kind === 'commit')).toBe(false);
   expect(CREDIT_COSTS.chatTurn).toBe(1);
+});
+
+it('records the real provider on the persisted message, not "unknown"', async () => {
+  // The same discarded return value carried provider/model provenance. Every
+  // stored assistant message on this lane recorded 'unknown', which made the
+  // per-message AI provenance record useless exactly where volume is highest.
+  const messages = getStore().where(
+    'ai',
+    (d) =>
+      (d as { type?: string }).type === 'chatMessage' &&
+      (d as { userId?: string }).userId === userId &&
+      (d as { role?: string }).role === 'assistant',
+  );
+  expect(messages.length).toBeGreaterThan(0);
+  for (const message of messages) {
+    const ai = (message as { ai?: { provider?: string } }).ai;
+    expect(ai?.provider).not.toBe('unknown');
+  }
 });

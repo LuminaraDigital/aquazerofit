@@ -115,6 +115,7 @@ function toProfileInput(p: WellnessProfile): ProfileInput {
     allergies: p.allergies,
     equipment: p.equipment,
     unitPreference: p.unitPreference,
+    nutritionEmphasis: p.nutritionEmphasis ?? 'standard',
     ...(p.targetWeightKg != null ? { targetWeightKg: p.targetWeightKg } : {}),
   };
 }

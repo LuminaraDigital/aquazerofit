@@ -14,11 +14,17 @@
 import { Router, type Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../platform/auth';
+import { localeOf } from '../../platform/locale';
 import { AppError } from '../../platform/errors';
-import { chatMessageSchema, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
+import { chatMessageSchema, WELLNESS_DISCLAIMER, portionCorrectionWorthRemembering } from '@aquazerofit/shared';
 import type { Allergen, ChatMessage, ChatSession, Food, MealLogItem, MealType, User } from '@aquazerofit/shared';
 import { complete, stream, type GatewayResult } from '../ai/gateway';
-import { preAsync, post as postGuardrail, refusalMessageFor } from '../ai/guardrails';
+import {
+  preAsync,
+  post as postGuardrail,
+  refusalMessageFor,
+  type GuardrailDecision,
+} from '../ai/guardrails';
 import { warnOnStyle } from '../ai/styleLint';
 import { creditLedger } from '../ai/creditLedger';
 import { assertLaneAllowed } from '../ai/tierPolicy';
@@ -32,8 +38,10 @@ import { hasConsent } from '../me/service';
 // idempotency and the source field to drift.
 import { createMealLog } from '../logs/service';
 import { extractMemoryFromTurn } from '../memory/extraction';
+import { getRememberedPortionGrams, rememberPortionCorrection } from '../memory/service';
 import { buildHistoryMessages } from './history';
 import {
+  applyRememberedPortions,
   buildDraftItems,
   CHAT_MEAL_DRAFT_TYPE,
   draftNotes,
@@ -186,51 +194,77 @@ chatRouter.post(
 
     // --- Admission: tier lane + credits (before headers → JSON error envelope)
     assertLaneAllowed(user.tier, 'chatFast');
-    const reservationId = await creditLedger.reserve(user.id, 'chatTurn');
+    const reservationId = await creditLedger.reserve(user.id, 'chatTurn', user.tier);
 
-    // Persist the user message regardless of guardrail outcome (audit trail).
-    const decision = await preAsync(content, { userId: user.id });
-    const userMessage: ChatMessage = {
-      id: newId('cm'),
-      sessionId,
-      userId: user.id,
-      type: 'chatMessage',
-      role: 'user',
-      content,
-      guardrail: { blocked: decision.blocked, category: decision.blocked ? decision.category : null },
-      createdAt: nowIso(),
-    };
-    await upsertDoc('ai', userMessage);
-
-    // Session title from the first user message.
-    if (session.title === 'New conversation') {
-      session.title = content.length > 42 ? `${content.slice(0, 42).trimEnd()}…` : content;
-    }
-    session.updatedAt = nowIso();
-    await upsertDoc('ai', session);
-
-    // --- From here on we speak SSE.
-    openStream(res);
+    // Everything from here to the model call is fallible, and the
+    // reservation is already held. A throw from preAsync, either upsertDoc
+    // or the refusal write used to escape with the credits still reserved —
+    // and once openStream() has run the headers are SSE, so the JSON error
+    // handler could not answer either and the connection simply hung. The
+    // catch below returns the credits either way, and answers in whichever
+    // protocol this request is already speaking.
+    // Declared out here, assigned inside the guard: the streaming half below
+    // still needs them, and the catch either rethrows or returns, so they are
+    // always assigned by the time anything reads them.
+    const locale = localeOf(req);
+    let decision!: GuardrailDecision;
+    let userMessage!: ChatMessage;
     let clientGone = false;
-    req.on('close', () => {
-      clientGone = true;
-    });
 
-    if (decision.blocked) {
-      // Supportive refusal: no model call, credits returned, audit already logged.
-      await creditLedger.release(reservationId);
-      const refusal: ChatMessage = {
+    try {
+
+      // Persist the user message regardless of guardrail outcome (audit trail).
+      // The locale rides along so a crisis refusal names a line the user can
+      // actually ring (Accept-Language; see platform/locale.ts).
+      decision = await preAsync(content, { userId: user.id, locale });
+      userMessage = {
         id: newId('cm'),
         sessionId,
         userId: user.id,
         type: 'chatMessage',
-        role: 'assistant',
-        content: decision.message ?? refusalMessageFor(decision.category),
-        guardrail: { blocked: true, category: decision.category },
+        role: 'user',
+        content,
+        guardrail: { blocked: decision.blocked, category: decision.blocked ? decision.category : null },
         createdAt: nowIso(),
       };
-      await upsertDoc('ai', refusal);
-      sendFrame(res, { type: 'error', code: 'SAFETY_INPUT', message: refusal.content });
+      await upsertDoc('ai', userMessage);
+
+      // Session title from the first user message.
+      if (session.title === 'New conversation') {
+        session.title = content.length > 42 ? `${content.slice(0, 42).trimEnd()}…` : content;
+      }
+      session.updatedAt = nowIso();
+      await upsertDoc('ai', session);
+
+      // --- From here on we speak SSE.
+      openStream(res);
+      req.on('close', () => {
+        clientGone = true;
+      });
+
+      if (decision.blocked) {
+        // Supportive refusal: no model call, credits returned, audit already logged.
+        await creditLedger.release(reservationId);
+        const refusal: ChatMessage = {
+          id: newId('cm'),
+          sessionId,
+          userId: user.id,
+          type: 'chatMessage',
+          role: 'assistant',
+          content: decision.message ?? refusalMessageFor(decision.category, locale),
+          guardrail: { blocked: true, category: decision.category },
+          createdAt: nowIso(),
+        };
+        await upsertDoc('ai', refusal);
+        sendFrame(res, { type: 'error', code: 'SAFETY_INPUT', message: refusal.content });
+        res.end();
+        return;
+      }
+    } catch (err) {
+      await creditLedger.release(reservationId);
+      if (!res.headersSent) throw err;
+      // Already streaming: the error envelope is a frame, not a body.
+      sendFrame(res, { type: 'error', code: 'INTERNAL', message: 'The turn could not be completed.' });
       res.end();
       return;
     }
@@ -281,23 +315,38 @@ chatRouter.post(
         },
       );
 
-      // Consume the stream and get the final result
-      let finalResult: GatewayResult | null = null;
-      try {
-        for await (const _token of streamResult) {
-          // Tokens already sent via onToken callback
-          // streamResult will return the final GatewayResult when done
+      // Drive the iterator by hand. `for await...of` DISCARDS an async
+      // generator's return value, and here the return value is the whole
+      // point: `stream()` is declared `AsyncGenerator<string, GatewayResult>`
+      // and that GatewayResult carries `meta.degraded` — which decides whether
+      // this turn is billed — plus the provider/model provenance recorded on
+      // the persisted message.
+      //
+      // What this replaces: a for-await loop that threw the result away,
+      // followed by a read of `iterator._finalResult`, a property nothing in
+      // gateway.ts ever sets. It therefore always fell through to a synthesised
+      // meta with `degraded: false` and `provider: 'unknown'`. Two consequences,
+      // both live: every turn answered by the offline fallback after real
+      // providers failed was billed anyway — against the invariant in
+      // CONTRIBUTING.md that degraded output is never charged for — and every
+      // stored ChatMessage.ai recorded 'unknown' provenance on the app's
+      // highest-volume AI lane.
+      //
+      // There is deliberately no try/catch around this loop. The old one was
+      // empty — commented "Generator exhausted", which is not what a throw
+      // means — so an AI_UNAVAILABLE raised with every provider down was
+      // swallowed, an empty assistant message was persisted, and the turn was
+      // charged for. Letting it propagate reaches the handler that releases the
+      // reservation and sends a real error frame.
+      const iterator = streamResult[Symbol.asyncIterator]();
+      let finalResult: GatewayResult;
+      for (;;) {
+        const step = await iterator.next();
+        if (step.done) {
+          finalResult = step.value;
+          break;
         }
-      } catch (e) {
-        // Generator exhausted, get the return value
-      }
-      // Get the return value from the async generator
-      const iterator = streamResult as any;
-      if (iterator._finalResult) {
-        finalResult = iterator._finalResult;
-      } else {
-        // Fallback: construct from fullText
-        finalResult = { text: fullText, meta: { provider: 'unknown', model: 'unknown', promptVersion: '', generatedAt: new Date().toISOString(), degraded: false } } as GatewayResult;
+        // The token already went out through the onToken callback above.
       }
 
       // finalResult is guaranteed to be non-null here due to fallback
@@ -310,7 +359,7 @@ chatRouter.post(
       const outCheck = postGuardrail(result.text, { userId: user.id });
       if (outCheck.blocked) {
         await creditLedger.release(reservationId);
-        const safeText = refusalMessageFor(outCheck.category);
+        const safeText = refusalMessageFor(outCheck.category, locale);
         const blockedMessage: ChatMessage = {
           id: newId('cm'),
           sessionId,
@@ -491,13 +540,14 @@ chatRouter.post(
 
     // --- Admission: lane, then credits.
     assertLaneAllowed(user.tier, 'planStructured');
-    const reservationId = await creditLedger.reserve(user.id, 'chatTurn');
+    const reservationId = await creditLedger.reserve(user.id, 'chatTurn', user.tier);
 
     try {
       // --- Input guardrail. A meal description is user text like any other.
-      const decision = await preAsync(text, { userId: user.id });
+      const locale = localeOf(req);
+      const decision = await preAsync(text, { userId: user.id, locale });
       if (decision.blocked) {
-        throw new AppError('SAFETY_INPUT', decision.message ?? refusalMessageFor(decision.category), {
+        throw new AppError('SAFETY_INPUT', decision.message ?? refusalMessageFor(decision.category, locale), {
           category: decision.category,
         });
       }
@@ -532,7 +582,11 @@ chatRouter.post(
 
       const { allergies, consented } = await allergiesFor(user.id);
       const foods = await loadFoodCorpus();
-      const items = buildDraftItems(candidates, foods, allergies);
+      const items = applyRememberedPortions(
+        buildDraftItems(candidates, foods, allergies),
+        foods,
+        (foodId) => getRememberedPortionGrams(user.id, foodId),
+      );
       const allergyCheck: ChatMealDraft['allergyCheck'] = consented ? 'applied' : 'skippedNoConsent';
 
       const draft: ChatMealDraft = {
@@ -680,6 +734,11 @@ chatRouter.post(
       const grams = Math.round(selection.grams ?? match.grams);
       const nutrition = nutritionFor(food, grams);
       logItems.push({ foodId: food.id, name: food.name, grams, ...nutrition });
+
+      const shownGrams = Math.round(match.grams);
+      if (portionCorrectionWorthRemembering(shownGrams, grams)) {
+        rememberPortionCorrection(user.id, selection.foodId, grams);
+      }
 
       if (match.allergenConflicts.length > 0) {
         conflicts.push({

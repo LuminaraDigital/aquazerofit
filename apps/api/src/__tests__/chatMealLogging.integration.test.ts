@@ -349,6 +349,75 @@ describe('POST /chat/meal-drafts/:id/confirm', () => {
     expect((res.body.draft as Draft).loggedMealId).toBe(log.id);
   });
 
+  /**
+   * The client owns the date, not the server.
+   *
+   * The server runs in UTC and has no idea what day it is where the user is.
+   * A phone logging last night's dinner just after midnight, or one used from
+   * Sydney against a server in Europe, would otherwise have the meal land on
+   * the wrong day and silently corrupt the day's totals. Both endpoints take
+   * `localDate`; this asserts the confirm one actually keys the written meal
+   * on it rather than on the server's own clock.
+   */
+  it('lands the meal on the localDate the client supplied, not the server’s today', async () => {
+    const user = await registerUser('chat-meal-localdate@example.com');
+    grantConsents(user.userId);
+    await creditLedger.grantDailyIfNeeded(user.userId);
+
+    // Deliberately not today anywhere on earth.
+    const draftDate = '2024-03-09';
+    const confirmDate = '2024-03-10';
+    const serverToday = new Date().toISOString().slice(0, 10);
+    expect(confirmDate).not.toBe(serverToday);
+
+    const created = await request(app)
+      .post(`${base}/chat/meal-drafts`)
+      .set(auth(user))
+      .send({ text: SOURCE_TEXT, localDate: draftDate });
+    expect(created.status).toBe(201);
+    const draft = created.body.draft as Draft & { localDate: string };
+    expect(draft.localDate).toBe(draftDate);
+
+    // The confirm call carries its own date, which must win over the draft's.
+    const res = await request(app)
+      .post(`${base}/chat/meal-drafts/${draft.id}/confirm`)
+      .set(auth(user))
+      .send({
+        localDate: confirmDate,
+        items: [{ itemId: itemBy(draft, 'flat white').id, foodId: 'food-flat-white' }],
+      });
+
+    expect(res.status).toBe(201);
+    const log = res.body.mealLog as MealLog;
+    expect(log.localDate).toBe(confirmDate);
+    expect(log.localDate).not.toBe(serverToday);
+
+    // And it is stored that way, with the draft reconciled to the same day.
+    expect(mealLogsFor(user.userId).find((l) => l.id === log.id)?.localDate).toBe(confirmDate);
+    expect((res.body.draft as Draft & { localDate: string }).localDate).toBe(confirmDate);
+  });
+
+  it('falls back to the draft’s date when the confirm call omits one', async () => {
+    const user = await registerUser('chat-meal-localdate-fallback@example.com');
+    grantConsents(user.userId);
+    await creditLedger.grantDailyIfNeeded(user.userId);
+
+    const draftDate = '2024-03-09';
+    const created = await request(app)
+      .post(`${base}/chat/meal-drafts`)
+      .set(auth(user))
+      .send({ text: SOURCE_TEXT, localDate: draftDate });
+    const draft = created.body.draft as Draft;
+
+    const res = await request(app)
+      .post(`${base}/chat/meal-drafts/${draft.id}/confirm`)
+      .set(auth(user))
+      .send({ items: [{ itemId: itemBy(draft, 'flat white').id, foodId: 'food-flat-white' }] });
+
+    expect(res.status).toBe(201);
+    expect((res.body.mealLog as MealLog).localDate).toBe(draftDate);
+  });
+
   it('refuses a food that was never offered for that item', async () => {
     const draft = await createDraft(plain);
     const coffee = itemBy(draft, 'flat white');

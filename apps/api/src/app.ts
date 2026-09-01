@@ -8,6 +8,7 @@ import { config } from './platform/config';
 import { errorHandler, notFoundHandler } from './platform/errors';
 import { assertTrustProxyHeaders, enforceHttps } from './platform/https';
 import { requestLogger, metrics } from './platform/telemetry';
+import { budgetSnapshot } from './platform/aiBudget';
 import { rateLimiter } from './platform/rateLimiter';
 import { getStore } from './platform/store';
 import { buildRouter } from './modules';
@@ -139,17 +140,42 @@ export function createApp() {
   // platform scraper cannot present credentials, and the payload carries no
   // user data (counts and timestamps only).
   app.get('/metrics', (_req, res) => {
-    res.json({ service: 'aquazerofit-api', version: config.version, metrics });
+    // aiBudget rides along because "how much have we spent today, and has the
+    // ceiling stopped us" is the question an operator has to be able to answer
+    // without reading a provider dashboard. `exhausted: true` means the app is
+    // serving offline output on purpose, which otherwise looks like an outage.
+    res.json({
+      service: 'aquazerofit-api',
+      version: config.version,
+      metrics,
+      aiBudget: budgetSnapshot(),
+    });
   });
-
-  app.use(rateLimiter);
 
   // Committed placeholder media (exercise art etc.) lives in assets/ and is
   // safe to serve publicly. User meal photos in uploads/ are deliberately NOT
   // statically mounted — they are private and served only through the
   // authenticated, ownership-checked GET /api/v1/meal-photos/:jobId/image.
+  //
+  // Mounted BEFORE the rate limiter on purpose. These are static, public,
+  // cacheable bytes, and they are requested in bursts: one workout-library
+  // screen asks for a whole page of exercise thumbnails at once. Behind the
+  // limiter each of those spent one of the same 300/min tokens as a real API
+  // call, so a user scrolling their own exercise list could rate-limit
+  // themselves out of the app — a 429 on an image, then on the next write.
+  // Static files are not the abuse vector the limiter exists for.
   const here = path.dirname(fileURLToPath(import.meta.url));
-  app.use('/uploads', express.static(path.resolve(here, '../assets')));
+  app.use(
+    '/uploads',
+    express.static(path.resolve(here, '../assets'), {
+      // Content-addressed by UUID path and replaced rather than edited, so a
+      // long TTL is safe and stops every thumbnail revalidating on each load.
+      maxAge: '30d',
+      immutable: true,
+    }),
+  );
+
+  app.use(rateLimiter);
 
   app.use(config.basePath, buildRouter());
 

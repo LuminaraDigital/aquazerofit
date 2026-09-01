@@ -16,6 +16,11 @@ coverage/
 .cursor/
 .windsurf/
 .aider*
+.artifacts/
+.codex/
+.gemini/
+.antigravity/
+AGENT_SCRATCH/
 
 # Editors
 .vscode/
@@ -35,7 +40,19 @@ desktop.ini
 # App data & uploads (runtime-generated)
 apps/api/.data/
 apps/api/uploads/
+# AZF_DATA_DIR is resolved relative to the process cwd, not to apps/api. Running
+# the API from the repo root — which `npm run dev` and the .env's
+# `AZF_DATA_DIR=./.data` both do — puts the live JSON store here instead, where
+# the line above does not reach it. It holds real local accounts: users.json
+# carries email addresses and password hashes, ledger.json carries credit
+# history. Ignore both locations, not just the one the default points at.
+/.data/
 *.tsbuildinfo
+
+# Loose screenshots dropped at the repo root during development. Deliberately
+# root-only (`/`), so genuine image assets under apps/, design/ and docs/ are
+# unaffected.
+/*.png
 
 # Logs & tool caches
 *.log
@@ -48,3 +65,23 @@ node_modules/.cache/
 # Anchored so the deliverable set in docs/specs/ is still tracked.
 /*.docx
 docker-compose.override.yml
+
+# Android (apps/android) — Gradle build outputs and local machine state.
+# Source, wrapper and exported Room schemas stay tracked.
+apps/android/.gradle/
+apps/android/build/
+apps/android/app/build/
+apps/android/local.properties
+# Root local.properties exists only because the root settings.gradle.kts makes
+# the monorepo a Gradle build for IDE indexing; it carries a machine-specific
+# sdk.dir and must never be committed. CI runs Gradle from apps/android.
+/local.properties
+# Same cause: the root Gradle build writes its own caches here.
+/.gradle/
+apps/android/.kotlin/
+apps/android/captures/
+*.apk
+*.aab
+*.jks
+*.keystore
+keystore.properties

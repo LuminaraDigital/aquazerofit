@@ -16,7 +16,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS } from '@aquazerofit/shared';
+import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS, MAX_BANKED_CREDITS } from '@aquazerofit/shared';
 import type { Entitlements } from '@/lib/queries';
 
 const mocks = vi.hoisted(() => ({ useEntitlements: vi.fn() }));
@@ -72,8 +72,28 @@ describe('plan page — free tier', () => {
     expect(screen.getByText(/AI credits available/i)).toBeTruthy();
     // The daily top-up is stated as its own number, not folded into "12 of 50".
     expect(
-      screen.getByText(new RegExp(`adds ${FREE_TIER_DAILY_CREDITS} credits`, 'i')),
+      screen.getByText(new RegExp(`tops your balance up by ${FREE_TIER_DAILY_CREDITS} credits`, 'i')),
     ).toBeTruthy();
+  });
+
+  /*
+   * The ceiling is server-sent and optional, so the copy has two correct
+   * forms and the wrong one is a lie either way round: promising unlimited
+   * carry-over to a user whose balance stops at 100, or naming a ceiling to a
+   * user on an older API that has none. Both branches are pinned.
+   */
+  it('names the carry-over ceiling when the API sends one', () => {
+    renderWith({ data: { ...FREE, maxBankedCredits: MAX_BANKED_CREDITS } });
+
+    expect(
+      screen.getByText(new RegExp(`up to a maximum of ${MAX_BANKED_CREDITS}`, 'i')),
+    ).toBeTruthy();
+  });
+
+  it('falls back to the unlimited carry-over wording when the API omits the ceiling', () => {
+    renderWith({ data: FREE });
+
+    expect(screen.getByText(/anything you do not spend carries over/i)).toBeTruthy();
   });
 
   it('describes premium from the lanes the API reports, and claims nothing more', () => {

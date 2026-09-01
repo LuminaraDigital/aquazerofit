@@ -61,6 +61,8 @@ const TASK_LABEL: Record<string, string> = {
   planGeneration: 'New training plan',
   recipeGeneration: 'Recipe',
   progressInsight: 'Weekly insight',
+  exerciseSwap: 'Exercise swap suggestion',
+  memoryExtraction: 'Coach memory update',
 };
 
 function creditWord(n: number): string {
@@ -76,11 +78,14 @@ function creditWord(n: number): string {
  * for anyone carrying credits over.
  */
 function PositionCard({ entitlements }: { entitlements: Entitlements }) {
-  const { tier, dailyCredits, creditsRemaining } = entitlements;
+  const { tier, dailyCredits, creditsRemaining, maxBankedCredits } = entitlements;
   const premium = tier === 'premium';
   // Bar denominator never smaller than the balance, so a carried-over balance
-  // cannot overflow the track.
-  const scale = Math.max(dailyCredits, creditsRemaining, 1);
+  // cannot overflow the track. maxBankedCredits is the natural full mark now
+  // that one exists, but it stays inside the Math.max rather than replacing it:
+  // a server that has not shipped the field yet sends undefined, and a server
+  // that lowers the ceiling leaves existing balances temporarily above it.
+  const scale = Math.max(dailyCredits, creditsRemaining, maxBankedCredits ?? 0, 1);
   const pct = Math.round((Math.max(creditsRemaining, 0) / scale) * 100);
 
   return (
@@ -111,10 +116,20 @@ function PositionCard({ entitlements }: { entitlements: Entitlements }) {
         >
           <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
         </div>
+        {/*
+          States the ceiling rather than promising unlimited carry-over. The
+          balance used to accumulate without bound, so "anything you do not
+          spend carries over" was true; it now tops up toward a maximum and
+          stops, and copy that still promised the old behaviour would be the
+          app telling the user something the server no longer does.
+        */}
         <p className="mt-3 text-xs leading-relaxed text-on-surface-variant">
-          The first AI action you take each day adds {dailyCredits.toLocaleString()}{' '}
-          {creditWord(dailyCredits)} to your balance, and anything you do not spend carries over.
-          Logging meals, water and weight by hand never costs a credit.
+          The first AI action you take each day tops your balance up by{' '}
+          {dailyCredits.toLocaleString()} {creditWord(dailyCredits)}
+          {maxBankedCredits === undefined
+            ? ', and anything you do not spend carries over'
+            : `, up to a maximum of ${maxBankedCredits.toLocaleString()}. Unspent credits carry over until you reach that ceiling`}
+          . Logging meals, water and weight by hand never costs a credit.
         </p>
       </div>
     </GlassCard>

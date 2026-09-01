@@ -116,6 +116,12 @@ export function estimateKcal(session: WorkoutSession): number {
  * Paths arrive server-relative (`/uploads/...`), so they are resolved through
  * mediaUrl(): same origin by default, VITE_MEDIA_BASE_URL when the API and
  * the static site are hosted on different origins.
+ *
+ * CONTRACT: `className` must pin the box — every call site passes either an
+ * `aspect-*` ratio or explicit `h-`/`w-` sizes. Imported wger media has no
+ * fixed intrinsic size, so width/height attributes here would be a guess; the
+ * caller's box is what actually keeps this out of the layout-shift budget.
+ * Always below the fold (a list or a detail panel), so it stays lazy.
  */
 export function ExerciseImage({
   src,
@@ -138,6 +144,7 @@ export function ExerciseImage({
       alt={presentation.alt}
       aria-hidden={presentation.ariaHidden}
       loading="lazy"
+      decoding="async"
       className={className}
       onError={() => setErrored(true)}
     />

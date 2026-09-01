@@ -158,7 +158,17 @@ export function TopBar({ onLanding = false }: { onLanding?: boolean }) {
           aria-label="Primary"
         >
           <Link to="/" className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="" className="h-8 w-8 object-contain" aria-hidden="true" />
+            {/* Fixed top bar — in the viewport from the first paint. */}
+            <img
+              src="/logo.png"
+              alt=""
+              width={359}
+              height={376}
+              loading="eager"
+              decoding="async"
+              className="h-8 w-8 object-contain"
+              aria-hidden="true"
+            />
             <span className="font-heading text-lg font-extrabold tracking-tight text-primary">
               AquaZeroFit
             </span>
@@ -214,7 +224,17 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
       <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="" className="h-8 w-8 object-contain" aria-hidden="true" />
+            {/* Footer sits below a long landing page — defer it. */}
+            <img
+              src="/logo.png"
+              alt=""
+              width={359}
+              height={376}
+              loading="lazy"
+              decoding="async"
+              className="h-8 w-8 object-contain"
+              aria-hidden="true"
+            />
             <span className="font-heading text-lg font-extrabold tracking-tight text-primary">
               AquaZeroFit
             </span>

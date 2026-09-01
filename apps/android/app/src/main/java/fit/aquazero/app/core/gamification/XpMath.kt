@@ -1,4 +1,4 @@
-package fit.aquazero.app.feature.gamification
+package fit.aquazero.app.core.gamification
 
 import fit.aquazero.app.core.model.ExperienceStatusDto
 import kotlin.math.floor

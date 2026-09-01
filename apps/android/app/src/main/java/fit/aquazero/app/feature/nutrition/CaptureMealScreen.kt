@@ -88,7 +88,7 @@ import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File

@@ -1,4 +1,4 @@
-package fit.aquazero.app.feature.gamification
+package fit.aquazero.app.core.gamification
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

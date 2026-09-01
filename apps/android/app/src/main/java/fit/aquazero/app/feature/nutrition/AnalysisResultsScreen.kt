@@ -76,7 +76,7 @@ import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 
 /**
  * The confirmation gate.

@@ -53,7 +53,7 @@ import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.FoodNutrientsDto
 import fit.aquazero.app.core.model.FoodServingDto
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 
 /**
  * Bottom-sheet food search.

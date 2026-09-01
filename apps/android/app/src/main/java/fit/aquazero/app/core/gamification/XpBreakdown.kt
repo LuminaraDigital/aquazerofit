@@ -1,4 +1,4 @@
-package fit.aquazero.app.feature.gamification
+package fit.aquazero.app.core.gamification
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

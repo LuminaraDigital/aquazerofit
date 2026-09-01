@@ -56,11 +56,11 @@ import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.revealOnEnter
+import fit.aquazero.app.core.gamification.CelebrationHost
 import fit.aquazero.app.core.model.ConsistencyStatusDto
 import fit.aquazero.app.core.model.ProgressSummaryDto
 import fit.aquazero.app.core.model.TrendPointDto
 import fit.aquazero.app.core.ui.LocaleFormatters
-import fit.aquazero.app.feature.gamification.CelebrationHost
 import java.time.LocalDate
 import java.util.Locale
 import kotlin.math.abs

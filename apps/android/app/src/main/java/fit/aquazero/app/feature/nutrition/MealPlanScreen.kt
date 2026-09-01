@@ -48,8 +48,8 @@ import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.MealRecommendationDto
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.feature.dashboard.NutritionFormat
-import fit.aquazero.app.feature.dashboard.rememberToastSink
+import fit.aquazero.app.core.ui.NutritionFormat
+import fit.aquazero.app.core.ui.rememberToastSink
 import kotlin.math.roundToInt
 
 /**

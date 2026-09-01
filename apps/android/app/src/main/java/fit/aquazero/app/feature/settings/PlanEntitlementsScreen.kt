@@ -53,7 +53,7 @@ import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.EntitlementsDto
 import fit.aquazero.app.core.model.UserTier
-import fit.aquazero.app.feature.dashboard.rememberToastSink
+import fit.aquazero.app.core.ui.rememberToastSink
 
 /**
  * Your plan, and the one thing this app sells.

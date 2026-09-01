@@ -2,7 +2,7 @@ package fit.aquazero.app.widget
 
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.model.WorkoutSessionStatus
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 
 /** Today's training session, reduced to the three states the widget can draw. */
 enum class WidgetWorkoutState {

@@ -62,7 +62,7 @@ import fit.aquazero.app.core.model.BuddyChallengeDto
 import fit.aquazero.app.core.model.BuddyChallengeKind
 import fit.aquazero.app.core.model.BuddyChallengeMemberDto
 import fit.aquazero.app.core.model.BuddyChallengeStatus
-import fit.aquazero.app.feature.dashboard.rememberToastSink
+import fit.aquazero.app.core.ui.rememberToastSink
 
 /**
  * Buddy huddles.

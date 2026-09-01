@@ -39,7 +39,7 @@ import fit.aquazero.app.core.designsystem.GramsStepper
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 import java.util.IdentityHashMap
 
 /**

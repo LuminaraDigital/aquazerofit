@@ -65,10 +65,10 @@ import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.designsystem.currentLocale
 import fit.aquazero.app.core.ui.LocaleFormatters
+import fit.aquazero.app.core.ui.rememberToastSink
 import fit.aquazero.app.core.ui.reminders.ReminderPrefs
 import fit.aquazero.app.core.ui.reminders.TimeOfDay
 import fit.aquazero.app.core.ui.reminders.WaterFrequency
-import fit.aquazero.app.feature.dashboard.rememberToastSink
 import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.format.TextStyle

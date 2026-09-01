@@ -1,4 +1,4 @@
-package fit.aquazero.app.feature.dashboard
+package fit.aquazero.app.core.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember

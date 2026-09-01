@@ -11,7 +11,7 @@ import fit.aquazero.app.core.data.ProfileRepository
 import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.RecipeDto
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

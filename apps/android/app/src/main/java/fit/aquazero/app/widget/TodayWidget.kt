@@ -29,7 +29,7 @@ import androidx.glance.semantics.contentDescription
 import androidx.glance.semantics.semantics
 import androidx.glance.text.Text
 import fit.aquazero.app.R
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 
 /**
  * "Today" — calories against target, hydration against target, and whether

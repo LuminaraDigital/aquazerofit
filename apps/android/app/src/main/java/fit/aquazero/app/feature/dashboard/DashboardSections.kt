@@ -59,6 +59,9 @@ import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.Sparkline
 import fit.aquazero.app.core.designsystem.pressScale
+import fit.aquazero.app.core.ui.HydrationCard
+import fit.aquazero.app.core.ui.MacroRow
+import fit.aquazero.app.core.ui.NutritionFormat
 
 /** Date line, greeting and the Akin mascot — the screen's personal opener. */
 @Composable

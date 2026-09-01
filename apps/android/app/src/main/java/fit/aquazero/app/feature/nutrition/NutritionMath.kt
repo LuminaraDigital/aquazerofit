@@ -5,7 +5,7 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealLogItemDto
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlin.math.roundToInt
 
 /** Rolled-up micronutrients for one day. */

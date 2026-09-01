@@ -65,8 +65,8 @@ import fit.aquazero.app.core.designsystem.RingProgress
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.pressScale
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.feature.dashboard.MacroRow
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.MacroRow
+import fit.aquazero.app.core.ui.NutritionFormat
 
 /** Previous / current / next day, with the calendar trigger on the label. */
 @Composable

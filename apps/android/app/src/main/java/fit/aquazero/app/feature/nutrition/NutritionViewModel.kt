@@ -15,7 +15,7 @@ import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow

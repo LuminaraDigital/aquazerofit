@@ -1,4 +1,4 @@
-package fit.aquazero.app.feature.gamification
+package fit.aquazero.app.core.gamification
 
 import android.content.Intent
 import fit.aquazero.app.core.ui.CoachPersona

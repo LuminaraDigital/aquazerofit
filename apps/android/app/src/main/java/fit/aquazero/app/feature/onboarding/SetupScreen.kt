@@ -58,7 +58,7 @@ import fit.aquazero.app.core.model.DerivedTargetsDto
 import fit.aquazero.app.core.model.Goal
 import fit.aquazero.app.core.model.Sex
 import fit.aquazero.app.core.model.UnitPreference
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlin.math.roundToInt
 
 /**

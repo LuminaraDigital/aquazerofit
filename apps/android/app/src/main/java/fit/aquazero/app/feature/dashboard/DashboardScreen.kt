@@ -39,7 +39,11 @@ import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.ReadinessChip
 import fit.aquazero.app.core.designsystem.revealOnEnter
-import fit.aquazero.app.feature.gamification.CelebrationHost
+import fit.aquazero.app.core.gamification.CelebrationHost
+import fit.aquazero.app.core.ui.CardSkeleton
+import fit.aquazero.app.core.ui.HydrationCard
+import fit.aquazero.app.core.ui.TargetExplainSheet
+import fit.aquazero.app.core.ui.rememberToastSink
 
 /**
  * Home. A port of `apps/web/src/pages/dashboard/Dashboard.tsx`, with the

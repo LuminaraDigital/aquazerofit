@@ -13,7 +13,7 @@ import fit.aquazero.app.core.data.VisionRepository
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.sync.MealPhotoUploadScheduler
 import fit.aquazero.app.core.sync.MealPhotoUploadWorker
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -1,4 +1,4 @@
-package fit.aquazero.app.feature.dashboard
+package fit.aquazero.app.core.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer

@@ -84,9 +84,9 @@ import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
 import fit.aquazero.app.core.ui.LocaleFormatters
 import fit.aquazero.app.core.ui.SetupUnits
+import fit.aquazero.app.core.ui.TargetExplainSheet
 import fit.aquazero.app.core.ui.TargetsNotSetCard
-import fit.aquazero.app.feature.dashboard.TargetExplainSheet
-import fit.aquazero.app.feature.dashboard.rememberToastSink
+import fit.aquazero.app.core.ui.rememberToastSink
 import java.time.YearMonth
 import kotlin.math.roundToInt
 

@@ -21,6 +21,7 @@ import fit.aquazero.app.core.model.ReadinessAssessmentDto
 import fit.aquazero.app.core.model.WellnessProfileDto
 import fit.aquazero.app.core.model.WorkoutSessionStatus
 import fit.aquazero.app.core.ui.CoachRoster
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow

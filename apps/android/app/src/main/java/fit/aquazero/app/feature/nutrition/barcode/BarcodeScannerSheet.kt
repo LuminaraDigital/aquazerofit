@@ -103,7 +103,7 @@ import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.FoodNutrientsDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.Nutriscore
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 import fit.aquazero.app.feature.nutrition.CameraPermission
 import fit.aquazero.app.feature.nutrition.NutritionMath
 import fit.aquazero.app.feature.nutrition.awaitOnMain

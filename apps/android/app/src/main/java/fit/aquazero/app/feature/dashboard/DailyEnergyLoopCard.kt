@@ -15,6 +15,7 @@ import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.model.DerivedTargetsDto
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlin.math.abs
 
 /**

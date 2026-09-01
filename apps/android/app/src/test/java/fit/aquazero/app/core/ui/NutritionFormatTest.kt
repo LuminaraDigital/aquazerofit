@@ -1,4 +1,4 @@
-package fit.aquazero.app.feature.dashboard
+package fit.aquazero.app.core.ui
 
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.FoodNutrientsDto

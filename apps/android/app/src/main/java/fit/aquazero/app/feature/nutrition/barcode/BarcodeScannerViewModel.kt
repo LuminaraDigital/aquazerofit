@@ -12,7 +12,7 @@ import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.BarcodeLookupDto
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 import fit.aquazero.app.feature.nutrition.CameraPermission
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow

@@ -1,4 +1,4 @@
-package fit.aquazero.app.feature.dashboard
+package fit.aquazero.app.core.ui
 
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
@@ -12,7 +12,6 @@ import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.WorkoutSessionDto
-import fit.aquazero.app.core.ui.LocaleFormatters
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.TextStyle

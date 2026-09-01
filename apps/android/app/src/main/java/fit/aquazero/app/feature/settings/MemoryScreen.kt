@@ -58,7 +58,7 @@ import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.MemoryFactCategory
 import fit.aquazero.app.core.model.MemoryFactDto
 import fit.aquazero.app.core.model.MemoryFactStatus
-import fit.aquazero.app.feature.dashboard.rememberToastSink
+import fit.aquazero.app.core.ui.rememberToastSink
 
 /**
  * What your coach remembers.

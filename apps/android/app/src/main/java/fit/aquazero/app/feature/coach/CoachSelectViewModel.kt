@@ -5,11 +5,11 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.core.data.CoachesRepository
 import fit.aquazero.app.core.database.CoachEntity
+import fit.aquazero.app.core.gamification.MonotonicExperience
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.ExperienceStatusDto
 import fit.aquazero.app.core.ui.CoachPersona
 import fit.aquazero.app.core.ui.CoachRoster
-import fit.aquazero.app.feature.gamification.MonotonicExperience
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

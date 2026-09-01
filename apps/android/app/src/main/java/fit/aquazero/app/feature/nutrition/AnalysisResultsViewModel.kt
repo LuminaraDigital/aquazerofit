@@ -16,7 +16,7 @@ import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.VisionJobDto
 import fit.aquazero.app.core.model.VisionJobStatus
 import fit.aquazero.app.core.model.VisionPredictionDto
-import fit.aquazero.app.feature.dashboard.NutritionFormat
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay

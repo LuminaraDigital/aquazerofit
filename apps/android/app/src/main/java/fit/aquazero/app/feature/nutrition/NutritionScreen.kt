@@ -39,10 +39,10 @@ import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.revealOnEnter
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.feature.dashboard.CardSkeleton
-import fit.aquazero.app.feature.dashboard.HydrationCard
-import fit.aquazero.app.feature.dashboard.NutritionFormat
-import fit.aquazero.app.feature.dashboard.rememberToastSink
+import fit.aquazero.app.core.ui.CardSkeleton
+import fit.aquazero.app.core.ui.HydrationCard
+import fit.aquazero.app.core.ui.NutritionFormat
+import fit.aquazero.app.core.ui.rememberToastSink
 import fit.aquazero.app.feature.nutrition.barcode.prefetchBarcodeScannerModule
 
 /**

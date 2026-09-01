@@ -73,13 +73,13 @@ import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
+import fit.aquazero.app.core.gamification.CelebrationHost
 import fit.aquazero.app.core.model.ChatMealDraftDto
 import fit.aquazero.app.core.ui.CoachAvatar
 import fit.aquazero.app.core.ui.CoachPersona
 import fit.aquazero.app.core.ui.CoachPortrait
 import fit.aquazero.app.core.ui.CoachRoster
-import fit.aquazero.app.feature.dashboard.rememberToastSink
-import fit.aquazero.app.feature.gamification.CelebrationHost
+import fit.aquazero.app.core.ui.rememberToastSink
 import kotlinx.coroutines.flow.conflate
 
 /**

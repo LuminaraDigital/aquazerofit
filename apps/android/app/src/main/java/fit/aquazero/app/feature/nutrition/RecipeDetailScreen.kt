@@ -59,8 +59,8 @@ import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.FoodNutrientsDto
 import fit.aquazero.app.core.model.RecipeDto
 import fit.aquazero.app.core.model.RecipeIngredientDto
-import fit.aquazero.app.feature.dashboard.NutritionFormat
-import fit.aquazero.app.feature.dashboard.rememberToastSink
+import fit.aquazero.app.core.ui.NutritionFormat
+import fit.aquazero.app.core.ui.rememberToastSink
 import kotlin.math.roundToInt
 
 /**

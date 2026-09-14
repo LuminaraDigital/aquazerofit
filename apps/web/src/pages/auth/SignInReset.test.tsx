@@ -31,7 +31,14 @@ vi.mock('../../lib/telegram', () => ({
   haptic: vi.fn(),
 }));
 vi.mock('../../lib/queries', () => ({
-  useAuthActions: () => ({ login: vi.fn(), register: vi.fn(), telegramLogin: vi.fn() }),
+  useAuthActions: () => ({
+    login: vi.fn(),
+    register: vi.fn(),
+    telegramLogin: vi.fn(),
+    requestPasswordReset: vi.fn(),
+    firebaseEnabled: false,
+    mapFirebaseError: (err: unknown) => String(err),
+  }),
 }));
 vi.mock('../../lib/useTelegramAutoLogin', () => ({ useTelegramAutoLogin: () => false }));
 

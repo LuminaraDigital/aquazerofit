@@ -32,6 +32,7 @@ import type {
   WorkoutSession,
 } from '@aquazerofit/shared';
 import { api, ApiError, tokenStore } from './api';
+import { toAuthResponseStub, useFirebaseAuth } from './AuthProvider';
 import { asList, orNull, unwrap } from './envelopes';
 
 export type TrendRange = '7d' | '30d' | '90d';
@@ -342,14 +343,21 @@ function storeUser(user: PublicUser | undefined): void {
 }
 
 /**
- * AuthContext-free auth actions wrapping api() + tokenStore.
- * Each action manages tokens and the react-query cache; navigation is up
- * to the caller.
+ * Auth actions wrapping Firebase (when enabled) or the legacy /auth API,
+ * plus tokenStore and the react-query cache. Navigation is up to the caller.
  */
 export function useAuthActions() {
   const qc = useQueryClient();
+  const firebase = useFirebaseAuth();
 
   async function login(email: string, password: string): Promise<AuthResponse> {
+    if (firebase.firebaseEnabled) {
+      const user = await firebase.signInEmail(email, password);
+      const token = tokenStore.access ?? '';
+      storeUser(user);
+      qc.clear();
+      return toAuthResponseStub(user, token);
+    }
     const res = await api<AuthResponse>('/auth/login', {
       method: 'POST',
       body: { email, password },
@@ -368,6 +376,17 @@ export function useAuthActions() {
     /** Turnstile token when the deployment is challenged; omitted otherwise. */
     captchaToken?: string;
   }): Promise<AuthResponse> {
+    if (firebase.firebaseEnabled) {
+      const user = await firebase.registerEmail({
+        email: input.email,
+        password: input.password,
+        displayName: input.displayName,
+      });
+      const token = tokenStore.access ?? '';
+      storeUser(user);
+      qc.clear();
+      return toAuthResponseStub(user, token);
+    }
     const res = await api<Partial<AuthResponse>>('/auth/register', {
       method: 'POST',
       // captchaToken rides in the body (the API reads it before the zod parse,
@@ -412,6 +431,11 @@ export function useAuthActions() {
     } catch {
       // Revocation is best-effort; local sign-out always proceeds.
     }
+    try {
+      await firebase.signOutFirebase();
+    } catch {
+      // Firebase sign-out is best-effort when disabled or already signed out.
+    }
     tokenStore.clear();
     try {
       localStorage.removeItem(USER_KEY);
@@ -421,7 +445,22 @@ export function useAuthActions() {
     qc.clear();
   }
 
-  return { login, register, telegramLogin, logout };
+  async function requestPasswordReset(
+    email: string,
+    captchaToken?: string,
+  ): Promise<{ devToken?: string } | undefined> {
+    if (firebase.firebaseEnabled) {
+      await firebase.resetPassword(email);
+      return undefined;
+    }
+    return api<{ devToken?: string } | undefined>('/auth/password-reset/request', {
+      method: 'POST',
+      body: { email, captchaToken: captchaToken || undefined },
+      auth: false,
+    });
+  }
+
+  return { login, register, telegramLogin, logout, requestPasswordReset, firebaseEnabled: firebase.firebaseEnabled, mapFirebaseError: firebase.mapError };
 }
 
 export type { MemoryFact, MemoryFactCategory, MemoryFactStatus, UserMemory };

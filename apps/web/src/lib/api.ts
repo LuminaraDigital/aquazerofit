@@ -6,8 +6,13 @@
  * /api/v1/auth — it is never written to web storage. The access token is
  * kept in a module-level variable (memory only); a page reload restores the
  * session by calling /auth/refresh, whose cookie carries the credential.
+ *
+ * When Firebase Auth is enabled, the in-memory bearer may be a Firebase ID
+ * token instead. 401 recovery then prefers Firebase getIdToken(true) before
+ * the legacy cookie refresh.
  */
 import { isApiErrorBody, type ApiErrorBody, type AuthResponse } from '@aquazerofit/shared';
+import { getFirebaseAuth, isFirebaseAuthEnabled } from './firebase';
 
 /**
  * API origin. Same-origin by default, which is what the Vite dev proxy and any
@@ -74,13 +79,28 @@ function isJwtLike(token: string): boolean {
   return parts.every((part) => part.length > 0 && base64url.test(part));
 }
 
+async function tryFirebaseRefresh(): Promise<boolean> {
+  if (!isFirebaseAuthEnabled()) return false;
+  const auth = getFirebaseAuth();
+  const user = auth?.currentUser;
+  if (!user) return false;
+  try {
+    const token = await user.getIdToken(true);
+    tokenStore.set({ accessToken: token });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Rotate the session via the httpOnly refresh cookie. Empty body — the
- * cookie carries the credential. Used on 401 retry, app boot, and SSE.
+ * Rotate the session via Firebase ID token refresh and/or the httpOnly
+ * refresh cookie. Used on 401 retry, app boot, and SSE.
  */
 async function tryRefresh(): Promise<boolean> {
   refreshPromise ??= (async () => {
     try {
+      if (await tryFirebaseRefresh()) return true;
       const res = await fetch(`${BASE}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,9 +124,8 @@ async function tryRefresh(): Promise<boolean> {
 
 /**
  * Restore a session after a page reload: the in-memory access token is gone
- * but the refresh cookie survives. Returns true when a fresh access token
- * was minted. Safe to call unconditionally on boot — it is a no-op when
- * already authenticated and deduplicates concurrent callers.
+ * but Firebase persistence and/or the refresh cookie may survive. Returns true
+ * when a fresh access token was minted. Safe to call unconditionally on boot.
  */
 export async function restoreSession(): Promise<boolean> {
   if (accessToken) return true;

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import type { WellnessProfile } from '@aquazerofit/shared';
 import { restoreSession, tokenStore } from '../../lib/api';
+import { useFirebaseAuth } from '../../lib/AuthProvider';
 import { isTMA } from '../../lib/telegram';
 import { useProfile } from '../../lib/queries';
 import { AuthGateSkeleton } from '../ui/Skeleton';
@@ -60,13 +61,23 @@ export function useProfileGate(): ProfileGate {
  */
 export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
   const location = useLocation();
+  const { isLoading: firebaseLoading, firebaseEnabled, firebaseUser } = useFirebaseAuth();
   // FE-01: the access token lives in memory, so a reload starts unauthenticated
-  // even with a valid session. Attempt one cookie-backed refresh on mount.
-  const [restoring, setRestoring] = useState(!tokenStore.isAuthenticated);
+  // even with a valid session. Wait for Firebase first when enabled, then
+  // attempt one cookie-backed refresh for Telegram / legacy sessions.
+  const [restoring, setRestoring] = useState(
+    () => !tokenStore.isAuthenticated && !firebaseLoading,
+  );
+
   useEffect(() => {
+    if (firebaseLoading) return;
     let alive = true;
+    if (firebaseEnabled && firebaseUser && tokenStore.isAuthenticated) {
+      setRestoring(false);
+      return;
+    }
     if (!tokenStore.isAuthenticated) {
-      void restoreSession().then((ok) => {
+      void restoreSession().then(() => {
         if (alive) setRestoring(false);
       });
     } else {
@@ -75,11 +86,13 @@ export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
     return () => {
       alive = false;
     };
-  }, []);
-  const isAuthed = tokenStore.isAuthenticated;
-  const { data: profile, isLoading, isError, refetch } = useProfile(isAuthed && !restoring);
+  }, [firebaseLoading, firebaseEnabled, firebaseUser]);
 
-  if (restoring) return <AuthGateSkeleton />;
+  const isAuthed = tokenStore.isAuthenticated;
+  const gatePending = firebaseLoading || restoring;
+  const { data: profile, isLoading, isError, refetch } = useProfile(isAuthed && !gatePending);
+
+  if (gatePending) return <AuthGateSkeleton />;
 
   if (!isAuthed) {
     if (publicIndex && location.pathname === '/' && !isTMA()) return <>{publicIndex}</>;

@@ -121,7 +121,14 @@ function SignInInner() {
   const location = useLocation();
   const [params] = useSearchParams();
   const toast = useToast();
-  const { login, register, telegramLogin } = useAuthActions();
+  const {
+    login,
+    register,
+    telegramLogin,
+    requestPasswordReset,
+    firebaseEnabled,
+    mapFirebaseError,
+  } = useAuthActions();
 
   const [mode, setMode] = useState<Mode>(params.get('mode') === 'register' ? 'register' : 'signIn');
   const [email, setEmail] = useState('');
@@ -179,6 +186,10 @@ function SignInInner() {
 
   const from = (location.state as { from?: string } | null)?.from;
   const isRegister = mode === 'register';
+  // Firebase owns bot/rate defence for web email flows; Turnstile stays on the
+  // legacy API register / reset path (Android still hits those endpoints).
+  const challengeRegister = captchaOn && !firebaseEnabled;
+  const challengeReset = captchaOn && !firebaseEnabled;
 
   // Inside Telegram, try signing in silently before showing the form.
   const autoLoginPending = useTelegramAutoLogin();
@@ -217,15 +228,17 @@ function SignInInner() {
     setResetEmailError(undefined);
     setResetBusy(true);
     try {
-      const res = await api<{ devToken?: string } | undefined>('/auth/password-reset/request', {
-        method: 'POST',
-        // Omitted rather than sent empty on an unchallenged deployment, so the
-        // request body is byte-identical to what it was before bot protection.
-        body: { email: parsedEmail.data, captchaToken: resetCaptcha || undefined },
-        auth: false,
-      });
+      const res = await requestPasswordReset(
+        parsedEmail.data,
+        firebaseEnabled ? undefined : resetCaptcha || undefined,
+      );
       // Anti-enumeration copy - shown regardless of whether the account exists.
       setResetNote('If that account exists, reset instructions have been issued.');
+      if (firebaseEnabled) {
+        toast.success('If that account exists, reset instructions have been issued.');
+        closeReset();
+        return;
+      }
       if (res && typeof res.devToken === 'string' && res.devToken.length > 0) {
         setResetToken(res.devToken);
         setResetTokenIsDev(true);
@@ -233,7 +246,9 @@ function SignInInner() {
       setResetStep('confirm');
     } catch (err) {
       haptic('error');
-      if (err instanceof ApiError && err.code === 'RATE_LIMITED') {
+      if (firebaseEnabled) {
+        toast.error(mapFirebaseError(err));
+      } else if (err instanceof ApiError && err.code === 'RATE_LIMITED') {
         toast.error('Too many attempts. Please wait a moment and try again.');
       } else if (err instanceof ApiError && err.code === 'VALIDATION_FAILED') {
         // The API returns both a bad email and a bad challenge as
@@ -331,21 +346,27 @@ function SignInInner() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      const res = isRegister
-        ? await register({
-            email,
-            password,
-            displayName: displayName.trim() || undefined,
-            captchaToken: registerCaptcha,
-          })
-        : await login(email, password);
+      if (isRegister) {
+        await register({
+          email,
+          password,
+          displayName: displayName.trim() || undefined,
+          captchaToken: firebaseEnabled ? undefined : registerCaptcha,
+        });
+      } else {
+        await login(email, password);
+      }
       haptic('success');
       // Straight into the app whether or not a wellness profile exists - the
       // essentials are asked for by the surfaces that need them, not here.
       navigate(safeInternalPath(from), { replace: true });
     } catch (err) {
       haptic('error');
-      if (err instanceof ApiError) {
+      if (firebaseEnabled) {
+        const message = mapFirebaseError(err);
+        if (message.includes('already exists')) setErrors({ email: message });
+        else toast.error(message);
+      } else if (err instanceof ApiError) {
         if (err.code === 'VALIDATION_FAILED' && isCaptchaError(err)) {
           setRegisterCaptchaReset((n) => n + 1);
           setRegisterCaptcha('');
@@ -454,15 +475,17 @@ function SignInInner() {
                       }}
                       error={resetEmailError}
                     />
-                    <Turnstile
-                      action="password-reset"
-                      onToken={setResetCaptcha}
-                      resetSignal={resetCaptchaReset}
-                    />
+                    {challengeReset && (
+                      <Turnstile
+                        action="password-reset"
+                        onToken={setResetCaptcha}
+                        resetSignal={resetCaptchaReset}
+                      />
+                    )}
                     <PrimaryButton
                       type="submit"
                       loading={resetBusy}
-                      disabled={captchaOn && resetCaptcha === ''}
+                      disabled={challengeReset && resetCaptcha === ''}
                     >
                       Send reset instructions
                     </PrimaryButton>
@@ -629,7 +652,7 @@ function SignInInner() {
                   already defended by the per-email lockout and the per-IP auth
                   lane, and a challenge on every return visit is friction paid
                   by real users on the path they walk most. */}
-              {isRegister && (
+              {isRegister && challengeRegister && (
                 <Turnstile
                   action="register"
                   onToken={setRegisterCaptcha}
@@ -640,7 +663,7 @@ function SignInInner() {
               <PrimaryButton
                 type="submit"
                 loading={submitting}
-                disabled={captchaOn && isRegister && registerCaptcha === ''}
+                disabled={challengeRegister && isRegister && registerCaptcha === ''}
               >
                 {isRegister ? 'Create Account' : 'Sign In'}
               </PrimaryButton>

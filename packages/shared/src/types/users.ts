@@ -36,6 +36,12 @@ export interface User {
   premiumUntil?: string | null;
   role: UserRole;
   displayName: string;
+  /**
+   * Firebase Auth uid when the account was created or linked via the web
+   * Firebase Auth path. Absent for legacy email/password and Telegram-only
+   * accounts until they sign in with Firebase once.
+   */
+  firebaseUid?: string;
   tgId?: number; // unique when present (Telegram link)
   tgUsername?: string;
   timezone?: string; // IANA name (e.g. 'Australia/Sydney'); optional, set via PATCH /me

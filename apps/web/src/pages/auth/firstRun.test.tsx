@@ -70,7 +70,7 @@ vi.mock('../../lib/queries', () => ({
   useTargets: () => ({ data: null, isLoading: true }),
   useUpdateProfile: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateConsents: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useAuthActions: () => ({ login: vi.fn(), register: vi.fn(), telegramLogin: vi.fn() }),
+  useAuthActions: () => ({ login: vi.fn(), register: vi.fn(), telegramLogin: vi.fn(), logout: vi.fn(), firebaseEnabled: false }),
 }));
 
 // Real pages are replaced by markers: this suite is about which surface the

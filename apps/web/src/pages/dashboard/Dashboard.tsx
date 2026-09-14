@@ -5,14 +5,14 @@ import { api } from '@/lib/api';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { RingProgress } from '@/components/ui/RingProgress';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { Skeleton, DashboardSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { CoachCard } from '@/components/coach/CoachCard';
 import { ConsistencyCard } from '@/components/progress/ConsistencyCard';
 import { ConsistencyChip } from '@/components/progress/ConsistencyChip';
 import { ReadinessChip } from '@/components/progress/ReadinessChip';
 import { WeeklyInsightCard } from '@/components/progress/WeeklyInsightCard';
-import { todayWorkoutQuery, useProgressInsight, useReadiness } from '@/lib/queries';
+import { todayWorkoutQuery, queryKeys, useProgressInsight, useReadiness } from '@/lib/queries';
 import { MacroBar } from './MacroBar';
 import { WaterCard } from './WaterCard';
 import { Sparkline } from './Sparkline';
@@ -36,7 +36,7 @@ export default function Dashboard() {
   const today = todayLocalDate();
 
   const dailyQuery = useQuery({
-    queryKey: ['nutrition', 'daily', today],
+    queryKey: queryKeys.nutritionDaily(today),
     queryFn: () => api<DailyNutrition>('/analytics/nutrition/daily', { query: { date: today } }),
   });
   const profileQuery = useQuery({
@@ -44,14 +44,14 @@ export default function Dashboard() {
     queryFn: () => api<unknown>('/me'),
   });
   const progressQuery = useQuery({
-    queryKey: ['progress'],
+    queryKey: queryKeys.progress,
     queryFn: () => api<ProgressSummary>('/progress/summary'),
   });
   // Shared cache key ⇒ shared queryFn; the raw envelope is unwrapped at use
   // (asWorkoutSession below), never cached pre-transformed.
   const workoutQuery = useQuery(todayWorkoutQuery);
   const trendsQuery = useQuery({
-    queryKey: ['nutrition', 'trends', '30d'],
+    queryKey: queryKeys.nutritionTrends('30d'),
     queryFn: () => api<TrendsResponse>('/analytics/nutrition/trends', { query: { range: '30d' } }),
   });
   const insightQuery = useProgressInsight();
@@ -63,6 +63,12 @@ export default function Dashboard() {
   const progress = progressQuery.data;
   const session = asWorkoutSession(workoutQuery.data);
   const weightSeries = trendsQuery.data?.weight ?? progress?.weightSeries ?? [];
+  const coldLoad =
+    dailyQuery.isPending &&
+    !daily &&
+    !dailyQuery.isError &&
+    profileQuery.isPending &&
+    progressQuery.isPending;
 
   const headerRight = (
     <div className="flex items-center gap-2.5">
@@ -85,10 +91,13 @@ export default function Dashboard() {
     <div>
       <AppHeader right={headerRight} />
 
+      {coldLoad ? (
+        <DashboardSkeleton />
+      ) : (
       <main className="px-container-margin">
         {/* Greeting - tighter, more personal */}
         <section className="mt-5 mb-5 reveal">
-          <p className="text-sm text-on-surface-variant/70 font-medium tracking-tight">
+          <p className="text-sm text-on-surface-variant font-medium tracking-tight">
             {formatLocalDate(today)}
           </p>
           <h1 className="font-heading font-semibold tracking-tight text-3xl text-on-surface leading-tight mt-0.5">
@@ -100,18 +109,53 @@ export default function Dashboard() {
           </h1>
         </section>
 
-        {/* How hard the plan should push this week — supportive, never a warning */}
+        {/* How hard the plan should push this week: supportive, never a warning */}
         <section className="mb-5 reveal reveal-2" aria-label="This week's readiness">
           <ReadinessChip readiness={readinessQuery.data} loading={readinessQuery.isPending} />
         </section>
 
         {dailyQuery.isError ? (
           <ErrorState
+            surface="dashboard"
             message="We couldn't load today's nutrition."
             retry={() => void dailyQuery.refetch()}
           />
         ) : (
           <>
+            {/* First-value callout: empty day gets an explicit next step, not a blank ring. */}
+            {daily && daily.kcalConsumed === 0 && (
+              <section className="mb-5 reveal reveal-2" aria-label="Get started">
+                <GlassCard className="p-card-padding border border-primary/30">
+                  <p className="text-xs font-bold uppercase tracking-wider text-primary mb-1">
+                    Next step
+                  </p>
+                  <h2 className="font-heading font-semibold text-xl text-on-surface mb-1">
+                    Log your first meal
+                  </h2>
+                  <p className="text-sm text-on-surface-variant mb-4">
+                    Search a food, scan a barcode, or photograph your plate. One log unlocks the
+                    rest of today&apos;s targets.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/nutrition')}
+                      className="cta-gradient px-5 py-2.5 rounded-xl text-on-primary font-bold text-sm active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    >
+                      Open nutrition
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/nutrition/capture')}
+                      className="px-5 py-2.5 rounded-xl border border-primary/60 text-primary font-bold text-sm active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    >
+                      Scan a meal
+                    </button>
+                  </div>
+                </GlassCard>
+              </section>
+            )}
+
             {/* Calorie ring hero - the visual anchor */}
             <section className="mb-5 reveal reveal-2" aria-label="Daily calories">
               <GlassCard tier="hero" className="p-card-padding flex flex-col items-center relative overflow-hidden float-gentle">
@@ -226,13 +270,13 @@ export default function Dashboard() {
         )}
 
         {/* Your coach, what they make of the week, and the XP ladder. Placed
-            above consistency because it is the surface people come back for —
+            above consistency because it is the surface people come back for:
             the numbers below are the evidence behind what the coach just said. */}
         <section className="mb-5 reveal reveal-3" aria-label="Your coach">
           <CoachCard />
         </section>
 
-        {/* Consistency — activeDays/windowDays, never a resettable streak */}
+        {/* Consistency: activeDays/windowDays, never a resettable streak */}
         <section className="mb-5 reveal reveal-4" aria-label="Consistency">
           <ConsistencyCard
             consistency={progress?.consistency}
@@ -396,8 +440,9 @@ export default function Dashboard() {
           )}
         </section>
       </main>
+      )}
 
-      {/* Camera FAB — anchored to the centered content column, not the viewport */}
+      {/* Camera FAB: anchored to the centered content column, not the viewport */}
       <div className="fixed bottom-24 inset-x-0 z-40 flex max-w-md mx-auto justify-end pr-container-margin">
         <button
           type="button"

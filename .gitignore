@@ -8,6 +8,8 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.staging.example
+!.env.production.example
 
 # AI coding-assistant workspaces. These are developer-local scratch state, not
 # product code. Previously clean only because of a machine-local global ignore,

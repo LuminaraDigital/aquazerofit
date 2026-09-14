@@ -12,7 +12,7 @@
  * beginner progression, no declared exclusions) and edited later in Settings,
  * where those fields already live.
  */
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { RANGES, profileSchema, type ProfileInput } from '@aquazerofit/shared';
 import {
@@ -26,6 +26,11 @@ import {
 } from '../../lib/format';
 import { haptic } from '../../lib/telegram';
 import { useTargets, useUpdateConsents, useUpdateProfile } from '../../lib/queries';
+import { useDraftPersistence } from '../../lib/useDraftPersistence';
+import {
+  trackOnboardingCompleted,
+  trackOnboardingSkipped,
+} from '../../lib/retention';
 import { useProfileGate } from '../../components/layout/RequireAuth';
 import { Input } from '../../components/ui/Input';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
@@ -109,7 +114,10 @@ export default function Setup() {
   const isFirstSetup = profile === null;
 
   const [phase, setPhase] = useState<'form' | 'reveal'>('form');
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<
+    'age' | 'height' | 'weight' | 'goal' | 'activityLevel' | 'consent' | 'form',
+    string
+  >>>({});
   const [state, setState] = useState<FormState>(() => {
     if (!profile) return EMPTY;
     const { ft, inches } = cmToFtIn(profile.heightCm);
@@ -127,36 +135,62 @@ export default function Setup() {
     };
   });
 
+  const isDirtyDraft = useCallback(
+    (s: FormState) =>
+      s.age.trim() !== '' ||
+      s.heightCm.trim() !== '' ||
+      s.weight.trim() !== '' ||
+      s.goal !== null ||
+      s.activityLevel !== null,
+    [],
+  );
+
+  const onRestoreDraft = useCallback((stored: FormState) => {
+    if (!isFirstSetup) return;
+    setState((prev) => ({ ...prev, ...stored }));
+  }, [isFirstSetup]);
+
+  const { clear: clearDraft } = useDraftPersistence({
+    storageKey: 'azf_setup_draft_v1',
+    value: state,
+    enabled: isFirstSetup && phase === 'form',
+    isDirty: isDirtyDraft,
+    surface: 'setup',
+    onRestore: onRestoreDraft,
+  });
+
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setState((prev) => ({ ...prev, [key]: value }));
 
-  function validate(): string | null {
+  function validate(): typeof fieldErrors {
+    const next: typeof fieldErrors = {};
     const age = Number(state.age);
     if (!Number.isInteger(age) || age < RANGES.age.min || age > RANGES.age.max) {
-      return `Age must be between ${RANGES.age.min} and ${RANGES.age.max}.`;
+      next.age = `Age must be between ${RANGES.age.min} and ${RANGES.age.max}.`;
     }
     const heightCm = resolveHeightCm(state);
     if (heightCm < RANGES.heightCm.min || heightCm > RANGES.heightCm.max) {
-      return state.unit === 'imperial'
-        ? "Height must be between 3'4\" and 8'2\"."
-        : `Height must be between ${RANGES.heightCm.min} and ${RANGES.heightCm.max} cm.`;
+      next.height =
+        state.unit === 'imperial'
+          ? "Height must be between 3'4\" and 8'2\"."
+          : `Height must be between ${RANGES.heightCm.min} and ${RANGES.heightCm.max} cm.`;
     }
     const weightKg = resolveWeightKg(state);
     if (weightKg < RANGES.weightKg.min || weightKg > RANGES.weightKg.max) {
-      return `Weight must be between ${kgToDisplay(RANGES.weightKg.min, state.unit)} and ${kgToDisplay(RANGES.weightKg.max, state.unit)} ${weightUnit(state.unit)}.`;
+      next.weight = `Weight must be between ${kgToDisplay(RANGES.weightKg.min, state.unit)} and ${kgToDisplay(RANGES.weightKg.max, state.unit)} ${weightUnit(state.unit)}.`;
     }
-    if (!state.goal) return 'Pick the goal that fits you best.';
-    if (!state.activityLevel) return 'Select your typical activity level.';
+    if (!state.goal) next.goal = 'Pick the goal that fits you best.';
+    if (!state.activityLevel) next.activityLevel = 'Select your typical activity level.';
     if (isFirstSetup && !state.consentWellness) {
-      return 'The wellness data consent is required so we can compute your targets.';
+      next.consent = 'The wellness data consent is required so we can compute your targets.';
     }
-    return null;
+    return next;
   }
 
   async function submit() {
-    const problem = validate();
-    setError(problem);
-    if (problem) {
+    const problems = validate();
+    setFieldErrors(problems);
+    if (Object.keys(problems).length > 0) {
       haptic('error');
       return;
     }
@@ -179,7 +213,7 @@ export default function Setup() {
     };
     const parsed = profileSchema.safeParse(input);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Please review your details.');
+      setFieldErrors({ form: parsed.error.issues[0]?.message ?? 'Please review your details.' });
       return;
     }
     try {
@@ -191,13 +225,16 @@ export default function Setup() {
           anonymisedAnalytics: state.consentAnalytics,
           reminders: state.consentReminders,
         });
+        trackOnboardingCompleted('setup');
       }
+      clearDraft();
       refetchProfile();
       haptic('success');
       setPhase('reveal');
     } catch {
       haptic('error');
       toast.error('We could not save your details. Please try again.');
+      setFieldErrors({ form: 'We could not save your details. Please try again.' });
     }
   }
 
@@ -232,6 +269,7 @@ export default function Setup() {
           max={RANGES.age.max}
           placeholder="e.g. 28"
           value={state.age}
+          error={fieldErrors.age}
           onChange={(e) => set('age', e.target.value)}
         />
 
@@ -245,6 +283,7 @@ export default function Setup() {
             max={RANGES.heightCm.max}
             placeholder="e.g. 175"
             value={state.heightCm}
+            error={fieldErrors.height}
             onChange={(e) => set('heightCm', e.target.value)}
           />
         ) : (
@@ -258,6 +297,7 @@ export default function Setup() {
               max={8}
               placeholder="5"
               value={state.heightFt}
+              error={fieldErrors.height}
               onChange={(e) => set('heightFt', e.target.value)}
             />
             <Input
@@ -280,6 +320,7 @@ export default function Setup() {
           inputMode="decimal"
           placeholder={state.unit === 'imperial' ? 'e.g. 165' : 'e.g. 75'}
           value={state.weight}
+          error={fieldErrors.weight}
           onChange={(e) => set('weight', e.target.value)}
         />
 
@@ -302,7 +343,7 @@ export default function Setup() {
             {
               value: 'lose',
               title: 'Lose weight',
-              body: 'A sustainable calorie deficit — never below safe floors.',
+              body: 'A sustainable calorie deficit - never below safe floors.',
               icon: 'trending_down',
             },
             {
@@ -319,6 +360,14 @@ export default function Setup() {
             },
           ]}
         />
+        {fieldErrors.goal && (
+          <p role="alert" className="flex items-center gap-1.5 -mt-4 text-xs text-tertiary-container">
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">
+              error
+            </span>
+            {fieldErrors.goal}
+          </p>
+        )}
 
         <div className="space-y-2">
           <SegmentedOptions
@@ -329,6 +378,14 @@ export default function Setup() {
           />
           {activityHint && (
             <p className="text-xs text-on-surface-variant ml-1">{activityHint}</p>
+          )}
+          {fieldErrors.activityLevel && (
+            <p role="alert" className="flex items-center gap-1.5 text-xs text-tertiary-container">
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                error
+              </span>
+              {fieldErrors.activityLevel}
+            </p>
           )}
         </div>
 
@@ -359,15 +416,23 @@ export default function Setup() {
               title="Reminders"
               body="Allow meal, water, workout and weigh-in reminders (configurable later)."
             />
+            {fieldErrors.consent && (
+              <p role="alert" className="flex items-center gap-1.5 text-xs text-tertiary-container">
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                  error
+                </span>
+                {fieldErrors.consent}
+              </p>
+            )}
           </fieldset>
         )}
 
-        {error && (
+        {fieldErrors.form && (
           <p role="alert" className="flex items-center gap-1.5 text-sm text-tertiary-container">
             <span className="material-symbols-outlined text-base" aria-hidden="true">
               error
             </span>
-            {error}
+            {fieldErrors.form}
           </p>
         )}
       </div>
@@ -379,7 +444,13 @@ export default function Setup() {
         >
           Show my targets
         </PrimaryButton>
-        <SecondaryButton onClick={() => navigate(next, { replace: true })} className="min-h-[48px]">
+        <SecondaryButton
+          onClick={() => {
+            if (isFirstSetup) trackOnboardingSkipped('setup_not_now');
+            navigate(next, { replace: true });
+          }}
+          className="min-h-[48px]"
+        >
           Not now
         </SecondaryButton>
       </div>
@@ -404,7 +475,7 @@ function ConsentCheckbox({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 w-5 h-5 shrink-0 rounded border-outline-variant bg-surface-container-lowest text-secondary-container accent-[#00bd85] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+        className="mt-0.5 w-5 h-5 shrink-0 rounded border-outline-variant bg-surface-container-lowest text-secondary-container accent-success-container focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
       />
       <span>
         <span className="block text-sm font-medium text-on-surface">{title}</span>

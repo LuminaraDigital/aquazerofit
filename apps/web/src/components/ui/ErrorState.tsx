@@ -1,6 +1,24 @@
+import { useEffect } from 'react';
+import { trackFriction } from '@/lib/retention';
 import { SecondaryButton } from './SecondaryButton';
 
-export function ErrorState({ message, retry }: { message?: string; retry?: () => void }) {
+export function ErrorState({
+  message,
+  retry,
+  surface = 'unknown',
+}: {
+  message?: string;
+  retry?: () => void;
+  /** Optional route/surface label for drop-off telemetry. */
+  surface?: string;
+}) {
+  useEffect(() => {
+    trackFriction('error_encountered', {
+      surface,
+      message: message ?? 'generic_load_failure',
+    });
+  }, [message, surface]);
+
   return (
     <div role="alert" className="glass-card p-8 flex flex-col items-center text-center gap-3">
       <span

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useToast } from '@/components/ui/Toast';
+import { trackFirstValueMeal } from '@/lib/retention';
 import {
   asRecommendation,
   fmtInt,
@@ -30,7 +31,7 @@ export function SuggestMealCard({ date }: { date: string }) {
         setRec(next);
         setLogged(false);
       } else {
-        show('Could not read the suggestion — please try again');
+        show('Could not read the suggestion. Please try again');
       }
     },
     onError: () => show('Suggestion unavailable right now'),
@@ -42,10 +43,11 @@ export function SuggestMealCard({ date }: { date: string }) {
     onSuccess: () => {
       setLogged(true);
       show('Added to your log');
+      trackFirstValueMeal('suggest_meal');
       void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
-    onError: () => show('Could not log that meal — please try again'),
+    onError: () => show('Could not log that meal. Please try again'),
   });
 
   return (
@@ -58,9 +60,8 @@ export function SuggestMealCard({ date }: { date: string }) {
         </div>
         <div>
           <h3 className="font-heading font-semibold uppercase tracking-[0.02em] text-xl text-on-surface">
-            AI Meal Suggestion
+            Meal suggestion
           </h3>
-          <p className="text-sm text-on-surface-variant">Tuned to what you have left today.</p>
         </div>
       </div>
 

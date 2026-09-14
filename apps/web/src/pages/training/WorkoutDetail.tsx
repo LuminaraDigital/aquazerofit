@@ -19,6 +19,7 @@ import type {
   WorkoutSession,
 } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
+import { trackFirstValueWorkout } from '@/lib/retention';
 import {
   unwrapResolved,
   type CompleteExerciseInput,
@@ -286,6 +287,7 @@ export default function WorkoutDetail() {
     }) => api<WorkoutSession>(`/workouts/${sessionId}/complete`, { method: 'POST', body: payload }),
     ...completePatch,
     onSuccess: async () => {
+      trackFirstValueWorkout('workout_complete');
       toast.success('Workout complete - great session!');
       const mins = durationMinutes();
       setSharePayload({
@@ -426,7 +428,6 @@ export default function WorkoutDetail() {
               <h1 className="heading-display font-heading text-3xl leading-tight text-on-surface">
                 {session.focus}
               </h1>
-              <p className="text-sm text-on-surface-variant">Aqua Coach • personalised session</p>
             </div>
           </section>
 

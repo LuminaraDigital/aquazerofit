@@ -18,6 +18,7 @@
     "seed": "npm run seed --workspace apps/api",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "eval": "tsx evals/runner.ts",
+    "smoke": "node scripts/smoke-check.mjs",
     "verify": "npm run typecheck && npm run test && npm run eval",
     "start": "npm run start --workspace apps/api",
     "assets:coaches": "node tools/coaches/build-art.mjs",
@@ -30,6 +31,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "sharp": "^0.35.2",
     "tsx": "^4.16.2"
   }
 }

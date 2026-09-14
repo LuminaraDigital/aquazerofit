@@ -12,6 +12,7 @@ import {
 } from './types';
 import { MEMORY_FACT_MAX_CHARS, RANGES } from './constants';
 import { COACHES } from './coaches';
+import { containsProfanity, PROFANITY_MESSAGE } from './profanity';
 
 // ---------- primitives ----------
 
@@ -43,7 +44,15 @@ export const passwordSchema = z
 export const registerSchema = z.object({
   email: z.string().email(),
   password: passwordSchema,
-  displayName: z.string().min(1).max(60).optional(),
+  // Filtered here as well as on displayNameSchema: these are two independent
+  // definitions, and leaving registration unfiltered would make signup the
+  // way in for exactly the name the rename path refuses.
+  displayName: z
+    .string()
+    .min(1)
+    .max(60)
+    .refine((v) => !containsProfanity(v), { message: PROFANITY_MESSAGE })
+    .optional(),
 });
 
 export const loginSchema = z.object({
@@ -249,7 +258,12 @@ export const chatMessageSchema = z.object({
  * "   " cannot become a display name via PATCH (registration falls back to the
  * email prefix instead, which PATCH has no equivalent for).
  */
-export const displayNameSchema = z.string().trim().min(1).max(60);
+export const displayNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(60)
+  .refine((v) => !containsProfanity(v), { message: PROFANITY_MESSAGE });
 
 /**
  * Loose IANA timezone check: the runtime's Intl database is the authority

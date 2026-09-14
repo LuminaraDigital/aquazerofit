@@ -20,7 +20,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ChatMessage, ChatSession, ChatToolCall, MealType } from '@aquazerofit/shared';
 import { AQUA_CHARACTER, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
 import { api, ApiError, streamChat } from '@/lib/api';
-import { useCoachRoster, type CoachCardData } from '@/lib/queries';
+import { asList } from '@/lib/envelopes';
+import { todayLocalDate } from '@/lib/format';
+import { useDraftPersistence } from '@/lib/useDraftPersistence';
+import { trackFirstValueMeal } from '@/lib/retention';
+import { queryKeys, useCoachRoster, type CoachCardData } from '@/lib/queries';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Chip } from '@/components/ui/Chip';
@@ -44,12 +48,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 /** The user's own calendar day, which is the day a meal belongs to. */
-function localToday(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
-}
+const localToday = todayLocalDate;
 
 const TOOL_LABELS: Record<string, string> = {
   getTodayNutrition: "Today's nutrition",
@@ -137,21 +136,9 @@ function timeOf(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-/** Accept bare arrays and the API's { items } / { sessions } / { messages } envelopes. */
-function asList<T>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === 'object') {
-    const record = data as Record<string, unknown>;
-    for (const key of ['items', 'sessions', 'messages']) {
-      if (Array.isArray(record[key])) return record[key] as T[];
-    }
-  }
-  return [];
-}
-
 /**
  * Byline above each assistant turn. Shows the user's selected coach, falling
- * back to the Aqua mascot before the roster query resolves — the alternative
+ * back to the Aqua mascot before the roster query resolves - the alternative
  * (an empty slot that pops in) makes the first paint of every conversation
  * flicker on the slowest connections, which is where it is most visible.
  */
@@ -216,10 +203,23 @@ export default function Coach() {
   const endRef = useRef<HTMLDivElement>(null);
   const creatingRef = useRef(false);
 
+  const onRestoreComposer = useCallback((stored: string) => {
+    setInput(stored);
+  }, []);
+  const { clear: clearComposerDraft } = useDraftPersistence({
+    storageKey: 'azf_coach_composer_v1',
+    value: input,
+    enabled: !streaming,
+    isDirty: (v) => v.trim().length > 0,
+    surface: 'coach',
+    onRestore: onRestoreComposer,
+  });
+
   // ---- session bootstrap ----
   const sessionsQuery = useQuery({
     queryKey: ['chat', 'sessions'],
-    queryFn: async () => asList<ChatSession>(await api<unknown>('/chat/sessions')),
+    queryFn: async () =>
+      asList<ChatSession>(await api<unknown>('/chat/sessions'), ['items', 'sessions']),
   });
 
   const createSession = useMutation({
@@ -246,7 +246,10 @@ export default function Coach() {
   const messagesQuery = useQuery({
     queryKey: ['chat', 'messages', sessionId],
     queryFn: async () =>
-      asList<ChatMessage>(await api<unknown>(`/chat/sessions/${sessionId}/messages`)),
+      asList<ChatMessage>(
+        await api<unknown>(`/chat/sessions/${sessionId}/messages`),
+        ['items', 'messages'],
+      ),
     enabled: sessionId !== '',
   });
   const messages = useMemo(() => messagesQuery.data ?? [], [messagesQuery.data]);
@@ -277,6 +280,7 @@ export default function Coach() {
       const text = content.trim();
       if (!text || streaming || !sessionId) return;
       setInput('');
+      clearComposerDraft();
       setPendingUser(text);
       setStreaming(true);
       setStreamText('');
@@ -310,7 +314,7 @@ export default function Coach() {
         setPendingUser(null);
       }
     },
-    [sessionId, streaming, queryClient, coachName],
+    [sessionId, streaming, queryClient, coachName, clearComposerDraft],
   );
 
   // ---- chat-native logging: propose → confirm ----
@@ -322,6 +326,7 @@ export default function Coach() {
       }),
     onSuccess: (data) => {
       setInput('');
+      clearComposerDraft();
       setDraft(data.draft);
       void queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
     },
@@ -343,11 +348,13 @@ export default function Coach() {
       }),
     onSuccess: async (data) => {
       setDraft(null);
+      trackFirstValueMeal('coach_confirm');
       toast.success(`Logged ${Math.round(data.mealLog.totalKcal)} kcal`);
       await queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
       // The dashboard and food log read the same rows this just wrote.
       void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
-      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.progress });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutToday });
     },
     onError: (e) =>
       toast.error(e instanceof ApiError ? e.message : 'Could not log that meal. Please try again.'),

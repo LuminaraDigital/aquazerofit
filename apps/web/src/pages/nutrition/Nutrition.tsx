@@ -10,6 +10,7 @@ import type {
   TrendPoint,
 } from '@aquazerofit/shared';
 import { api } from '@/lib/api';
+import { trackFirstValueMeal } from '@/lib/retention';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { RingProgress } from '@/components/ui/RingProgress';
@@ -457,6 +458,7 @@ export default function Nutrition() {
     onSuccess: () => {
       setAddSheetMeal(null);
       show('Meal logged');
+      trackFirstValueMeal('nutrition_add');
     },
     onSettled: () => invalidateLogs(),
   });

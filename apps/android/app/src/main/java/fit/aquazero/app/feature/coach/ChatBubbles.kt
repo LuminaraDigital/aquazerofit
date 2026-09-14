@@ -37,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -155,13 +157,18 @@ fun AssistantBubble(
         ) {
             CoachByline(persona)
             if (onSpeakClick != null && !guardrailBlocked) {
+                // The glyph stays 18dp so the byline still reads as a quiet
+                // caption, but the button itself keeps Material's 48dp
+                // minimum: a 28dp target is a coin-flip to hit one-handed.
                 IconButton(
                     onClick = onSpeakClick,
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Outlined.VolumeUp,
-                        contentDescription = if (isSpeaking) "Stop voice" else "Read aloud",
+                        contentDescription = stringResource(
+                            if (isSpeaking) R.string.coach_stop_voice_cd else R.string.coach_read_aloud_cd,
+                        ),
                         tint = if (isSpeaking) persona.colour else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
@@ -283,7 +290,18 @@ fun ActionChipGroup(
             }
 
             Row(
+                // Order matters. `clickable` and the 48dp minimum sit OUTSIDE
+                // the background, so the chip still draws at its designed
+                // ~32dp while the tap area is Material's minimum; putting the
+                // minimum inside would have inflated the visible pill instead.
                 modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(enabled = !executed, role = Role.Button) {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        executedActionIds = executedActionIds + action.id
+                        onActionClick(action)
+                    }
+                    .minimumInteractiveComponentSize()
                     .clip(RoundedCornerShape(12.dp))
                     .background(bg)
                     .border(
@@ -297,11 +315,6 @@ fun ActionChipGroup(
                         ),
                         RoundedCornerShape(12.dp),
                     )
-                    .clickable(enabled = !executed) {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        executedActionIds = executedActionIds + action.id
-                        onActionClick(action)
-                    }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -321,7 +334,7 @@ fun ActionChipGroup(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = if (executed) "Logged" else action.label,
+                    text = if (executed) stringResource(R.string.coach_action_logged) else action.label,
                     style = MaterialTheme.typography.labelMedium,
                     color = if (executed) {
                         MaterialTheme.colorScheme.onPrimaryContainer

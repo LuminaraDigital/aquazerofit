@@ -702,11 +702,16 @@ private fun Composer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp),
+                    .padding(bottom = 8.dp)
+                    // The mic opens asynchronously after the tap, and TalkBack
+                    // does not re-read a button whose label changed under a
+                    // resting finger. This fires once per dictation, so it
+                    // tells the user speech is being captured without nagging.
+                    .semantics { liveRegion = LiveRegionMode.Polite },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Listening... Speak your meal or question",
+                    text = stringResource(R.string.coach_listening_hint),
                     style = MaterialTheme.typography.labelMedium,
                     color = state.persona.colour,
                     modifier = Modifier.weight(1f),
@@ -718,7 +723,13 @@ private fun Composer(
             IconButton(onClick = onToggleMic, enabled = enabled) {
                 Icon(
                     imageVector = if (isListening) Icons.Outlined.MicOff else Icons.Outlined.Mic,
-                    contentDescription = if (isListening) "Stop voice dictation" else "Start voice dictation",
+                    contentDescription = stringResource(
+                        if (isListening) {
+                            R.string.coach_dictation_stop_cd
+                        } else {
+                            R.string.coach_dictation_start_cd
+                        },
+                    ),
                     tint = if (isListening) {
                         state.persona.colour
                     } else if (enabled) {

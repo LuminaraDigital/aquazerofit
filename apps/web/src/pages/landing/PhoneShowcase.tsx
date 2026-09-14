@@ -76,18 +76,18 @@ export function PhoneShowcase() {
             </span>
             <span className="text-[11px] font-semibold text-on-surface">Photo analysed</span>
           </div>
-          <p className="mt-1.5 text-[10px] leading-relaxed text-on-surface-variant/70">
+          <p className="mt-1.5 text-[10px] leading-relaxed text-on-surface-variant">
             Grilled salmon, quinoa, broccoli — 612 kcal
           </p>
           <div className="mt-2 flex gap-1.5">
             <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[9px] text-primary">
               Confirm
             </span>
-            <span className="rounded-full bg-white/6 px-2 py-0.5 text-[9px] text-on-surface-variant/70">
+            <span className="rounded-full bg-white/6 px-2 py-0.5 text-[9px] text-on-surface-variant">
               Edit
             </span>
           </div>
-          <p className="mt-2 text-[9px] uppercase tracking-wider text-on-surface-variant/70">
+          <p className="mt-2 text-[9px] uppercase tracking-wider text-on-surface-variant">
             Never logged without you
           </p>
         </div>
@@ -102,7 +102,7 @@ export function PhoneShowcase() {
             </span>
             <span className="text-[11px] font-semibold text-on-surface">Aqua Coach</span>
           </div>
-          <p className="mt-1.5 text-[10px] leading-relaxed text-on-surface-variant/70">
+          <p className="mt-1.5 text-[10px] leading-relaxed text-on-surface-variant">
             You have around 1,135 kcal left — a 30 g protein snack fits well.
           </p>
         </div>

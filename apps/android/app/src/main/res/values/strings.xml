@@ -16,7 +16,7 @@
 
     <!-- Welcome carousel -->
     <string name="welcome_slide1_title">Your AI wellness coach</string>
-    <string name="welcome_slide1_subtitle">Nutrition, weight, and home training — powered by personalized data.</string>
+    <string name="welcome_slide1_subtitle">Nutrition, weight, and home training - powered by personalized data.</string>
     <string name="welcome_slide2_title">Hydration &amp; nutrition paths</string>
     <string name="welcome_slide2_subtitle">AI-driven plans that adapt to your daily performance and metabolic rhythm.</string>
     <string name="welcome_slide3_title">Progress with precision</string>
@@ -87,15 +87,9 @@
     <string name="meal_dinner">Dinner</string>
     <string name="meal_snack">Snack</string>
 
-    <!-- Wave 2 placeholders -->
-    <string name="wave2_title">Coming online in Wave 2</string>
-    <string name="wave2_message">This surface is being built. The foundation underneath it is already live.</string>
-
     <!-- ===================== Training: workout library ===================== -->
     <string name="training_this_week">This week</string>
     <string name="training_training_days">%1$d training days</string>
-    <string name="training_week_strip">This week\'s plan</string>
-    <string name="training_day_cd">%1$s, %2$s</string>
     <string name="training_day_today">today</string>
     <string name="training_day_completed">completed</string>
     <string name="training_day_rest">rest day</string>
@@ -111,13 +105,12 @@
     <string name="training_generating">Generating…</string>
     <string name="training_generate_offline">Plan generation needs a connection. Your current plan stays available offline.</string>
     <string name="training_generate_done">Your new training plan is ready</string>
-    <string name="training_generate_failed">Plan generation did not finish. Nothing changed — try again.</string>
+    <string name="training_generate_failed">Plan generation did not finish. Nothing changed - try again.</string>
     <string name="training_plan_error_title">Plan unavailable</string>
     <string name="training_plan_error_body">The plan could not be refreshed. Anything already cached still shows.</string>
     <string name="training_rest_day_title">Rest day</string>
     <string name="training_rest_day_body">Recovery is part of the plan. See you tomorrow.</string>
     <string name="training_today">Today</string>
-    <string name="training_todays_workout">Today\'s workout</string>
     <string name="training_minutes">%1$d min</string>
     <string name="training_exercise_count">%1$d exercises</string>
     <string name="training_kcal_estimate">~%1$d kcal</string>
@@ -134,6 +127,8 @@
     <string name="training_catalog_empty_body">Connect once and the whole exercise library caches for offline browsing.</string>
     <string name="training_load_more">Load more (%1$d of %2$d)</string>
     <string name="training_open_exercise">Open %1$s</string>
+    <string name="training_week_day_cd">%1$s, %2$s</string>
+    <string name="training_akin_cd">Akin, your training mascot. Tap to change pose.</string>
     <string name="training_muscles">Muscles</string>
     <string name="training_equipment">Equipment</string>
     <string name="training_difficulty">Difficulty: %1$s</string>
@@ -176,7 +171,7 @@
     <string name="equipment_swiss_ball">Swiss ball</string>
     <string name="equipment_incline_bench">Incline bench</string>
 
-    <!-- Attribution (CC-BY-SA — legally required on every exercise surface) -->
+    <!-- Attribution (CC-BY-SA - legally required on every exercise surface) -->
     <string name="attribution_label">Attribution</string>
     <string name="attribution_exercise_data">Exercise data: © %1$s, %2$s</string>
     <string name="attribution_exercise_data_via">Exercise data: © %1$s, %2$s, via wger.de</string>
@@ -186,7 +181,6 @@
     <string name="attribution_demonstration">%1$s demonstration</string>
 
     <!-- ===================== Training: guided session ===================== -->
-    <string name="session_overview">Session overview</string>
     <string name="session_guided">Guided workout session</string>
     <string name="session_empty_title">No session today</string>
     <string name="session_empty_body">Today is a rest day, or there is no active plan yet.</string>
@@ -200,12 +194,13 @@
     <string name="session_start">Start workout</string>
     <string name="session_resume">Resume session</string>
     <string name="session_resumed">Picked up exactly where you left off.</string>
+    <string name="session_activity_denied">Activity access is off, so the rest timer can\'t reach your lock screen. Your workout still runs here.</string>
+    <string name="session_activity_blocked">Activity access is blocked. Turn it on in Settings for the lock-screen rest timer, or keep your workout in the app.</string>
     <string name="session_progress_exercise">Exercise %1$d/%2$d</string>
     <string name="session_progress_sets">%1$d/%2$d sets</string>
     <string name="session_progress_label">Workout progress</string>
     <string name="session_current_exercise">Current exercise</string>
     <string name="session_target">Target: %1$s</string>
-    <string name="session_rir_chip">RiR %1$s</string>
     <string name="session_tap_when_done">Tap when done</string>
     <string name="session_set_counter">%1$d/%2$d</string>
     <string name="session_complete_set_cd">Complete set %1$d of %2$d of %3$s</string>
@@ -216,7 +211,6 @@
     <string name="session_rest_remaining_cd">%1$d seconds of rest remaining</string>
     <string name="session_skip_rest">Skip rest</string>
     <string name="session_next_up">Next up</string>
-    <string name="session_actuals_legend">Log actuals for set %1$d</string>
     <string name="session_weight_kg">Weight kg</string>
     <string name="session_weight_cd">Weight in kilograms for set %1$d of %2$s</string>
     <string name="session_reps">Reps</string>
@@ -237,8 +231,8 @@
     <string name="session_coach_summary_prompt">%1$s, I just finished my workout. How did it look and what should I do next?</string>
     <string name="session_saving">Saving…</string>
     <string name="session_back_to_workout">Back to workout</string>
-    <string name="session_saved">Workout complete — great session.</string>
-    <string name="session_save_failed">Could not save the workout. Your session is still here — try again.</string>
+    <string name="session_saved">Workout complete - great session.</string>
+    <string name="session_save_failed">Could not save the workout. Your session is still here - try again.</string>
     <string name="session_save_offline">Finishing a workout needs a connection. Your session stays saved on this device.</string>
     <string name="session_announce_started">Workout started. First exercise: %1$s.</string>
     <string name="session_announce_next">Next exercise: %1$s.</string>
@@ -249,8 +243,6 @@
     <string name="session_announce_restored">Session restored. Exercise %1$d of %2$d.</string>
 
     <!-- ===================== Progress ===================== -->
-    <string name="progress_title">Your progress</string>
-    <string name="progress_range_label">Time range</string>
     <string name="progress_range_7d">7d</string>
     <string name="progress_range_30d">30d</string>
     <string name="progress_range_90d">90d</string>
@@ -260,7 +252,6 @@
     <string name="progress_since_start">Since start</string>
     <string name="progress_weight_journey">Weight journey</string>
     <string name="progress_goal_kg">Goal %1$s kg</string>
-    <string name="progress_goal_chart_label">Goal %1$s kg</string>
     <string name="progress_no_weighins_title">No weigh-ins yet</string>
     <string name="progress_no_weighins_body">Log your first weight to start your journey chart.</string>
     <string name="progress_weight_chart_cd">Weight chart from %1$s to %2$s. Latest %3$s kilograms.</string>
@@ -269,6 +260,16 @@
     <string name="progress_kcal_bars_cd">Daily calorie intake bars. Average %1$d kilocalories.</string>
     <string name="progress_kcal_bars_cd_target">Daily calorie intake bars. Average %1$d kilocalories against a target of %2$d.</string>
     <string name="progress_kcal_avg">Avg %1$d kcal / day</string>
+    <string name="progress_change_cd">%1$s %2$s</string>
+    <string name="progress_adaptive_title">Adaptive metabolism</string>
+    <string name="progress_adaptive_confidence">%1$s confidence</string>
+    <string name="progress_adaptive_confidence_high">High</string>
+    <string name="progress_adaptive_confidence_moderate">Moderate</string>
+    <string name="progress_adaptive_confidence_low">Low</string>
+    <string name="progress_adaptive_expenditure">Estimated expenditure</string>
+    <string name="progress_adaptive_target">Adapted target</string>
+    <string name="progress_adaptive_kcal">%1$s kcal</string>
+    <string name="progress_adaptive_stats_cd">Estimated expenditure %1$s kilocalories. Adapted target %2$s kilocalories.</string>
     <string name="progress_kcal_target">Target %1$d</string>
     <string name="progress_no_meals_title">No meals logged</string>
     <string name="progress_no_meals_body">Log meals to see your calorie trend against your target.</string>
@@ -284,7 +285,7 @@
     <string name="progress_macro_cd">Average macro split: protein %1$d percent, carbs %2$d percent, fat %3$d percent of calories.</string>
     <string name="progress_achievements">Milestones &amp; badges</string>
     <string name="progress_no_badges_title">No badges yet</string>
-    <string name="progress_no_badges_body">Keep logging and training — your first badge is close.</string>
+    <string name="progress_no_badges_body">Keep logging and training - your first badge is close.</string>
     <string name="progress_badge_earned">%1$s, earned %2$s</string>
     <string name="progress_badge_locked">%1$s, not earned yet</string>
     <string name="progress_log_weight">Log weight</string>
@@ -304,7 +305,6 @@
     <!-- Consistency (never a breakable streak) -->
     <string name="consistency_title">Consistency</string>
     <string name="consistency_window">Rolling %1$d-day window</string>
-    <string name="consistency_headline">%1$d of the last %2$d days</string>
     <string name="consistency_of_last">of the last %1$d days</string>
     <string name="consistency_empty_headline">Ready when you are</string>
     <string name="consistency_state_resting">Resting</string>
@@ -312,15 +312,14 @@
     <string name="consistency_state_building">Building</string>
     <string name="consistency_state_steady">Steady</string>
     <string name="consistency_body_resting">Rest is part of it. Whenever you log something next, it lands right here.</string>
-    <string name="consistency_body_recovering">Good to see you back — coming back is the hard part, and today already counts.</string>
+    <string name="consistency_body_recovering">Good to see you back - coming back is the hard part, and today already counts.</string>
     <string name="consistency_body_building">Days are adding up at your own pace.</string>
     <string name="consistency_body_steady">A steady rhythm across the last few weeks.</string>
-    <string name="consistency_body_grace">A day off is already covered — you\'re still going.</string>
+    <string name="consistency_body_grace">A day off is already covered - you\'re still going.</string>
     <string name="consistency_current_run">Current run %1$s</string>
     <string name="consistency_best">Best so far %1$s</string>
 
     <!-- ===================== Log weight ===================== -->
-    <string name="log_weight_entry">Weight entry</string>
     <string name="log_weight_input_cd">Weight in %1$s</string>
     <string name="log_weight_kilograms">kilograms</string>
     <string name="log_weight_pounds">pounds</string>
@@ -333,9 +332,7 @@
     <string name="log_weight_date">Date</string>
     <string name="log_weight_date_earlier">Earlier day</string>
     <string name="log_weight_date_later">Later day</string>
-    <string name="log_weight_today">Today</string>
     <string name="log_weight_notes">Notes (optional)</string>
-    <string name="log_weight_notes_hint">How are you feeling today?</string>
     <string name="log_weight_quick_morning">Morning fasted</string>
     <string name="log_weight_quick_post_workout">Post-workout</string>
     <string name="log_weight_quick_after_meal">After meal</string>
@@ -345,8 +342,7 @@
     <string name="log_weight_error_range_kg">Weight must be between 30 and 300 kg</string>
     <string name="log_weight_error_range_lb">Weight must be between 66 and 661 lb</string>
     <string name="log_weight_error_future">Date cannot be in the future</string>
-    <string name="log_weight_saved">Weight saved — your daily targets recompute on sync.</string>
-    <string name="log_weight_saved_offline">Weight saved on this device. It syncs as soon as you\'re back online.</string>
+    <string name="log_weight_saved">Weight saved - your daily targets recompute on sync.</string>
     <string name="log_weight_recent">Recent entries</string>
     <string name="log_weight_recent_empty_title">No entries yet</string>
     <string name="log_weight_recent_empty_body">Your last 30 days of weigh-ins will appear here.</string>
@@ -357,10 +353,6 @@
     <plurals name="days_count">
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
-    </plurals>
-    <plurals name="sets_logged">
-        <item quantity="one">%1$d set</item>
-        <item quantity="other">%1$d sets</item>
     </plurals>
 
     <!-- ===================== Dashboard ===================== -->
@@ -378,7 +370,6 @@
     <string name="dashboard_error_title">Today didn\'t load</string>
     <string name="dashboard_error_message">Everything you log is safe on this device and syncs when you\'re back online.</string>
     <string name="dashboard_calories_cd">Daily calories: %1$s of %2$s kilocalories consumed</string>
-    <string name="dashboard_mascot">Akin, your training companion</string>
     <string name="fab_capture_meal">Scan a meal with your camera</string>
     <string name="target_explain_link">Why this target?</string>
     <string name="target_explain_title">Why this target</string>
@@ -402,7 +393,7 @@
     <string name="hydration_log_cd">Log 250 millilitres of water</string>
     <string name="hydration_droplets_cd">Water intake %1$d of %2$d millilitres</string>
     <string name="water_logged">250 ml added</string>
-    <string name="water_log_failed">Could not log water — please try again</string>
+    <string name="water_log_failed">Could not log water - please try again</string>
 
     <!-- Today\'s workout card -->
     <string name="workout_today_title">Today\'s workout</string>
@@ -419,8 +410,8 @@
     <string name="workout_kcal_cd">%1$s kilocalories</string>
 
     <!-- Suggest-meal card -->
-    <string name="suggest_title">AI meal suggestion</string>
-    <string name="suggest_subtitle">Tuned to what you have left today.</string>
+    <string name="suggest_title">Meal suggestion</string>
+    <string name="suggest_subtitle"></string>
     <string name="suggest_action">Suggest a meal</string>
     <string name="suggest_another">Suggest another</string>
     <string name="suggest_thinking">Thinking…</string>
@@ -428,10 +419,10 @@
     <string name="suggest_logging">Logging…</string>
     <string name="suggest_logged_label">Logged</string>
     <string name="suggest_offline">Suggestions need a connection. Everything else on this screen keeps working.</string>
-    <string name="suggest_ai_disclaimer">AI estimate — nothing is logged until you tap add.</string>
+    <string name="suggest_ai_disclaimer">AI estimate - nothing is logged until you tap add.</string>
     <string name="suggestion_unavailable">Suggestions are offline right now</string>
     <string name="suggestion_logged">Added to your log</string>
-    <string name="suggestion_log_failed">Could not log that meal — please try again</string>
+    <string name="suggestion_log_failed">Could not log that meal - please try again</string>
 
     <!-- Weight trend -->
     <string name="weight_trend_title">Weight trend</string>
@@ -499,25 +490,25 @@
     <string name="timeline_delete">Delete %1$s entry</string>
     <string name="timeline_from_photo">from photo</string>
     <string name="timeline_pending">Waiting to sync</string>
-    <string name="timeline_failed">Sync failed — open to retry</string>
+    <string name="timeline_failed">Sync failed - open to retry</string>
     <string name="kcal_value">%1$s kcal</string>
     <string name="macro_line">P %1$s g · C %2$s g · F %3$s g</string>
-    <string name="item_grams">%1$s %2$d g</string>
 
     <string name="weekly_title">Weekly calorie trend</string>
     <string name="weekly_avg">Avg %1$s</string>
     <string name="weekly_empty">Log meals for a few days to see your trend.</string>
     <string name="weekly_chart_cd">Calories per day for the last week</string>
+    <string name="weekly_bar_cd">%1$s, %2$s kilocalories</string>
+    <string name="weekly_bar_selected_cd">%1$s, %2$s kilocalories, selected</string>
 
     <!-- Food search sheet -->
-    <string name="food_sheet_title">Add food</string>
     <string name="food_sheet_title_meal">Add to %1$s</string>
     <string name="food_search_label">Search foods</string>
     <string name="food_search_min">Type at least two letters to search the food library.</string>
     <string name="food_search_none_title">No foods found</string>
     <string name="food_search_none_body">Try a shorter or different name.</string>
     <string name="food_recent_title">Recently used</string>
-    <string name="food_offline_note">Offline — showing foods you\'ve logged before.</string>
+    <string name="food_offline_note">Offline - showing foods you\'ve logged before.</string>
     <string name="food_back_to_search">Back to search</string>
     <string name="food_per_100g">%1$s kcal · P %2$s g · C %3$s g · F %4$s g per 100 g</string>
     <string name="food_kcal_per_100g">%1$s kcal/100g</string>
@@ -526,9 +517,8 @@
     <string name="food_serving_label">%1$s (%2$d g)</string>
     <string name="food_preview_calories">Calories</string>
     <string name="food_allergens">Contains: %1$s</string>
-    <string name="sheet_close">Close</string>
 
-    <!-- Allergen names — deterministic mirror of the shared ALLERGENS union -->
+    <!-- Allergen names - deterministic mirror of the shared ALLERGENS union -->
     <string name="allergen_peanuts">peanuts</string>
     <string name="allergen_tree_nuts">tree nuts</string>
     <string name="allergen_milk">milk</string>
@@ -545,7 +535,7 @@
     <string name="edit_save">Save changes</string>
     <string name="edit_saving">Saving…</string>
     <string name="meal_logged">Meal logged</string>
-    <string name="meal_log_failed">Could not log that food — please try again</string>
+    <string name="meal_log_failed">Could not log that food - please try again</string>
     <string name="meal_updated">Meal updated</string>
     <string name="meal_removed">Entry removed</string>
     <string name="copy_success">Copied yesterday\'s meals</string>
@@ -573,7 +563,7 @@
     <string name="capture_analyze">Analyse meal</string>
     <string name="capture_hint_frame">Fit the whole plate inside the frame.</string>
     <string name="capture_hint_lighting">Even, natural light gives the best results.</string>
-    <string name="capture_hint_ready">Looking good — analyse when you\'re ready.</string>
+    <string name="capture_hint_ready">Looking good - analyse when you\'re ready.</string>
     <string name="capture_preparing">Preparing your photo…</string>
     <string name="capture_uploading">Uploading your photo…</string>
     <string name="capture_permission_title">Camera access needed</string>
@@ -583,37 +573,28 @@
     <string name="capture_permission_settings">Open Settings</string>
     <string name="capture_permission_use_gallery">Choose from gallery</string>
     <string name="capture_error_shutter">That shot didn\'t save. Try again.</string>
-    <string name="capture_rate_limited">Things are busy right now — your photo is queued and will upload shortly.</string>
+    <string name="capture_rate_limited">Things are busy right now - your photo is queued and will upload shortly.</string>
     <string name="capture_upload_failed">That photo didn\'t upload. Try again.</string>
     <string name="capture_error_unsupported_type">That file type isn\'t supported. Use a JPEG, PNG or HEIC photo.</string>
     <string name="capture_error_too_large">That photo is over the 10 MB limit. Try a smaller one.</string>
     <string name="capture_error_unreadable">That photo couldn\'t be read. Try another one.</string>
 
-    <!-- Photo analysis — the confirmation gate -->
+    <!-- Photo analysis - the confirmation gate -->
     <string name="analysis_scanning_title">Reading your plate…</string>
     <string name="analysis_scanning_body">Identifying the food and working out the macros. Nothing is logged yet.</string>
     <string name="analysis_load_error_title">This analysis didn\'t load</string>
-    <string name="analysis_load_error_body">Check your connection and try again — nothing has been logged.</string>
+    <string name="analysis_load_error_body">Check your connection and try again - nothing has been logged.</string>
     <string name="analysis_failed_title">We couldn\'t read that photo</string>
     <string name="analysis_failed_body">Try again, or add the food by hand instead.</string>
-    <string name="analysis_empty_title">Nothing recognised</string>
-    <string name="analysis_empty_body">Add the food yourself to log this meal.</string>
-    <string name="analysis_totals_title">Estimated total</string>
-    <string name="analysis_meal_label">Logging to %1$s</string>
-    <string name="analysis_items_title">What we found</string>
     <string name="analysis_item_name">Item</string>
     <string name="analysis_remove_item">Remove %1$s</string>
     <string name="analysis_confidence_high">High confidence</string>
     <string name="analysis_confidence_medium">Medium confidence</string>
     <string name="analysis_confidence_low">Low confidence</string>
     <string name="analysis_confidence_pct">%1$s · %2$d%%</string>
-    <string name="analysis_manual_item">Added by you</string>
-    <string name="analysis_unlinked_note">Some items aren\'t matched to the food library. Their macros still count towards your day.</string>
     <string name="analysis_add_item">Add an item</string>
-    <string name="analysis_confirm">Confirm &amp; log meal</string>
     <string name="analysis_too_many_items">You can log up to 30 items in one meal.</string>
-    <string name="analysis_confirm_offline">You appear to be offline. Nothing was logged — try again when connected.</string>
-    <string name="analysis_dismiss">Dismiss this message</string>
+    <string name="analysis_confirm_offline">You appear to be offline. Nothing was logged - try again when connected.</string>
 
     <!-- Shared -->
     <string name="action_retry">Try again</string>
@@ -628,30 +609,31 @@
     <string name="coach_conversation_cd">Conversation with your coach</string>
     <string name="coach_greeting_title">Hi, I\'m %1$s</string>
     <string name="coach_greeting_body">%1$s Ask me about your nutrition, training or progress.</string>
-    <string name="coach_meal_hint">Or type what you ate — “two eggs on toast and a flat white” — and tap the meal button to turn it into a meal log.</string>
+    <string name="coach_meal_hint">Or type what you ate - “two eggs on toast and a flat white” - and tap the meal button to turn it into a meal log.</string>
     <string name="coach_mic_denied">Microphone access is off, so dictation can\'t start. You can still type your message.</string>
     <string name="coach_mic_blocked">Microphone access is blocked. Turn it on in Settings to dictate, or type your message instead.</string>
-    <string name="coach_input_label">Message %1$s</string>
     <string name="coach_input_placeholder">Ask %1$s…</string>
     <string name="coach_send">Send message</string>
     <string name="coach_log_meal">Log this as a meal</string>
     <string name="coach_typing">%1$s is typing</string>
     <string name="coach_replying">%1$s is replying</string>
-    <string name="coach_replied">%1$s has replied</string>
-    <string name="coach_message_options">Message options</string>
     <string name="coach_report">Report response</string>
     <string name="coach_report_hint">Long-press a reply to report it</string>
-    <string name="coach_report_done">Thanks — this response has been reported for review.</string>
+    <string name="coach_report_done">Thanks - this response has been reported for review.</string>
     <string name="coach_report_failed">Could not report that message. Please try again.</string>
     <string name="coach_reported_badge">Reported</string>
     <string name="coach_change_cd">%1$s is your coach. Change coach.</string>
     <string name="coach_error_unavailable">Your coach is unavailable right now. Please try again in a moment.</string>
-    <string name="coach_error_dropped">That reply did not come through. Your message is saved — ask again whenever you are ready.</string>
+    <string name="coach_error_dropped">That reply did not come through. Your message is saved - ask again whenever you are ready.</string>
     <string name="coach_error_send_retry">Ask again</string>
     <string name="coach_offline">You are offline. Past conversations are here to read; a new question needs a connection.</string>
-    <string name="coach_load_failed">Could not open the coach</string>
-    <string name="coach_load_failed_body">Your history is safe. Try again when you have a connection.</string>
     <string name="coach_safety_cd">Supportive note from your coach</string>
+    <string name="coach_read_aloud_cd">Read this reply aloud</string>
+    <string name="coach_stop_voice_cd">Stop reading aloud</string>
+    <string name="coach_dictation_start_cd">Start voice dictation</string>
+    <string name="coach_dictation_stop_cd">Stop voice dictation</string>
+    <string name="coach_listening_hint">Listening… speak your meal or question</string>
+    <string name="coach_action_logged">Logged</string>
     <string name="coach_prompt_1">What should I eat tonight?</string>
     <string name="coach_prompt_2">How is my weight trending?</string>
     <string name="coach_prompt_3">Adjust today\'s workout</string>
@@ -672,22 +654,21 @@
     <string name="draft_confirm">Log meal</string>
     <string name="draft_choose_food">Which one did you have?</string>
     <string name="draft_choose_placeholder">Choose a food…</string>
-    <string name="draft_unmatched">“%1$s” — not in the food database yet.</string>
+    <string name="draft_unmatched">“%1$s” - not in the food database yet.</string>
     <string name="draft_include_cd">Include %1$s</string>
     <string name="draft_portion_as_said">as you said</string>
     <string name="draft_portion_serving">standard serving: %1$s</string>
     <string name="draft_portion_assumed">assumed portion</string>
     <string name="draft_allergen_title">Allergy check</string>
     <string name="draft_allergen_body">%1$s match an allergy on your profile.</string>
-    <string name="draft_allergen_ack">I know — log it anyway.</string>
-    <string name="draft_contains">Contains %1$s — on your allergy list.</string>
+    <string name="draft_allergen_ack">I know - log it anyway.</string>
+    <string name="draft_contains">Contains %1$s - on your allergy list.</string>
     <string name="draft_total">Total to log</string>
     <string name="draft_kcal">%1$d kcal</string>
     <string name="draft_reading">Reading that as a meal…</string>
     <string name="draft_failed">Could not log that meal. Please try again.</string>
     <string name="draft_propose_failed">Could not read that as a meal. Please try again.</string>
     <string name="draft_pick_food_first">Pick a food for each line you want logged.</string>
-    <string name="draft_grams_cd">Grams of %1$s</string>
 
     <!-- Confirm-first trust layer -->
     <string name="trust_fat_caution">Photo and AI estimates often miss cooking oil and sauces. Add fat if needed and confirm portions.</string>
@@ -704,20 +685,19 @@
          =================================================================== -->
     <string name="coach_select_heading">Your corner</string>
     <string name="coach_select_sub">Every coach gives the same safe, measured advice. What changes is who is saying it.</string>
-    <string name="coach_select_xp_note">You earn XP for logging, training, hydrating and resting — never for eating less.</string>
+    <string name="coach_select_xp_note">You earn XP for logging, training, hydrating and resting - never for eating less.</string>
     <string name="coach_select_footer">Coaches change the tone, never the advice. Calorie targets, allergen filtering and every safety boundary are computed the same way whoever is in your corner.</string>
     <string name="coach_select_choose">Choose</string>
     <string name="coach_select_open">Open chat</string>
     <string name="coach_select_switching">Switching…</string>
     <string name="coach_select_active">In your corner</string>
-    <string name="coach_select_switched">%1$s is in your corner.</string>
     <string name="coach_select_failed">Could not switch coach. Please try again.</string>
     <string name="coach_select_roster_failed">We couldn\'t load the coach roster</string>
     <string name="coach_select_roster_failed_body">The names you have already unlocked are still here.</string>
     <string name="coach_unlock_label">Reach level %1$d</string>
     <string name="coach_locked_cd">%1$s, locked. %2$s</string>
     <string name="coach_unlocked_cd">%1$s, unlocked</string>
-    <string name="coach_locked_toast">%1$s joins you at level %2$d. Keep logging — you are on your way.</string>
+    <string name="coach_locked_toast">%1$s joins you at level %2$d. Keep logging - you are on your way.</string>
     <string name="coach_bond">Bond %1$d · %2$s XP together</string>
     <string name="coach_portrait_cd">%1$s portrait</string>
 
@@ -737,115 +717,115 @@
 
     <!-- Personas (proper nouns stay in code; prose lives here) -->
     <string name="coach_akin_tagline">Show up. Stay kind. Go again.</string>
-    <string name="coach_akin_discipline">Muay Thai · Lethwei · Taekwondo — Melbourne, Australia</string>
+    <string name="coach_akin_discipline">Muay Thai · Lethwei · Taekwondo - Melbourne, Australia</string>
     <string name="coach_akin_domain">Full-body foundations &amp; striking conditioning</string>
     <string name="coach_akin_voice">Hungry</string>
     <string name="coach_sanzo_tagline">You showed up. That is already a victory.</string>
-    <string name="coach_sanzo_discipline">Sumo · Grappling — Kyoto, Japan</string>
+    <string name="coach_sanzo_discipline">Sumo · Grappling - Kyoto, Japan</string>
     <string name="coach_sanzo_domain">Foundational power &amp; bodyweight basics</string>
     <string name="coach_sanzo_voice">Joyful</string>
     <string name="coach_anderson_tagline">Slow is smooth. Smooth is strong.</string>
-    <string name="coach_anderson_discipline">Wrestling · Boxing — Ohio, USA</string>
+    <string name="coach_anderson_discipline">Wrestling · Boxing - Ohio, USA</string>
     <string name="coach_anderson_domain">Strength &amp; resistance training</string>
     <string name="coach_anderson_voice">Steady</string>
     <string name="coach_carlos_tagline">Move like lightning, land like thunder.</string>
-    <string name="coach_carlos_discipline">Lucha Libre · Boxing — Guadalajara, Mexico</string>
+    <string name="coach_carlos_discipline">Lucha Libre · Boxing - Guadalajara, Mexico</string>
     <string name="coach_carlos_domain">Agility, rotational power &amp; explosive endurance</string>
     <string name="coach_carlos_voice">Electric</string>
     <string name="coach_king_tagline">Breathe with the rhythm. Begin.</string>
-    <string name="coach_king_discipline">Muay Thai · MMA — Phuket, Thailand</string>
+    <string name="coach_king_discipline">Muay Thai · MMA - Phuket, Thailand</string>
     <string name="coach_king_domain">Cardio &amp; conditioning</string>
     <string name="coach_king_voice">Centred</string>
     <string name="coach_craig_tagline">No shortcuts. Build the frame to carry the world.</string>
-    <string name="coach_craig_discipline">Powerlifting · Brawling — Manchester, UK</string>
+    <string name="coach_craig_discipline">Powerlifting · Brawling - Manchester, UK</string>
     <string name="coach_craig_domain">Maximum load &amp; compound strength</string>
     <string name="coach_craig_voice">Gritty</string>
-    <string name="coach_jacare_tagline">You woke up! Come — we flow.</string>
-    <string name="coach_jacare_discipline">Brazilian Jiu-Jitsu · Kickboxing — Manaus, Brazil</string>
+    <string name="coach_jacare_tagline">You woke up! Come - we flow.</string>
+    <string name="coach_jacare_discipline">Brazilian Jiu-Jitsu · Kickboxing - Manaus, Brazil</string>
     <string name="coach_jacare_domain">Mobility, flexibility &amp; flow</string>
     <string name="coach_jacare_voice">Playful</string>
     <string name="coach_danial_tagline">Control the center. Dictate the pace.</string>
-    <string name="coach_danial_discipline">Freestyle Wrestling · MMA — State College, USA</string>
+    <string name="coach_danial_discipline">Freestyle Wrestling · MMA - State College, USA</string>
     <string name="coach_danial_domain">Explosive takedowns &amp; scramble conditioning</string>
     <string name="coach_danial_voice">Relentless</string>
     <string name="coach_kazushi_tagline">Train for decades, not for weeks.</string>
-    <string name="coach_kazushi_discipline">Catch wrestling · MMA — Tokyo, Japan</string>
+    <string name="coach_kazushi_discipline">Catch wrestling · MMA - Tokyo, Japan</string>
     <string name="coach_kazushi_domain">Core, stability &amp; longevity</string>
     <string name="coach_kazushi_voice">Wise</string>
     <string name="coach_dmitry_tagline">Cold discipline outlasts burning emotion.</string>
-    <string name="coach_dmitry_discipline">Combat Sambo · Judo — Novosibirsk, Russia</string>
+    <string name="coach_dmitry_discipline">Combat Sambo · Judo - Novosibirsk, Russia</string>
     <string name="coach_dmitry_domain">Grip strength, torso armor &amp; cold endurance</string>
     <string name="coach_dmitry_voice">Unyielding</string>
-    <string name="coach_mataemon_tagline">But what if — hear me out — we go slower?</string>
-    <string name="coach_mataemon_discipline">Judo · Jiu-Jitsu — Shizuoka, Japan</string>
+    <string name="coach_mataemon_tagline">But what if - hear me out - we go slower?</string>
+    <string name="coach_mataemon_discipline">Judo · Jiu-Jitsu - Shizuoka, Japan</string>
     <string name="coach_mataemon_domain">Skill, balance &amp; technique</string>
     <string name="coach_mataemon_voice">Eccentric</string>
     <string name="coach_fabio_tagline">Find your rhythm, and the movement follows.</string>
-    <string name="coach_fabio_discipline">Capoeira · BJJ — Salvador, Brazil</string>
+    <string name="coach_fabio_discipline">Capoeira · BJJ - Salvador, Brazil</string>
     <string name="coach_fabio_domain">Dynamic agility &amp; ground mobility</string>
     <string name="coach_fabio_voice">Harmonious</string>
     <string name="coach_frank_tagline">Every blow you absorb is a lesson in durability.</string>
-    <string name="coach_frank_discipline">Bareknuckle · Greco-Roman — Philadelphia, USA</string>
+    <string name="coach_frank_discipline">Bareknuckle · Greco-Roman - Philadelphia, USA</string>
     <string name="coach_frank_domain">Isometric strength &amp; core durability</string>
     <string name="coach_frank_voice">Stoic</string>
     <string name="coach_uthman_tagline">No talk. Work. Then we rest.</string>
-    <string name="coach_uthman_discipline">Draka · MMA — Moscow, Russia</string>
+    <string name="coach_uthman_discipline">Draka · MMA - Moscow, Russia</string>
     <string name="coach_uthman_domain">High-intensity &amp; metabolic conditioning</string>
     <string name="coach_uthman_voice">Direct</string>
     <string name="coach_gaius_tagline">Victory is prepared long before the arena gates open.</string>
-    <string name="coach_gaius_discipline">Pankration · Classical Boxing — Rome, Italy</string>
+    <string name="coach_gaius_discipline">Pankration · Classical Boxing - Rome, Italy</string>
     <string name="coach_gaius_domain">Tactical pacing &amp; aerobic endurance</string>
     <string name="coach_gaius_voice">Commanding</string>
     <string name="coach_george_tagline">Perfection is not an accident. It is geometry.</string>
-    <string name="coach_george_discipline">Karate · MMA — Montreal, Canada</string>
+    <string name="coach_george_discipline">Karate · MMA - Montreal, Canada</string>
     <string name="coach_george_domain">Biomechanical precision &amp; clean form</string>
     <string name="coach_george_voice">Methodical</string>
     <string name="coach_kwon_tagline">Precision beats power, and timing beats speed.</string>
-    <string name="coach_kwon_discipline">Taekwondo · Kickboxing — Seoul, South Korea</string>
+    <string name="coach_kwon_discipline">Taekwondo · Kickboxing - Seoul, South Korea</string>
     <string name="coach_kwon_domain">Fast-twitch power, footwork &amp; balance</string>
     <string name="coach_kwon_voice">Sharp</string>
     <string name="coach_mike_tagline">Cut through distraction. Master the single strike.</string>
-    <string name="coach_mike_discipline">Kendo · Shooto — Osaka, Japan</string>
+    <string name="coach_mike_discipline">Kendo · Shooto - Osaka, Japan</string>
     <string name="coach_mike_domain">Posture, reaction speed &amp; core alignment</string>
     <string name="coach_mike_voice">Focused</string>
     <string name="coach_paul_tagline">Weather any storm. Stand your ground.</string>
-    <string name="coach_paul_discipline">Heavyweight Boxing — London, UK</string>
+    <string name="coach_paul_discipline">Heavyweight Boxing - London, UK</string>
     <string name="coach_paul_domain">Shoulder endurance &amp; heavyweight power</string>
     <string name="coach_paul_voice">Grounded</string>
     <string name="coach_randall_tagline">Speed is king. Make every second count.</string>
-    <string name="coach_randall_discipline">Western Boxing · Calisthenics — Detroit, USA</string>
+    <string name="coach_randall_discipline">Western Boxing · Calisthenics - Detroit, USA</string>
     <string name="coach_randall_domain">Upper body speed &amp; high-cadence conditioning</string>
     <string name="coach_randall_voice">Dynamic</string>
     <string name="coach_reinier_tagline">Pressure breaks everything. Keep moving forward.</string>
-    <string name="coach_reinier_discipline">Dutch Kickboxing — Amsterdam, Netherlands</string>
+    <string name="coach_reinier_discipline">Dutch Kickboxing - Amsterdam, Netherlands</string>
     <string name="coach_reinier_domain">Combination flow &amp; heavy bag stamina</string>
     <string name="coach_reinier_voice">Intense</string>
     <string name="coach_rolando_tagline">Slip the danger, strike with heat.</string>
-    <string name="coach_rolando_discipline">Cuban Boxing · Cross-Training — Havana, Cuba</string>
+    <string name="coach_rolando_discipline">Cuban Boxing · Cross-Training - Havana, Cuba</string>
     <string name="coach_rolando_domain">Head movement, core rotation &amp; reflex work</string>
     <string name="coach_rolando_voice">Passionate</string>
     <string name="coach_ryoto_tagline">Iron shins, quiet mind, unbending spirit.</string>
-    <string name="coach_ryoto_discipline">Kyokushin Karate — Nagoya, Japan</string>
+    <string name="coach_ryoto_discipline">Kyokushin Karate - Nagoya, Japan</string>
     <string name="coach_ryoto_domain">Full-contact conditioning &amp; mental toughness</string>
     <string name="coach_ryoto_voice">Fierce</string>
     <string name="coach_sergio_tagline">Every position has an answer. Find the lever.</string>
-    <string name="coach_sergio_discipline">Submission Grappling — San Diego, USA</string>
+    <string name="coach_sergio_discipline">Submission Grappling - San Diego, USA</string>
     <string name="coach_sergio_domain">Deep flexibility, joint health &amp; isometric holds</string>
     <string name="coach_sergio_voice">Analytical</string>
     <string name="coach_terry_tagline">Scramble hard. Outwork everyone in the room.</string>
-    <string name="coach_terry_discipline">Folkstyle Wrestling — Des Moines, USA</string>
+    <string name="coach_terry_discipline">Folkstyle Wrestling - Des Moines, USA</string>
     <string name="coach_terry_domain">Grit conditioning &amp; mat stamina</string>
     <string name="coach_terry_voice">Tough</string>
     <string name="coach_usman_tagline">Smash excuses. High altitude discipline.</string>
-    <string name="coach_usman_discipline">Combat Sambo — Makhachkala, Dagestan</string>
+    <string name="coach_usman_discipline">Combat Sambo - Makhachkala, Dagestan</string>
     <string name="coach_usman_domain">Aerobic threshold &amp; chain wrestling stamina</string>
     <string name="coach_usman_voice">Relentless</string>
     <string name="coach_zhang_tagline">Strike without form. Move like water.</string>
-    <string name="coach_zhang_discipline">Sanda · Wushu — Beijing, China</string>
+    <string name="coach_zhang_discipline">Sanda · Wushu - Beijing, China</string>
     <string name="coach_zhang_domain">Lateral agility, explosive kicks &amp; balance</string>
     <string name="coach_zhang_voice">Fluid</string>
     <string name="coach_ogun_tagline">Discipline is the only throne that cannot be inherited.</string>
-    <string name="coach_ogun_discipline">Complete MMA — Washington D.C., USA</string>
+    <string name="coach_ogun_discipline">Complete MMA - Washington D.C., USA</string>
     <string name="coach_ogun_domain">Elite &amp; advanced performance</string>
     <string name="coach_ogun_voice">Sovereign</string>
 
@@ -853,13 +833,10 @@
          Gamification
          =================================================================== -->
     <string name="xp_level">Level %1$d</string>
-    <string name="xp_level_short">LV %1$d</string>
-    <string name="xp_earned_today">+%1$d today</string>
     <string name="xp_full_day_banked">Full day banked</string>
-    <string name="xp_top_of_ladder">%1$s XP — top of the ladder.</string>
+    <string name="xp_top_of_ladder">%1$s XP - top of the ladder.</string>
     <string name="xp_banked_progress">%1$s XP banked toward level %2$d</string>
     <string name="xp_breakdown_title">Banked today</string>
-    <string name="xp_entry">%1$s +%2$d</string>
     <string name="xp_entry_cd">%1$s, plus %2$d XP</string>
     <string name="xp_progress_cd">Level %1$d, %2$d percent of the way to level %3$d</string>
     <string name="celebration_level_up_label">Level up</string>
@@ -867,7 +844,6 @@
     <string name="celebration_achievement_label">Achievement unlocked</string>
     <string name="celebration_dismiss">Nice</string>
     <string name="celebration_cd">%1$s. %2$s</string>
-    <string name="celebration_confetti_cd">Celebration</string>
     <string name="achievement_dismiss_cd">Dismiss</string>
     <!-- Photo meal capture -->
 
@@ -880,10 +856,10 @@
     <string name="analysis_macro_line">%1$s %2$sg</string>
     <string name="analysis_macro_row">P %1$sg · C %2$sg · F %3$sg</string>
     <string name="analysis_breakdown">Analysis breakdown</string>
-    <string name="analysis_no_items">No items on the list — add what was on your plate before confirming.</string>
+    <string name="analysis_no_items">No items on the list - add what was on your plate before confirming.</string>
     <string name="analysis_unlinked_items">Some items are not matched to a food yet. Remove them, or add the matching food from search, before confirming.</string>
     <string name="analysis_gate_copy">Check the items and portions before saving. Nothing is added to your log until you confirm.</string>
-    <string name="analysis_ai_disclaimer">AI estimate — not medical advice.</string>
+    <string name="analysis_ai_disclaimer">AI estimate - not medical advice.</string>
     <string name="analysis_confirm_cta">Looks right, log it</string>
     <string name="analysis_saving">Saving…</string>
     <string name="analysis_already_logged">Already logged</string>
@@ -900,8 +876,8 @@
     <string name="barcode_manual_label">Barcode (EAN)</string>
     <string name="barcode_lookup">Look up product</string>
     <string name="barcode_not_found">We do not know that barcode yet. Try the food search instead.</string>
-    <string name="barcode_invalid_code">That does not look like a valid barcode — check the digits and try again.</string>
-    <string name="barcode_lookup_offline">Lookup failed — check your connection and try again.</string>
+    <string name="barcode_invalid_code">That does not look like a valid barcode - check the digits and try again.</string>
+    <string name="barcode_lookup_offline">Lookup failed - check your connection and try again.</string>
     <string name="barcode_permission_body">Turn on camera access to scan a barcode, or type the digits below.</string>
     <string name="barcode_permission_blocked">Camera access is turned off for AquaZeroFit. Switch it back on in Settings, or type the barcode below.</string>
     <string name="barcode_scanner_unavailable">The barcode scanner could not start. Google Play services may still be fetching it, or this device may not support it. Type the barcode below, or search for the food by name instead.</string>
@@ -914,40 +890,36 @@
     <string name="barcode_nutriscore_cd">Nutri-Score %1$s</string>
     <string name="barcode_off_attribution">© Open Food Facts contributors</string>
     <string name="barcode_allergen_title">Allergen warning</string>
-    <string name="barcode_allergen_contains_body">This product contains %1$s, which you listed as an allergy. Allergen data is best-effort — always check the label.</string>
-    <string name="barcode_allergen_traces_body">This product may contain traces of %1$s, which you listed as an allergy. Allergen data is best-effort — always check the label.</string>
+    <string name="barcode_allergen_contains_body">This product contains %1$s, which you listed as an allergy. Allergen data is best-effort - always check the label.</string>
+    <string name="barcode_allergen_traces_body">This product may contain traces of %1$s, which you listed as an allergy. Allergen data is best-effort - always check the label.</string>
     <string name="barcode_log_cta">Log %1$dg to %2$s</string>
     <string name="barcode_scan_another">Scan another product</string>
 
     <!-- ===================================================================
-         PHASE 6 — onboarding essentials, settings stack, challenges,
+         PHASE 6 - onboarding essentials, settings stack, challenges,
          meal plan and recipes. Owned by the settings/account-lifecycle lane.
          Do not interleave other lanes' strings inside this block.
          =================================================================== -->
 
     <!-- Setup: the six-control wellness essentials form -->
     <string name="setup_heading">Your daily targets</string>
-    <string name="setup_intro">Six answers is everything the calculator needs. Nothing here is a guess — your calories, macros and water come straight out of these numbers.</string>
+    <string name="setup_intro">Six answers is everything the calculator needs. Nothing here is a guess - your calories, macros and water come straight out of these numbers.</string>
     <string name="setup_units">Units</string>
     <string name="setup_unit_metric">Metric</string>
     <string name="setup_unit_imperial">Imperial</string>
     <string name="setup_age">Age</string>
-    <string name="setup_age_hint">e.g. 28</string>
     <string name="setup_height_cm">Height (cm)</string>
-    <string name="setup_height_cm_hint">e.g. 175</string>
     <string name="setup_height_ft">Height (ft)</string>
     <string name="setup_height_in">Height (in)</string>
     <string name="setup_weight_kg">Weight (kg)</string>
     <string name="setup_weight_lb">Weight (lb)</string>
-    <string name="setup_weight_hint_metric">e.g. 75</string>
-    <string name="setup_weight_hint_imperial">e.g. 165</string>
     <string name="setup_sex_label">Sex (used only for the calorie formula)</string>
     <string name="setup_sex_female">Female</string>
     <string name="setup_sex_male">Male</string>
     <string name="setup_sex_unspecified">Prefer not to say</string>
     <string name="setup_goal_label">Goal</string>
     <string name="setup_goal_lose">Lose weight</string>
-    <string name="setup_goal_lose_body">A sustainable calorie deficit — never below safe floors.</string>
+    <string name="setup_goal_lose_body">A sustainable calorie deficit - never below safe floors.</string>
     <string name="setup_goal_maintain">Maintain</string>
     <string name="setup_goal_maintain_body">Hold steady and build healthy habits.</string>
     <string name="setup_goal_gain">Gain muscle</string>
@@ -956,14 +928,13 @@
     <string name="setup_activity_sedentary">Sedentary</string>
     <string name="setup_activity_sedentary_hint">Desk-bound, little exercise.</string>
     <string name="setup_activity_light">Light</string>
-    <string name="setup_activity_light_hint">Light exercise 1–3 days a week.</string>
+    <string name="setup_activity_light_hint">Light exercise 1-3 days a week.</string>
     <string name="setup_activity_moderate">Moderate</string>
-    <string name="setup_activity_moderate_hint">Exercise 3–5 days a week.</string>
+    <string name="setup_activity_moderate_hint">Exercise 3-5 days a week.</string>
     <string name="setup_activity_active">Active</string>
-    <string name="setup_activity_active_hint">Hard exercise 6–7 days a week.</string>
+    <string name="setup_activity_active_hint">Hard exercise 6-7 days a week.</string>
     <string name="setup_activity_very_active">Very active</string>
     <string name="setup_activity_very_active_hint">Physical job or twice-daily training.</string>
-    <string name="setup_consents_legend">Consent choices</string>
     <string name="setup_submit">Show my targets</string>
     <string name="setup_skip">Not now</string>
     <string name="setup_error_age">Age must be between 16 and 100.</string>
@@ -975,7 +946,7 @@
     <string name="setup_error_activity">Select your typical activity level.</string>
     <string name="setup_error_consent">The wellness data consent is required so we can compute your targets.</string>
     <string name="setup_error_save">We could not save your details. Please try again.</string>
-    <string name="setup_deferred_note">Allergies, dietary preferences, home equipment and training experience live in Settings — add them whenever you like and the plans and meal ideas will follow.</string>
+    <string name="setup_deferred_note">Allergies, dietary preferences, home equipment and training experience live in Settings - add them whenever you like and the plans and meal ideas will follow.</string>
 
     <!-- Setup: the targets reveal -->
     <string name="setup_reveal_heading">Your daily targets</string>
@@ -986,14 +957,14 @@
     <string name="setup_reveal_fat">Fat</string>
     <string name="setup_reveal_grams">%1$dg</string>
     <string name="setup_reveal_water">Daily water target: %1$s</string>
-    <string name="setup_reveal_clamped">We adjusted your calorie target to a safe minimum. Slower, sustainable progress protects your health — AquaZeroFit never recommends eating below this floor.</string>
-    <string name="setup_reveal_clamped_reason">We adjusted your calorie target to a safe minimum (%1$s). Slower, sustainable progress protects your health — AquaZeroFit never recommends eating below this floor.</string>
+    <string name="setup_reveal_clamped">We adjusted your calorie target to a safe minimum. Slower, sustainable progress protects your health - AquaZeroFit never recommends eating below this floor.</string>
+    <string name="setup_reveal_clamped_reason">We adjusted your calorie target to a safe minimum (%1$s). Slower, sustainable progress protects your health - AquaZeroFit never recommends eating below this floor.</string>
     <string name="setup_reveal_continue">Continue</string>
 
     <!-- First run: signed in, no profile yet -->
     <string name="firstrun_greeting">Hey</string>
     <string name="firstrun_greeting_named">Hey, %1$s</string>
-    <string name="firstrun_body">You are in — nothing to fill in first. Have a look around, and set your targets whenever you are ready.</string>
+    <string name="firstrun_body">You are in - nothing to fill in first. Have a look around, and set your targets whenever you are ready.</string>
     <string name="firstrun_start_here">Start here</string>
     <string name="firstrun_workouts_title">Browse workouts</string>
     <string name="firstrun_workouts_body">The full exercise library, with form cues and demo clips.</string>
@@ -1005,7 +976,7 @@
 
     <!-- The honest "no targets yet" card, shared by first run and settings -->
     <string name="targets_not_set_title">Daily targets</string>
-    <string name="targets_not_set_body">Not set up yet. We work your calories, macros and water out from your height, weight, age and how active you are — we never guess them, so there is nothing to show until you tell us.</string>
+    <string name="targets_not_set_body">Not set up yet. We work your calories, macros and water out from your height, weight, age and how active you are - we never guess them, so there is nothing to show until you tell us.</string>
     <string name="targets_not_set_cta">Set up my targets</string>
     <string name="targets_not_set_footnote">Five questions, about thirty seconds.</string>
 
@@ -1060,7 +1031,6 @@
     <string name="settings_export_title">Export my data (JSON)</string>
     <string name="settings_export_body">Everything on your account, as a file you can keep.</string>
     <string name="settings_export_preparing">Preparing export…</string>
-    <string name="settings_export_ready">Export ready — choose where to send it.</string>
     <string name="settings_export_failed">Export failed. Please try again.</string>
     <string name="settings_export_share_title">AquaZeroFit data export</string>
     <string name="settings_legal_heading">Legal &amp; source</string>
@@ -1075,7 +1045,7 @@
     <string name="settings_name_updated">Name updated.</string>
     <string name="settings_name_failed">Could not update your name. Please try again.</string>
     <string name="settings_name_invalid">Please use a name between 1 and 60 characters.</string>
-    <string name="settings_profile_updated">Profile updated — targets recomputed.</string>
+    <string name="settings_profile_updated">Profile updated - targets recomputed.</string>
     <string name="settings_profile_save_failed">Could not save changes. Please try again.</string>
     <string name="settings_sign_out">Sign out</string>
     <string name="settings_sign_out_draining">Sending unsynced entries…</string>
@@ -1083,19 +1053,19 @@
 
     <!-- Settings: account deletion (Play compliance surface) -->
     <string name="settings_danger_heading">Delete account</string>
-    <string name="settings_delete_body">Deleting your account removes your profile, logs, plans and coach memory. There is a %1$d-day grace period first — signing in again with your email and password during that time cancels the request.</string>
+    <string name="settings_delete_body">Deleting your account removes your profile, logs, plans and coach memory. There is a %1$d-day grace period first - signing in again with your email and password during that time cancels the request.</string>
     <string name="settings_delete_cta">Delete my account</string>
     <string name="settings_delete_export_first">Export your data first if you want to keep a copy.</string>
     <string name="settings_delete_dialog_title">Delete account?</string>
     <string name="settings_delete_dialog_body">Your profile, meal logs, weight history, training plans and coach memory will be scheduled for permanent removal. Nothing is erased for %1$d days, and signing in again with your email and password during that time cancels the request. After the grace period it cannot be undone.</string>
     <string name="settings_delete_dialog_confirm">Yes, delete my account</string>
     <string name="settings_delete_pending_heading">Deletion is scheduled</string>
-    <string name="settings_delete_pending_body">Your account is scheduled for deletion. It is removed automatically after the %1$d-day grace period, and signing in again with your email and password cancels it. You can also erase everything right now — that is immediate and cannot be undone.</string>
+    <string name="settings_delete_pending_body">Your account is scheduled for deletion. It is removed automatically after the %1$d-day grace period, and signing in again with your email and password cancels it. You can also erase everything right now - that is immediate and cannot be undone.</string>
     <string name="settings_delete_now_cta">Delete everything now</string>
     <string name="settings_delete_now_dialog_title">Erase everything now?</string>
     <string name="settings_delete_now_dialog_body">This skips the grace period. Your account and all its data are erased immediately and cannot be recovered.</string>
     <string name="settings_delete_now_confirm">Yes, erase it now</string>
-    <string name="settings_delete_requested">Deletion requested — you have %1$d days to change your mind.</string>
+    <string name="settings_delete_requested">Deletion requested - you have %1$d days to change your mind.</string>
     <string name="settings_delete_purged">Your account and data have been deleted.</string>
     <string name="settings_delete_failed">Could not delete your account. Please try again.</string>
     <string name="settings_delete_web_note">You can also request deletion from the web, without reinstalling the app.</string>
@@ -1104,9 +1074,9 @@
     <!-- Notification settings: real local reminders -->
     <string name="reminders_heading">Reminders</string>
     <string name="reminders_intro">Reminders are scheduled on this device. Times and per-category choices stay here; the master switch is saved to your account consents.</string>
-    <string name="reminders_inexact_note">Android may deliver a reminder a little after its slot — these are nudges, not alarms.</string>
+    <string name="reminders_inexact_note">Android may deliver a reminder a little after its slot - these are nudges, not alarms.</string>
     <string name="reminders_master_title">All reminders</string>
-    <string name="reminders_master_body">Master switch — stored with your consents.</string>
+    <string name="reminders_master_body"></string>
     <string name="reminders_permission_title">Notifications are switched off</string>
     <string name="reminders_permission_body">Android needs permission before AquaZeroFit can send a reminder. Nothing is scheduled until you allow it.</string>
     <string name="reminders_permission_cta">Allow notifications</string>
@@ -1115,13 +1085,13 @@
     <string name="reminders_permission_denied">No reminders will be sent until notifications are allowed.</string>
     <string name="reminders_consent_off_body">Reminders are switched off in your consents, so nothing is scheduled. Turn the master switch on to start them.</string>
     <string name="reminders_meals_title">Meal reminders</string>
-    <string name="reminders_meals_body">Don\'t miss a fuelling window.</string>
+    <string name="reminders_meals_body"></string>
     <string name="reminders_water_title">Water reminders</string>
-    <string name="reminders_water_body">Hydration nudges through your waking hours.</string>
+    <string name="reminders_water_body"></string>
     <string name="reminders_workout_title">Workout time</string>
-    <string name="reminders_workout_body">Your daily training session.</string>
+    <string name="reminders_workout_body"></string>
     <string name="reminders_weigh_in_title">Weekly weigh-in</string>
-    <string name="reminders_weigh_in_body">One prompt a week to log your weight.</string>
+    <string name="reminders_weigh_in_body"></string>
     <string name="reminders_time_label">Time</string>
     <string name="reminders_frequency_label">Frequency</string>
     <string name="reminders_day_label">Day</string>
@@ -1129,10 +1099,7 @@
     <string name="reminders_every_2h">Every 2 hours</string>
     <string name="reminders_every_4h">Every 4 hours</string>
     <string name="reminders_water_window">Between %1$s and %2$s</string>
-    <string name="reminders_next_at">Next: %1$s</string>
     <string name="reminders_pick_time">Choose a time</string>
-    <string name="reminders_time_cd">%1$s, change the reminder time</string>
-    <string name="reminders_updated">Reminders updated.</string>
     <string name="reminders_enabled_toast">Reminders enabled.</string>
     <string name="reminders_disabled_toast">Reminders disabled.</string>
     <string name="reminders_consent_failed">Could not update the reminders consent.</string>
@@ -1150,22 +1117,22 @@
     <string name="reminder_workout_title">Training time</string>
     <string name="reminder_workout_body">Your session is coming up. Ready when you are.</string>
     <string name="reminder_weigh_in_title">Weekly weigh-in</string>
-    <string name="reminder_weigh_in_body">Add this week\'s entry — every one of them stays on the trend line.</string>
+    <string name="reminder_weigh_in_body">Add this week\'s entry - every one of them stays on the trend line.</string>
 
     <!-- Coach memory -->
     <string name="memory_title">Coach memory</string>
     <string name="memory_heading">What your coach remembers</string>
-    <string name="memory_intro">Memories help your coach personalise its guidance — and you are always in control: review, edit or delete anything here.</string>
+    <string name="memory_intro">Memories help your coach personalise its guidance - and you are always in control: review, edit or delete anything here.</string>
     <string name="memory_consent_off_title">Memory is paused</string>
-    <string name="memory_consent_off_body">Coach memory needs the AI personalisation consent, which is currently switched off. Nothing new is remembered while it is off — you decide if and when to turn it back on.</string>
+    <string name="memory_consent_off_body">Coach memory needs the AI personalisation consent, which is currently switched off. Nothing new is remembered while it is off - you decide if and when to turn it back on.</string>
     <string name="memory_consent_off_cta">Review consent settings</string>
     <string name="memory_error">We could not load your coach memory.</string>
     <string name="memory_retry">Try again</string>
     <string name="memory_summary_heading">Summary</string>
     <string name="memory_empty_title">Nothing remembered yet</string>
-    <string name="memory_empty_body">As you chat and log, your coach will suggest memories here for you to review — or add one yourself below.</string>
+    <string name="memory_empty_body">As you chat and log, your coach will suggest memories here for you to review - or add one yourself below.</string>
     <string name="memory_suggested_heading">Needs your review (%1$d)</string>
-    <string name="memory_suggested_body">Your coach noticed these — keep the ones that are right.</string>
+    <string name="memory_suggested_body">Your coach noticed these - keep the ones that are right.</string>
     <string name="memory_keep">Keep it</string>
     <string name="memory_not_right">Not right</string>
     <string name="memory_confirmed_heading">Remembered (%1$d)</string>
@@ -1178,7 +1145,6 @@
     <string name="memory_restore">Restore</string>
     <string name="memory_add_heading">Add a memory</string>
     <string name="memory_add_label">What should your coach remember?</string>
-    <string name="memory_add_hint">e.g. I train before work on weekdays</string>
     <string name="memory_category_label">Category</string>
     <string name="memory_category_preference">Preference</string>
     <string name="memory_category_preference_hint">Foods, workouts and styles you enjoy.</string>
@@ -1196,13 +1162,13 @@
     <string name="memory_source_profile">From your profile</string>
     <string name="memory_source_user">Added by you</string>
     <string name="memory_source_unknown">Remembered</string>
-    <string name="memory_forget_body">Forgetting everything permanently deletes the summary and every memory above. Your coach starts fresh — this cannot be undone.</string>
+    <string name="memory_forget_body">Forgetting everything permanently deletes the summary and every memory above. Your coach starts fresh - this cannot be undone.</string>
     <string name="memory_forget_cta">Forget everything</string>
     <string name="memory_forget_dialog_title">Forget everything?</string>
-    <string name="memory_forget_dialog_body">Every memory and the coach summary will be permanently deleted. Your coach will still work — it just starts with a blank slate.</string>
+    <string name="memory_forget_dialog_body">Every memory and the coach summary will be permanently deleted. Your coach will still work - it just starts with a blank slate.</string>
     <string name="memory_forget_confirm">Yes, forget everything</string>
     <string name="memory_kept">Memory kept.</string>
-    <string name="memory_rejected_toast">Okay — the coach will not use that.</string>
+    <string name="memory_rejected_toast">Okay - the coach will not use that.</string>
     <string name="memory_updated">Memory updated.</string>
     <string name="memory_deleted">Memory deleted.</string>
     <string name="memory_added">Memory added.</string>
@@ -1211,7 +1177,7 @@
     <string name="memory_delete_failed">Could not delete that memory. Please try again.</string>
     <string name="memory_add_failed">Could not save that memory. Please try again.</string>
     <string name="memory_clear_failed">Could not clear your memories. Please try again.</string>
-    <string name="memory_add_consent_failed">AI personalisation is switched off — enable it in Settings first.</string>
+    <string name="memory_add_consent_failed">AI personalisation is switched off - enable it in Settings first.</string>
 
     <!-- Plan / entitlements. The premium subscription is the only thing sold
          in this app; coach personas are not purchasable on any surface. -->
@@ -1231,12 +1197,12 @@
     <string name="plan_credits_explainer_uncapped_one">The first AI action you take each day adds 1 credit to your balance, and anything you do not spend carries over. Logging meals, water and weight by hand never costs a credit.</string>
     <string name="plan_difference_heading">What premium changes</string>
     <string name="plan_difference_heading_premium">What premium gives you</string>
-    <string name="plan_no_lanes">Nothing is held back from the free plan at the moment — every feature in the app is available to you.</string>
-    <string name="plan_free_forever_note">Logging meals, water, weight and workouts, your targets, training plans and coach chat stay free forever. Premium only adds optional AI lanes — it never takes away what you already use.</string>
+    <string name="plan_no_lanes">Nothing is held back from the free plan at the moment - every feature in the app is available to you.</string>
+    <string name="plan_free_forever_note">Logging meals, water, weight and workouts, your targets, training plans and coach chat stay free forever. Premium only adds optional AI lanes - it never takes away what you already use.</string>
     <string name="plan_lane_on">On</string>
     <string name="plan_lane_locked">Premium</string>
     <string name="plan_lane_insight_title">A coach-written weekly note</string>
-    <string name="plan_lane_insight_body">On premium, the narrative at the top of your weekly summary is written by the coach. On free it is written from your own numbers by the app itself — you still get the summary, and every "what changed" line in it, every week.</string>
+    <string name="plan_lane_insight_body">On premium, the narrative at the top of your weekly summary is written by the coach. On free it is written from your own numbers by the app itself - you still get the summary, and every "what changed" line in it, every week.</string>
     <string name="plan_lane_generic_body">This part of the coach runs on a model lane the free tier does not reach.</string>
     <string name="plan_difference_footnote">Your targets, your logging, your training plans, the coach chat and every number in your weekly summary work the same way on both plans.</string>
     <string name="plan_costs_heading">What each AI action costs</string>
@@ -1251,21 +1217,30 @@
     <string name="plan_task_exercise_swap">Exercise swap suggestion</string>
     <string name="plan_task_memory_extraction">Coach memory update</string>
     <string name="plan_upgrade_heading">Go premium</string>
-    <string name="plan_upgrade_body">Premium is a monthly subscription through Google Play. It adds the lanes listed above; everything on your free plan keeps working exactly as it does now, and nothing you use today is being taken away to make room for it.</string>
+    <string name="plan_upgrade_body">Premium gives you 150 daily AI credits (15× free tier) and personalized coach-written insights. Everything on your free plan keeps working exactly as it does now.</string>
     <string name="plan_upgrade_coaches">Coaches are not part of this. Every coach is earned by training, on both plans, and no amount of money unlocks one.</string>
-    <!-- %1$s is Google Play's own formatted price, in the user's currency. The
-         product is a monthly base plan, so the period is safe to state here. -->
-    <string name="plan_upgrade_cta">Go premium — %1$s a month</string>
+    <string name="plan_period_annual">Annual</string>
+    <string name="plan_period_annual_discount">SAVE %1$d%%</string>
+    <string name="plan_period_annual_price_sub">%1$s / year</string>
+    <string name="plan_period_monthly">Monthly</string>
+    <string name="plan_period_monthly_price_sub">%1$s / month</string>
+    <string name="plan_period_trial_badge">7-DAY FREE TRIAL</string>
+    <string name="plan_upgrade_cta_trial">Start 7-Day Free Trial</string>
+    <string name="plan_upgrade_cta_annual">Go Annual - %1$s / year</string>
+    <string name="plan_upgrade_cta_monthly">Go Monthly - %1$s / month</string>
+    <string name="plan_upgrade_cta">Go premium - %1$s a month</string>
+    <string name="plan_upgrade_terms_annual">7 days free, then %1$s/year. Auto-renews yearly. Cancel anytime in Google Play.</string>
+    <string name="plan_upgrade_terms_monthly">Renews every month at %1$s until you cancel. Cancel anytime in Google Play.</string>
     <string name="plan_upgrade_terms">Renews every month until you cancel. You can cancel any time in Google Play, and you keep premium until the month you have paid for runs out.</string>
     <string name="plan_upgrade_unavailable">Google Play cannot offer the subscription on this device right now, so there is nothing to buy here at the moment. Your free plan is unaffected.</string>
     <string name="plan_upgrade_done">You\'re on premium. Your plan has been updated.</string>
-    <string name="plan_upgrade_pending">Google Play is still processing your payment. Premium switches on by itself once it clears — there is nothing else for you to do.</string>
-    <string name="plan_upgrade_rejected">Google could not confirm that purchase, so we have not changed your plan. A purchase we do not confirm is refunded by Google automatically — you will not be left paying for it.</string>
-    <string name="plan_upgrade_verify_later">Google took the purchase, but we could not confirm it just yet. The app retries by itself next time you open it; if it never confirms, Google refunds it.</string>
+    <string name="plan_upgrade_pending">Google Play is still processing your payment. Premium switches on by itself once it clears - there is nothing else for you to do.</string>
+    <string name="plan_upgrade_rejected">Google could not confirm that purchase, so it has not unlocked premium and we have not changed your plan. If Google is still charging you for it, contact Support and we will work it out with you - it will not resolve on its own.</string>
+    <string name="plan_upgrade_verify_later">Google took the purchase, but we could not confirm it just yet. The app keeps retrying on its own each time you open it, and premium starts as soon as it goes through. If it still has not after a day or two, contact Support rather than buying again.</string>
     <string name="plan_upgrade_offline">You\'re offline, so the purchase could not be confirmed. It will be picked up next time you open the app with a connection.</string>
     <string name="plan_upgrade_play_unavailable">Google Play billing isn\'t available on this device, so premium can\'t be bought here.</string>
     <string name="plan_upgrade_failed">That purchase didn\'t go through. Your plan is unchanged.</string>
-    <string name="plan_premium_note">You\'re on premium — your weekly note is written for you automatically. The subscription renews in Google Play, and you can cancel it there whenever you like.</string>
+    <string name="plan_premium_note">You\'re on premium - your weekly note is written for you automatically. The subscription renews in Google Play, and you can cancel it there whenever you like.</string>
     <string name="plan_manage_subscription">Manage subscription in Google Play</string>
     <string name="plan_error">We could not read your plan details right now.</string>
 
@@ -1280,7 +1255,6 @@
     <string name="challenges_create_note">Up to %1$d people, including you.</string>
     <string name="challenges_join_heading">Join with a code</string>
     <string name="challenges_join_label">Challenge code</string>
-    <string name="challenges_join_hint">AQUA-XXXXXX</string>
     <string name="challenges_join_cta">Join huddle</string>
     <string name="challenges_yours_heading">Your huddles</string>
     <string name="challenges_empty_title">No huddles yet</string>
@@ -1306,29 +1280,31 @@
     <string name="readiness_week_label">%1$s week</string>
     <string name="readiness_show_why">Why</string>
     <string name="readiness_hide_why">Hide</string>
+    <string name="readiness_summary_cd">%1$s week. %2$s</string>
+    <string name="readiness_expand_cd">%1$s week. %2$s. Show what drove this.</string>
+    <string name="readiness_collapse_cd">%1$s week. %2$s. Hide what drove this.</string>
     <string name="energy_loop_adaptive_delta">Adaptive adjustment: %1$s%2$s kcal this week</string>
     <string name="achievement_share_cd">Share achievement</string>
-    <string name="challenges_created">Huddle %1$s is ready — share the code.</string>
+    <string name="challenges_created">Huddle %1$s is ready - share the code.</string>
     <string name="challenges_create_failed">Could not create the huddle. Please try again.</string>
     <string name="challenges_joined">Joined the huddle.</string>
     <string name="challenges_join_failed">Could not join with that code.</string>
     <string name="challenges_code_too_short">Enter the full code from your invite.</string>
 
     <!-- Meal plan -->
-    <string name="meal_plan_heading">Your AI meal plan</string>
-    <string name="meal_plan_intro">Four suggestions built around what is left of today\'s targets. Nothing is logged until you say so.</string>
+    <string name="meal_plan_heading">Meal plan</string>
+    <string name="meal_plan_intro"></string>
     <string name="meal_plan_regenerate_all">Regenerate every meal</string>
     <string name="meal_plan_regenerate_one">Regenerate the %1$s suggestion</string>
     <string name="meal_plan_planned_kcal">Planned kcal</string>
     <string name="meal_plan_planned_protein">Planned protein</string>
-    <string name="meal_plan_planned_summary">%1$d meals · %2$s kcal</string>
     <string name="meal_plan_of_target">of %1$s</string>
     <string name="meal_plan_macros">P %1$dg · C %2$dg · F %3$dg</string>
     <string name="meal_plan_kcal">%1$s kcal</string>
     <string name="meal_plan_log_cta">Log this</string>
     <string name="meal_plan_logged">Logged</string>
     <string name="meal_plan_logged_toast">Added to your log.</string>
-    <string name="meal_plan_log_failed">Could not log that meal — please try again.</string>
+    <string name="meal_plan_log_failed">Could not log that meal - please try again.</string>
     <string name="meal_plan_slot_failed">Couldn\'t generate a suggestion.</string>
     <string name="meal_plan_slot_retry">Retry</string>
     <string name="meal_plan_offline_title">Meal ideas need a connection</string>
@@ -1336,7 +1312,7 @@
     <string name="meal_plan_feedback_up">This suggestion is good</string>
     <string name="meal_plan_feedback_down">This suggestion is not for me</string>
     <string name="meal_plan_feedback_failed">Feedback failed to send.</string>
-    <string name="meal_plan_deterministic_note">Chosen from the recipe library by the app itself, not by a model — AI personalisation is switched off.</string>
+    <string name="meal_plan_deterministic_note">Chosen from the recipe library by the app itself, not by a model - AI personalisation is switched off.</string>
     <string name="meal_plan_recipes_heading">Recipes</string>
     <string name="meal_plan_recipes_body">Full method and ingredients, cached for offline reading.</string>
     <string name="meal_plan_recipes_empty">Recipes will appear here once they have been downloaded.</string>
@@ -1354,13 +1330,11 @@
     <string name="recipe_servings_body">Adjust before logging.</string>
     <string name="recipe_servings_less">One less serving</string>
     <string name="recipe_servings_more">One more serving</string>
-    <string name="recipe_servings_count">%1$d servings selected</string>
     <string name="recipe_ingredients_heading">Ingredients</string>
-    <string name="recipe_ingredient_cd">%1$s, %2$s</string>
     <string name="recipe_method_heading">Method</string>
     <string name="recipe_step">Step %1$d</string>
     <string name="recipe_allergens_heading">Allergens</string>
-    <string name="recipe_allergens_body">Contains %1$s. Allergen data is best-effort — always check your own ingredients.</string>
+    <string name="recipe_allergens_body">Contains %1$s. Allergen data is best-effort - always check your own ingredients.</string>
     <string name="recipe_allergens_yours">This recipe contains %1$s, which you listed as an allergy.</string>
     <string name="recipe_attribution">Recipe source: %1$s · %2$s</string>
     <string name="recipe_log_cta">Log this meal (%1$s kcal)</string>
@@ -1369,7 +1343,6 @@
     <string name="recipe_not_found_title">Recipe not found</string>
     <string name="recipe_not_found_body">This recipe is no longer in the library.</string>
     <string name="recipe_error">We couldn\'t load this recipe.</string>
-    <string name="recipe_image_cd">Plated %1$s</string>
 
     <!-- Shell -->
     <string name="shell_open_settings">Open settings</string>

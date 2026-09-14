@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -68,12 +70,19 @@ fun ReadinessChip(
     AzfCard(modifier = modifier.fillMaxWidth()) {
         val summaryModifier = Modifier.fillMaxWidth()
         if (hasSignals) {
+            // The row is the disclosure control, so its label has to say that
+            // tapping reveals the signals — the "Why" text alone is invisible
+            // to a merged announcement.
+            val expandCd = stringResource(
+                if (expanded) R.string.readiness_collapse_cd else R.string.readiness_expand_cd,
+                copy.label,
+                readiness.headline,
+            )
             Row(
                 modifier = summaryModifier
-                    .clickable { expanded = !expanded }
-                    .semantics {
-                        contentDescription = "${copy.label} week. ${readiness.headline}"
-                    },
+                    .clickable(role = Role.Button) { expanded = !expanded }
+                    .minimumInteractiveComponentSize()
+                    .semantics { contentDescription = expandCd },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ReadinessSummary(copy = copy, headline = readiness.headline, modifier = Modifier.weight(1f))
@@ -92,10 +101,13 @@ fun ReadinessChip(
                 }
             }
         } else {
+            val summaryCd = stringResource(
+                R.string.readiness_summary_cd,
+                copy.label,
+                readiness.headline,
+            )
             Row(
-                modifier = summaryModifier.semantics {
-                    contentDescription = "${copy.label} week. ${readiness.headline}"
-                },
+                modifier = summaryModifier.semantics { contentDescription = summaryCd },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ReadinessSummary(copy = copy, headline = readiness.headline, modifier = Modifier.weight(1f))

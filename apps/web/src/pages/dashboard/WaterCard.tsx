@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DailyNutrition } from '@aquazerofit/shared';
 import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/queries';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useToast } from '@/components/ui/Toast';
 import { newIdempotencyKey } from './lib';
@@ -34,10 +35,11 @@ export function WaterCard({ date, consumedMl, targetMl }: WaterCardProps) {
         idempotencyKey: newIdempotencyKey(),
       }),
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['nutrition', 'daily', date] });
-      const previous = queryClient.getQueryData<DailyNutrition>(['nutrition', 'daily', date]);
+      const key = queryKeys.nutritionDaily(date);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<DailyNutrition>(key);
       if (previous) {
-        queryClient.setQueryData<DailyNutrition>(['nutrition', 'daily', date], {
+        queryClient.setQueryData<DailyNutrition>(key, {
           ...previous,
           waterMl: { ...previous.waterMl, consumed: previous.waterMl.consumed + INCREMENT_ML },
         });
@@ -46,13 +48,13 @@ export function WaterCard({ date, consumedMl, targetMl }: WaterCardProps) {
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(['nutrition', 'daily', date], context.previous);
+        queryClient.setQueryData(queryKeys.nutritionDaily(date), context.previous);
       }
       show('Could not log water — please try again');
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
-      void queryClient.invalidateQueries({ queryKey: ['progress'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.progress });
     },
   });
 

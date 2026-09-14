@@ -1,13 +1,16 @@
 package fit.aquazero.app
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -28,13 +31,16 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import fit.aquazero.app.core.designsystem.AzfColors
+import fit.aquazero.app.core.designsystem.AzfShapes
+import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.Skeleton
 import androidx.navigation3.ui.NavDisplay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.core.auth.AuthState
 import fit.aquazero.app.core.data.AccountRepository
 import fit.aquazero.app.core.data.AuthRepository
 import fit.aquazero.app.core.designsystem.AzfBottomNav
-import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfTab
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.ToastHost
@@ -135,11 +141,29 @@ fun AzfNavigation(rootViewModel: RootViewModel = hiltViewModel()) {
     val authState by rootViewModel.authState.collectAsStateWithLifecycle()
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when (authState) {
-            is AuthState.Unknown -> CircularProgressIndicator(color = AzfColors.PrimaryFixedDim)
+            is AuthState.Unknown -> AuthGateSkeleton()
             is AuthState.SignedOut -> PreAuthFlow()
             is AuthState.SignedIn -> MainShell(toastController = rootViewModel.toastController)
         }
         ToastHost(controller = rootViewModel.toastController)
+    }
+}
+
+@Composable
+private fun AuthGateSkeleton() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(AzfSpacing.ContainerMargin)
+            .statusBarsPadding(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Skeleton(modifier = Modifier.fillMaxWidth(0.35f).height(28.dp))
+        Skeleton(modifier = Modifier.fillMaxWidth(0.55f).height(36.dp))
+        Skeleton(modifier = Modifier.fillMaxWidth().height(48.dp), shape = AzfShapes.Pill)
+        Skeleton(modifier = Modifier.fillMaxWidth().height(180.dp), shape = AzfShapes.Card)
+        Skeleton(modifier = Modifier.fillMaxWidth().height(120.dp), shape = AzfShapes.Card)
+        Skeleton(modifier = Modifier.fillMaxWidth().height(120.dp), shape = AzfShapes.Card)
     }
 }
 
@@ -264,11 +288,20 @@ private fun MainShell(
                         // ----- tab roots -----
                         entry<DashboardKey> {
                             when (hasProfile) {
-                                null -> Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center,
+                                null -> Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(AzfSpacing.ContainerMargin),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
                                 ) {
-                                    CircularProgressIndicator(color = AzfColors.PrimaryFixedDim)
+                                    Skeleton(
+                                        modifier = Modifier.fillMaxWidth().height(180.dp),
+                                        shape = AzfShapes.Card,
+                                    )
+                                    Skeleton(
+                                        modifier = Modifier.fillMaxWidth().height(120.dp),
+                                        shape = AzfShapes.Card,
+                                    )
                                 }
                                 false -> FirstRunScreen(
                                     onSetUpTargets = { backStack.add(SetupKey) },

@@ -1,5 +1,6 @@
 package fit.aquazero.app.feature.nutrition
 
+import fit.aquazero.app.core.common.Hydration
 import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.database.MealLogEntity
 import fit.aquazero.app.core.database.SyncState
@@ -373,7 +374,7 @@ class NutritionViewModelTest {
         viewModel.logWater()
         advanceUntilIdle()
 
-        assertEquals(listOf(NutritionViewModel.WATER_INCREMENT_ML to yesterday), data.loggedWater)
+        assertEquals(listOf(Hydration.WATER_INCREMENT_ML to yesterday), data.loggedWater)
     }
 
     @Test

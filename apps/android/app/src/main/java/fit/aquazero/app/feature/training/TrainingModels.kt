@@ -66,9 +66,6 @@ object TrainingFormat {
             String.format(java.util.Locale.US, "%.1f", value)
         }
 
-    /** One decimal, always — for weights and deltas in metric displays. */
-    fun oneDecimal(value: Double): String = String.format(java.util.Locale.US, "%.1f", value)
-
     /**
      * Session length estimate, matching the web exactly:
      * `setsPlanned × (reps × 4s + restSeconds)`, floored at 10 minutes, with

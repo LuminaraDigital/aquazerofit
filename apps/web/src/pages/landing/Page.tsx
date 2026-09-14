@@ -79,7 +79,7 @@ export function PageHero({
       <div className="lp-floor" aria-hidden="true" />
       <div className="relative mx-auto max-w-6xl px-5">
         <Reveal>
-          <nav aria-label="Breadcrumb" className="text-[12px] text-on-surface-variant/70">
+          <nav aria-label="Breadcrumb" className="text-[12px] text-on-surface-variant">
             <Link to="/" className="transition-colors hover:text-primary">
               Home
             </Link>
@@ -153,7 +153,7 @@ export function Spec({ rows, caption }: { rows: Array<[string, string]>; caption
         </tbody>
       </table>
       {caption && (
-        <p className="border-t border-white/5 px-5 py-3 text-[12px] leading-relaxed text-on-surface-variant/70">
+        <p className="border-t border-white/5 px-5 py-3 text-[12px] leading-relaxed text-on-surface-variant">
           {caption}
         </p>
       )}
@@ -182,7 +182,7 @@ export function PageCta({
           <TelegramCta placement="subpage-final" />
           <WebFallbackLink placement="subpage-final" />
         </div>
-        <p className="mx-auto mt-8 max-w-xl text-[12px] leading-relaxed text-on-surface-variant/70">
+        <p className="mx-auto mt-8 max-w-xl text-[12px] leading-relaxed text-on-surface-variant">
           {disclaimer}
         </p>
       </div>

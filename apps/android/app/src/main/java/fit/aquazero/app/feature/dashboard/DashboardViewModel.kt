@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.CoachNudgeContext
+import fit.aquazero.app.core.common.Hydration
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.common.proactiveCoachNudges
@@ -395,7 +396,7 @@ class DashboardViewModel @Inject constructor(
      * after midnight is filed against the day the user is actually in — and
      * the card jumps to that day with it.
      */
-    fun logWater(amountMl: Int = WATER_INCREMENT_ML) {
+    fun logWater(amountMl: Int = Hydration.WATER_INCREMENT_ML) {
         if (_uiState.value.waterPending) return
         val localDate = syncToToday()
         _uiState.update { it.copy(waterPending = true) }
@@ -472,9 +473,6 @@ class DashboardViewModel @Inject constructor(
     )
 
     companion object {
-        /** The web's one-tap hydration increment. */
-        const val WATER_INCREMENT_ML = 250
-
         /** Achievement tiles shown in the strip (matches the web's slice). */
         const val MAX_ACHIEVEMENTS = 4
 

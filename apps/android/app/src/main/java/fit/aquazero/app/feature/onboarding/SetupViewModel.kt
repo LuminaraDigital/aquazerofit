@@ -57,15 +57,7 @@ data class SetupUiState(
     val errorRes: Int? = null,
     val saving: Boolean = false,
     val targets: DerivedTargetsDto? = null,
-) {
-    /** True once every required control has an answer. */
-    val isComplete: Boolean
-        get() = age.isNotBlank() &&
-            goal != null &&
-            activityLevel != null &&
-            (if (unit == UnitPreference.IMPERIAL) heightFt.isNotBlank() else heightCm.isNotBlank()) &&
-            weight.isNotBlank()
-}
+)
 
 /** One-shot effects from the setup flow. */
 sealed interface SetupEvent {

@@ -1,5 +1,6 @@
 package fit.aquazero.app.feature.nutrition
 
+import fit.aquazero.app.core.common.Hydration
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.FoodNutrientsDto
 import fit.aquazero.app.core.model.FoodServingDto
@@ -84,7 +85,7 @@ class NutritionMidnightTest {
         advanceUntilIdle()
 
         assertEquals(
-            listOf(NutritionViewModel.WATER_INCREMENT_ML to NEXT_DAY),
+            listOf(Hydration.WATER_INCREMENT_ML to NEXT_DAY),
             data.loggedWater,
         )
     }

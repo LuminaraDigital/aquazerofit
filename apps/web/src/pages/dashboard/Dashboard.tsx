@@ -191,7 +191,7 @@ export default function Dashboard() {
                           <span className="font-heading font-semibold text-[44px] text-primary tabular-nums leading-none">
                             {fmtInt(Math.max(0, daily.kcalRemaining))}
                           </span>
-                          <span className="text-xs text-on-surface-variant/70 mt-1.5 uppercase tracking-wider">kcal left</span>
+                          <span className="text-xs text-on-surface-variant mt-1.5 uppercase tracking-wider">kcal left</span>
                         </div>
                       </RingProgress>
                     </div>
@@ -306,7 +306,7 @@ export default function Dashboard() {
                   {session.status === 'completed' ? 'Done' : 'Planned'}
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-on-surface-variant/70 text-sm mb-4">
+              <div className="flex items-center gap-4 text-on-surface-variant text-sm mb-4">
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                     fitness_center
@@ -342,7 +342,7 @@ export default function Dashboard() {
                 <h3 className="font-heading font-semibold uppercase tracking-[0.04em] text-lg text-on-surface">
                   Rest &amp; Recover
                 </h3>
-                <p className="text-sm text-on-surface-variant/70 mt-0.5">
+                <p className="text-sm text-on-surface-variant mt-0.5">
                   No workout scheduled. Browse the library.
                 </p>
               </div>
@@ -389,7 +389,7 @@ export default function Dashboard() {
                     <span className="text-3xl font-bold tabular-nums text-on-surface">
                       {progress.currentWeightKg.toFixed(1)}
                     </span>
-                    <span className="text-sm text-on-surface-variant/70 ml-1">kg</span>
+                    <span className="text-sm text-on-surface-variant ml-1">kg</span>
                   </p>
                 )}
                 <Sparkline points={weightSeries.slice(-14)} />
@@ -432,7 +432,7 @@ export default function Dashboard() {
                 </div>
               ))}
               {(progress?.achievements ?? []).length === 0 && (
-                <p className="text-sm text-on-surface-variant/70">
+                <p className="text-sm text-on-surface-variant">
                   Keep logging to unlock achievements.
                 </p>
               )}

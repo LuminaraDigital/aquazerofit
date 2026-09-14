@@ -38,7 +38,7 @@ import { assessReadiness } from './readiness';
  * no cycle — creditLedger reaches only platform/store, platform/errors and
  * the shared package.
  */
-import { creditLedger } from '../ai/creditLedger';
+import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { tierOf } from '../billing/entitlements';
 
 const EXPERIENCE_RANK: Record<ExerciseExperience, number> = {
@@ -687,11 +687,7 @@ export async function generatePlanForUser(
      * burning tokens on output we then discarded is our cost to absorb, not
      * the user's — they are holding a plan that no model wrote.
      */
-    if (plan && billableAi) {
-      await creditLedger.commit(reservationId);
-    } else {
-      await creditLedger.release(reservationId);
-    }
+    await settleReservation(reservationId, !!(plan && billableAi));
   }
   if (!plan) {
     plan = buildPlan({

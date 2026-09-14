@@ -20,6 +20,7 @@ import { credentialsId, toPublicUser, type CredentialsDoc } from '../me/service'
 import { validateTelegramInitData, type TelegramUser } from './telegram';
 import { sendPasswordResetEmail } from './emails';
 import bcrypt from 'bcryptjs';
+import { containsProfanity } from '@aquazerofit/shared';
 
  // Cost 12 for production security; cost 4 under vitest for test speed.
  // bcrypt is pure JS; offloaded to worker thread in production to avoid blocking the event loop.
@@ -57,6 +58,15 @@ export function auditAuthEvent(
     ip,
     createdAt: new Date().toISOString(),
   });
+}
+
+/**
+ * Last line of defence for a display name that did not come from the schema.
+ * Falls back to a neutral placeholder rather than erroring: registration must
+ * not fail because someone's email local-part happens to trip the filter.
+ */
+function safeDisplayName(candidate: string): string {
+  return containsProfanity(candidate) ? 'Aqua member' : candidate;
 }
 
 function isUserDoc(d: { id: string }): d is User {
@@ -247,7 +257,10 @@ export async function register(
     emailVerified: config.isDev,
     role: 'user',
     tier: 'free',
-    displayName: input.displayName?.trim() || input.email.split('@')[0]!,
+    // The email prefix is derived, not submitted, so it never passes through
+    // registerSchema — which makes it the one way a refused name could still
+    // land on an account (someone@ signing up as the slur before the @).
+    displayName: safeDisplayName(input.displayName?.trim() || input.email.split('@')[0]!),
     createdAt: now,
     deletionRequestedAt: null,
   };

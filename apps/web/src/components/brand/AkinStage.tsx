@@ -161,7 +161,7 @@ export function AkinStage({
                 <p className="font-heading text-sm font-semibold uppercase tracking-[0.2em] text-primary">
                   {AQUA_CHARACTER.name}
                 </p>
-                <p className="text-xs text-on-surface-variant/80">
+                <p className="text-xs text-on-surface-variant">
                   {meta.label} · {meta.hint}
                 </p>
               </div>

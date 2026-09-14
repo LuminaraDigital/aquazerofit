@@ -25,8 +25,6 @@ import { billingRouter } from './billing/router';
 
 import { exportRouter } from './export/export';
 
-export { exportRouter };
-
 // ---------------------------------------------------------------------------
 // Cache policy
 // ---------------------------------------------------------------------------

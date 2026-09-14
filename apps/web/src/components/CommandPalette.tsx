@@ -128,7 +128,7 @@ export function CommandPalette() {
             Esc
           </kbd>
         </div>
-        <div className="px-4 py-3 text-sm text-on-surface-variant/80 flex items-start justify-between gap-4">
+        <div className="px-4 py-3 text-sm text-on-surface-variant flex items-start justify-between gap-4">
           <p>
             Type a meal, press Enter, confirm on the coach screen. Faster than any tap flow.
           </p>

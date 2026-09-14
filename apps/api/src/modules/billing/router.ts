@@ -26,6 +26,7 @@ import { config } from '../../platform/config';
 import { logEvent } from '../../platform/telemetry';
 import { getStore } from '../../platform/store';
 import {
+  accountForProviderRef,
   effectiveTier,
   grantPremium,
   revokePremium,
@@ -83,6 +84,35 @@ billingRouter.post(
      */
     if (verified.obfuscatedAccountId && verified.obfuscatedAccountId !== obfuscatedAccountIdFor(userId)) {
       logEvent('play_purchase_account_mismatch', { userId });
+      throw new AppError('PURCHASE_INVALID', 'This purchase belongs to a different account.');
+    }
+
+    /*
+     * Second lock on the same door, for the purchases the first one cannot
+     * reach: a token with no `obfuscatedExternalAccountId` is unowned as far as
+     * the check above is concerned, and one account presenting another's token
+     * was therefore refused only by accident. `grantPremium` deduplicates on
+     * `play:<token>:<expiry>`, so an exact replay settles as a duplicate and
+     * grants the second account nothing — but the expiry is in that key, so the
+     * FIRST renewal makes the very same replay a brand-new event and premium
+     * lands on both accounts. One paid subscription, two subscribers, renewing
+     * indefinitely: the classic sharing fraud, reachable by anyone who can pass
+     * a token between two installs.
+     *
+     * So a reference already settled against another account is refused here.
+     * Free of false positives for the ordinary user, who presents their own
+     * token on their own account for the life of the subscription.
+     *
+     * Skipped when the bound account no longer exists. A user who deletes their
+     * account and signs up again is a real person with a live Play
+     * subscription, and leaving their token bound to a deleted row would strand
+     * them on the free tier with no way back. (Google's own identifier already
+     * refuses that case, which is a separate gap and not one this can close:
+     * only Play can re-issue the purchase under a new account id.)
+     */
+    const boundTo = accountForProviderRef(input.purchaseToken);
+    if (boundTo && boundTo !== userId && getStore().byId<User>('users', boundTo)) {
+      logEvent('play_purchase_token_rebind_refused', { userId });
       throw new AppError('PURCHASE_INVALID', 'This purchase belongs to a different account.');
     }
 

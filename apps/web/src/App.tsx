@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { RequireAuth, RequireTargets, useProfileGate } from './components/layout/RequireAuth';
-import { PageSpinner } from './components/ui/PageSpinner';
+import { RouteFallbackSkeleton } from './components/ui/Skeleton';
 
 const Landing = lazy(() => import('./pages/landing/Landing'));
 const FeaturesPage = lazy(() => import('./pages/landing/Features'));
@@ -25,7 +25,7 @@ const AccountDeletionPage = lazy(() => import('./pages/legal/AccountDeletion'));
 const MobileCaptchaPage = lazy(() => import('./pages/auth/MobileCaptcha'));
 const Welcome = lazy(() => import('./pages/auth/Welcome'));
 const SignIn = lazy(() => import('./pages/auth/SignIn'));
-/* Wellness essentials — asked when a target is wanted, not before the app opens. */
+/* Wellness essentials - asked when a target is wanted, not before the app opens. */
 const Setup = lazy(() => import('./pages/auth/Setup'));
 const FirstRun = lazy(() => import('./pages/auth/FirstRun'));
 
@@ -54,8 +54,8 @@ const Memory = lazy(() => import('./pages/settings/Memory'));
 
 /**
  * `/` is the app's front door for everyone, which means it has to work before
- * the account has a wellness profile. The dashboard cannot — it is built around
- * a calorie ring — so an account without essentials gets the first-run home
+ * the account has a wellness profile. The dashboard cannot - it is built around
+ * a calorie ring - so an account without essentials gets the first-run home
  * instead. Nobody is redirected out of the app to a form.
  */
 function HomeRoute() {
@@ -65,8 +65,8 @@ function HomeRoute() {
 
 /**
  * `/landing` was the marketing page's own URL before `/` started serving it
- * directly. It stays as a permanent alias — the address is in the wild, in
- * shared links and in anything already indexed — and forwards to the canonical
+ * directly. It stays as a permanent alias - the address is in the wild, in
+ * shared links and in anything already indexed - and forwards to the canonical
  * `/`, carrying the fragment across so `/landing#safety` still arrives at the
  * safety section rather than at the top of the page.
  */
@@ -77,11 +77,11 @@ function LandingAlias() {
 
 export default function App() {
   // Last-resort boundary for screens outside AppLayout (auth, settings,
-  // capture flows) — AppLayout has its own so the bottom nav survives there.
+  // capture flows) - AppLayout has its own so the bottom nav survives there.
   const { pathname } = useLocation();
   return (
     <ErrorBoundary resetKey={pathname}>
-      <Suspense fallback={<PageSpinner />}>
+      <Suspense fallback={<RouteFallbackSkeleton />}>
         <Routes>
         <Route path="/landing" element={<LandingAlias />} />
         <Route path="/features" element={<FeaturesPage />} />
@@ -97,7 +97,7 @@ export default function App() {
         <Route path="/mobile/captcha" element={<MobileCaptchaPage />} />
 
         {/* `publicIndex` makes `/` the marketing front door for signed-out web
-            visitors while leaving it the app's home for everyone else — see
+            visitors while leaving it the app's home for everyone else - see
             RequireAuth. Cold traffic and crawlers land on the canonical URL
             with no redirect in between. */}
         <Route element={<RequireAuth publicIndex={<Landing />} />}>
@@ -145,7 +145,7 @@ export default function App() {
           <Route path="/challenges" element={<Challenges />} />
           {/* Character select renders its own header and nav, like /settings. */}
           <Route path="/coach/select" element={<CoachSelect />} />
-          {/* Renders its own header and nav, so it sits outside AppLayout —
+          {/* Renders its own header and nav, so it sits outside AppLayout -
               same as /settings. Deliberately NOT behind RequireTargets: what
               your plan allows does not depend on having entered a height. */}
           <Route path="/plan" element={<PlanPage />} />

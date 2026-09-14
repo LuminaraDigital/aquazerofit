@@ -13,7 +13,8 @@ import { useToast } from '@/components/ui/Toast';
 import { ShareMoment } from '@/components/share/ShareMoment';
 import type { ShareCardPayload } from '@/lib/shareCard';
 import { useMe } from '@/lib/queries';
-import { FoodSearchSheet, GramsStepper } from './Nutrition';
+import { FoodSearchSheet } from './FoodSearchSheet';
+import { GramsStepper } from './GramsStepper';
 import { fmtInt, round1, todayLocalDate } from '../dashboard/lib';
 
 /** Review item: keeps per-gram ratios so edits recompute deterministically in code. */

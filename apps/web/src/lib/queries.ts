@@ -12,12 +12,8 @@ import {
 import type {
   AuthResponse,
   ConsentState,
-  CreateMealLogInput,
   CreditTask,
-  DailyNutrition,
   DerivedTargets,
-  Food,
-  MealLog,
   MemoryFact,
   MemoryFactCategory,
   MemoryFactStatus,
@@ -28,31 +24,17 @@ import type {
   CoachUnlock,
   ProgressInsight,
   ProgressionStatus,
-  ProgressSummary,
   PublicUser,
   ReadinessAssessment,
-  TrainingPlan,
-  TrendPoint,
   UserMemory,
   UserTier,
-  WaterLog,
-  WeightLog,
   WellnessProfile,
   WorkoutSession,
 } from '@aquazerofit/shared';
 import { api, ApiError, tokenStore } from './api';
+import { asList, orNull, unwrap } from './envelopes';
 
 export type TrendRange = '7d' | '30d' | '90d';
-
-export interface NutritionTrends {
-  kcal: TrendPoint[];
-  weight: TrendPoint[];
-  macros: {
-    proteinG: TrendPoint[];
-    carbsG: TrendPoint[];
-    fatG: TrendPoint[];
-  };
-}
 
 /**
  * What this account can currently do (GET /me/entitlements).
@@ -98,27 +80,13 @@ export const queryKeys = {
   weight: (range: TrendRange) => ['weight', range] as const,
 };
 
-/** Treat 404 as "absent" rather than an error (profile / plan / session). */
-async function orNull<T>(fn: () => Promise<T>): Promise<T | null> {
-  try {
-    return await fn();
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return null;
-    throw e;
-  }
-}
-
 /**
  * Single resources come back in a named envelope ({ profile }, { targets },
  * { consents }, …). Accept both wrapped and bare shapes so hooks stay stable
  * if the envelope ever changes.
  */
-function unwrap<T>(data: unknown, key: string): T | null {
-  if (!data || typeof data !== 'object') return (data as T) ?? null;
-  const record = data as Record<string, unknown>;
-  if (key in record) return (record[key] as T) ?? null;
-  return data as T;
-}
+// orNull / unwrap / asList live in ./envelopes (SSOT for defensive unwrap).
+
 
 // ---------- profile & targets ----------
 
@@ -275,33 +243,7 @@ export function useUpdateConsents() {
   });
 }
 
-// ---------- nutrition ----------
-
-export function useDailyNutrition(date: string): UseQueryResult<DailyNutrition> {
-  return useQuery({
-    queryKey: queryKeys.nutritionDaily(date),
-    queryFn: () => api<DailyNutrition>('/analytics/nutrition/daily', { query: { date } }),
-    enabled: Boolean(date) && tokenStore.isAuthenticated,
-  });
-}
-
-export function useNutritionTrends(range: TrendRange): UseQueryResult<NutritionTrends> {
-  return useQuery({
-    queryKey: queryKeys.nutritionTrends(range),
-    queryFn: () => api<NutritionTrends>('/analytics/nutrition/trends', { query: { range } }),
-    enabled: tokenStore.isAuthenticated,
-  });
-}
-
 // ---------- progress / plans / workouts ----------
-
-export function useProgressSummary(): UseQueryResult<ProgressSummary> {
-  return useQuery({
-    queryKey: queryKeys.progress,
-    queryFn: () => api<ProgressSummary>('/progress/summary'),
-    enabled: tokenStore.isAuthenticated,
-  });
-}
 
 /**
  * GET /progress/insight — the weekly narrative + deterministic "what changed"
@@ -323,15 +265,6 @@ export function useProgressInsight(): UseQueryResult<ProgressInsight | null> {
     queryKey: queryKeys.progressInsight,
     queryFn: async () =>
       unwrap<ProgressInsight>(await orNull(() => api<unknown>('/progress/insight')), 'insight'),
-    enabled: tokenStore.isAuthenticated,
-  });
-}
-
-export function useCurrentPlan(): UseQueryResult<TrainingPlan | null> {
-  return useQuery({
-    queryKey: queryKeys.plan,
-    queryFn: async () =>
-      unwrap<TrainingPlan>(await orNull(() => api<unknown>('/plans/current')), 'plan'),
     enabled: tokenStore.isAuthenticated,
   });
 }
@@ -375,127 +308,6 @@ export function unwrapWorkoutSession(data: unknown): WorkoutSession | null {
   return maybe && typeof maybe === 'object' && Array.isArray((maybe as WorkoutSession).exercises)
     ? (maybe as WorkoutSession)
     : null;
-}
-
-export function useTodayWorkout(): UseQueryResult<WorkoutSession | null> {
-  return useQuery({
-    ...todayWorkoutQuery,
-    select: unwrapWorkoutSession,
-    enabled: tokenStore.isAuthenticated,
-  });
-}
-
-// ---------- food search ----------
-
-export function useFoodSearch(term: string): UseQueryResult<Food[]> {
-  return useQuery({
-    queryKey: queryKeys.foods(term),
-    queryFn: async () => {
-      const res = await api<Food[] | { items: Food[] }>('/foods', { query: { search: term } });
-      return Array.isArray(res) ? res : res.items;
-    },
-    enabled: term.trim().length >= 2 && tokenStore.isAuthenticated,
-    staleTime: 5 * 60_000,
-  });
-}
-
-// ---------- mutations ----------
-
-function newIdempotencyKey(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-/** Logging a meal invalidates ['nutrition'] + ['progress']. */
-export function useLogMeal() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateMealLogInput) =>
-      api<MealLog>('/meal-logs', {
-        method: 'POST',
-        body: input,
-        idempotencyKey: newIdempotencyKey(),
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['nutrition'] });
-      void qc.invalidateQueries({ queryKey: ['progress'] });
-    },
-  });
-}
-
-/** Logging water invalidates ['nutrition'] + ['progress']. */
-export function useLogWater() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { amountMl: number; localDate: string }) =>
-      api<WaterLog>('/water-logs', {
-        method: 'POST',
-        body: input,
-        idempotencyKey: newIdempotencyKey(),
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['nutrition'] });
-      void qc.invalidateQueries({ queryKey: ['progress'] });
-    },
-  });
-}
-
-/** Logging weight invalidates ['weight'] + ['progress'] + ['targets']. */
-export function useLogWeight() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { weightKg: number; note?: string; localDate: string }) =>
-      api<WeightLog>('/weight-logs', {
-        method: 'POST',
-        body: input,
-        idempotencyKey: newIdempotencyKey(),
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['weight'] });
-      void qc.invalidateQueries({ queryKey: ['progress'] });
-      void qc.invalidateQueries({ queryKey: ['targets'] });
-    },
-  });
-}
-
-/** Generating a plan invalidates ['plan'] + ['workout']. */
-export function useGeneratePlan() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { daysPerWeek?: number; focus?: 'weightLoss' | 'strength' | 'general' }) =>
-      api<TrainingPlan>('/plans/generate', { method: 'POST', body: input }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['plan'] });
-      void qc.invalidateQueries({ queryKey: ['workout'] });
-    },
-  });
-}
-
-/** Completing a workout invalidates ['workout'] + ['plan'] + ['progress']. */
-export function useCompleteWorkout() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: {
-      id: string;
-      exercises: { exerciseId: string; setsCompleted: number; skipped?: boolean }[];
-      durationMinutes: number;
-      localDate: string;
-    }) =>
-      api<WorkoutSession>(`/workouts/${input.id}/complete`, {
-        method: 'POST',
-        body: {
-          exercises: input.exercises,
-          durationMinutes: input.durationMinutes,
-          localDate: input.localDate,
-        },
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['workout'] });
-      void qc.invalidateQueries({ queryKey: ['plan'] });
-      void qc.invalidateQueries({ queryKey: ['progress'] });
-    },
-  });
 }
 
 // ---------- auth actions ----------

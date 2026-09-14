@@ -7,8 +7,18 @@
     <exclude domain="file" path="datastore/azf_auth.preferences_pb" />
     <!-- Wellness cache (meals, chat, profile, etc.) must not leave the device
          via cloud backup or device transfer; refresh tokens are already
-         excluded above and are useless off-device without the Keystore key. -->
+         excluded above and are useless off-device without the Keystore key.
+
+         The sidecars are excluded alongside the database because they hold
+         the same rows. -wal/-shm are the WAL pair Room uses by default;
+         -journal is the rollback journal Room falls back to when WAL is
+         unavailable (AUTOMATIC journal mode drops to TRUNCATE on low-RAM
+         devices), and it holds pre-images of modified pages. Excluding
+         azf.db alone would therefore still have shipped user data off a
+         low-RAM device. Excluding a file that does not exist costs
+         nothing, so both journalling schemes are covered. -->
     <exclude domain="database" path="azf.db" />
     <exclude domain="database" path="azf.db-wal" />
     <exclude domain="database" path="azf.db-shm" />
+    <exclude domain="database" path="azf.db-journal" />
 </full-backup-content>

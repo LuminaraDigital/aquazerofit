@@ -12,14 +12,10 @@ import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
-import androidx.health.connect.client.records.WeightRecord
-import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
-import androidx.health.connect.client.units.Mass
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -31,10 +27,11 @@ import javax.inject.Singleton
  * Everything above this talks to [HealthConnectRepository] in plain Kotlin
  * types, for the usual reason — a swap or a fake should not touch call sites —
  * and for one specific to this dependency: Health Connect record classes carry
- * far more than the numbers this app wants. A `WeightRecord` knows the device
- * that produced it and the app that wrote it, and a `SleepSessionRecord`
- * carries per-stage timings. Keeping those types inside this file is what
- * stops any of it drifting into a ViewModel, a log line or a cache.
+ * far more than the numbers this app wants. A `HeartRateRecord` knows the
+ * device that produced it and the app that wrote it, and a
+ * `SleepSessionRecord` carries per-stage timings. Keeping those types inside
+ * this file is what stops any of it drifting into a ViewModel, a log line or a
+ * cache.
  *
  * **This class holds no state and caches nothing.** Availability, the client
  * and the permission grants are all re-read on every call, because all three
@@ -54,18 +51,23 @@ class HealthConnectManager @Inject constructor(
     /**
      * Exactly what this app asks for, and no more.
      *
-     * Four reads and one write. There is deliberately no
+     * Four reads, and nothing else. There is deliberately no
      * `READ_RESTING_HEART_RATE`, no `READ_ACTIVE_CALORIES_BURNED` and no
      * `READ_WEIGHT`: each would widen the request screen the user has to
      * approve for a figure already derivable from what is here, and a
      * permission prompt is where an integration loses people.
+     *
+     * `WRITE_WEIGHT` was here too, and nothing ever wrote a record. Because
+     * [hasAllPermissions] requires the whole set, it was not merely unused —
+     * it gated the reads, so a user who declined the one permission the app
+     * had no use for saw no figures at all. Restoring it means building the
+     * write path and re-filing the Play health declaration, together.
      */
     val permissions: Set<String> = setOf(
         HealthPermission.getReadPermission(HeartRateRecord::class),
         HealthPermission.getReadPermission(SleepSessionRecord::class),
         HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
-        HealthPermission.getWritePermission(WeightRecord::class),
     )
 
     /** Whether the platform is present, out of date, or absent. */
@@ -95,7 +97,7 @@ class HealthConnectManager @Inject constructor(
      * Resting heart rate for [date], taken as the day's lowest reading.
      *
      * Health Connect has a `RestingHeartRateRecord`, and this does not read
-     * it: doing so would mean asking for a sixth permission to obtain a number
+     * it: doing so would mean asking for a fifth permission to obtain a number
      * that only some sources write at all, and whose usual derivation is
      * exactly the minimum computed here. An approximation the user did not
      * have to authorise beats an exact figure most of them would not have.
@@ -121,27 +123,6 @@ class HealthConnectManager @Inject constructor(
         aggregate(TotalCaloriesBurnedRecord.ENERGY_TOTAL, HealthWindows.day(date, zone()))
             ?.inKilocalories,
     )
-
-    /**
-     * Publish a weight the user logged in this app, so the rest of their
-     * health stack sees it. Returns false when nothing was written.
-     *
-     * Marked as a manual entry rather than a recording, because that is what
-     * it is: a number somebody typed. Consumers weight a manual entry
-     * differently from a smart scale's, and claiming the latter would corrupt
-     * every trend built downstream of it.
-     */
-    suspend fun writeWeight(kg: Double, at: Instant): Boolean {
-        if (!kg.isFinite() || kg <= 0.0) return false
-        val client = client() ?: return false
-        val record = WeightRecord(
-            time = at,
-            zoneOffset = null,
-            weight = Mass.kilograms(HealthRounding.kilograms(kg)),
-            metadata = Metadata.manualEntry(),
-        )
-        return healthCall { client.insertRecords(listOf(record)) } != null
-    }
 
     /** Health Connect's own settings, where a grant can be reviewed or revoked. */
     fun settingsIntent(): Intent = Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)

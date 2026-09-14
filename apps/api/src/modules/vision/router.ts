@@ -25,10 +25,11 @@ import {
 } from '@aquazerofit/shared';
 import type { Food, MealLog, MealType, VisionJob, VisionPrediction } from '@aquazerofit/shared';
 import { complete } from '../ai/gateway';
-import { creditLedger } from '../ai/creditLedger';
+import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { post as postGuardrail } from '../ai/guardrails';
 import { assertLaneAllowed } from '../ai/tierPolicy';
-import { asyncHandler, byIdDoc, deleteDoc, getUser, localToday, newId, nowIso, round1, upsertDoc, whereDocs } from '../ai/util';
+import { todayFor } from '../../platform/dates';
+import { asyncHandler, byIdDoc, deleteDoc, getUser, newId, nowIso, round1, upsertDoc, whereDocs } from '../ai/util';
 
 export const visionRouter = Router();
 visionRouter.use(requireAuth);
@@ -614,7 +615,7 @@ visionRouter.post(
       source: 'photo',
       visionJobId: job.id,
       loggedAt: nowIso(),
-      localDate: localDate || localToday(),
+      localDate: localDate || todayFor(req),
     };
     await upsertDoc('logs', mealLog);
 
@@ -630,11 +631,7 @@ visionRouter.post(
     // are not a model answer the user should pay for, even though they confirmed
     // a meal log off the back of them. Mirrors the chat and recommendation lanes.
     if (job.reservationId) {
-      if (job.aiDegraded) {
-        await creditLedger.release(job.reservationId);
-      } else {
-        await creditLedger.commit(job.reservationId);
-      }
+      await settleReservation(job.reservationId, job.aiDegraded !== true);
     }
 
     res.status(201).json({ mealLog, job: publicJob(job) });

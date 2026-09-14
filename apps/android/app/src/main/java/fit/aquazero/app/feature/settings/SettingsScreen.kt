@@ -32,7 +32,6 @@ import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +64,7 @@ import fit.aquazero.app.core.designsystem.AzfNavigationRow
 import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSegmentOption
 import fit.aquazero.app.core.designsystem.AzfSegmented
+import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfSwitchRow
 import fit.aquazero.app.core.designsystem.AzfTextField
@@ -72,6 +72,7 @@ import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
+import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.designsystem.currentLocale
 import fit.aquazero.app.core.model.ActivityLevel
@@ -372,13 +373,15 @@ fun SettingsScreen(
 
 @Composable
 private fun LoadingRow() {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp),
-        contentAlignment = Alignment.Center,
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CircularProgressIndicator(color = AzfColors.PrimaryFixedDim)
+        Skeleton(modifier = Modifier.fillMaxWidth().height(28.dp))
+        Skeleton(modifier = Modifier.fillMaxWidth().height(96.dp), shape = AzfShapes.Card)
+        Skeleton(modifier = Modifier.fillMaxWidth().height(72.dp), shape = AzfShapes.Card)
     }
 }
 

@@ -15,7 +15,7 @@ import {
 } from '@aquazerofit/shared';
 import { creditLedger } from '../ai/creditLedger';
 import { PREMIUM_LANES } from '../ai/tierPolicy';
-import { asyncHandler } from '../ai/util';
+import { asyncHandler } from '../../platform/errors';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { AppError } from '../../platform/errors';
 import { getStore } from '../../platform/store';

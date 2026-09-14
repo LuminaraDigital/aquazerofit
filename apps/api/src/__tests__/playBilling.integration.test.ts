@@ -299,6 +299,71 @@ describe('POST /billing/play/verify', () => {
     expect(res.status).toBe(200);
     expect(effectiveTier(userDoc())).toBe('premium');
   });
+
+  /*
+   * Subscription sharing, on the tokens the identifier check cannot reach.
+   *
+   * A purchase with no `obfuscatedExternalAccountId` — a build from before the
+   * client sent one — is unowned as far as that check is concerned, so what
+   * stopped a second account presenting it was only the idempotency key
+   * `play:<token>:<expiry>`: an exact replay settles as a duplicate and grants
+   * the second account nothing.
+   *
+   * The expiry is IN that key, so the first renewal turns the identical replay
+   * into a brand-new event, and premium lands on both accounts. One
+   * subscription, two subscribers, renewing for as long as the payer keeps
+   * paying — and reachable by anyone who can pass a token between two installs.
+   * The token is bound to the first account that settles it instead.
+   */
+  it('refuses a token already settled against another account, even after a renewal', async () => {
+    const other = await request(app)
+      .post(`${base}/auth/register`)
+      .send({ email: 'play-thief@example.com', password: 'CorrectHorse9Battery' });
+    expect(other.status).toBe(201);
+    const otherToken = other.body.accessToken as string;
+    const otherId = other.body.user.id as string;
+
+    // The paying subscriber settles the token first. No account identifier, so
+    // only the binding can tell these two apart.
+    stubGoogle(activeSubscription(inDays(30)));
+    const bought = await request(app)
+      .post(`${base}/billing/play/verify`)
+      .set(auth())
+      .send({ purchaseToken: 'tok-shared', productId: 'azf_premium_monthly' });
+    expect(bought.status).toBe(200);
+
+    // A month later the subscription renews, so the expiry — and with it the
+    // idempotency key — has moved. This is the request that used to succeed.
+    stubGoogle(activeSubscription(inDays(60)));
+    const stolen = await request(app)
+      .post(`${base}/billing/play/verify`)
+      .set({ Authorization: `Bearer ${otherToken}` })
+      .send({ purchaseToken: 'tok-shared', productId: 'azf_premium_monthly' });
+
+    expect(stolen.status).toBe(402);
+    expect(stolen.body.code).toBe('PURCHASE_INVALID');
+    expect(effectiveTier(getStore().byId<User>('users', otherId)!)).toBe('free');
+  });
+
+  it('still lets the owning account re-verify its own token after a renewal', async () => {
+    // The other half of the binding: it must not cost the paying subscriber
+    // the client-side self-heal that renewals depend on when RTDN is silent.
+    stubGoogle(activeSubscription(inDays(30)));
+    await request(app)
+      .post(`${base}/billing/play/verify`)
+      .set(auth())
+      .send({ purchaseToken: 'tok-bound-mine', productId: 'azf_premium_monthly' });
+
+    const renewed = inDays(60);
+    stubGoogle(activeSubscription(renewed));
+    const again = await request(app)
+      .post(`${base}/billing/play/verify`)
+      .set(auth())
+      .send({ purchaseToken: 'tok-bound-mine', productId: 'azf_premium_monthly' });
+
+    expect(again.status).toBe(200);
+    expect(again.body.premiumUntil).toBe(renewed);
+  });
 });
 
 describe('POST /billing/play/webhook', () => {

@@ -1,5 +1,6 @@
 package fit.aquazero.app.feature.dashboard
 
+import fit.aquazero.app.core.common.Hydration
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.database.UserEntity
 import fit.aquazero.app.core.designsystem.ToastKind
@@ -101,7 +102,7 @@ class DashboardViewModelTest {
         viewModel.logWater()
         advanceUntilIdle()
 
-        assertEquals(listOf(DashboardViewModel.WATER_INCREMENT_ML), data.loggedWater.map { it.first })
+        assertEquals(listOf(Hydration.WATER_INCREMENT_ML), data.loggedWater.map { it.first })
         assertTrue(events.single() is DashboardEvent.Message)
         assertEquals(ToastKind.Success, (events.single() as DashboardEvent.Message).kind)
         assertTrue(!viewModel.uiState.value.waterPending)

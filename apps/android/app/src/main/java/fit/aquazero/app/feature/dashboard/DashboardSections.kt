@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -34,6 +35,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -287,9 +289,12 @@ internal fun CalorieDerivationRow(
         NutritionFormat.fmtInt(nutrition.kcalRemaining),
     )
     Row(
+        // Same treatment as the ring above: the four cells are one sentence,
+        // so clear them and speak the sentence. Left as a plain `semantics`
+        // this row is nine TalkBack stops reading "1,850", "GOAL", "− 1,200"…
         modifier = modifier
             .fillMaxWidth()
-            .semantics { contentDescription = formulaDescription },
+            .clearAndSetSemantics { contentDescription = formulaDescription },
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         DerivationCell(
@@ -480,11 +485,6 @@ internal fun SuggestMealCard(
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Text(
-                    text = stringResource(R.string.suggest_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
 
@@ -605,8 +605,12 @@ internal fun WeightTrendCard(
                     .clickable(
                         interactionSource = interaction,
                         indication = null,
+                        role = Role.Button,
                         onClick = onViewAll,
                     )
+                    // Label + chevron are only ~34dp tall; the tap area is
+                    // padded back out without moving the pixels.
+                    .minimumInteractiveComponentSize()
                     .padding(horizontal = 8.dp, vertical = 6.dp),
             ) {
                 Text(
@@ -717,7 +721,9 @@ private fun AchievementTile(achievement: AchievementUi) {
         modifier = Modifier
             .width(112.dp)
             .alpha(if (achievement.earned) 1f else LOCKED_ALPHA)
-            .semantics { contentDescription = description },
+            // `achievement_cd_earned` already contains the name, so the tile's
+            // own two Texts would repeat it straight back.
+            .clearAndSetSemantics { contentDescription = description },
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -772,7 +778,9 @@ private fun MetricChip(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.semantics { contentDescription = description },
+        // The description spells out the unit ("about 45 minutes"); the raw
+        // value Text underneath would then say "45" again.
+        modifier = Modifier.clearAndSetSemantics { contentDescription = description },
     ) {
         Icon(
             imageVector = icon,

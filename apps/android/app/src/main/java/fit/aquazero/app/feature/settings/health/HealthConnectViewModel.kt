@@ -34,9 +34,6 @@ data class HealthConnectUiState(
     /** True when there is something on this device to connect to. */
     val available: Boolean get() = availability == HealthConnectAvailability.AVAILABLE
 
-    /** True when figures should be shown at all. */
-    val showingFigures: Boolean get() = available && connected && permissionsGranted
-
     /**
      * Connected in this app, but the platform has since taken a permission
      * away. Distinct from "not connected": the fix is Health Connect's own

@@ -130,7 +130,7 @@ export default function FeaturesPage() {
           {/* On-this-page rail */}
           <Reveal className="lg:sticky lg:top-24 lg:self-start">
             <nav aria-label="On this page">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/70">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
                 On this page
               </h2>
               <ul className="mt-4 space-y-2.5 border-l border-white/8 pl-4">

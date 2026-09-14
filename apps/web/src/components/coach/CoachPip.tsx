@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { DailyNutrition, WorkoutSession } from '@aquazerofit/shared';
 import { COACHES, coachById } from '@aquazerofit/shared';
 import { api } from '@/lib/api';
-import { useProgression } from '@/lib/queries';
+import { queryKeys, todayWorkoutQuery, useProgression } from '@/lib/queries';
 import { RingProgress } from '@/components/ui/RingProgress';
 import { CoachAvatar } from '@/components/coach/CoachAvatar';
 import {
@@ -77,7 +77,7 @@ function PipHud({
         <CoachAvatar art={coachArt} name={coachName} colour={coachColour} size={40} />
         <div className="min-w-0">
           <p className="font-heading font-semibold text-sm leading-tight truncate">{coachName}</p>
-          <p className="text-[11px] uppercase tracking-wider text-on-surface-variant/70">
+          <p className="text-[11px] uppercase tracking-wider text-on-surface-variant">
             Corner coach
           </p>
         </div>
@@ -96,18 +96,18 @@ function PipHud({
               <span className="font-heading font-semibold text-2xl text-primary tabular-nums leading-none">
                 {fmtInt(Math.max(0, daily.kcalRemaining))}
               </span>
-              <span className="text-[10px] text-on-surface-variant/70 mt-1 uppercase tracking-wider">
+              <span className="text-[10px] text-on-surface-variant mt-1 uppercase tracking-wider">
                 kcal left
               </span>
             </div>
           </RingProgress>
         </section>
       ) : (
-        <p className="text-sm text-on-surface-variant/70 mb-4">Loading today&apos;s ring…</p>
+        <p className="text-sm text-on-surface-variant mb-4">Loading today&apos;s ring…</p>
       )}
 
       <section className="mb-4 rounded-xl border border-outline/40 bg-surface-container-low/60 p-3">
-        <p className="text-[10px] uppercase tracking-wider text-on-surface-variant/70 mb-1">
+        <p className="text-[10px] uppercase tracking-wider text-on-surface-variant mb-1">
           {resting || !session ? 'Today' : 'Next up'}
         </p>
         {resting || !session ? (
@@ -120,7 +120,7 @@ function PipHud({
                 {nextExercise.name} · {nextExercise.setsPlanned}×{nextExercise.reps}
               </p>
             )}
-            <p className="text-xs text-on-surface-variant/70 mt-1 tabular-nums">
+            <p className="text-xs text-on-surface-variant mt-1 tabular-nums">
               ~{estimateDurationMinutes(session)} min
             </p>
           </>
@@ -144,13 +144,12 @@ export function CoachPip() {
 
   const today = todayLocalDate();
   const dailyQuery = useQuery({
-    queryKey: ['nutrition', 'daily', today],
+    queryKey: queryKeys.nutritionDaily(today),
     queryFn: () => api<DailyNutrition>('/analytics/nutrition/daily', { query: { date: today } }),
     enabled: open,
   });
   const workoutQuery = useQuery({
-    queryKey: ['workouts', 'today'],
-    queryFn: () => api<unknown>('/workouts/today'),
+    ...todayWorkoutQuery,
     enabled: open,
   });
   const progression = useProgression();

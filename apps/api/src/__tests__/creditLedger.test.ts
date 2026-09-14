@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createCreditLedger, type LedgerContainer } from '../modules/ai/creditLedger';
-import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS, MAX_BANKED_CREDITS } from '@aquazerofit/shared';
+import {
+  STALE_RESERVATION_MS,
+  createCreditLedger,
+  type LedgerContainer,
+} from '../modules/ai/creditLedger';
+import {
+  CREDIT_COSTS,
+  FREE_TIER_DAILY_CREDITS,
+  MAX_BANKED_CREDITS,
+  PREMIUM_TIER_DAILY_CREDITS,
+  maxBankedCreditsFor,
+} from '@aquazerofit/shared';
 import type { CreditTransaction } from '@aquazerofit/shared';
 
 /** In-memory container implementing the JsonStore contract for hermetic tests. */
@@ -274,5 +284,165 @@ describe('creditLedger concurrency (the lock is the invariant)', () => {
     // Either outcome is fine — both happening is not.
     const hasCommit = settlements.some((t) => t.kind === 'commit');
     expect(settlements.length).toBe(hasCommit ? 2 : 1);
+  });
+});
+
+/**
+ * Upgrading mid-day.
+ *
+ * The credit allowance IS the paywall, so the moment a subscription is paid for
+ * is the moment the allowance has to move. It did not: the grant asked only
+ * "was there a grant today", so anyone who opened the app on the free tier
+ * before subscribing kept ten credits until the next UTC day — they paid, the
+ * plan screen refreshed, and the number on it stayed exactly where it was.
+ *
+ * That is indistinguishable from a purchase that failed, on the one screen
+ * where the user is looking for confirmation that it did not.
+ */
+describe('the daily grant follows the tier the account is on now', () => {
+  let mem: ReturnType<typeof memoryContainer>;
+  let ledger: ReturnType<typeof createCreditLedger>;
+  const userId = 'u_upgrade';
+
+  beforeEach(() => {
+    mem = memoryContainer();
+    ledger = createCreditLedger(() => mem.container);
+  });
+
+  it('tops a free account up to the premium allowance on the day it subscribes', async () => {
+    await ledger.grantDailyIfNeeded(userId, 'free');
+    expect(await ledger.balance(userId)).toBe(FREE_TIER_DAILY_CREDITS);
+
+    expect(await ledger.grantDailyIfNeeded(userId, 'premium')).toBe(true);
+    // The DIFFERENCE, not a second full allowance stacked on the first.
+    expect(await ledger.balance(userId)).toBe(PREMIUM_TIER_DAILY_CREDITS);
+  });
+
+  it('counts what was already spent, rather than restoring the day to full', async () => {
+    await ledger.grantDailyIfNeeded(userId, 'free');
+    const reservationId = await ledger.reserve(userId, 'planGeneration', 'free');
+    await ledger.commit(reservationId);
+    const spent = CREDIT_COSTS.planGeneration;
+
+    await ledger.grantDailyIfNeeded(userId, 'premium');
+    expect(await ledger.balance(userId)).toBe(PREMIUM_TIER_DAILY_CREDITS - spent);
+  });
+
+  it('is idempotent once the premium allowance has been issued', async () => {
+    await ledger.grantDailyIfNeeded(userId, 'free');
+    expect(await ledger.grantDailyIfNeeded(userId, 'premium')).toBe(true);
+    // Every later read of /me/entitlements calls this again. It must be a
+    // no-op, or the top-up becomes "restore to the premium allowance on
+    // demand" and the daily cap stops bounding anything.
+    expect(await ledger.grantDailyIfNeeded(userId, 'premium')).toBe(false);
+    expect(await ledger.grantDailyIfNeeded(userId, 'premium')).toBe(false);
+    expect(await ledger.balance(userId)).toBe(PREMIUM_TIER_DAILY_CREDITS);
+  });
+
+  it('does not hand a second allowance to an account that lapsed the same day', async () => {
+    await ledger.grantDailyIfNeeded(userId, 'premium');
+    expect(await ledger.balance(userId)).toBe(PREMIUM_TIER_DAILY_CREDITS);
+
+    // A refund or a revoke lands: the account is free again, having already had
+    // today's credits. The free grant must not run on top of them.
+    expect(await ledger.grantDailyIfNeeded(userId, 'free')).toBe(false);
+    expect(await ledger.balance(userId)).toBe(PREMIUM_TIER_DAILY_CREDITS);
+  });
+
+  it('still clamps the upgrade top-up to the premium banking ceiling', async () => {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    mem.container.upsert({
+      id: 'ct_banked',
+      userId,
+      type: 'creditTransaction',
+      kind: 'grant',
+      amount: maxBankedCreditsFor('premium'),
+      reason: 'dailyGrant',
+      createdAt: yesterday,
+    } as CreditTransaction);
+
+    await ledger.grantDailyIfNeeded(userId, 'premium');
+    expect(await ledger.balance(userId)).toBe(maxBankedCreditsFor('premium'));
+  });
+});
+
+/**
+ * Holds nothing will ever settle.
+ *
+ * Every lane releases its own reservation on every branch it can reach. None of
+ * them covers the process stopping between the reserve and the settle, and
+ * against an append-only ledger that loss is permanent — the user is short
+ * those credits for good, for a request that produced nothing.
+ */
+describe('sweepStaleReservations', () => {
+  let mem: ReturnType<typeof memoryContainer>;
+  let ledger: ReturnType<typeof createCreditLedger>;
+  const userId = 'u_orphan';
+  /** Comfortably past STALE_RESERVATION_MS, whatever it is set to. */
+  const wellPastCutoff = STALE_RESERVATION_MS * 2;
+
+  beforeEach(() => {
+    mem = memoryContainer();
+    ledger = createCreditLedger(() => mem.container);
+  });
+
+  /** Backdate a hold so it looks like one the process died holding. */
+  function ageReservation(reservationId: string, byMs: number): void {
+    for (const tx of mem.docs.values()) {
+      if (tx.reservationId === reservationId && tx.kind === 'reserve') {
+        mem.container.upsert({
+          ...tx,
+          createdAt: new Date(Date.parse(tx.createdAt) - byMs).toISOString(),
+        });
+      }
+    }
+  }
+
+  it('returns a hold the process died holding', async () => {
+    await ledger.grantDailyIfNeeded(userId);
+    const reservationId = await ledger.reserve(userId, 'planGeneration');
+    ageReservation(reservationId, wellPastCutoff);
+
+    expect(await ledger.sweepStaleReservations()).toBe(1);
+    expect(await ledger.balance(userId)).toBe(FREE_TIER_DAILY_CREDITS);
+  });
+
+  /*
+   * The case that decides the cutoff. A meal photo that has been analysed but
+   * not yet confirmed holds its reservation until the user answers, and the
+   * vision sweep gives them a day to do it — so a backstop that fired sooner
+   * would refund a scan the user then confirms, and the confirmation would find
+   * the reservation settled and charge nothing.
+   */
+  it('leaves a hold that is still young enough to belong to a live request', async () => {
+    await ledger.grantDailyIfNeeded(userId);
+    const pending = await ledger.reserve(userId, 'planGeneration');
+    ageReservation(pending, STALE_RESERVATION_MS / 2);
+
+    expect(await ledger.sweepStaleReservations()).toBe(0);
+    expect(await ledger.balance(userId)).toBe(
+      FREE_TIER_DAILY_CREDITS - CREDIT_COSTS.planGeneration,
+    );
+  });
+
+  it('does not refund a reservation that was already committed', async () => {
+    await ledger.grantDailyIfNeeded(userId);
+    const reservationId = await ledger.reserve(userId, 'chatTurn');
+    await ledger.commit(reservationId);
+    ageReservation(reservationId, wellPastCutoff);
+    const settled = await ledger.balance(userId);
+
+    expect(await ledger.sweepStaleReservations()).toBe(0);
+    expect(await ledger.balance(userId)).toBe(settled);
+  });
+
+  it('is idempotent — a second sweep finds nothing left to return', async () => {
+    await ledger.grantDailyIfNeeded(userId);
+    const reservationId = await ledger.reserve(userId, 'chatTurn');
+    ageReservation(reservationId, wellPastCutoff);
+
+    expect(await ledger.sweepStaleReservations()).toBe(1);
+    expect(await ledger.sweepStaleReservations()).toBe(0);
+    expect(await ledger.balance(userId)).toBe(FREE_TIER_DAILY_CREDITS);
   });
 });

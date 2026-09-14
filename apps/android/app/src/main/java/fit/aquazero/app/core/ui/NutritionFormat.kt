@@ -190,6 +190,16 @@ object NutritionFormat {
             LocalDate.parse(isoDate).dayOfWeek.getDisplayName(TextStyle.NARROW, locale)
         }.getOrDefault("")
 
+    /**
+     * Spoken weekday ("Monday"). The bars are labelled with a single letter,
+     * which is all a sighted reader needs next to the bar height but is
+     * meaningless read aloud — screen readers get the full name instead.
+     */
+    fun fullWeekday(isoDate: String, locale: Locale = Locale.getDefault()): String =
+        runCatching {
+            LocalDate.parse(isoDate).dayOfWeek.getDisplayName(TextStyle.FULL, locale)
+        }.getOrDefault("")
+
     /** Day-of-month number for the calendar grid. */
     fun dayOfMonth(isoDate: String): Int =
         runCatching { LocalDate.parse(isoDate).dayOfMonth }.getOrDefault(0)

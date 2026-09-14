@@ -179,7 +179,7 @@ export function TopBar({ onLanding = false }: { onLanding?: boolean }) {
               <li key={link.href}>
                 <a
                   href={sectionHref(link.href, onLanding)}
-                  className="text-sm text-on-surface-variant/70 transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                  className="text-sm text-on-surface-variant transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
                 >
                   {link.label}
                 </a>
@@ -239,16 +239,16 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
               AquaZeroFit
             </span>
           </div>
-          <p className="mt-4 max-w-sm text-[13px] leading-relaxed text-on-surface-variant/70">
+          <p className="mt-4 max-w-sm text-[13px] leading-relaxed text-on-surface-variant">
             {WELLNESS_DISCLAIMER}
           </p>
         </div>
 
         <div>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/70">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
             Product
           </h2>
-          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant/70">
+          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant">
             {FOOTER_PRODUCT.map((item) => (
               <li key={item.label}>
                 {item.to ? (
@@ -269,10 +269,10 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
         </div>
 
         <div>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/70">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
             Legal
           </h2>
-          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant/70">
+          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant">
             {[
               { to: '/privacy', label: 'Privacy notice' },
               { to: '/terms', label: 'Terms of use' },
@@ -288,10 +288,10 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
         </div>
 
         <div>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/70">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
             Project
           </h2>
-          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant/70">
+          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant">
             <li>
               <a
                 href={SOURCE_CODE_URL}
@@ -326,7 +326,7 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
         </div>
       </div>
 
-      <div className="mt-12 flex flex-col gap-3 border-t border-white/5 py-8 text-[12px] text-on-surface-variant/70 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-12 flex flex-col gap-3 border-t border-white/5 py-8 text-[12px] text-on-surface-variant sm:flex-row sm:items-center sm:justify-between">
         <p>Copyright (C) 2026 AquaZero. Free software under the GNU AGPL v3.</p>
         <p className="uppercase tracking-[0.18em]">General wellness support only</p>
       </div>

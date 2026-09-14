@@ -16,7 +16,7 @@ import {
   type ProgressionStatus,
   type WorkoutSession,
 } from '@aquazerofit/shared';
-import { asyncHandler } from '../ai/util';
+import { asyncHandler } from '../../platform/errors';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { timezoneOf, todayFor } from '../../platform/dates';
 import { getStore } from '../../platform/store';

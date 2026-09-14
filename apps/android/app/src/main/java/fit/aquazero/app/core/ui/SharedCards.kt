@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -58,7 +59,10 @@ fun MacroRow(
         consumed = consumed,
         target = target,
         color = color,
-        modifier = modifier.semantics { contentDescription = description },
+        // `macro_progress_cd` already says "Protein: 90 of 150 grams", which
+        // is exactly what the bar's own label and ratio Texts say — cleared so
+        // it is announced once.
+        modifier = modifier.clearAndSetSemantics { contentDescription = description },
     )
 }
 

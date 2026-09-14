@@ -1,5 +1,5 @@
 /**
- * Your Progress — pixel reference: your_progress.
+ * Your Progress - pixel reference: your_progress.
  * Range selector (7d/30d/90d), weight hero with hand-rolled SVG line chart
  * (smooth path, gradient fill, goal line, min/max labels), calorie trend bars
  * vs target, stats MetricCards, macro donut, achievements grid, Log-weight CTA
@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { ProgressSummary, TrendPoint } from '@aquazerofit/shared';
 import { AQUA_CHARACTER } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
+import { orNull } from '@/lib/envelopes';
 import { normalizeWorkoutStats, type WorkoutStatsResponse } from '@/lib/contracts';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -18,7 +19,7 @@ import { MetricCard } from '@/components/ui/MetricCard';
 import { Chip } from '@/components/ui/Chip';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { Skeleton, ProgressSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
@@ -32,7 +33,7 @@ import {
   CONSISTENCY_EMPTY_HEADLINE,
 } from '@/components/progress/consistencyCopy';
 import type { ShareCardPayload } from '@/lib/shareCard';
-import { useMe, useProgressInsight, useReadiness, useTargets } from '@/lib/queries';
+import { useMe, useProgressInsight, useReadiness, useTargets, queryKeys } from '@/lib/queries';
 import { Sparkline } from '../dashboard/Sparkline';
 
 type Range = '7d' | '30d' | '90d';
@@ -113,7 +114,7 @@ function WeightChart({
   const last = series[series.length - 1];
 
   return (
-    <figure aria-label={`Weight chart from ${first ? shortDate(first.date) : ''} to ${last ? shortDate(last.date) : ''}. Latest ${last ? last.value.toFixed(1) : '–'} kilograms${goal !== null ? `, goal ${goal.toFixed(1)} kilograms` : ''}.`}>
+    <figure aria-label={`Weight chart from ${first ? shortDate(first.date) : ''} to ${last ? shortDate(last.date) : ''}. Latest ${last ? last.value.toFixed(1) : '-'} kilograms${goal !== null ? `, goal ${goal.toFixed(1)} kilograms` : ''}.`}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-hidden="true">
         <defs>
           <linearGradient id="azfWeightArea" x1="0" x2="0" y1="0" y2="1">
@@ -177,7 +178,7 @@ function KcalBars({ series, target }: { series: TrendPoint[]; target: number | n
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-hidden="true">
         {/* Every bar is the same aqua. Painting over-target days coral marked
             them as errors, which is the calorie-target guilt this product is
-            required to design out (AQF-11 §6) — and it was redundant besides:
+            required to design out (AQF-11 §6) - and it was redundant besides:
             a bar that crosses the dashed target line has already said so, by
             position rather than by alarm. Position also survives colour
             blindness, which the red/blue split did not. */}
@@ -265,16 +266,6 @@ function MacroDonut({ protein, carbs, fat }: { protein: number; carbs: number; f
 
 // ---------- page ----------
 
-/** Treat NOT_FOUND as "endpoint not live yet" (backend rolls out in parallel). */
-async function orNull<T>(fn: () => Promise<T>): Promise<T | null> {
-  try {
-    return await fn();
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return null;
-    throw e;
-  }
-}
-
 export default function Progress() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -284,11 +275,11 @@ export default function Progress() {
   const [sharePayload, setSharePayload] = useState<ShareCardPayload | null>(null);
 
   const progressQuery = useQuery({
-    queryKey: ['progress'],
+    queryKey: queryKeys.progress,
     queryFn: () => api<ProgressSummary>('/progress/summary'),
   });
   const trendsQuery = useQuery({
-    queryKey: ['nutrition', 'trends', range],
+    queryKey: queryKeys.nutritionTrends(range),
     queryFn: () => api<NutritionTrends>('/analytics/nutrition/trends', { query: { range } }),
   });
   // Shared ['targets'] key: useTargets caches the unwrapped targets object;
@@ -297,7 +288,7 @@ export default function Progress() {
   const insightQuery = useProgressInsight();
   const readinessQuery = useReadiness();
   // Deterministic training stats (Brzycki e1RM + weekly volume). Optional
-  // read model — the block stays hidden while the endpoint rolls out (404).
+  // read model - the block stays hidden while the endpoint rolls out (404).
   const workoutStatsQuery = useQuery({
     queryKey: ['workout-stats'],
     queryFn: async () => {
@@ -343,7 +334,7 @@ export default function Progress() {
       URL.revokeObjectURL(url);
       toast.success('Your data export has been downloaded');
     } catch {
-      toast.error('Export failed — please try again');
+      toast.error('Export failed - please try again');
     }
   };
 
@@ -368,11 +359,7 @@ export default function Progress() {
       </div>
 
       {progressQuery.isPending ? (
-        <div className="mt-5 space-y-4">
-          <Skeleton className="h-24 w-full rounded-card" />
-          <Skeleton className="h-64 w-full rounded-card" />
-          <Skeleton className="h-24 w-full rounded-card" />
-        </div>
+        <ProgressSkeleton />
       ) : progressQuery.isError ? (
         <div className="mt-5">
           <ErrorState
@@ -404,7 +391,7 @@ export default function Progress() {
                 <span className="text-sm text-on-surface-variant">Current Weight</span>
                 <div className="mt-2 flex items-baseline gap-2">
                   <span className="text-3xl font-bold text-primary tabular-nums">
-                    {summary.currentWeightKg?.toFixed(1) ?? '–'}
+                    {summary.currentWeightKg?.toFixed(1) ?? '-'}
                   </span>
                   <span className="text-sm text-on-surface-variant">kg</span>
                 </div>
@@ -413,7 +400,7 @@ export default function Progress() {
                 <span className="text-sm text-on-surface-variant">Since start</span>
                 {/* Direction is reported, not judged: a gain is not rendered as
                     a failure and a loss is not rendered as a reward. Same ink
-                    either way — the sign carries the information. */}
+                    either way - the sign carries the information. */}
                 <div className="mt-2 flex items-center gap-1">
                   <span
                     className="material-symbols-outlined text-on-surface-variant"
@@ -422,7 +409,7 @@ export default function Progress() {
                     {delta !== null && delta <= 0 ? 'trending_down' : 'trending_up'}
                   </span>
                   <span className="text-sm font-bold tabular-nums text-on-surface">
-                    {delta !== null ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg` : '–'}
+                    {delta !== null ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg` : '-'}
                   </span>
                 </div>
               </GlassCard>
@@ -480,7 +467,7 @@ export default function Progress() {
           </section>
 
           {/* ---- stats row ---- */}
-          {/* Consistency is the card above; these are cumulative totals only —
+          {/* Consistency is the card above; these are cumulative totals only -
               nothing here can be reset by a missed day. */}
           <section aria-label="Statistics" className="grid grid-cols-2 gap-3">
             <MetricCard
@@ -601,7 +588,7 @@ export default function Progress() {
               <EmptyState
                 icon="military_tech"
                 title="No badges yet"
-                body="Keep logging and training — your first badge is close."
+                body="Keep logging and training - your first badge is close."
               />
             ) : (
               <ul className="grid grid-cols-3 gap-4">

@@ -199,6 +199,18 @@ class WorkoutLibraryScreenTest {
      * A condition, not a sleep: the refresh coroutines and the Room flows land
      * when they land, and the test proceeds on the state it asked for or fails
      * the timeout.
+     *
+     * `exercises.size <= totalMatches` is the state's own invariant — it is
+     * what `hasMore` is defined against — and waiting on it is what makes this
+     * "settled" rather than merely "populated". The page and the pager
+     * denominator are written by two different queries, so there is a real
+     * window where the rows have landed and `totalMatches` is still 0. A
+     * caller that samples the state in that window reads a denominator of
+     * zero: `everyCachedExerciseGetsARowAndEveryRowCarriesItsAttribution`
+     * then scrolled looking for "0 exercises", a string the screen never
+     * shows, and failed on a slow or loaded emulator while the product was
+     * behaving perfectly. Cheap to wait for, and it removes the whole class
+     * of half-updated read rather than that one symptom.
      */
     private fun WorkoutLibraryViewModel.awaitLoaded(exerciseCount: Int): WorkoutLibraryUiState =
         runBlocking {
@@ -207,7 +219,8 @@ class WorkoutLibraryScreenTest {
                     !state.loadingPlan &&
                         !state.loadingToday &&
                         !state.loadingLibrary &&
-                        state.exercises.size == exerciseCount
+                        state.exercises.size == exerciseCount &&
+                        state.exercises.size <= state.totalMatches
                 }
             }
         }

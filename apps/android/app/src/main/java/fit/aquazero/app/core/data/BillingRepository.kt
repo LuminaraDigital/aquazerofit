@@ -47,10 +47,28 @@ import kotlin.coroutines.resume
  * pass — is a plain function covered by JVM unit tests rather than something
  * only reachable by driving a billing sandbox.
  */
+/** Subscription period options for premium plans. */
+enum class PlanPeriod {
+    MONTHLY,
+    ANNUAL,
+}
+
 internal object PlayPurchaseRules {
 
-    /** The single subscription product; a monthly base plan. */
+    /** Default / legacy product id. */
     const val PREMIUM_PRODUCT_ID = "azf_premium_monthly"
+    const val PREMIUM_MONTHLY_PRODUCT_ID = "azf_premium_monthly"
+    const val PREMIUM_ANNUAL_PRODUCT_ID = "azf_premium_annual"
+
+    val ALL_PRODUCT_IDS = listOf(PREMIUM_ANNUAL_PRODUCT_ID, PREMIUM_MONTHLY_PRODUCT_ID)
+
+    fun isOurProduct(productId: String): Boolean =
+        productId in ALL_PRODUCT_IDS || productId == PREMIUM_PRODUCT_ID
+
+    fun productIdFor(period: PlanPeriod): String = when (period) {
+        PlanPeriod.MONTHLY -> PREMIUM_MONTHLY_PRODUCT_ID
+        PlanPeriod.ANNUAL -> PREMIUM_ANNUAL_PRODUCT_ID
+    }
 
     /**
      * Whether a purchase Play reported still has to go to our server.
@@ -113,9 +131,37 @@ internal object PlayPurchaseRules {
 /** The premium subscription as Google priced it for this user, in their currency. */
 data class PremiumOffer(
     val productId: String,
-    /** Play's own formatted price for the recurring phase, e.g. "£3.99". */
+    val period: PlanPeriod,
+    /** Play's own formatted price for the recurring phase, e.g. "£3.99" or "$59.99". */
     val formattedPrice: String,
+    val priceAmountMicros: Long = 0L,
+    val currencyCode: String = "",
+    val hasFreeTrial: Boolean = false,
+    val offerToken: String = "",
 )
+
+/** Collection of available subscription offers. */
+data class PremiumOffers(
+    val annual: PremiumOffer? = null,
+    val monthly: PremiumOffer? = null,
+) {
+    fun offerFor(period: PlanPeriod): PremiumOffer? = when (period) {
+        PlanPeriod.ANNUAL -> annual
+        PlanPeriod.MONTHLY -> monthly
+    }
+
+    /** Calculated savings percentage on Annual vs Monthly (e.g. 50%). */
+    val annualSavingsPercent: Int?
+        get() {
+            val m = monthly ?: return null
+            val a = annual ?: return null
+            if (m.priceAmountMicros <= 0 || a.priceAmountMicros <= 0) return null
+            val annualEquivalentFromMonthly = m.priceAmountMicros * 12
+            val diff = annualEquivalentFromMonthly - a.priceAmountMicros
+            if (diff <= 0) return null
+            return ((diff.toDouble() / annualEquivalentFromMonthly) * 100).toInt()
+        }
+}
 
 /** Why an attempt to buy or restore the subscription did not end in an entitlement. */
 enum class BillingFailure {
@@ -229,25 +275,49 @@ class BillingRepository @Inject constructor(
         .build()
 
     /**
-     * What premium costs, or null when Play cannot quote a price right now.
+     * What premium costs (both Annual and Monthly), or null when Play cannot quote a price.
      *
      * Null is rendered as "not available on this device", never as an error:
      * an emulator without Play services, a work profile, or a build that is not
      * yet published on a track all land here and none of them is the user's
      * problem.
      */
-    suspend fun premiumOffer(): PremiumOffer? {
+    suspend fun premiumOffers(): PremiumOffers? {
         if (connect().responseCode != BillingResponseCode.OK) return null
-        val details = productDetails() ?: return null
-        val offer = selectOffer(details) ?: return null
-        // Last phase, not first: a base plan carrying a free trial or an
-        // introductory price lists those first, and quoting "£0.00 a month"
-        // for a subscription that renews at full price is the one price we
-        // must not print.
-        val recurring = offer.pricingPhases.pricingPhaseList.last()
+        val detailsList = allProductDetails()
+        if (detailsList.isEmpty()) return null
+
+        val annualDetails = detailsList.firstOrNull { it.productId == PlayPurchaseRules.PREMIUM_ANNUAL_PRODUCT_ID }
+        val monthlyDetails = detailsList.firstOrNull { it.productId == PlayPurchaseRules.PREMIUM_MONTHLY_PRODUCT_ID }
+            ?: detailsList.firstOrNull { it.productId == PlayPurchaseRules.PREMIUM_PRODUCT_ID }
+
+        val annualOffer = annualDetails?.let { parseOffer(it, PlanPeriod.ANNUAL) }
+        val monthlyOffer = monthlyDetails?.let { parseOffer(it, PlanPeriod.MONTHLY) }
+
+        if (annualOffer == null && monthlyOffer == null) return null
+        return PremiumOffers(annual = annualOffer, monthly = monthlyOffer)
+    }
+
+    /** Legacy single offer getter — defaults to annual if available, otherwise monthly. */
+    suspend fun premiumOffer(): PremiumOffer? {
+        val offers = premiumOffers() ?: return null
+        return offers.annual ?: offers.monthly
+    }
+
+    private fun parseOffer(details: ProductDetails, period: PlanPeriod): PremiumOffer? {
+        val offerDetails = selectOffer(details) ?: return null
+        val phases = offerDetails.pricingPhases.pricingPhaseList
+        if (phases.isEmpty()) return null
+        val recurring = phases.last()
+        val hasFreeTrial = phases.any { it.priceAmountMicros == 0L }
         return PremiumOffer(
             productId = details.productId,
+            period = period,
             formattedPrice = recurring.formattedPrice,
+            priceAmountMicros = recurring.priceAmountMicros,
+            currencyCode = recurring.priceCurrencyCode,
+            hasFreeTrial = hasFreeTrial,
+            offerToken = offerDetails.offerToken,
         )
     }
 
@@ -258,14 +328,21 @@ class BillingRepository @Inject constructor(
      * [BillingOutcome.Verified] to say the server granted something, not to say
      * what it granted.
      */
-    suspend fun purchasePremium(activity: Activity): BillingOutcome = playGate.withLock {
+    suspend fun purchasePremium(
+        activity: Activity,
+        period: PlanPeriod = PlanPeriod.ANNUAL,
+    ): BillingOutcome = playGate.withLock {
         val connection = connect()
         if (connection.responseCode != BillingResponseCode.OK) {
             return@withLock BillingOutcome.Failed(playFailure(connection))
         }
-        val details = productDetails()
+        val targetProductId = PlayPurchaseRules.productIdFor(period)
+        val detailsList = allProductDetails()
+        val targetDetails = detailsList.firstOrNull { it.productId == targetProductId }
+            ?: detailsList.firstOrNull { it.productId == PlayPurchaseRules.PREMIUM_PRODUCT_ID }
             ?: return@withLock BillingOutcome.Failed(BillingFailure.PRODUCT_UNAVAILABLE)
-        val offerToken = selectOffer(details)?.offerToken
+
+        val offerToken = selectOffer(targetDetails)?.offerToken
             ?: return@withLock BillingOutcome.Failed(BillingFailure.PRODUCT_UNAVAILABLE)
 
         // Read before the waiter is armed. It touches Room, and a suspension
@@ -278,7 +355,7 @@ class BillingRepository @Inject constructor(
         // before launchBillingFlow has returned, and an update that arrives
         // with no waiter installed leaves this coroutine parked for ever.
         purchaseWaiter.set(waiter)
-        val launched = client.launchBillingFlow(activity, flowParams(details, offerToken, accountId))
+        val launched = client.launchBillingFlow(activity, flowParams(targetDetails, offerToken, accountId))
         if (launched.responseCode != BillingResponseCode.OK) {
             purchaseWaiter.compareAndSet(waiter, null)
             return@withLock outcomeFor(launched)
@@ -385,7 +462,9 @@ class BillingRepository @Inject constructor(
 
     /** Send every purchase Play reported through [grant], as far as it gets. */
     private suspend fun settle(purchases: List<Purchase>): BillingOutcome {
-        val ours = purchases.filter { PlayPurchaseRules.PREMIUM_PRODUCT_ID in it.products }
+        val ours = purchases.filter { purchase ->
+            purchase.products.any { PlayPurchaseRules.isOurProduct(it) }
+        }
         if (ours.isEmpty()) return BillingOutcome.NothingToSettle
         var outcome: BillingOutcome = BillingOutcome.NothingToSettle
         for (purchase in ours) {
@@ -427,22 +506,22 @@ class BillingRepository @Inject constructor(
         }
     }
 
-    private suspend fun productDetails(): ProductDetails? {
+    private suspend fun allProductDetails(): List<ProductDetails> {
+        val productList = PlayPurchaseRules.ALL_PRODUCT_IDS.map { productId ->
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(productId)
+                .setProductType(BillingClient.ProductType.SUBS)
+                .build()
+        }
         val params = QueryProductDetailsParams.newBuilder()
-            .setProductList(
-                listOf(
-                    QueryProductDetailsParams.Product.newBuilder()
-                        .setProductId(PlayPurchaseRules.PREMIUM_PRODUCT_ID)
-                        .setProductType(BillingClient.ProductType.SUBS)
-                        .build(),
-                ),
-            )
+            .setProductList(productList)
             .build()
         val result = client.queryProductDetails(params)
-        if (result.billingResult.responseCode != BillingResponseCode.OK) return null
+        if (result.billingResult.responseCode != BillingResponseCode.OK) return emptyList()
         return result.productDetailsList.orEmpty()
-            .firstOrNull { it.productId == PlayPurchaseRules.PREMIUM_PRODUCT_ID }
     }
+
+    private suspend fun productDetails(): ProductDetails? = allProductDetails().firstOrNull()
 
     /**
      * The one offer this app sells, chosen the same way every time.

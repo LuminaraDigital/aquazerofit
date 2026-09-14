@@ -4,7 +4,6 @@ import android.content.Intent
 import androidx.activity.result.contract.ActivityResultContract
 import kotlinx.coroutines.flow.Flow
 import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -62,7 +61,7 @@ class HealthConnectRepository @Inject constructor(
      * Record the opt-in, but only if the platform really did grant everything.
      *
      * Called after the permission sheet returns. The sheet's own result is not
-     * trusted as the answer: a user can approve four of five toggles, and
+     * trusted as the answer: a user can approve three of the four toggles, and
      * storing "connected" off a partial grant would leave the card claiming a
      * connection whose reads all come back empty.
      */
@@ -99,16 +98,6 @@ class HealthConnectRepository @Inject constructor(
             sleepMinutes = manager.readSleepMinutes(date),
             energyBurnedKcal = manager.readEnergyBurnedKcal(date),
         )
-    }
-
-    /**
-     * Push a weight logged in this app out to the platform. Returns false when
-     * nothing was written, which callers are expected to ignore: the in-app
-     * log is the record of truth and Health Connect is a copy.
-     */
-    suspend fun publishWeight(kg: Double, at: Instant): Boolean {
-        if (!readable()) return false
-        return manager.writeWeight(kg, at)
     }
 
     /** The contract a screen launches to show the permission sheet. */

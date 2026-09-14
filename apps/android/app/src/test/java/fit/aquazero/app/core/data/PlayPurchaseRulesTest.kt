@@ -18,8 +18,15 @@ import org.junit.Test
 class PlayPurchaseRulesTest {
 
     @Test
-    fun `the product id is the monthly base plan the server verifies against`() {
+    fun `the product ids match the annual and monthly base plans`() {
+        assertEquals("azf_premium_monthly", PlayPurchaseRules.PREMIUM_MONTHLY_PRODUCT_ID)
+        assertEquals("azf_premium_annual", PlayPurchaseRules.PREMIUM_ANNUAL_PRODUCT_ID)
         assertEquals("azf_premium_monthly", PlayPurchaseRules.PREMIUM_PRODUCT_ID)
+        assertTrue(PlayPurchaseRules.isOurProduct("azf_premium_monthly"))
+        assertTrue(PlayPurchaseRules.isOurProduct("azf_premium_annual"))
+        assertFalse(PlayPurchaseRules.isOurProduct("other_unrelated_product"))
+        assertEquals("azf_premium_annual", PlayPurchaseRules.productIdFor(PlanPeriod.ANNUAL))
+        assertEquals("azf_premium_monthly", PlayPurchaseRules.productIdFor(PlanPeriod.MONTHLY))
     }
 
     @Test

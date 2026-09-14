@@ -92,7 +92,7 @@ export function CoachCard() {
           {data.reactions.slice(1).map((reaction) => (
             <p
               key={`${reaction.kind}:${reaction.text}`}
-              className="text-xs text-on-surface-variant/70 mt-1.5 leading-relaxed"
+              className="text-xs text-on-surface-variant mt-1.5 leading-relaxed"
             >
               {reaction.text}
             </p>

@@ -188,6 +188,28 @@ export function createApp() {
     // Vite emits content-hashed filenames under /assets, so they are immutable
     // and safe to cache for a year. index.html must never be cached, or clients
     // pin themselves to a stale bundle after a deploy.
+    // /.well-known must be mounted BEFORE the general static handler and before
+    // the SPA catch-all. serve-static defaults to `dotfiles: 'ignore'`, so a
+    // request for /.well-known/assetlinks.json is skipped by express.static,
+    // falls through to the HTML fallback below, and returns the SPA shell with
+    // a 200. Android reads that, fails to parse JSON, and App Links
+    // verification fails silently — the deep link just stops opening the app,
+    // with nothing in any log to say why.
+    //
+    // Scoped to this one directory rather than setting dotfiles:'allow' on the
+    // whole dist, so no other dotfile becomes reachable.
+    app.use(
+      '/.well-known',
+      express.static(path.join(spaDir, '.well-known'), {
+        dotfiles: 'allow',
+        index: false,
+        setHeaders: (res) => {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+        },
+      }),
+    );
+
     app.use(
       express.static(spaDir, {
         index: false,
@@ -213,6 +235,8 @@ export function createApp() {
     app.use((req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();
       if (req.path.startsWith(config.basePath) || req.path.startsWith('/uploads')) return next();
+      // A machine-readable path must 404 rather than receive the SPA shell.
+      if (req.path.startsWith('/.well-known')) return next();
       if (!req.accepts('html')) return next();
       res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(spaDir, 'index.html'));

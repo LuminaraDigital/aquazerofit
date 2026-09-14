@@ -1,6 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Release config: cleartext is never permitted. Debug builds override this
-     file (src/debug/res/xml) to allow cleartext to the emulator loopback only. -->
+     file (src/debug/res/xml) to allow cleartext to the emulator loopback only.
+     Build types do not merge resources into one another, so the debug override
+     replaces this file wholesale in the debug APK and cannot reach the release
+     one. This config also takes precedence over `usesCleartextTraffic` in the
+     manifest from API 24 up — see the comment above <application> there.
+
+     No `trust-anchors` block, deliberately. A `base-config` that omits one
+     inherits the platform default, and for targetSdk 24+ that default is
+     system CAs only: user-installed certificates are already not trusted, in
+     debug as well as release, because there is no `debug-overrides` block
+     either. Writing the anchors out would restate the platform default and
+     invite someone to "just add the user source" while they are in here.
+
+     NO CERTIFICATE PINNING, and that is a decision rather than an omission.
+     Pinning defends against a trusted-CA compromise or a corporate MITM
+     proxy; the exposure it adds is that every pinned certificate is a fuse on
+     a timer, and this app cannot rotate one. The pin would live in an APK on
+     the user's device, so a certificate rotation the server does routinely —
+     an expiry, an ACME renewal onto a new intermediate, a CDN provider change
+     — bricks every installed copy of the app until a store release ships AND
+     each user updates, which is days, not minutes, and the users who never
+     update are simply gone. The traffic is already TLS-only to a single
+     first-party origin over the system trust store, which is the industry
+     bar; pinning would trade a residual risk for a self-inflicted outage we
+     have no lever to shorten.
+
+     If this is ever revisited, the prerequisites are a backup pin for the
+     next key already published, a monitored expiry, and a server-driven kill
+     switch — not just a `<pin-set>` block. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
 </network-security-config>

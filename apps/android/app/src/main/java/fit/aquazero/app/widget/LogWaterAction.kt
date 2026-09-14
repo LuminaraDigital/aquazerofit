@@ -5,17 +5,16 @@ import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.updateAll
-import fit.aquazero.app.feature.dashboard.DashboardViewModel
+import fit.aquazero.app.core.common.Hydration
 
 /**
  * The widget's one-tap hydration write.
  *
- * The increment is taken from [DashboardViewModel.WATER_INCREMENT_ML] rather
- * than restated: it is a product decision ("a glass"), it is already spelled
- * out in the strings the user reads, and two copies of it would eventually
+ * The increment is taken from [Hydration.WATER_INCREMENT_ML] rather than
+ * restated: it is a product decision ("a glass"), it is already spelled out
+ * in the strings the user reads, and two copies of it would eventually
  * disagree about what one tap means. It is a compile-time constant, so this
- * import costs nothing at runtime and creates no cycle — the dashboard has no
- * reason to ever look at the widget.
+ * import costs nothing at runtime and creates no cycle.
  *
  * [updateAll] is called explicitly rather than relied upon: the composition
  * does observe Room, but only while a Glance session is alive, and after a tap
@@ -30,7 +29,7 @@ class LogWaterAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters,
     ) {
-        TodayWidgetReader.from(context).logWater(DashboardViewModel.WATER_INCREMENT_ML)
+        TodayWidgetReader.from(context).logWater(Hydration.WATER_INCREMENT_ML)
         TodayWidget().updateAll(context)
     }
 }

@@ -27,14 +27,14 @@ import type {
 } from '@aquazerofit/shared';
 import { complete } from '../ai/gateway';
 import { post as postGuardrail } from '../ai/guardrails';
-import { creditLedger } from '../ai/creditLedger';
+import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { assertLaneAllowed } from '../ai/tierPolicy';
 import { hasConsent } from '../me/service';
+import { todayFor } from '../../platform/dates';
 import {
   asyncHandler,
   byIdDoc,
   getUser,
-  localToday,
   newId,
   nowIso,
   readProfile,
@@ -356,14 +356,10 @@ recommendationsRouter.post(
         createdAt: nowIso(),
       };
       await upsertDoc('ai', recommendation);
-      // Real providers failed and the gateway fell back to offline templates —
+      // Real providers failed and the gateway fell back to offline templates -
       // do not charge. Keyless mock (no providers configured) keeps degraded
       // false and bills normally per product rules. Same stance as the chat lane.
-      if (result.meta.degraded) {
-        await creditLedger.release(reservationId);
-      } else {
-        await creditLedger.commit(reservationId);
-      }
+      await settleReservation(reservationId, result.meta.degraded !== true);
 
       res.status(201).json({ recommendation, remaining });
     } catch (err) {
@@ -398,7 +394,7 @@ recommendationsRouter.post(
     const localDate =
       typeof req.body?.localDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.localDate)
         ? (req.body.localDate as string)
-        : localToday();
+        : todayFor(req);
 
     const mealLog: MealLog = {
       id: newId('ml'),

@@ -42,10 +42,10 @@ export function AquaStatusline({ className = '', collapsible = true }: AquaStatu
   }, []);
 
   const getStatusColor = (val: number | null) => {
-    if (val === null) return 'text-red-400 border-red-500/40 bg-red-500/10';
-    if (val < 150) return 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10';
-    if (val < 400) return 'text-amber-400 border-amber-500/40 bg-amber-500/10';
-    return 'text-red-400 border-red-500/40 bg-red-500/10';
+    if (val === null) return 'text-error border-error/40 bg-error/10';
+    if (val < 150) return 'text-success border-success/40 bg-success/10';
+    if (val < 400) return 'text-warning border-warning/40 bg-warning/10';
+    return 'text-error border-error/40 bg-error/10';
   };
 
   return (
@@ -56,10 +56,10 @@ export function AquaStatusline({ className = '', collapsible = true }: AquaStatu
       <div className="flex items-center justify-between gap-2">
         {/* Main Indicator Pill */}
         <div className="flex items-center gap-2 min-w-0">
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-bold">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-success/30 bg-success/10 text-success font-bold">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
             </span>
             <span className="text-[11px] tracking-wider uppercase">AI {gatewayStatus}</span>
           </div>
@@ -75,7 +75,7 @@ export function AquaStatusline({ className = '', collapsible = true }: AquaStatu
           </div>
 
           {/* Credits badge */}
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 text-primary font-semibold">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-md border border-info/30 bg-info/10 text-info font-semibold">
             <span className="material-symbols-outlined text-[14px]">bolt</span>
             <span>
               {credits.remaining}/{credits.total} cr
@@ -126,11 +126,11 @@ export function AquaStatusline({ className = '', collapsible = true }: AquaStatu
           </div>
           <div className="p-2 rounded-xl bg-surface-container-low border border-outline-variant/30">
             <span className="block text-[10px] text-outline uppercase tracking-wider">API Ping RTT</span>
-            <span className="font-bold text-emerald-400">{apiPing !== null ? `${apiPing} ms` : 'Offline'}</span>
+            <span className="font-bold text-success">{apiPing !== null ? `${apiPing} ms` : 'Offline'}</span>
           </div>
           <div className="p-2 rounded-xl bg-surface-container-low border border-outline-variant/30">
             <span className="block text-[10px] text-outline uppercase tracking-wider">Rate Limit</span>
-            <span className="font-bold text-cyan-400">120 req/min</span>
+            <span className="font-bold text-info">120 req/min</span>
           </div>
         </div>
       )}

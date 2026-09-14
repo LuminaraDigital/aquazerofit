@@ -1,11 +1,15 @@
 /**
  * Local-date resolution helpers (AQF-07 §1: timestamps are ISO UTC; the client
- * supplies its timezone — X-Timezone header — so day boundaries resolve
+ * supplies its timezone - X-Timezone header - so day boundaries resolve
  * correctly server-side when the client omits an explicit localDate).
+ *
+ * Two "today" semantics (do not mix them):
+ * - `todayFor(req)`: the requesting client's calendar day (X-Timezone).
+ * - `processLocalToday()`: the server process calendar day (jobs, grants,
+ *   challenges with no request context). Prefer `todayFor` whenever a Request
+ *   is available.
  */
 import type { Request } from 'express';
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** YYYY-MM-DD for `at` in the given IANA timezone (UTC fallback on bad input). */
 export function localDateFor(timeZone: string | undefined, at: Date = new Date()): string {
@@ -32,8 +36,23 @@ export function todayFor(req: Request): string {
   return localDateFor(timezoneOf(req));
 }
 
-export function isValidLocalDate(value: unknown): value is string {
-  return typeof value === 'string' && DATE_RE.test(value);
+/**
+ * Process-local YYYY-MM-DD (server calendar, no timezone header).
+ * Alias kept as `localToday` for AI-lane call sites without a Request.
+ */
+export function processLocalToday(at: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(at);
+}
+
+export const localToday = processLocalToday;
+
+/** UTC calendar day as YYYY-MM-DD (credit grants, UTC-keyed ledgers). */
+export function utcToday(at: Date = new Date()): string {
+  return at.toISOString().slice(0, 10);
 }
 
 /** date arithmetic on YYYY-MM-DD strings (UTC-safe). */
@@ -52,4 +71,12 @@ export function lastNDates(endDate: string, days: number): string[] {
 
 export function rangeToDays(range: '7d' | '30d' | '90d'): number {
   return range === '7d' ? 7 : range === '30d' ? 30 : 90;
+}
+
+/** Whole calendar days between two YYYY-MM-DD strings (UTC midnight). */
+export function daysBetween(fromDate: string, toDate: string): number {
+  const from = Date.parse(`${fromDate}T00:00:00Z`);
+  const to = Date.parse(`${toDate}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return 0;
+  return Math.round((to - from) / 86_400_000);
 }

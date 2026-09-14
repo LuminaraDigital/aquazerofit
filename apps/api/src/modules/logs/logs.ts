@@ -7,8 +7,6 @@ import { userIdOf } from '../../platform/auth';
 import { todayFor } from '../../platform/dates';
 import { copyPreviousDayMealLogs } from './service';
 
-export { copyPreviousDayMealLogs };
-
 export function copyPreviousHandler(req: Request, res: Response): void {
   const userId = userIdOf(req);
   const bodyDate =

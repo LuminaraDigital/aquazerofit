@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.R
+import fit.aquazero.app.core.common.Hydration
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.database.MealLogEntity
@@ -354,7 +355,7 @@ class NutritionViewModel @Inject constructor(
     // ----- water -----
 
     /** One-tap +250 ml on the selected day (optimistic, Room-first). */
-    fun logWater(amountMl: Int = WATER_INCREMENT_ML) {
+    fun logWater(amountMl: Int = Hydration.WATER_INCREMENT_ML) {
         if (_uiState.value.waterPending) return
         val date = syncToToday()
         _uiState.update { it.copy(waterPending = true) }
@@ -561,9 +562,6 @@ class NutritionViewModel @Inject constructor(
     )
 
     companion object {
-        /** The web's one-tap hydration increment. */
-        const val WATER_INCREMENT_ML = 250
-
         /** Search debounce, matching the web client's 300ms. */
         const val SEARCH_DEBOUNCE_MS = 300L
     }

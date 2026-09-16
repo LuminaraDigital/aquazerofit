@@ -43,7 +43,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Gradle Cache
-        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Grant Execute Permission to Gradlew
         run: chmod +x apps/android/gradlew

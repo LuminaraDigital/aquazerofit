@@ -134,11 +134,13 @@ const PROVIDERS: ProviderDef[] = [
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     keyEnv: 'GEMINI_API_KEY',
     models: {
-      visionPrimary: 'gemini-2.0-flash',
-      chatFast: 'gemini-2.0-flash',
-      planStructured: 'gemini-2.0-flash',
-      safetyCheap: 'gemini-2.0-flash-lite',
-      insightBatch: 'gemini-2.0-flash',
+      // Stable aliases: Google retires pinned model ids (2.0-flash 404s now),
+      // the *-latest aliases always resolve to the current flash generation.
+      visionPrimary: 'gemini-flash-latest',
+      chatFast: 'gemini-flash-latest',
+      planStructured: 'gemini-flash-latest',
+      safetyCheap: 'gemini-flash-lite-latest',
+      insightBatch: 'gemini-flash-latest',
     },
   },
   {

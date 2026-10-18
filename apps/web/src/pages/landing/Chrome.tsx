@@ -32,6 +32,7 @@ const FOOTER_PRODUCT: Array<{ label: string; to?: string; href?: string }> = [
   { label: 'How it works', to: '/how-it-works' },
   { label: 'Aqua Coach', to: '/aqua-coach' },
   { label: 'Safety', to: '/safety' },
+  { label: 'Android app', to: '/google-play' },
   { label: 'Screens', href: '#screens' },
   { label: 'Sign in', to: '/sign-in' },
 ];
@@ -275,6 +276,7 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
           <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant">
             {[
               { to: '/privacy', label: 'Privacy notice' },
+              { to: '/google-play/privacy-policy', label: 'Google Play privacy policy' },
               { to: '/terms', label: 'Terms of use' },
               { to: '/support', label: 'Support' },
             ].map((item) => (

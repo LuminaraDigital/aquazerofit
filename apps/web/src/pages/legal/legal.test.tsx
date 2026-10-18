@@ -19,10 +19,12 @@ const mocks = vi.hoisted(() => ({ isTMA: vi.fn(() => false) }));
 vi.mock('../../lib/telegram', () => ({ isTMA: mocks.isTMA }));
 
 import PrivacyPage from './Privacy';
+import GooglePlayPrivacyPage from './GooglePlayPrivacy';
 import TermsPage from './Terms';
 import SupportPage from './Support';
 import AccountDeletionPage from './AccountDeletion';
 import { isPublished, OPERATOR } from './operator';
+import { marketingRoute } from '../../lib/site';
 
 function renderAt(path: string, element: React.ReactNode) {
   return render(
@@ -60,6 +62,7 @@ describe('legal pages', () => {
 
     for (const [path, element] of [
       ['/privacy', <PrivacyPage key="p" />],
+      ['/google-play/privacy-policy', <GooglePlayPrivacyPage key="gp" />],
       ['/terms', <TermsPage key="t" />],
       ['/support', <SupportPage key="s" />],
       ['/account/deletion', <AccountDeletionPage key="d" />],
@@ -117,6 +120,34 @@ describe('privacy notice', () => {
     expect(
       screen.getByText(new RegExp(`accepts ages from\\s+${RANGES.age.min}`, 'i')),
     ).toBeTruthy();
+  });
+});
+
+/**
+ * Play Console declares /google-play/privacy-policy as the listing's policy
+ * URL. It must stay crawlable and must carry the same disclosures as /privacy,
+ * not a lighter copy of them.
+ */
+describe('Google Play privacy policy', () => {
+  it('is published at the URL declared in Play Console', () => {
+    expect(marketingRoute('/google-play/privacy-policy')?.title).toMatch(/google play privacy policy/i);
+  });
+
+  it('frames itself for the Play listing', () => {
+    renderAt('/google-play/privacy-policy', <GooglePlayPrivacyPage />);
+
+    expect(screen.getByRole('heading', { level: 1, name: /google play privacy policy/i })).toBeTruthy();
+    expect(screen.getByText(/privacy policy for the Google Play listing/i)).toBeTruthy();
+  });
+
+  it('carries the same disclosures as the privacy notice', () => {
+    renderAt('/google-play/privacy-policy', <GooglePlayPrivacyPage />);
+
+    expect(screen.getByText(`${MEMORY_REJECTED_RETENTION_DAYS} days, then erased.`)).toBeTruthy();
+    expect(screen.getByText(/24 hours after the analysis finishes/i)).toBeTruthy();
+    expect(screen.getAllByText(/Open Food Facts/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/LUMINARA DIGITAL PTY LTD/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/\[operator legal name\]/i)).toBeNull();
   });
 });
 

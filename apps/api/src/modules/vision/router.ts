@@ -246,6 +246,54 @@ function pickVariant(variants: StoredImageVariant[], accept: string | undefined)
 }
 
 /**
+ * Boot-time recovery for jobs a restart left queued or processing. Their
+ * processJob timer died with the old process, so without this the user
+ * watches a spinner until the 2-hour sweep quietly deletes the job.
+ *
+ * A job whose photo survived is re-queued with createdAt re-stamped, so the
+ * sweep that runs straight after boot cannot reclaim it. A job whose photo
+ * is gone (ephemeral filesystem, redeploy) fails with a retriable message and
+ * its credit hold returned.
+ *
+ * The release is written BEFORE the failed status on purpose: interrupted
+ * between the two, the job is still non-terminal and the next boot retries
+ * the (idempotent) release. The other order would leave a terminal job that
+ * recovery skips and a hold that only the 24-hour sweep ever frees.
+ *
+ * Awaited from index.ts before the first sweep; exported for tests.
+ */
+export async function recoverStuckVisionJobs(): Promise<{ requeued: number; failed: number }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stuck = await whereDocs<StoredVisionJob>('ai', (d: any) =>
+    d?.type === 'cvJob' && (d?.status === 'queued' || d?.status === 'processing'),
+  );
+  let requeued = 0;
+  let failed = 0;
+  for (const job of stuck) {
+    if (job.imagePath && existsSync(job.imagePath)) {
+      job.status = 'queued';
+      job.createdAt = nowIso();
+      await upsertDoc('ai', job);
+      const jobId = job.id;
+      setTimeout(() => {
+        void processJob(jobId);
+      }, 0);
+      requeued += 1;
+      continue;
+    }
+    if (job.reservationId) await creditLedger.release(job.reservationId);
+    job.status = 'failed';
+    job.error = 'The photo was not retained across a server restart. Please try uploading again.';
+    job.completedAt = nowIso();
+    await upsertDoc('ai', job);
+    // Same data-minimisation rule as any failed job: drop whatever variant is left.
+    deleteJobImage(job);
+    failed += 1;
+  }
+  return { requeued, failed };
+}
+
+/**
  * TTL sweep: photo files (and their job docs) for jobs that reached a terminal
  * state more than 24 hours ago are deleted. Runs on boot and hourly
  * (scheduled from index.ts); exported for tests.

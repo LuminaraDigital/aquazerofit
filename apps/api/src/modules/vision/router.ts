@@ -27,6 +27,7 @@ import type { Food, MealLog, MealType, VisionJob, VisionPrediction } from '@aqua
 import { complete } from '../ai/gateway';
 import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { post as postGuardrail } from '../ai/guardrails';
+import { loadPrompt } from '../ai/prompts';
 import { assertLaneAllowed } from '../ai/tierPolicy';
 import { todayFor } from '../../platform/dates';
 import { asyncHandler, byIdDoc, deleteDoc, getUser, newId, nowIso, round1, upsertDoc, whereDocs } from '../ai/util';
@@ -347,24 +348,36 @@ async function processJob(jobId: string): Promise<void> {
     const foods = await whereDocs<Food>('content', (d: any) => d?.type === 'food');
     const seedKey = path.basename(job.imagePath);
     
-    // AI-04: Compute image hash for mock engine acknowledgment (dev parity)
+    // The stored JPEG is what the model must actually analyse; the mock seeds
+    // on its hash instead (AI-04 dev parity). A missing file (sweeper race,
+    // disk fault) degrades to the text-only prompt rather than failing the job
+    // — the mock still grounds on the candidate catalog either way.
     let imageHash: string | undefined;
+    let images: string[] | undefined;
     if (existsSync(job.imagePath)) {
       const imageBuffer = readFileSync(job.imagePath);
-      const hash = crypto.createHash('sha256').update(imageBuffer).digest('hex');
-      imageHash = hash.slice(0, 16); // Short hash for seed
+      imageHash = crypto.createHash('sha256').update(imageBuffer).digest('hex').slice(0, 16);
+      images = [`data:${STORED_JPEG_MIME};base64,${imageBuffer.toString('base64')}`];
+    } else {
+      console.warn('[vision] stored photo unreadable, falling back to text-only prompt', jobId);
     }
-    
-    const result = await complete('visionPrimary', [{ role: 'user', content: `Identify foods in photo ${seedKey}` }], {
-      json: true,
-      promptId: 'P-01',
-      context: {
-        seedKey,
-        candidates: visionCandidates(foods),
-        // AI-04: Pass image hash for mock dev parity
-        imageHash,
+
+    // Real providers need P-01 itself — the output schema, the grounding rule
+    // and the examples. Without it they saw only the context block and
+    // answered with schema-mismatched or empty predictions.
+    const result = await complete(
+      'visionPrimary',
+      [
+        { role: 'system', content: loadPrompt('P-01').content },
+        { role: 'user', content: `Identify foods in photo ${seedKey}` },
+      ],
+      {
+        json: true,
+        promptId: 'P-01',
+        images,
+        context: { seedKey, candidates: visionCandidates(foods), imageHash },
       },
-    });
+    );
 
     if (result.text) {
       const outCheck = postGuardrail(result.text, { userId: job.userId });
@@ -469,8 +482,9 @@ visionRouter.post(
     const dir = uploadsDir();
 
     // imagePath stays the JPEG. It is the canonical copy — the fallback the
-    // serve route falls back TO, and what processJob hashes — so the variant
-    // list records it as well rather than treating it as a separate thing.
+    // serve route falls back TO, and what processJob sends to the model — so
+    // the variant list records it as well rather than treating it as a
+    // separate thing.
     const imagePath = path.join(dir, `${jobId}${STORED_JPEG_EXT}`);
     writeFileSync(imagePath, encoded.jpeg);
     const imageVariants: StoredImageVariant[] = [{ path: imagePath, mime: STORED_JPEG_MIME }];

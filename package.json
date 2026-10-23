@@ -34,5 +34,8 @@
   "devDependencies": {
     "sharp": "^0.35.4",
     "tsx": "^4.16.2"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6"
   }
 }

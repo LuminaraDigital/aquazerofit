@@ -16,7 +16,7 @@ import { warnIfBotProtectionUnconfigured } from './platform/botProtection';
 import { describeStoreInitFailure, getStore, initStore } from './platform/store';
 import { sweepExpiredDeletions } from './modules/me/service';
 import { sweepIdempotencyRecords } from './modules/logs/service';
-import { sweepVisionArtifacts } from './modules/vision/router';
+import { recoverStuckVisionJobs, sweepVisionArtifacts } from './modules/vision/router';
 import { sweepGrowthEvents } from './modules/analytics/router';
 import { creditLedger } from './modules/ai/creditLedger';
 
@@ -110,6 +110,16 @@ function runReservationSweep(): void {
     .catch((err) => console.error('[sweep] reservation sweep failed', err));
 }
 
+async function runVisionRecovery(): Promise<void> {
+  try {
+    const { requeued, failed } = await recoverStuckVisionJobs();
+    if (requeued > 0) console.log(`[recovery] re-queued ${requeued} interrupted meal photo job(s)`);
+    if (failed > 0) console.log(`[recovery] failed ${failed} meal photo job(s) whose photo was lost`);
+  } catch (err) {
+    console.error('[recovery] vision job recovery failed', err);
+  }
+}
+
 runDeletionSweep();
 runGrowthEventSweep();
 runReservationSweep();
@@ -117,6 +127,9 @@ runReservationSweep();
 // than the interval would otherwise never sweep at all, which is exactly how
 // the idempotency backlog grew unbounded in the first place.
 runIdempotencySweep();
+// Recovery first, so a job it re-queues is not reclaimed by the sweep's
+// 2-hour in-flight cutoff the moment the process comes back up.
+await runVisionRecovery();
 runVisionSweep();
 setInterval(runDeletionSweep, 6 * 3600 * 1000).unref();
 setInterval(runGrowthEventSweep, 6 * 3600 * 1000).unref();

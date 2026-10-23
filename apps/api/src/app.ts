@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './platform/config';
 import { errorHandler, notFoundHandler } from './platform/errors';
-import { assertTrustProxyHeaders, enforceHttps } from './platform/https';
+import { assertTrustProxyHeaders, enforceHttps, redirectWwwToCanonical } from './platform/https';
 import { requestLogger, metrics } from './platform/telemetry';
 import { budgetSnapshot } from './platform/aiBudget';
 import { rateLimiter } from './platform/rateLimiter';
@@ -30,6 +30,7 @@ export function createApp() {
   // The trust-proxy check sits first because enforceHttps reads `req.secure`,
   // which is only trustworthy when TRUST_PROXY matches the real topology.
   app.use(assertTrustProxyHeaders);
+  app.use(redirectWwwToCanonical);
   app.use(enforceHttps);
 
   // Is a built SPA present and enabled? This changes the security posture:

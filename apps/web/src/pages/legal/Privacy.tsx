@@ -36,15 +36,24 @@ const CLAUSES: Clause[] = [
   { id: 'changes', heading: 'Changes and contact' },
 ];
 
-export default function PrivacyPage() {
+/**
+ * `googlePlay` renders the same policy at the URL declared in Play Console
+ * (/google-play/privacy-policy). One body, two framings: the public site and
+ * the Play listing cannot drift into contradictory disclosures.
+ */
+export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boolean }) {
   const mib = Math.round(MEAL_PHOTO_MAX_BYTES / (1024 * 1024));
 
   return (
     <LegalPage
-      path="/privacy"
-      crumb="Privacy"
-      title="Privacy notice"
-      lead="What AquaZeroFit collects, why, who else can see it, and how to get rid of it. The service handles what you eat and what you weigh, so this is written to be read rather than to be survived."
+      path={googlePlay ? '/google-play/privacy-policy' : '/privacy'}
+      crumb={googlePlay ? 'Google Play privacy policy' : 'Privacy'}
+      title={googlePlay ? 'Google Play privacy policy' : 'Privacy notice'}
+      lead={
+        googlePlay
+          ? 'This policy applies to the AquaZeroFit Android app on Google Play and the AquaZeroFit service it connects to. It explains what we collect, why we use it, who else can see it, and how to delete it.'
+          : 'What AquaZeroFit collects, why, who else can see it, and how to get rid of it. The service handles what you eat and what you weigh, so this is written to be read rather than to be survived.'
+      }
       clauses={CLAUSES}
     >
       <Section id="summary" index={1} heading="The short version">
@@ -58,8 +67,9 @@ export default function PrivacyPage() {
           ]}
         />
         <Notice icon="info">
-          This notice describes the software. If you are reading it on a deployment run by someone
-          other than the authors, the operator named below is the one answerable for it.
+          {googlePlay
+            ? 'This is the privacy policy for the Google Play listing. The Android app and the AquaZeroFit service it connects to follow this same policy, which is also published as the privacy notice on this site.'
+            : 'This notice describes the software. If you are reading it on a deployment run by someone other than the authors, the operator named below is the one answerable for it.'}
         </Notice>
       </Section>
 

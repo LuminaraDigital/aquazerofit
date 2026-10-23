@@ -160,12 +160,32 @@ export const MARKETING_ROUTES: readonly MarketingRoute[] = [
     priority: 0.6,
   },
   {
+    path: '/google-play',
+    title: 'AquaZeroFit for Android — coming soon to Google Play',
+    description:
+      'AquaZeroFit is coming soon to Google Play. Track meals, hydration, workouts and progress with an AI wellness coach built around your real day.',
+    summary:
+      'AquaZeroFit for Android is coming soon to Google Play. The app brings meal logging by photograph, barcode or search, calorie and macro targets computed from your own profile, home training and Aqua Coach to a native Android app, connected to the same AquaZeroFit service. Until the listing is published, the live Telegram Mini App offers the core experience.',
+    priority: 0.6,
+  },
+  {
     path: '/privacy',
     title: 'Privacy notice | AquaZeroFit',
     description:
       'What AquaZeroFit stores, why it stores it, and which personalisation is opt-in. Your wellness data is yours.',
     summary:
       'The AquaZeroFit privacy notice: what data is stored, why it is stored, how long it is retained, and which personalisation features are opt-in rather than on by default.',
+    priority: 0.4,
+  },
+  {
+    /* The privacy-policy URL declared in Play Console. Moving it breaks the
+       listing's mandatory policy link. */
+    path: '/google-play/privacy-policy',
+    title: 'Google Play privacy policy | AquaZeroFit',
+    description:
+      'Privacy policy for the AquaZeroFit Android app on Google Play: data collected, AI processing, meal photos, retention and deletion.',
+    summary:
+      'The privacy policy for the AquaZeroFit Android app on Google Play and the AquaZeroFit service it connects to: what data is collected, why, how AI processing and meal photographs are handled, how long data is retained, and how to delete it.',
     priority: 0.4,
   },
   {

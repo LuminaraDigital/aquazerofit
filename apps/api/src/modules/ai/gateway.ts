@@ -67,6 +67,47 @@ export interface GatewayOptions {
    * matter which character the user picked.
    */
   coachId?: string;
+  /**
+   * Base64 data URLs (`data:image/jpeg;base64,...`) attached to the LAST user
+   * message as OpenAI-style `image_url` content parts, so vision-capable
+   * providers actually receive the pixels. Only providers flagged
+   * `supportsVision` are tried. The mock never sees them (it grounds on
+   * opts.context), so the keyless path is unchanged.
+   */
+  images?: string[];
+}
+
+/** OpenAI-compatible multimodal content part (text or inline image). */
+export type WireContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
+/** What actually goes on the wire to a real provider: content may be parts. */
+export interface WireMessage {
+  role: GatewayMessage['role'];
+  content: string | WireContentPart[];
+}
+
+/**
+ * Attach images to the last user message as multimodal content parts. With no
+ * user message the images are dropped rather than invented into a synthetic
+ * turn — a system-only payload is a caller bug.
+ */
+export function withImageParts(messages: GatewayMessage[], images: string[] | undefined): WireMessage[] {
+  if (!images?.length) return messages;
+  const lastUser = messages.map((m) => m.role).lastIndexOf('user');
+  if (lastUser === -1) return messages;
+  return messages.map((m, i) =>
+    i === lastUser
+      ? {
+          role: m.role,
+          content: [
+            { type: 'text' as const, text: m.content },
+            ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+          ],
+        }
+      : m,
+  );
 }
 
 /** Why a result came from the offline engine instead of a real model. */
@@ -101,6 +142,12 @@ interface ProviderDef {
   keyEnv: string;
   /** If true, the key is optional (e.g. local Ollama needs no auth). */
   keyOptional?: boolean;
+  /**
+   * True when the provider's visionPrimary model accepts image_url content
+   * parts. Providers without it are skipped when the caller supplies
+   * opts.images, so a text-only model never answers 400 to a meal photo.
+   */
+  supportsVision?: boolean;
   models: Record<ModelGroup, string>;
 }
 
@@ -109,6 +156,11 @@ const PROVIDERS: ProviderDef[] = [
     name: 'groq',
     baseUrl: 'https://api.groq.com/openai/v1',
     keyEnv: 'GROQ_API_KEY',
+    // supportsVision intentionally absent: image requests to Groq returned 400
+    // in production (2026-08, then on text-only llama-3.3-70b-versatile).
+    // llama-4-scout accepts images, but enable this only after a live check.
+    // Groq stays in the chain for every text lane and for a text-only vision
+    // call (stored photo unreadable).
     models: {
       visionPrimary: 'meta-llama/llama-4-scout-17b-16e-instruct',
       chatFast: 'qwen/qwen3.8-27b',
@@ -121,6 +173,7 @@ const PROVIDERS: ProviderDef[] = [
     name: 'openai',
     baseUrl: 'https://api.openai.com/v1',
     keyEnv: 'OPENAI_API_KEY',
+    supportsVision: true, // gpt-4o-mini
     models: {
       visionPrimary: 'gpt-4o-mini',
       chatFast: 'gpt-4o-mini',
@@ -133,12 +186,15 @@ const PROVIDERS: ProviderDef[] = [
     name: 'gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     keyEnv: 'GEMINI_API_KEY',
+    supportsVision: true, // gemini flash
     models: {
-      visionPrimary: 'gemini-2.0-flash',
-      chatFast: 'gemini-2.0-flash',
-      planStructured: 'gemini-2.0-flash',
-      safetyCheap: 'gemini-2.0-flash-lite',
-      insightBatch: 'gemini-2.0-flash',
+      // Stable aliases: Google retires pinned model ids (2.0-flash 404s now),
+      // the *-latest aliases always resolve to the current flash generation.
+      visionPrimary: 'gemini-flash-latest',
+      chatFast: 'gemini-flash-latest',
+      planStructured: 'gemini-flash-latest',
+      safetyCheap: 'gemini-flash-lite-latest',
+      insightBatch: 'gemini-flash-latest',
     },
   },
   {
@@ -146,6 +202,7 @@ const PROVIDERS: ProviderDef[] = [
     baseUrl: 'https://integrate.api.nvidia.com/v1',
     baseUrlEnv: 'NVIDIA_BASE_URL',
     keyEnv: 'NVIDIA_API_KEY',
+    supportsVision: true, // llama-3.2-11b-vision-instruct
     models: {
       visionPrimary: 'meta/llama-3.2-11b-vision-instruct',
       chatFast: 'meta/llama-3.2-11b-vision-instruct',
@@ -160,6 +217,7 @@ const PROVIDERS: ProviderDef[] = [
     baseUrlEnv: 'OLLAMA_BASE_URL',
     keyEnv: 'OLLAMA_API_KEY',
     keyOptional: true,
+    supportsVision: true, // llava
     models: {
       visionPrimary: 'llava',
       chatFast: 'llama3.1',
@@ -279,9 +337,32 @@ export function resetProviderCircuits(): void {
   circuits.clear();
 }
 
-function extractJson(text: string): unknown {
-  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
-  return JSON.parse(trimmed);
+/**
+ * Pull the JSON object out of a provider response. Some providers (Gemini in
+ * particular) add prose or a markdown fence even in json_object mode, so the
+ * candidates run strictest first: the whole text, the text with a fence
+ * stripped, then the span from the first `{` to the last `}`. Throws a
+ * SyntaxError when none parses, so the caller counts it as a failed attempt.
+ * Exported for tests.
+ */
+export function extractJson(text: string): unknown {
+  const trimmed = text.trim();
+  const first = trimmed.indexOf('{');
+  const last = trimmed.lastIndexOf('}');
+  const candidates = [
+    trimmed,
+    trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim(),
+    first !== -1 && last > first ? trimmed.slice(first, last + 1) : '',
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      /* try the next, more permissive candidate */
+    }
+  }
+  throw new SyntaxError('extractJson: no valid JSON object found in provider response');
 }
 
 interface OpenAiCompletion {
@@ -392,7 +473,7 @@ export function validateOutputForInjection(text: string): { safe: boolean; reaso
 async function callProvider(
   provider: ProviderDef,
   task: ModelGroup,
-  messages: GatewayMessage[],
+  messages: WireMessage[],
   opts: GatewayOptions,
   /** Time this single attempt may take: the lesser of its timeout and what is left of the deadline. */
   budgetMs: number,
@@ -441,6 +522,9 @@ async function callProvider(
       try {
         json = extractJson(text);
       } catch {
+        // Enough of the raw text to tell a safety refusal from prose from a
+        // schema mismatch, without logging a whole completion.
+        console.warn(`[ai-gateway] ${provider.name} returned unparseable JSON (first 300 chars):`, text.slice(0, 300));
         throw new ProviderError(`${provider.name} returned unparseable JSON`, true);
       }
     }
@@ -487,6 +571,9 @@ export async function complete(
   // message; the mock keeps receiving it via MockOptions so its deterministic
   // output (seeded on raw messages + context values) is byte-identical.
   const providerMessages = withContextMessage(messages, opts.context);
+  // Image bytes are not counted toward prompt tokens; only the text is estimated.
+  const wireMessages = withImageParts(providerMessages, opts.images);
+  const hasImages = !!opts.images?.length;
   const promptTokens = estimateTokens(providerMessages.map((m) => m.content).join('\n'));
 
   // Callers may tighten the budget but never extend it past the ceiling.
@@ -515,9 +602,11 @@ export async function complete(
   outer: for (const provider of budgetStopped ? [] : PROVIDERS) {
     const credentialed = !!process.env[provider.keyEnv];
     if (!credentialed && !provider.keyOptional) continue;
-    // Counted before the breaker check: a provider skipped because it is
-    // already failing is still a real dependency the user did not get.
+    // Counted before the breaker and vision checks: a provider skipped because
+    // it is failing, or cannot see the photo, is still a real dependency the
+    // user did not get, so a mock answer after it is degraded (and not billed).
     realProviderInPlay = realProviderInPlay || credentialed;
+    if (hasImages && !provider.supportsVision) continue;
     if (circuitIsOpen(provider.name)) continue;
     // A key-optional provider with no key is an opportunistic local probe
     // (Ollama on localhost), not a configured dependency: one shot, no retries,
@@ -535,7 +624,7 @@ export async function complete(
         const { text, json, tokens, model } = await callProvider(
           provider,
           task,
-          providerMessages,
+          wireMessages,
           opts,
           budget,
         );

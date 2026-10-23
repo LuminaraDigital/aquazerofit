@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +52,7 @@ import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.model.AchievementStatusDto
 import fit.aquazero.app.core.model.ConsistencyStatusDto
 import fit.aquazero.app.core.model.ProgressInsightDto
+import fit.aquazero.app.core.ui.NutritionFormat
 
 /** Compact cumulative metric tile. Nothing here can be reset by a missed day. */
 @Composable
@@ -283,10 +285,18 @@ fun WeeklyInsightCard(
             )
             insight.changes.forEach { change ->
                 val spokenDirection = stringResource(directionWordRes(change.direction))
+                val changeCd = stringResource(
+                    R.string.progress_change_cd,
+                    spokenDirection,
+                    change.label,
+                )
                 Row(
                     modifier = Modifier
                         .padding(top = 8.dp)
-                        .semantics { contentDescription = "$spokenDirection ${change.label}" },
+                        // The direction word is only in the description, so
+                        // the label Text has to be cleared or it is read twice
+                        // — once with the direction and once without.
+                        .clearAndSetSemantics { contentDescription = changeCd },
                     verticalAlignment = Alignment.Top,
                 ) {
                     Box(
@@ -348,7 +358,9 @@ fun AchievementTile(
         stringResource(R.string.progress_badge_locked, status.definition.name)
     }
     Column(
-        modifier = modifier.semantics { contentDescription = description },
+        // The description names the achievement and its earned state; the
+        // name Text below would otherwise repeat it.
+        modifier = modifier.clearAndSetSemantics { contentDescription = description },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -420,14 +432,23 @@ fun AdaptiveMetabolicCard(
         fit.aquazero.app.core.common.ExpenditureConfidence.LOW -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
+    val confidenceWord = stringResource(confidenceWordRes(result.confidence))
+    // Grouped strings, not raw ints: "2,410" is spoken as a number.
+    val expenditureKcal = NutritionFormat.fmtInt(result.estimatedTdeeKcal)
+    val targetKcal = NutritionFormat.fmtInt(result.recommendedTargetKcal)
+
     AzfCard(tier = AzfCardTier.Hero, modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            // Title and badge are one fact — "Adaptive metabolism, high
+            // confidence" — not two stops on the swipe path.
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics(mergeDescendants = true) {},
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "ADAPTIVE METABOLISM",
+                text = stringResource(R.string.progress_adaptive_title).uppercase(),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -438,7 +459,10 @@ fun AdaptiveMetabolicCard(
                     .padding(horizontal = 8.dp, vertical = 3.dp),
             ) {
                 Text(
-                    text = "${result.confidence.name} CONFIDENCE",
+                    text = stringResource(
+                        R.string.progress_adaptive_confidence,
+                        confidenceWord,
+                    ).uppercase(),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = confidenceBadgeColor,
                 )
@@ -447,30 +471,39 @@ fun AdaptiveMetabolicCard(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        val statsCd = stringResource(
+            R.string.progress_adaptive_stats_cd,
+            expenditureKcal,
+            targetKcal,
+        )
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            // Four Text nodes that only mean anything together; spelled out
+            // once, with units, instead of four fragments.
+            modifier = Modifier
+                .fillMaxWidth()
+                .clearAndSetSemantics { contentDescription = statsCd },
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "ESTIMATED EXPENDITURE",
+                    text = stringResource(R.string.progress_adaptive_expenditure).uppercase(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "${result.estimatedTdeeKcal.toInt()} kcal",
+                    text = stringResource(R.string.progress_adaptive_kcal, expenditureKcal),
                     style = DataLarge.copy(fontSize = 24.sp),
                     color = extended.primaryFixedDim,
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "ADAPTED TARGET",
+                    text = stringResource(R.string.progress_adaptive_target).uppercase(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "${result.recommendedTargetKcal.toInt()} kcal",
+                    text = stringResource(R.string.progress_adaptive_kcal, targetKcal),
                     style = DataLarge.copy(fontSize = 24.sp),
                     color = extended.secondaryFixedDim,
                 )
@@ -487,6 +520,23 @@ fun AdaptiveMetabolicCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+/**
+ * The confidence enum is a wire value, not copy: never render `.name`, or a
+ * screen reader (and every non-English user) gets the identifier verbatim.
+ */
+private fun confidenceWordRes(
+    confidence: fit.aquazero.app.core.common.ExpenditureConfidence,
+): Int = when (confidence) {
+    fit.aquazero.app.core.common.ExpenditureConfidence.HIGH ->
+        R.string.progress_adaptive_confidence_high
+
+    fit.aquazero.app.core.common.ExpenditureConfidence.MODERATE ->
+        R.string.progress_adaptive_confidence_moderate
+
+    fit.aquazero.app.core.common.ExpenditureConfidence.LOW ->
+        R.string.progress_adaptive_confidence_low
 }
 
 private fun directionIcon(direction: String): ImageVector = when (direction) {

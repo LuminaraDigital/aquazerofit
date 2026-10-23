@@ -12,6 +12,7 @@ import { config } from './config';
 import { AppError } from './errors';
 import { getStore, newId } from './store';
 import { effectiveTier } from '../modules/billing/entitlements';
+import { verifyFirebaseIdToken } from './firebaseAdmin';
 
 export interface AuthUser {
   id: string;
@@ -206,31 +207,77 @@ export function revokeAllForUser(userId: string): void {
 
 // ----- middleware -----
 
+function attachUser(req: Request, user: User): void {
+  /*
+   * Role/tier reflect the current user record, not stale token claims - and
+   * tier goes through `effectiveTier`, which folds an expired `premiumUntil`
+   * back to free. This is the load-bearing call: `assertLaneAllowed` reads
+   * `req.user.tier` and nothing else, so a lapsed subscription that were
+   * read straight off the document would keep its premium lanes open until
+   * somebody noticed.
+   */
+  req.user = { id: user.id, role: user.role, tier: effectiveTier(user) };
+}
+
+function isUserDocument(user: User | undefined): user is User {
+  if (!user) return false;
+  return (user as { type?: string }).type !== 'refreshToken';
+}
+
+/**
+ * Dual auth: Firebase ID token (web) first when Admin is configured, then
+ * legacy HS256 access JWT (Android / Telegram / offline). Role and tier are
+ * always loaded from the document store - never from client-sent claims.
+ */
 export const requireAuth: RequestHandler = (req: Request, _res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     next(new AppError('AUTH_REQUIRED', 'Authentication required'));
     return;
   }
-  try {
-    const claims = verifyAccess(header.slice(7));
-    const user = getStore().byId<User>('users', claims.id);
-    if (!user || (user as { type?: string }).type === 'refreshToken') {
-      throw new AppError('AUTH_INVALID', 'Account no longer exists');
+  const token = header.slice(7);
+
+  void (async () => {
+    try {
+      const firebaseIdentity = await verifyFirebaseIdToken(token);
+      if (firebaseIdentity) {
+        // Dynamic import avoids a load-time cycle: this module is imported by
+        // auth/service, and firebaseUsers imports helpers from auth/service.
+        const { ensureUserFromFirebase } = await import('../modules/auth/firebaseUsers');
+        const user = ensureUserFromFirebase(firebaseIdentity, req.ip);
+        if (!isUserDocument(user)) {
+          throw new AppError('AUTH_INVALID', 'Account no longer exists');
+        }
+        attachUser(req, user);
+        next();
+        return;
+      }
+    } catch (err) {
+      // Not a Firebase token, or Firebase rejected it. Fall through to legacy
+      // JWT so Android/Telegram keep working when Admin is configured. A
+      // clearly-invalid Firebase token that is also not a legacy JWT still
+      // fails below.
+      if (err instanceof AppError) {
+        // Re-throw AppErrors from ensureUserFromFirebase; continue for verify failures.
+        if (err.code !== 'AUTH_INVALID' && err.code !== 'AUTH_REQUIRED') {
+          next(err);
+          return;
+        }
+      }
     }
-    /*
-     * Role/tier reflect the current user record, not stale token claims — and
-     * tier goes through `effectiveTier`, which folds an expired `premiumUntil`
-     * back to free. This is the load-bearing call: `assertLaneAllowed` reads
-     * `req.user.tier` and nothing else, so a lapsed subscription that were
-     * read straight off the document would keep its premium lanes open until
-     * somebody noticed.
-     */
-    req.user = { id: user.id, role: user.role, tier: effectiveTier(user) };
-    next();
-  } catch (err) {
-    next(err);
-  }
+
+    try {
+      const claims = verifyAccess(token);
+      const user = getStore().byId<User>('users', claims.id);
+      if (!isUserDocument(user)) {
+        throw new AppError('AUTH_INVALID', 'Account no longer exists');
+      }
+      attachUser(req, user);
+      next();
+    } catch (err) {
+      next(err instanceof AppError ? err : new AppError('AUTH_INVALID', 'Access token is invalid or expired'));
+    }
+  })().catch(next);
 };
 
 export const requireAdmin: RequestHandler = (req, _res, next) => {

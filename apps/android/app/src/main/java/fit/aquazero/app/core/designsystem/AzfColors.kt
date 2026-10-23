@@ -3,7 +3,7 @@ package fit.aquazero.app.core.designsystem
 import androidx.compose.ui.graphics.Color
 
 /**
- * Deep Sea palette — ported verbatim from
+ * Deep Sea palette - ported verbatim from
  * `design/figma/modern_aquatic_wellness/DESIGN.md`. This file is the single
  * source of truth for raw color values; everything else reads the
  * [androidx.compose.material3.ColorScheme] built in [AzfTheme] or the
@@ -61,6 +61,23 @@ object AzfColors {
     /** Progress-ring track (Level 1 border color from DESIGN.md elevation). */
     val RingTrack = Color(0xFF1E4C74)
 
-    /** Coral accent — the only color for weight *gain* (never red). */
     val Coral = Color(0xFFFFB2B9)
+
+    /** Semantic success (aliases secondary mint). */
+    val Success = Color(0xFF45DFA4)
+    val OnSuccess = Color(0xFF003825)
+    val SuccessContainer = Color(0xFF00BD85)
+    val OnSuccessContainer = Color(0xFF00452E)
+
+    /** Semantic warning (amber). */
+    val Warning = Color(0xFFFFC45A)
+    val OnWarning = Color(0xFF302000)
+    val WarningContainer = Color(0xFF664400)
+    val OnWarningContainer = Color(0xFFFFDCA0)
+
+    /** Semantic info (aliases primary aqua). */
+    val Info = Color(0xFF8AEBFF)
+    val OnInfo = Color(0xFF00363E)
+    val InfoContainer = Color(0xFF22D3EE)
+    val OnInfoContainer = Color(0xFF005763)
 }

@@ -1,10 +1,15 @@
 package fit.aquazero.app.feature.training
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.pm.PackageManager
 import android.content.res.Resources
+import android.os.Build
 import android.view.WindowManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -51,6 +56,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +67,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
@@ -165,12 +173,56 @@ fun WorkoutSessionScreen(
         }
     }
 
+    // The ongoing rest-timer notification runs in a `health` foreground
+    // service, and the platform only grants that type to callers holding one
+    // of its prerequisite permissions (see AndroidManifest.xml). Asked here,
+    // on the tap that starts a live workout, rather than at launch — it is the
+    // only moment where the reason for asking is on screen.
+    //
+    // The session starts either way. A denial costs the lock-screen surface,
+    // not the workout, so the two toasts below say so: a plain "not now", and
+    // a blocked permission where Android has stopped showing the dialog and
+    // the prompt would otherwise never appear again with no explanation.
+    val activityDenied = stringResource(R.string.session_activity_denied)
+    val activityBlocked = stringResource(R.string.session_activity_blocked)
+
+    // InlinedApi: `ACTIVITY_RECOGNITION` is an API 29 field, and minSdk is 26.
+    // It is a compile-time String constant, so it inlines and can never raise
+    // NoSuchFieldError — and this callback is only reachable after the
+    // launcher fired, which the SDK_INT guard in `onStartSession` below
+    // confines to API 29+. Lint cannot follow that, hence the suppression.
+    @Suppress("InlinedApi")
+    val activityPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (!granted) {
+            val canAskAgain = activity?.shouldShowRequestPermissionRationale(
+                Manifest.permission.ACTIVITY_RECOGNITION,
+            ) ?: false
+            toastController?.info(if (canAskAgain) activityDenied else activityBlocked)
+        }
+        viewModel.startSession()
+    }
+
+    val onStartSession: () -> Unit = {
+        val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACTIVITY_RECOGNITION,
+            ) != PackageManager.PERMISSION_GRANTED
+        if (needsPermission) {
+            activityPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        } else {
+            viewModel.startSession()
+        }
+    }
+
     WorkoutSessionContent(
         state = state,
         durationMinutes = viewModel.durationMinutes(),
         modifier = modifier,
         onBack = onBack,
-        onStart = viewModel::startSession,
+        onStart = onStartSession,
         onCompleteSet = viewModel::completeSet,
         onSkipExercise = viewModel::skipExercise,
         onSkipRest = viewModel::skipRest,
@@ -618,6 +670,7 @@ private fun TapTarget(
             .clickable(
                 interactionSource = interaction,
                 indication = null,
+                role = Role.Button,
                 onClick = onClick,
             )
             .semantics { contentDescription = description },
@@ -678,7 +731,9 @@ private fun RestCard(
                 .align(Alignment.CenterHorizontally)
                 // Description only, never a live region: re-announcing the
                 // countdown once a second would talk over the user's rest.
-                .semantics { contentDescription = remaining },
+                // Cleared, not merely described: the bare seconds Text inside
+                // the ring is otherwise a second stop reading just "45".
+                .clearAndSetSemantics { contentDescription = remaining },
         ) {
             Text(
                 text = state.restLeftSeconds.toString(),

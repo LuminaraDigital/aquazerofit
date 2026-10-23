@@ -29,8 +29,17 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
 
-        deepLinkStore.parseJoinChallengeIntent(intent)?.let(deepLinkStore::publish)
-        deepLinkStore.parseShortcutIntent(intent)?.let(deepLinkStore::publish)
+        // Only on a genuinely fresh launch. A non-null savedInstanceState means
+        // this activity is being rebuilt — a rotation, a theme change, a restore
+        // after process death — and Android hands `intent` back unchanged each
+        // time. Re-parsing it there would re-navigate on every rotation, undoing
+        // wherever the user had got to since the link opened. The back stack is
+        // already restored by then, and DeepLinkStore is @Singleton, so a link
+        // still queued because the user was signed out survives regardless.
+        if (savedInstanceState == null) {
+            deepLinkStore.parseJoinChallengeIntent(intent)?.let(deepLinkStore::publish)
+            deepLinkStore.parseShortcutIntent(intent)?.let(deepLinkStore::publish)
+        }
 
         // Dark-only theme: force dark scrims regardless of system setting.
         enableEdgeToEdge(

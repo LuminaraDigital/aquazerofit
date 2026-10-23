@@ -30,7 +30,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Chip } from '@/components/ui/Chip';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { CoachSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
 import { BottomSheet } from '@/pages/training/BottomSheet';
@@ -184,8 +184,8 @@ export default function Coach() {
   // already warm by the time the chat mounts.
   const roster = useCoachRoster();
   const activeCoach = roster.data?.roster.find((c) => c.id === roster.data?.activeCoachId);
-  // Every user-facing mention of "who you are talking to" — composer label,
-  // typing indicator, live-region announcements, empty-state greeting — names
+  // Every user-facing mention of "who you are talking to" - composer label,
+  // typing indicator, live-region announcements, empty-state greeting - names
   // the ACTIVE coach, falling back to the default character until the roster
   // loads. The message bubbles already did this (AssistantByline).
   const coachName = activeCoach ? activeCoach.name.split(' ')[0] : AQUA_CHARACTER.name;
@@ -474,11 +474,7 @@ export default function Coach() {
       {/* ---- message list ---- */}
       <main className="flex flex-1 flex-col gap-5 px-container-margin py-5" aria-label="Conversation with Aqua Coach">
         {sessionsQuery.isPending || (sessionId !== '' && messagesQuery.isPending) ? (
-          <div className="space-y-4">
-            <Skeleton className="h-20 w-3/4 rounded-card" />
-            <Skeleton className="ml-auto h-14 w-2/3 rounded-card" />
-            <Skeleton className="h-24 w-3/4 rounded-card" />
-          </div>
+          <CoachSkeleton />
         ) : sessionsQuery.isError ? (
           <ErrorState
             message="Could not open the coach."
@@ -719,7 +715,7 @@ export default function Coach() {
             value={input}
             disabled={streaming || sessionId === ''}
             onChange={(e) => setInput(e.target.value)}
-            className="flex-1 border-none bg-transparent px-2 text-base text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:ring-0 disabled:opacity-60"
+            className="flex-1 border-none bg-transparent px-2 text-base text-on-surface placeholder:text-outline focus:outline-none focus:ring-0 disabled:opacity-60"
           />
           {/* Logging is a separate, explicit action rather than something the
               coach infers from a chat turn: guessing "I ate X" from a sentence

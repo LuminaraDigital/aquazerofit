@@ -3,7 +3,6 @@ package fit.aquazero.app.feature.progress
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -32,6 +33,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -289,7 +292,9 @@ private fun UnitToggle(state: LogWeightUiState, onUnitChange: (WeightUnit) -> Un
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .semantics { contentDescription = groupLabel },
+            .semantics { contentDescription = groupLabel }
+            // Marks the pair as one radio group so TalkBack reads "1 of 2".
+            .selectableGroup(),
         horizontalArrangement = Arrangement.Center,
     ) {
         Row(
@@ -324,7 +329,15 @@ private fun UnitToggle(state: LogWeightUiState, onUnitChange: (WeightUnit) -> Un
                                 MaterialTheme.colorScheme.surfaceContainer
                             },
                         )
-                        .clickable { onUnitChange(unit) }
+                        // `selectable`, not `clickable`: kg/lb is a two-way
+                        // choice, so TalkBack should say "selected" rather
+                        // than leave the user to infer it from the fill.
+                        .selectable(
+                            selected = selected,
+                            role = Role.RadioButton,
+                            onClick = { onUnitChange(unit) },
+                        )
+                        .minimumInteractiveComponentSize()
                         .padding(horizontal = 20.dp, vertical = 8.dp),
                 )
             }

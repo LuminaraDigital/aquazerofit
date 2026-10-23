@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ====================================================================
-   Design tokens — the single binding point for the palette.
+   Design tokens - the single binding point for the palette.
 
    Values are space-separated sRGB channels, not hex, because that is the
    only form Tailwind can compose an alpha modifier against
@@ -13,10 +13,10 @@
    Everything below is the literal value the "Modern Aquatic Wellness"
    palette shipped with, so the browser target is unchanged by the
    indirection. Inside Telegram, lib/telegram.ts overwrites a *subset* of
-   these on :root at runtime — see the NEUTRALS/BRAND split there.
+   these on :root at runtime - see the NEUTRALS/BRAND split there.
    ==================================================================== */
 :root {
-  /* Neutrals — bound to the Telegram host when it is dark enough to keep
+  /* Neutrals - bound to the Telegram host when it is dark enough to keep
      the fixed brand foregrounds at WCAG AA. */
   --azf-surface: 14 20 22;
   --azf-surface-dim: 14 20 22;
@@ -31,7 +31,7 @@
   --azf-outline: 133 147 151;
   --azf-outline-variant: 60 73 76;
 
-  /* Brand — never bound to a host theme. These are the product's identity
+  /* Brand - never bound to a host theme. These are the product's identity
      (aqua / mint / coral) and the pairs they are used with; letting a chat
      client repaint them would make AquaZeroFit unrecognisable. */
   --azf-surface-tint: 47 217 244;
@@ -51,6 +51,21 @@
   --azf-on-error: 105 0 5;
   --azf-error-container: 147 0 10;
   --azf-on-error-container: 255 218 214;
+  /* Semantic status ramps: success aliases the secondary (mint) brand pair;
+     warning is a dedicated amber ramp; info aliases the primary (aqua) pair.
+     Components must use these roles, never raw Tailwind palette greens/reds. */
+  --azf-success: 69 223 164;
+  --azf-on-success: 0 56 37;
+  --azf-success-container: 0 189 133;
+  --azf-on-success-container: 0 69 46;
+  --azf-warning: 255 196 90;
+  --azf-on-warning: 48 32 0;
+  --azf-warning-container: 102 68 0;
+  --azf-on-warning-container: 255 220 160;
+  --azf-info: 138 235 255;
+  --azf-on-info: 0 54 62;
+  --azf-info-container: 34 211 238;
+  --azf-on-info-container: 0 87 99;
   --azf-primary-fixed-dim: 47 217 244;
   --azf-secondary-fixed-dim: 69 223 164;
   --azf-tertiary-fixed-dim: 255 178 185;
@@ -144,7 +159,7 @@ body {
 
 /* Inside a bound Telegram theme the host's background colour is the one the
    user chose, and an opaque full-screen aurora would hide it completely.
-   The shader stays — it is brand — but drops to a texture the host colour
+   The shader stays - it is brand - but drops to a texture the host colour
    can read through. Only ever set when lib/telegram.ts actually bound a
    theme, so the browser target never sees this rule apply. */
 html[data-tg-theme] .azf-bg-canvas {
@@ -203,16 +218,20 @@ html[data-tg-theme] .azf-bg-canvas {
 
   /* ---- CTA gradient with inner light ---- */
   .cta-gradient {
-    background: linear-gradient(135deg, #2fd9f4 0%, #45dfa4 100%);
+    background: linear-gradient(
+      135deg,
+      rgb(var(--azf-surface-tint)) 0%,
+      rgb(var(--azf-secondary)) 100%
+    );
     box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.25) inset,
-      0 4px 12px -4px rgba(47, 217, 244, 0.35);
+      0 1px 0 0 rgb(255 255 255 / 0.25) inset,
+      0 4px 12px -4px rgb(var(--azf-surface-tint) / 0.35);
   }
 
   .cta-gradient:active:not(:disabled) {
     box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.12) inset,
-      0 2px 6px -2px rgba(47, 217, 244, 0.2);
+      0 1px 0 0 rgb(255 255 255 / 0.12) inset,
+      0 2px 6px -2px rgb(var(--azf-surface-tint) / 0.2);
   }
 
   .heading-display {
@@ -239,7 +258,7 @@ html[data-tg-theme] .azf-bg-canvas {
      Applied by pages/settings/useHashTarget.ts when a `#id` deep link lands
      on a section, then removed. A single monotonic fade rather than a pulse:
      a repeating flash is a vestibular and photosensitivity hazard and reads
-     as an error. Brand aqua, deliberately not the coral/error tone — nothing
+     as an error. Brand aqua, deliberately not the coral/error tone - nothing
      has gone wrong, the user is just being shown where they asked to go.
      Colour is never the only signal: the hook also moves focus to the
      section, so assistive tech announces the arrival. */
@@ -435,7 +454,12 @@ html[data-tg-theme] .azf-bg-canvas {
   }
 
   .lp-gradient-text {
-    background: linear-gradient(120deg, #8aebff 0%, #2fd9f4 42%, #45dfa4 100%);
+    background: linear-gradient(
+      120deg,
+      rgb(var(--azf-primary)) 0%,
+      rgb(var(--azf-surface-tint)) 42%,
+      rgb(var(--azf-secondary)) 100%
+    );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -604,5 +628,12 @@ html[data-tg-theme] .azf-bg-canvas {
   @keyframes shimmer {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer {
+      animation: none;
+      background: rgb(var(--azf-surface-container-high) / 0.7);
+    }
   }
 }

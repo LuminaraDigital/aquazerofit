@@ -10,7 +10,9 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UnitPreference, WeightLog } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
-import { useProfile } from '@/lib/queries';
+import { asList } from '@/lib/envelopes';
+import { kgToLbs, lbsToKg, todayLocalDate } from '@/lib/format';
+import { queryKeys, useProfile } from '@/lib/queries';
 import { optimisticPatch, pendingWeightLog, upsertWeightLog } from '@/lib/optimistic';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -21,7 +23,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
 
-const KG_PER_LB = 0.45359237;
 type Unit = 'kg' | 'lb';
 
 /** Server may attach clamp / target-recompute advisories to the response. */
@@ -30,22 +31,6 @@ type WeightLogResponse = WeightLog & {
   clampReason?: string | null;
   advisory?: string;
 };
-
-/** Accept bare arrays and the API's { items } / { logs } envelopes. */
-function asList<T>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === 'object') {
-    const record = data as Record<string, unknown>;
-    for (const key of ['items', 'logs']) {
-      if (Array.isArray(record[key])) return record[key] as T[];
-    }
-  }
-  return [];
-}
-
-function todayLocal(): string {
-  return new Date().toLocaleDateString('en-CA');
-}
 
 const QUICK_NOTES = ['Morning fasted', 'Post-workout', 'After meal'];
 
@@ -57,7 +42,7 @@ export default function LogWeight() {
   const [unit, setUnit] = useState<Unit>('kg');
   const [unitTouched, setUnitTouched] = useState(false);
   const [value, setValue] = useState('');
-  const [date, setDate] = useState(todayLocal());
+  const [date, setDate] = useState(todayLocalDate());
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const idemKeyRef = useRef<string>(crypto.randomUUID());
@@ -76,7 +61,7 @@ export default function LogWeight() {
   }, [profileQuery.data, unitTouched]);
 
   const recentQuery = useQuery({
-    queryKey: ['weight', '30d'],
+    queryKey: queryKeys.weight('30d'),
     queryFn: async () =>
       asList<WeightLog>(await api<unknown>('/weight-logs', { query: { range: '30d' } })),
   });
@@ -87,8 +72,8 @@ export default function LogWeight() {
   );
   const latest = recent[0];
 
-  const toKg = (v: number) => (unit === 'lb' ? v * KG_PER_LB : v);
-  const display = (kg: number) => (unit === 'lb' ? kg / KG_PER_LB : kg);
+  const toKg = (v: number) => (unit === 'lb' ? lbsToKg(v) : v);
+  const display = (kg: number) => (unit === 'lb' ? kgToLbs(kg) : kg);
 
   const parsed = Number.parseFloat(value.replace(',', '.'));
   const parsedKg = Number.isFinite(parsed) ? toKg(parsed) : null;
@@ -107,7 +92,7 @@ export default function LogWeight() {
   const weightPatch = optimisticPatch<
     WeightLog[],
     { weightKg: number; note?: string; localDate: string }
-  >(queryClient, ['weight', '30d'], (previous, payload) =>
+  >(queryClient, queryKeys.weight('30d'), (previous, payload) =>
     upsertWeightLog(previous, pendingWeightLog({ key: idemKeyRef.current, ...payload })),
   );
 
@@ -151,7 +136,7 @@ export default function LogWeight() {
       setError(`Weight must be between ${unit === 'kg' ? '30 and 300 kg' : '66 and 661 lb'}`);
       return;
     }
-    if (date > todayLocal()) {
+    if (date > todayLocalDate()) {
       setError('Date cannot be in the future');
       return;
     }
@@ -203,7 +188,7 @@ export default function LogWeight() {
                 // convert the display value so the physical weight is preserved
                 if (Number.isFinite(parsed)) {
                   const kg = toKg(parsed);
-                  setValue(((u === 'lb' ? kg / KG_PER_LB : kg)).toFixed(1));
+                  setValue((display(kg)).toFixed(1));
                 }
                 setUnit(u);
                 setUnitTouched(true);
@@ -259,7 +244,7 @@ export default function LogWeight() {
               id="weight-date"
               type="date"
               value={date}
-              max={todayLocal()}
+              max={todayLocalDate()}
               onChange={(e) => setDate(e.target.value)}
               className="flex-1 appearance-none border-none bg-transparent text-on-surface focus:outline-none focus:ring-0"
             />
@@ -284,7 +269,7 @@ export default function LogWeight() {
               placeholder="How are you feeling today?"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="flex-1 resize-none border-none bg-transparent text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:ring-0"
+              className="flex-1 resize-none border-none bg-transparent text-on-surface placeholder:text-outline focus:outline-none focus:ring-0"
             />
           </div>
           <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">

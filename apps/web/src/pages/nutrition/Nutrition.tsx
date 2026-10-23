@@ -1,31 +1,28 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import type {
-  DailyNutrition,
-  Food,
-  MealLog,
-  MealLogItem,
-  MealType,
-  TrendPoint,
-} from '@aquazerofit/shared';
+import type { DailyNutrition, MealLog, MealLogItem, MealType, TrendPoint } from '@aquazerofit/shared';
 import { api } from '@/lib/api';
 import { trackFirstValueMeal } from '@/lib/retention';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { RingProgress } from '@/components/ui/RingProgress';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { Skeleton, NutritionSkeleton } from '@/components/ui/Skeleton';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { MacroBar } from '../dashboard/MacroBar';
 import { WaterCard } from '../dashboard/WaterCard';
 import { BarcodeSheet } from './BarcodeSheet';
+import { FoodSearchSheet } from './FoodSearchSheet';
+import { GramsStepper } from './GramsStepper';
+import { rescaleItem } from './nutritionMath';
 import { CircularMacroRing } from '@/components/ui/CircularMacroRing';
 import { AquaCalendarPicker, type DayStatus } from '@/components/ui/AquaCalendarPicker';
 import { AquaStatusline } from '@/components/ui/AquaStatusline';
 import { useDeepLinkRouter } from '@/lib/deeplink';
+import { queryKeys } from '@/lib/queries';
 import {
   insertPendingMealLog,
   isPendingId,
@@ -44,294 +41,8 @@ import {
   todayLocalDate,
 } from '../dashboard/lib';
 
-// ---------------------------------------------------------------- shared bits
-
-/** Grams stepper used by the food sheet, meal editing and photo analysis review. */
-export function GramsStepper({
-  value,
-  onChange,
-  label,
-  step = 10,
-  min = 5,
-  max = 2000,
-}: {
-  value: number;
-  onChange: (grams: number) => void;
-  label?: string;
-  step?: number;
-  min?: number;
-  max?: number;
-}) {
-  const clamp = (n: number) => Math.max(min, Math.min(max, Math.round(n)));
-  return (
-    <div className="flex items-center gap-2 bg-surface-container rounded-full p-1 border border-outline-variant">
-      <button
-        type="button"
-        aria-label={`Decrease ${label ?? 'portion'} by ${step} grams`}
-        onClick={() => onChange(clamp(value - step))}
-        className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container-high text-primary active:scale-90 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-      >
-        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-          remove
-        </span>
-      </button>
-      <label className="sr-only" htmlFor={`grams-${label ?? 'portion'}`}>
-        {label ?? 'Portion'} grams
-      </label>
-      <input
-        id={`grams-${label ?? 'portion'}`}
-        type="number"
-        inputMode="numeric"
-        value={value}
-        min={min}
-        max={max}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          if (Number.isFinite(n)) onChange(clamp(n));
-        }}
-        className="w-14 bg-transparent text-center font-bold tabular-nums text-on-surface focus:outline-none"
-      />
-      <span className="text-xs text-on-surface-variant pr-1">g</span>
-      <button
-        type="button"
-        aria-label={`Increase ${label ?? 'portion'} by ${step} grams`}
-        onClick={() => onChange(clamp(value + step))}
-        className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container-high text-primary active:scale-90 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-      >
-        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-          add
-        </span>
-      </button>
-    </div>
-  );
-}
-
-function normaliseFoods(raw: unknown): Food[] {
-  if (Array.isArray(raw)) return raw as Food[];
-  if (raw && typeof raw === 'object') {
-    const o = raw as Record<string, unknown>;
-    if (Array.isArray(o.items)) return o.items as Food[];
-    if (Array.isArray(o.foods)) return o.foods as Food[];
-  }
-  return [];
-}
-
-/** Deterministic client-side kcal/macros from per-100g values (never model-estimated). */
-export function itemFromFood(food: Food, grams: number): MealLogItem {
-  const factor = grams / 100;
-  return {
-    foodId: food.id,
-    name: food.name,
-    grams,
-    kcal: Math.round(food.per100g.kcal * factor),
-    proteinG: round1(food.per100g.proteinG * factor),
-    carbsG: round1(food.per100g.carbsG * factor),
-    fatG: round1(food.per100g.fatG * factor),
-  };
-}
-
-/**
- * Bottom-sheet food search (debounced GET /foods?search=) with a grams portion
- * stepper. Calls onPick with a fully computed MealLogItem.
- */
-export function FoodSearchSheet({
-  open,
-  title,
-  onClose,
-  onPick,
-  pending = false,
-}: {
-  open: boolean;
-  title?: string;
-  onClose: () => void;
-  onPick: (item: MealLogItem) => void;
-  /** True while the caller's log mutation is in flight — disables Add so a
-   *  double-tap cannot submit twice. */
-  pending?: boolean;
-}) {
-  const [term, setTerm] = useState('');
-  const [debounced, setDebounced] = useState('');
-  const [selected, setSelected] = useState<Food | null>(null);
-  const [grams, setGrams] = useState(100);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(term.trim()), 300);
-    return () => clearTimeout(t);
-  }, [term]);
-
-  useEffect(() => {
-    if (!open) {
-      setTerm('');
-      setDebounced('');
-      setSelected(null);
-      setGrams(100);
-    }
-  }, [open]);
-
-  const foodsQuery = useQuery({
-    queryKey: ['foods', debounced],
-    queryFn: () => api<unknown>('/foods', { query: { search: debounced, limit: 20 } }),
-    enabled: open && debounced.length >= 2,
-  });
-  const foods = normaliseFoods(foodsQuery.data);
-
-  if (!open) return null;
-
-  const preview = selected ? itemFromFood(selected, grams) : null;
-
-  return (
-    <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={title ?? 'Add food'}>
-      <button
-        type="button"
-        aria-label="Close food search"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-      />
-      <div className="absolute bottom-0 inset-x-0 max-w-md mx-auto bg-surface-container-high rounded-t-3xl border-t border-border-aqua p-5 pb-8 max-h-[85vh] overflow-y-auto">
-        <div className="w-12 h-1.5 bg-outline-variant rounded-full mx-auto mb-4" aria-hidden="true" />
-        <h3 className="font-heading font-semibold uppercase tracking-[0.02em] text-xl text-on-surface mb-4">
-          {title ?? 'Add food'}
-        </h3>
-
-        {!selected ? (
-          <>
-            <Input
-              label="Search foods"
-              icon="search"
-              value={term}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTerm(e.target.value)}
-              placeholder="e.g. chicken breast"
-              autoFocus
-            />
-            <div className="mt-4 space-y-2" aria-live="polite">
-              {foodsQuery.isFetching && (
-                <>
-                  <Skeleton className="h-14 w-full rounded-xl" />
-                  <Skeleton className="h-14 w-full rounded-xl" />
-                  <Skeleton className="h-14 w-full rounded-xl" />
-                </>
-              )}
-              {!foodsQuery.isFetching && debounced.length >= 2 && foods.length === 0 && (
-                <EmptyState
-                  icon="search_off"
-                  title="No foods found"
-                  body="Try a shorter or different name."
-                />
-              )}
-              {!foodsQuery.isFetching &&
-                foods.map((food) => (
-                  <button
-                    key={food.id}
-                    type="button"
-                    onClick={() => {
-                      setSelected(food);
-                      setGrams(food.commonServings[0]?.grams ?? 100);
-                    }}
-                    className="w-full flex justify-between items-center gap-3 p-3 rounded-xl bg-surface-container-low border border-outline-variant text-left active:scale-[0.99] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-                  >
-                    <div>
-                      <p className="font-bold text-on-surface">{food.name}</p>
-                      <p className="text-xs text-on-surface-variant">
-                        {food.brand ? `${food.brand} · ` : ''}
-                        {food.category}
-                      </p>
-                    </div>
-                    <span className="text-sm text-primary font-bold tabular-nums whitespace-nowrap">
-                      {Math.round(food.per100g.kcal)} kcal/100g
-                    </span>
-                  </button>
-                ))}
-              {debounced.length < 2 && !foodsQuery.isFetching && (
-                <p className="text-sm text-on-surface-variant text-center py-6">
-                  Type at least two letters to search the food library.
-                </p>
-              )}
-            </div>
-          </>
-        ) : (
-          <div>
-            <button
-              type="button"
-              onClick={() => setSelected(null)}
-              className="flex items-center gap-1 text-primary text-sm font-medium mb-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                arrow_back
-              </span>
-              Back to search
-            </button>
-            <p className="font-bold text-on-surface text-lg mb-1">{selected.name}</p>
-            <p className="text-xs text-on-surface-variant mb-4">
-              {Math.round(selected.per100g.kcal)} kcal · P {round1(selected.per100g.proteinG)}g · C{' '}
-              {round1(selected.per100g.carbsG)}g · F {round1(selected.per100g.fatG)}g per 100g
-            </p>
-            {selected.commonServings.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {selected.commonServings.map((s) => (
-                  <button
-                    key={s.label}
-                    type="button"
-                    onClick={() => setGrams(s.grams)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
-                      grams === s.grams
-                        ? 'border-primary text-on-primary bg-primary'
-                        : 'border-outline-variant text-on-surface-variant'
-                    }`}
-                  >
-                    {s.label} ({s.grams}g)
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-medium text-on-surface">Portion</span>
-              <GramsStepper value={grams} onChange={setGrams} label={selected.name} />
-            </div>
-            {preview && (
-              <div className="rounded-xl bg-surface-container-low border border-outline-variant p-4 mb-4 tabular-nums">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-on-surface-variant">Calories</span>
-                  <span className="font-bold text-primary">{fmtInt(preview.kcal)} kcal</span>
-                </div>
-                <div className="flex justify-between text-xs text-on-surface-variant">
-                  <span>Protein {preview.proteinG}g</span>
-                  <span>Carbs {preview.carbsG}g</span>
-                  <span>Fat {preview.fatG}g</span>
-                </div>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => preview && !pending && onPick(preview)}
-              disabled={pending || !preview}
-              className="cta-gradient w-full h-14 rounded-xl text-on-primary font-bold active:scale-[0.98] transition-transform disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              {pending ? 'Adding…' : `Add ${grams}g`}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------ page
-
 interface TrendsResponse {
   kcal?: TrendPoint[];
-}
-
-/** Per-item scale factors from originally logged values (deterministic rescale). */
-function rescaleItem(original: MealLogItem, grams: number): MealLogItem {
-  const factor = original.grams > 0 ? grams / original.grams : 0;
-  return {
-    ...original,
-    grams,
-    kcal: Math.round(original.kcal * factor),
-    proteinG: round1(original.proteinG * factor),
-    carbsG: round1(original.carbsG * factor),
-    fatG: round1(original.fatG * factor),
-  };
 }
 
 export default function Nutrition() {
@@ -352,6 +63,9 @@ export default function Nutrition() {
   const [microOpen, setMicroOpen] = useState(false);
   const [macroRingMode, setMacroRingMode] = useState<'concentric' | 'single'>('concentric');
   const [editingLog, setEditingLog] = useState<MealLog | null>(null);
+  const editPanelRef = useRef<HTMLDivElement>(null);
+  const closeEdit = useCallback(() => setEditingLog(null), []);
+  useFocusTrap(Boolean(editingLog), editPanelRef, closeEdit);
   // Each editable row keeps the ORIGINAL logged item beside the shown one, so
   // rescaling stays anchored to the right food even after a sibling row is
   // removed (an index lookup into the unfiltered list rebased onto the wrong
@@ -367,17 +81,17 @@ export default function Nutrition() {
   }, [addSheetMeal, barcodeOpen]);
 
   const dailyQuery = useQuery({
-    queryKey: ['nutrition', 'daily', date],
+    queryKey: queryKeys.nutritionDaily(date),
     queryFn: () => api<DailyNutrition>('/analytics/nutrition/daily', { query: { date } }),
   });
   const trendsQuery = useQuery({
-    queryKey: ['nutrition', 'trends', '7d'],
+    queryKey: queryKeys.nutritionTrends('7d'),
     queryFn: () => api<TrendsResponse>('/analytics/nutrition/trends', { query: { range: '7d' } }),
   });
 
   const yesterdayDate = shiftLocalDate(date, -1);
   const yesterdayQuery = useQuery({
-    queryKey: ['nutrition', 'daily', yesterdayDate],
+    queryKey: queryKeys.nutritionDaily(yesterdayDate),
     queryFn: () => api<DailyNutrition>('/analytics/nutrition/daily', { query: { date: yesterdayDate } }),
   });
 
@@ -385,7 +99,7 @@ export default function Nutrition() {
 
   const invalidateLogs = () => {
     void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
-    void queryClient.invalidateQueries({ queryKey: ['progress'] });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.progress });
   };
 
   const copyYesterdayMeals = useMutation({
@@ -424,7 +138,7 @@ export default function Nutrition() {
 
   /**
    * Logging a meal is the app's most repeated write, so the row goes into the
-   * cache before the request leaves — but only the row.
+   * cache before the request leaves - but only the row.
    *
    * The day's totals (kcalConsumed, kcalRemaining, the macro rings) are folded
    * by the server against the user's targets, and this is the one screen where
@@ -435,7 +149,7 @@ export default function Nutrition() {
    */
   const addMealPatch = optimisticPatch<DailyNutrition, { mealType: MealType; item: MealLogItem }>(
     queryClient,
-    ['nutrition', 'daily', date],
+    queryKeys.nutritionDaily(date),
     (previous, { mealType, item }) =>
       insertPendingMealLog(
         previous,
@@ -453,7 +167,7 @@ export default function Nutrition() {
     ...addMealPatch,
     onError: (_err, _vars, context) => {
       addMealPatch.onError(context);
-      show('Could not log that food — please try again');
+      show('Could not log that food - please try again');
     },
     onSuccess: () => {
       setAddSheetMeal(null);
@@ -478,7 +192,7 @@ export default function Nutrition() {
       show('Meal updated');
       invalidateLogs();
     },
-    onError: () => show('Could not update the meal — please try again'),
+    onError: () => show('Could not update the meal - please try again'),
   });
 
   const deleteMeal = useMutation({
@@ -487,7 +201,7 @@ export default function Nutrition() {
       show('Entry removed');
       invalidateLogs();
     },
-    onError: () => show('Could not delete the entry — please try again'),
+    onError: () => show('Could not delete the entry - please try again'),
   });
 
   const kcalTrend = trendsQuery.data?.kcal ?? [];
@@ -619,11 +333,7 @@ export default function Nutrition() {
             retry={() => void dailyQuery.refetch()}
           />
         ) : !daily ? (
-          <div className="space-y-4">
-            <Skeleton className="h-56 w-full rounded-card" />
-            <Skeleton className="h-40 w-full rounded-card" />
-            <Skeleton className="h-40 w-full rounded-card" />
-          </div>
+          <NutritionSkeleton />
         ) : (
           <>
             {/* Calories remaining card with formula row */}
@@ -827,7 +537,7 @@ export default function Nutrition() {
                 disabled={copyYesterdayMeals.isPending}
                 className="glass-card p-4 flex flex-col items-start gap-2 active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60"
               >
-                <span className="material-symbols-outlined text-emerald-400" aria-hidden="true">
+                <span className="material-symbols-outlined text-success" aria-hidden="true">
                   content_copy
                 </span>
                 <span className="font-bold text-on-surface text-sm text-left">
@@ -1100,10 +810,10 @@ export default function Nutrition() {
           <button
             type="button"
             aria-label="Close edit"
-            onClick={() => setEditingLog(null)}
+            onClick={closeEdit}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
-          <div className="absolute bottom-0 inset-x-0 max-w-md mx-auto bg-surface-container-high rounded-t-3xl border-t border-border-aqua p-5 pb-8 max-h-[85vh] overflow-y-auto">
+          <div ref={editPanelRef} tabIndex={-1} className="absolute bottom-0 inset-x-0 max-w-md mx-auto bg-surface-container-high rounded-t-3xl border-t border-border-aqua p-5 pb-8 max-h-[85vh] overflow-y-auto outline-none">
             <div className="w-12 h-1.5 bg-outline-variant rounded-full mx-auto mb-4" aria-hidden="true" />
             <h3 className="font-heading font-semibold uppercase tracking-[0.02em] text-xl text-on-surface mb-4">
               Edit {MEAL_LABEL[editingLog.mealType]}

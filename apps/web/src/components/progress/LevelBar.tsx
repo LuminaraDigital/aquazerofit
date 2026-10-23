@@ -63,7 +63,7 @@ export function LevelBar({
       </div>
 
       {!compact && (
-        <p className="text-xs text-on-surface-variant/70 mt-1.5 tabular-nums">
+        <p className="text-xs text-on-surface-variant mt-1.5 tabular-nums">
           {nextLevelXp === null
             ? `${totalXp.toLocaleString()} XP — top of the ladder.`
             : `${intoLevel.toLocaleString()} / ${levelSpan.toLocaleString()} XP to level ${level + 1}`}
@@ -86,7 +86,7 @@ export function XpBreakdown({ experience }: { experience: ExperienceStatus | und
       {experience.todayBreakdown.map((entry) => (
         <li
           key={entry.kind}
-          className="text-[11px] px-2 py-1 rounded-full bg-surface-variant/40 text-on-surface-variant/80 tabular-nums"
+          className="text-[11px] px-2 py-1 rounded-full bg-surface-variant/40 text-on-surface-variant tabular-nums"
         >
           {entry.label} <span className="text-primary font-medium">+{entry.points}</span>
         </li>

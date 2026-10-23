@@ -204,7 +204,7 @@ export default function AquaCoachPage() {
                   Crisis conversations — it signposts real support instead of improvising.
                 </li>
               </ul>
-              <p className="mt-5 text-[12px] leading-relaxed text-on-surface-variant/70">
+              <p className="mt-5 text-[12px] leading-relaxed text-on-surface-variant">
                 Over-blocking is treated as acceptable and under-blocking is not, so it will
                 occasionally decline something benign. That trade is deliberate.
               </p>
@@ -296,7 +296,7 @@ export default function AquaCoachPage() {
                       key={heading}
                       role="columnheader"
                       scope="col"
-                      className="px-5 py-3 text-[11px] uppercase tracking-[0.14em] text-on-surface-variant/70"
+                      className="px-5 py-3 text-[11px] uppercase tracking-[0.14em] text-on-surface-variant"
                     >
                       {heading}
                     </th>
@@ -394,12 +394,12 @@ export default function AquaCoachPage() {
               <blockquote className="lp-card border-l-2 border-l-coral p-6">
                 <p className="text-[15px] leading-relaxed text-on-surface">{CRISIS_SIGNPOST}</p>
               </blockquote>
-              <p className="mt-4 text-[13px] leading-relaxed text-on-surface-variant/70">
+              <p className="mt-4 text-[13px] leading-relaxed text-on-surface-variant">
                 The crisis line named is an Australian service, matching where AquaZeroFit is
                 published. A deployment serving another country is expected to repoint it — it is a
                 single constant, and it is the kind of thing a fork must not leave stale.
               </p>
-              <p className="mt-6 flex gap-3 rounded-2xl border border-primary/20 bg-primary/[0.05] px-4 py-3 text-[13px] leading-relaxed text-on-surface-variant/80">
+              <p className="mt-6 flex gap-3 rounded-2xl border border-primary/20 bg-primary/[0.05] px-4 py-3 text-[13px] leading-relaxed text-on-surface-variant">
                 <span
                   className="material-symbols-outlined shrink-0 text-[18px] text-primary"
                   aria-hidden="true"
@@ -479,7 +479,7 @@ export default function AquaCoachPage() {
               <Reveal key={exchange.id} delay={i * 90}>
                 <div className="lp-card flex h-full flex-col p-5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant/70">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
                       {exchange.kind === 'answer' ? 'Answered' : 'Declined'}
                     </span>
                     {exchange.badge && (
@@ -506,7 +506,7 @@ export default function AquaCoachPage() {
             ))}
           </div>
 
-          <p className="mt-5 text-center text-[12px] text-on-surface-variant/70">
+          <p className="mt-5 text-center text-[12px] text-on-surface-variant">
             Illustrative exchanges, written to show each path. The screenshots elsewhere on this
             site are real captures.{' '}
             <Link

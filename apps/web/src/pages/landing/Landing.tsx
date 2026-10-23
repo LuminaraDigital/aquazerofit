@@ -88,7 +88,7 @@ function Hero() {
           </Reveal>
 
           <Reveal delay={300}>
-            <p className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-on-surface-variant/70">
+            <p className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-on-surface-variant">
               <span className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[15px]" aria-hidden="true">
                   lock

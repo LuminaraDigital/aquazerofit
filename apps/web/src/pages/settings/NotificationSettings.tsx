@@ -1,5 +1,5 @@
 /**
- * Notification settings — pixel reference:
+ * Notification settings - pixel reference:
  * Figma_aquazerofit_wellness_platform/notification_settings.
  *
  * The backend stores only the master "reminders" consent (PUT /me/consents);
@@ -51,7 +51,7 @@ function savePrefs(prefs: NotificationPrefs): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
   } catch {
-    // storage unavailable — prefs simply won't persist
+    // storage unavailable - prefs simply won't persist
   }
 }
 
@@ -97,7 +97,7 @@ export default function NotificationSettings() {
       <AppHeader back title="Notifications" />
 
       <main className="pt-6 px-container-margin">
-        {/* Honest delivery status — preferences persist, delivery ships later */}
+        {/* Honest delivery status: preferences persist, delivery ships later */}
         <div className="glass-card mb-6 flex items-start gap-3 border border-primary/20 p-4" role="status">
           <span className="material-symbols-outlined text-primary shrink-0" aria-hidden="true">
             info
@@ -112,9 +112,6 @@ export default function NotificationSettings() {
           <h2 className="font-heading font-semibold uppercase tracking-wider text-xl text-primary mb-2">
             Preferences
           </h2>
-          <p className="text-on-surface-variant text-base">
-            Stay on track with personalized alerts for your aquatic fitness journey.
-          </p>
         </section>
 
         {/* Master consent */}
@@ -137,9 +134,6 @@ export default function NotificationSettings() {
                   <h3 className="font-heading font-semibold text-lg text-on-surface">
                     All reminders
                   </h3>
-                  <p className="text-sm text-on-surface-variant">
-                    Master switch — stored with your consents.
-                  </p>
                 </div>
               </div>
               <Switch
@@ -168,7 +162,6 @@ export default function NotificationSettings() {
                   <h3 className="font-heading font-semibold text-lg text-on-surface">
                     Meal reminders
                   </h3>
-                  <p className="text-sm text-on-surface-variant">Don't miss a fueling window</p>
                 </div>
               </div>
               <Switch
@@ -210,7 +203,6 @@ export default function NotificationSettings() {
                   <h3 className="font-heading font-semibold text-lg text-on-surface">
                     Water reminders
                   </h3>
-                  <p className="text-sm text-on-surface-variant">Stay hydrated and fluid</p>
                 </div>
               </div>
               <Switch
@@ -255,7 +247,6 @@ export default function NotificationSettings() {
                   <h3 className="font-heading font-semibold text-lg text-on-surface">
                     Workout time
                   </h3>
-                  <p className="text-sm text-on-surface-variant">Your daily performance session</p>
                 </div>
               </div>
               <Switch
@@ -297,7 +288,6 @@ export default function NotificationSettings() {
                   <h3 className="font-heading font-semibold text-lg text-on-surface">
                     Weekly weigh-in
                   </h3>
-                  <p className="text-sm text-on-surface-variant">Track your transformation</p>
                 </div>
               </div>
               <Switch
@@ -333,7 +323,7 @@ export default function NotificationSettings() {
           </div>
         </div>
 
-        <p className="mt-6 text-xs text-on-surface-variant/70 text-center px-4">
+        <p className="mt-6 text-xs text-on-surface-variant text-center px-4">
           Reminder times and per-category choices are stored on this device only. The master
           switch is saved to your account consents.
         </p>

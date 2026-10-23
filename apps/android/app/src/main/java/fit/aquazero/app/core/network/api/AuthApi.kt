@@ -5,7 +5,6 @@ import fit.aquazero.app.core.model.AuthTokensDto
 import fit.aquazero.app.core.model.CaptchaConfigDto
 import fit.aquazero.app.core.model.LoginRequest
 import fit.aquazero.app.core.model.LogoutRequest
-import fit.aquazero.app.core.model.PasswordResetConfirmRequest
 import fit.aquazero.app.core.model.PasswordResetRequest
 import fit.aquazero.app.core.model.RefreshRequest
 import fit.aquazero.app.core.model.RegisterRequest
@@ -37,9 +36,9 @@ interface AuthApi {
     @POST("auth/logout")
     suspend fun logout(@Body body: LogoutRequest)
 
+    // Request only. The reset itself is completed from the emailed link on the
+    // web, so there is deliberately no `auth/password-reset/confirm` binding
+    // here — the endpoint exists server-side, this client just never calls it.
     @POST("auth/password-reset/request")
     suspend fun requestPasswordReset(@Body body: PasswordResetRequest)
-
-    @POST("auth/password-reset/confirm")
-    suspend fun confirmPasswordReset(@Body body: PasswordResetConfirmRequest)
 }

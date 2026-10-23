@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -446,6 +447,11 @@ private fun PlanWeekStrip(
                 day.isRest -> restWord
                 else -> date.dayOfMonth.toString()
             }
+            val dayLabel = stringResource(
+                R.string.training_week_day_cd,
+                day.focus.ifBlank { restWord },
+                stateWord,
+            )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = date.dayOfWeek.getDisplayName(JavaTextStyle.NARROW, locale),
@@ -464,9 +470,7 @@ private fun PlanWeekStrip(
                                 else -> Modifier.background(MaterialTheme.colorScheme.surfaceContainer)
                             },
                         )
-                        .semantics {
-                            contentDescription = "${day.focus.ifBlank { restWord }}, $stateWord"
-                        },
+                        .semantics { contentDescription = dayLabel },
                     contentAlignment = Alignment.Center,
                 ) {
                     when {
@@ -646,7 +650,7 @@ private fun ExerciseListCard(card: ExerciseCard, onClick: () -> Unit) {
         tier = AzfCardTier.Compact,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = openLabel },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

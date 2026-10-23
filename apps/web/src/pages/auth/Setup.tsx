@@ -1,13 +1,13 @@
 /**
- * Wellness essentials — the one form the product still insists on, and only at
+ * Wellness essentials - the one form the product still insists on, and only at
  * the moment a target is actually wanted.
  *
  * Scope is set by the target calculator, not by what would be nice to know:
  * Mifflin-St Jeor needs weight, height and age (sex shifts the offset and has a
  * documented neutral value), the activity factor needs activity level, and the
  * goal adjustment needs the goal. Six controls, one screen. Everything the old
- * four-step wizard also demanded — training experience, equipment, dietary
- * preferences, allergies, a target weight — feeds personalisation rather than
+ * four-step wizard also demanded - training experience, equipment, dietary
+ * preferences, allergies, a target weight - feeds personalisation rather than
  * arithmetic, so it is written at its conservative value here (bodyweight-only,
  * beginner progression, no declared exclusions) and edited later in Settings,
  * where those fields already live.
@@ -36,7 +36,7 @@ import { Input } from '../../components/ui/Input';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SecondaryButton } from '../../components/ui/SecondaryButton';
 import { RingProgress } from '../../components/ui/RingProgress';
-import { PageSpinner } from '../../components/ui/PageSpinner';
+import { SetupTargetsSkeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../components/ui/Toast';
 import { OptionCardGroup, SegmentedOptions, UnitToggle } from '../../components/ui/fields';
 
@@ -44,9 +44,9 @@ type ActivityLevel = ProfileInput['activityLevel'];
 
 const ACTIVITY_OPTIONS: { value: ActivityLevel; label: string; hint: string }[] = [
   { value: 'sedentary', label: 'Sedentary', hint: 'Desk-bound, little exercise.' },
-  { value: 'light', label: 'Light', hint: 'Light exercise 1–3 days a week.' },
-  { value: 'moderate', label: 'Moderate', hint: 'Exercise 3–5 days a week.' },
-  { value: 'active', label: 'Active', hint: 'Hard exercise 6–7 days a week.' },
+  { value: 'light', label: 'Light', hint: 'Light exercise 1-3 days a week.' },
+  { value: 'moderate', label: 'Moderate', hint: 'Exercise 3-5 days a week.' },
+  { value: 'active', label: 'Active', hint: 'Hard exercise 6-7 days a week.' },
   { value: 'veryActive', label: 'Very active', hint: 'Physical job or twice-daily training.' },
 ];
 
@@ -93,7 +93,7 @@ function resolveWeightKg(s: FormState): number {
   return Math.round(displayToKg(Number(s.weight) || 0, s.unit) * 10) / 10;
 }
 
-/** Same-origin relative paths only — the `next` parameter is user-controllable. */
+/** Same-origin relative paths only - the `next` parameter is user-controllable. */
 function safeNext(path: string | null): string {
   if (!path || !path.startsWith('/') || path.startsWith('//')) return '/';
   if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return '/';
@@ -250,7 +250,7 @@ export default function Setup() {
         Your daily targets
       </h1>
       <p className="text-sm text-on-surface-variant mb-6 leading-relaxed">
-        Six answers is everything the calculator needs. Nothing here is a guess — your
+        Six answers is everything the calculator needs. Nothing here is a guess - your
         calories, macros and water come straight out of these numbers.
       </p>
 
@@ -486,14 +486,14 @@ function ConsentCheckbox({
 }
 
 /**
- * The payoff screen. Kept from the original wizard — seeing the numbers appear
- * is the moment the six questions justify themselves — and it now also names
+ * The payoff screen. Kept from the original wizard - seeing the numbers appear
+ * is the moment the six questions justify themselves - and it now also names
  * where the deferred parts of the profile are picked up.
  */
 function TargetsReveal({ onDone }: { onDone: () => void }) {
   const { data: targets, isLoading } = useTargets();
 
-  if (isLoading || !targets) return <PageSpinner />;
+  if (isLoading || !targets) return <SetupTargetsSkeleton />;
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col px-container-margin pt-10 pb-10">
@@ -582,14 +582,14 @@ function TargetsReveal({ onDone }: { onDone: () => void }) {
           <p className="text-xs text-on-surface-variant leading-relaxed">
             We adjusted your calorie target to a safe minimum
             {targets.clampReason ? ` (${targets.clampReason})` : ''}. Slower, sustainable progress
-            protects your health — AquaZeroFit never recommends eating below this floor.
+            protects your health - AquaZeroFit never recommends eating below this floor.
           </p>
         </div>
       )}
 
-      <p className="text-xs text-on-surface-variant/70 leading-relaxed mb-4">
+      <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
         Allergies, dietary preferences, home equipment and training experience live in
-        Settings — add them whenever you like and the plans and meal ideas will follow.
+        Settings - add them whenever you like and the plans and meal ideas will follow.
       </p>
 
       <div className="mt-auto">

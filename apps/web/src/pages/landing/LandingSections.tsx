@@ -111,7 +111,7 @@ export function Marquee() {
           <div key={copy} className="flex shrink-0 items-center">
             {MARQUEE_ITEMS.map((item) => (
               <span key={item} className="flex items-center whitespace-nowrap px-6">
-                <span className="text-sm font-medium uppercase tracking-[0.16em] text-on-surface-variant/70">
+                <span className="text-sm font-medium uppercase tracking-[0.16em] text-on-surface-variant">
                   {item}
                 </span>
                 <span className="ml-6 h-1 w-1 rounded-full bg-primary/40" />
@@ -150,7 +150,7 @@ function StatTile({
           </>
         )}
       </div>
-      <p className="mt-2 text-[13px] leading-snug text-on-surface-variant/70">{label}</p>
+      <p className="mt-2 text-[13px] leading-snug text-on-surface-variant">{label}</p>
     </div>
   );
 }
@@ -243,7 +243,7 @@ export function Features() {
                         Step {i + 1}
                       </p>
                       <p className="mt-1 text-[13px] font-semibold text-on-surface">{step.k}</p>
-                      <p className="text-[11px] text-on-surface-variant/70">{step.v}</p>
+                      <p className="text-[11px] text-on-surface-variant">{step.v}</p>
                     </div>
                   ))}
                 </div>
@@ -424,7 +424,7 @@ export function Gallery() {
                     />
                     <span
                       className={`font-heading text-base font-semibold transition-colors ${
-                        selected ? 'text-on-surface' : 'text-on-surface-variant/80'
+                        selected ? 'text-on-surface' : 'text-on-surface-variant'
                       }`}
                     >
                       {screen.title}
@@ -617,7 +617,7 @@ export function CoachDemo() {
                 'Remembers only what you confirm; suggested facts wait for your approval',
                 'Personalisation is off until you consent, and revocable at any time',
               ].map((item) => (
-                <li key={item} className="flex gap-3 text-sm text-on-surface-variant/80">
+                <li key={item} className="flex gap-3 text-sm text-on-surface-variant">
                   <span
                     className="material-symbols-outlined mt-0.5 text-[18px] text-secondary"
                     aria-hidden="true"
@@ -644,13 +644,13 @@ export function CoachDemo() {
               </span>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-on-surface">Aqua Coach</p>
-                <p className="text-[11px] text-on-surface-variant/70">
+                <p className="text-[11px] text-on-surface-variant">
                   Grounded in today&apos;s context
                 </p>
               </div>
               {/* The screens above are real captures; this exchange is scripted
                   to show the refusal path, so it says so. */}
-              <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-on-surface-variant/70">
+              <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-on-surface-variant">
                 Illustrative
               </span>
             </div>
@@ -685,7 +685,7 @@ export function CoachDemo() {
               ))}
             </div>
 
-            <p className="mt-5 border-t border-white/6 pt-4 text-[11px] leading-relaxed text-on-surface-variant/70">
+            <p className="mt-5 border-t border-white/6 pt-4 text-[11px] leading-relaxed text-on-surface-variant">
               {WELLNESS_DISCLAIMER}
             </p>
           </div>
@@ -770,7 +770,7 @@ export function Safety() {
               <h3 className="mt-4 font-heading text-lg font-semibold text-on-surface">
                 {item.title}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/70">{item.body}</p>
+              <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">{item.body}</p>
             </div>
           </Reveal>
         ))}
@@ -819,7 +819,7 @@ export function Platform() {
                 rather than left to bounce. The claim is deliberately specific:
                 one codebase really does serve both, so "the same app" is a
                 statement about the build, not a marketing softener. */}
-            <p className="mt-5 border-t border-white/5 pt-5 text-[13px] leading-relaxed text-on-surface-variant/70">
+            <p className="mt-5 border-t border-white/5 pt-5 text-[13px] leading-relaxed text-on-surface-variant">
               Telegram blocked on your network?{' '}
               <Link
                 to="/sign-in?mode=register"
@@ -846,7 +846,7 @@ export function Platform() {
               so every core journey works without a provider account.
             </p>
             <div className="mt-6 overflow-x-auto rounded-xl border border-white/8 bg-black/40 p-4">
-              <pre className="text-[12px] leading-relaxed text-on-surface-variant/80">
+              <pre className="text-[12px] leading-relaxed text-on-surface-variant">
                 <code>
                   {'git clone ' + SOURCE_CODE_URL + '.git\nnpm install\nnpm run api & npm run dev'}
                 </code>

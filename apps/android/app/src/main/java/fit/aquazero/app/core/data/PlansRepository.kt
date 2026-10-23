@@ -130,9 +130,6 @@ class PlansRepository @Inject constructor(
     suspend fun saveSessionDraft(sessionId: String, exerciseIndex: Int, setLogsJson: String?) =
         trainingDao.saveDraft(sessionId, exerciseIndex, setLogsJson, System.currentTimeMillis())
 
-    /** Clear the draft after completion or abandonment. */
-    suspend fun clearSessionDraft(sessionId: String) = trainingDao.clearDraft(sessionId)
-
     /**
      * Upsert a session document while preserving any in-session draft columns:
      * `@Upsert` replaces the whole row, and a background refresh must never

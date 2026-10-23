@@ -72,6 +72,10 @@ data class AzfExtendedColors(
     val primaryFixedDim: Color,
     /** Vibrant sea-green accent (`secondary-fixed-dim`). */
     val secondaryFixedDim: Color,
+    /** Semantic success / warning / info for status chrome. */
+    val success: Color,
+    val warning: Color,
+    val info: Color,
 )
 
 /** Default extended tokens; the gradient runs top-left → bottom-right (135°). */
@@ -85,6 +89,9 @@ val AzfExtended: AzfExtendedColors = AzfExtendedColors(
     coral = AzfColors.Coral,
     primaryFixedDim = AzfColors.PrimaryFixedDim,
     secondaryFixedDim = AzfColors.SecondaryFixedDim,
+    success = AzfColors.Success,
+    warning = AzfColors.Warning,
+    info = AzfColors.Info,
 )
 
 /** Composition local for [AzfExtendedColors]; provided by [AzfTheme]. */

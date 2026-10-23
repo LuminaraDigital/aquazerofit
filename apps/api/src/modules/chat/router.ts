@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { requireAuth } from '../../platform/auth';
 import { localeOf } from '../../platform/locale';
 import { AppError } from '../../platform/errors';
-import { chatMessageSchema, WELLNESS_DISCLAIMER, portionCorrectionWorthRemembering } from '@aquazerofit/shared';
+import { chatMessageSchema, localDateSchema, WELLNESS_DISCLAIMER, portionCorrectionWorthRemembering } from '@aquazerofit/shared';
 import type { Allergen, ChatMessage, ChatSession, Food, MealLogItem, MealType, User } from '@aquazerofit/shared';
 import { complete, stream, type GatewayResult } from '../ai/gateway';
 import {
@@ -26,11 +26,12 @@ import {
   type GuardrailDecision,
 } from '../ai/guardrails';
 import { warnOnStyle } from '../ai/styleLint';
-import { creditLedger } from '../ai/creditLedger';
+import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { assertLaneAllowed } from '../ai/tierPolicy';
 import { systemMessagesFor } from '../ai/persona';
 import { activeCoachFor } from '../coaches/service';
-import { asyncHandler, deleteDoc, getUser, localToday, newId, nowIso, readProfile, sleep, upsertDoc, whereDocs, byIdDoc } from '../ai/util';
+import { todayFor } from '../../platform/dates';
+import { asyncHandler, deleteDoc, getUser, newId, nowIso, readProfile, sleep, upsertDoc, whereDocs, byIdDoc } from '../ai/util';
 import { hasConsent } from '../me/service';
 // Deliberate team-boundary exception, and the point of the feature: chat-native
 // logging must produce the SAME meal-log row as the food tab, written by the
@@ -275,7 +276,7 @@ chatRouter.post(
       // log data enters model context and the coach answers generically.
       const localDate = typeof req.body?.localDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.localDate)
         ? (req.body.localDate as string)
-        : localToday();
+        : todayFor(req);
       const consented = hasConsent(user.id, 'aiPersonalisation');
       // Display name is identity, not wellness data — but greeting by name is
       // still personalisation, so it flows only with the same consent.
@@ -396,14 +397,10 @@ chatRouter.post(
         createdAt: nowIso(),
       };
       await upsertDoc('ai', assistantMessage);
-      // Real providers failed and the gateway fell back to offline templates —
+      // Real providers failed and the gateway fell back to offline templates -
       // do not charge. Keyless mock (no providers configured) keeps degraded
       // false and bills normally per product rules.
-      if (result.meta.degraded) {
-        await creditLedger.release(reservationId);
-      } else {
-        await creditLedger.commit(reservationId);
-      }
+      await settleReservation(reservationId, result.meta.degraded !== true);
 
       // Memory write-back (Phase 2): stage suggested facts from this turn.
       // Fire-and-forget with the same consent gate — never delays the stream,
@@ -469,7 +466,6 @@ chatRouter.post(
 // ---------------------------------------------------------------------------
 
 const mealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
-const localDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'localDate must be YYYY-MM-DD');
 
 const createMealDraftSchema = z.object({
   text: z.string().trim().min(1).max(MAX_SOURCE_TEXT_LENGTH),
@@ -529,7 +525,7 @@ chatRouter.post(
       });
     }
     const { text, mealType: requestedMealType, localDate: requestedDate } = parsed.data;
-    const localDate = requestedDate ?? localToday();
+    const localDate = requestedDate ?? todayFor(req);
 
     // The session is a display association only — a draft is valid without one.
     let sessionId: string | null = null;
@@ -614,11 +610,7 @@ chatRouter.post(
       // Offline-template output after real providers failed is not a model
       // answer the user should pay for; neither is a proposal with nothing in
       // it. Same stance as the chat, recommendation and vision lanes.
-      if (result.meta.degraded || items.length === 0) {
-        await creditLedger.release(reservationId);
-      } else {
-        await creditLedger.commit(reservationId);
-      }
+      await settleReservation(reservationId, !(result.meta.degraded || items.length === 0));
 
       res.status(201).json({ draft });
     } catch (err) {

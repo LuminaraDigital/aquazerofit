@@ -20,6 +20,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -40,6 +42,7 @@ import fit.aquazero.app.core.designsystem.AzfChip
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.ConfidenceBandChip
+import fit.aquazero.app.core.designsystem.CookingFatPresetsRow
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.FatCautionBanner
 import fit.aquazero.app.core.designsystem.GramsStepper
@@ -177,25 +180,17 @@ fun MealDraftCard(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            CookingFatPresetsRow(
                 modifier = Modifier.padding(top = 6.dp),
-            ) {
-                MealTrust.cookingFatPresets.forEach { preset ->
-                    AzfChip(
-                        text = preset.label,
-                        selected = false,
-                        onClick = {
-                            fatAdditives = fatAdditives + CookingFatLine(
-                                key = "fat-${preset.id}-${System.currentTimeMillis()}",
-                                preset = preset,
-                                grams = preset.grams.roundToInt(),
-                            )
-                            acknowledged = false
-                        },
+                onPresetClick = { preset ->
+                    fatAdditives = fatAdditives + CookingFatLine(
+                        key = "fat-${preset.id}-${System.currentTimeMillis()}",
+                        preset = preset,
+                        grams = preset.grams.roundToInt(),
                     )
-                }
-            }
+                    acknowledged = false
+                },
+            )
             Spacer(Modifier.height(12.dp))
         }
 
@@ -346,7 +341,10 @@ private fun DraftItemRow(
                     color = LocalAzfExtended.current.primaryFixedDim,
                     modifier = Modifier
                         .padding(top = 6.dp)
-                        .clickable(onClick = onLogManually),
+                        .clickable(role = Role.Button, onClick = onLogManually)
+                        // A bare text link: without this the target is one
+                        // line of labelLarge, roughly 20dp.
+                        .minimumInteractiveComponentSize(),
                 )
             }
         }
@@ -497,7 +495,7 @@ private fun FoodPicker(
                     .fillMaxWidth()
                     .clip(AzfShapes.Inner)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .clickable { open = true }
+                    .clickable(role = Role.DropdownList) { open = true }
                     .padding(horizontal = 12.dp, vertical = 14.dp),
             )
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
@@ -547,7 +545,9 @@ private fun CookingFatRow(
                 text = stringResource(R.string.trust_cooking_fat_remove),
                 style = MaterialTheme.typography.labelLarge,
                 color = LocalAzfExtended.current.primaryFixedDim,
-                modifier = Modifier.clickable(onClick = onRemove),
+                modifier = Modifier
+                    .clickable(role = Role.Button, onClick = onRemove)
+                    .minimumInteractiveComponentSize(),
             )
         }
         Row(

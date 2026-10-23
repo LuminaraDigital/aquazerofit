@@ -18,6 +18,7 @@ import { sweepExpiredDeletions } from './modules/me/service';
 import { sweepIdempotencyRecords } from './modules/logs/service';
 import { sweepVisionArtifacts } from './modules/vision/router';
 import { sweepGrowthEvents } from './modules/analytics/router';
+import { creditLedger } from './modules/ai/creditLedger';
 
 // Fail fast: never boot a production process on dev fallback secrets.
 assertProductionSecrets();
@@ -90,8 +91,28 @@ function runVisionSweep(): void {
     .catch((err) => console.error('[sweep] vision sweep failed', err));
 }
 
+/*
+ * Credits held by a process that died before it could settle them.
+ *
+ * Every lane releases its own hold on every branch it can reach; none of them
+ * covers the process stopping between the reserve and the settle, and against
+ * an append-only ledger that loss is permanent — the user is simply short, with
+ * nothing left holding a reference to the hold. Runs on boot as well as on the
+ * interval, because a process that crashes more often than the interval would
+ * otherwise never sweep the very holds its own crashes created.
+ */
+function runReservationSweep(): void {
+  creditLedger
+    .sweepStaleReservations()
+    .then((n) => {
+      if (n > 0) console.log(`[sweep] returned ${n} abandoned credit reservation(s)`);
+    })
+    .catch((err) => console.error('[sweep] reservation sweep failed', err));
+}
+
 runDeletionSweep();
 runGrowthEventSweep();
+runReservationSweep();
 // Prune on boot as well as on the interval: a process that restarts more often
 // than the interval would otherwise never sweep at all, which is exactly how
 // the idempotency backlog grew unbounded in the first place.
@@ -100,6 +121,10 @@ runVisionSweep();
 setInterval(runDeletionSweep, 6 * 3600 * 1000).unref();
 setInterval(runGrowthEventSweep, 6 * 3600 * 1000).unref();
 setInterval(runVisionSweep, 3600 * 1000).unref();
+// Six-hourly, not hourly: the cutoff inside the sweep already sits beyond the
+// longest legitimate hold (a meal photo analysed but not yet confirmed holds
+// its reservation for up to 24h), so sweeping more often buys nothing.
+setInterval(runReservationSweep, 6 * 3600 * 1000).unref();
 // unref'ed like its neighbours so a pending sweep can never hold a shutting
 // down process open, and not scheduled at all under test — nothing in the
 // suite loads this module today, but a timer that outlives a test worker is a

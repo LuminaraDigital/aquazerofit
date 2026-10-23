@@ -214,13 +214,6 @@ export class DeepLinkRouter {
 export const defaultDeepLinkRouter = new DeepLinkRouter();
 
 /**
- * Convenience helper to parse a deep link string.
- */
-export function parseDeepLink(input?: string): DeepLinkResult | null {
-  return defaultDeepLinkRouter.parse(input);
-}
-
-/**
  * Convenience helper to route a deep link string.
  */
 export function handleDeepLink(input?: string, navigate?: (path: string) => void): boolean {

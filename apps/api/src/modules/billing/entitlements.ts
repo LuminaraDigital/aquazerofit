@@ -225,6 +225,42 @@ export function entitlementHistory(userId: string): EntitlementGrant[] {
 }
 
 /**
+ * Which account, if any, a provider's subscription reference is already bound
+ * to.
+ *
+ * A purchase token is a bearer string: whoever holds it can present it. Google
+ * echoing back an `obfuscatedExternalAccountId` is the strong answer to "whose
+ * purchase is this", but it exists only for purchases made by a client build
+ * that sent one — and for the rest, nothing else in this module says a token
+ * may not be claimed twice. The idempotency key hides that for an exact replay
+ * (same token, same expiry, already settled) and stops hiding it the moment the
+ * subscription renews, because the expiry moves and the replay becomes a new
+ * event on somebody else's account.
+ *
+ * So the first account to settle a reference owns it. That is trust on first
+ * use, which is weaker than Google's own identifier and is deliberately only
+ * the fallback for tokens that carry none.
+ *
+ * Matches `providerRef` and, for grants written before the two were separated,
+ * `externalId`. Returns the EARLIEST claimant: a ledger that already contains
+ * two accounts for one token — written before this check existed — must resolve
+ * to the same account every time it is asked, and the first one is the one that
+ * actually paid.
+ */
+export function accountForProviderRef(providerRef: string): string | null {
+  const grants = getStore()
+    .where<EntitlementGrant>(
+      'ledger',
+      (d) =>
+        (d as { type?: string }).type === 'entitlementGrant' &&
+        ((d as EntitlementGrant).providerRef === providerRef ||
+          (d as { externalId?: string }).externalId === providerRef),
+    )
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return grants[0]?.userId ?? null;
+}
+
+/**
  * Effective tier for a userId, for callers deep in a service that hold an id
  * rather than a document.
  *

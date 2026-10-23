@@ -24,6 +24,8 @@ import {
   requestPasswordReset,
   telegramAuth,
 } from './service';
+import { firebaseSession } from './firebaseUsers';
+import { verifyFirebaseIdToken, isFirebaseAdminConfigured } from '../../platform/firebaseAdmin';
 import {
   clearRefreshCookie,
   resolveRefreshToken,
@@ -117,6 +119,34 @@ authRouter.post('/telegram', (req, res) => {
   const { initData } = telegramAuthSchema.parse(req.body);
   sendAuth(req, res, telegramAuth(initData, req.ip));
 });
+
+/**
+ * Web Firebase Auth session bootstrap. Client signs in with the Firebase SDK,
+ * then POSTs here with Authorization: Bearer <ID_TOKEN>. Hydrates / links the
+ * local User document and returns { user }. Protected API calls continue to
+ * send the same Firebase ID token; this route only materialises the public
+ * user envelope for the client cache.
+ */
+authRouter.post(
+  '/firebase/session',
+  asyncHandler(async (req, res) => {
+    if (!isFirebaseAdminConfigured()) {
+      throw new AppError(
+        'AUTH_INVALID',
+        'Firebase Auth is not configured on this server',
+      );
+    }
+    const header = req.headers.authorization;
+    if (!header?.startsWith('Bearer ')) {
+      throw new AppError('AUTH_REQUIRED', 'Firebase ID token required');
+    }
+    const identity = await verifyFirebaseIdToken(header.slice(7));
+    if (!identity) {
+      throw new AppError('AUTH_INVALID', 'Firebase ID token required');
+    }
+    res.json(firebaseSession(identity, req.ip));
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Password reset (frozen contract). Both endpoints sit on the strict /auth

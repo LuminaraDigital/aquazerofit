@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import fit.aquazero.app.MainActivity
 import fit.aquazero.app.R
@@ -41,6 +42,19 @@ data class LiveWorkoutState(
  *
  * Allows users to view real-time rest timers and trigger quick actions (+30s, skip)
  * directly from the lock screen and notification shade without unlocking their device.
+ *
+ * Runs as a `health`-typed foreground service, which the platform only grants
+ * to callers holding one of its prerequisite permissions — see the service
+ * block in AndroidManifest.xml. The notification is therefore best-effort: when
+ * the promotion is refused, [update] still publishes to [state] in-process and
+ * the workout carries on in the app; only the lock-screen surface is lost.
+ *
+ * [state] currently has no collector. It was read by a Quick Settings tile that
+ * was never declared in the manifest and so could never be surfaced; the tile
+ * has been deleted. The flow is kept because it is the whole point of the
+ * `notificationUnavailable` fallback branch in [update] — the in-process mirror
+ * a future lock-screen-less surface reads — and because deleting it would take
+ * that branch with it.
  */
 class WorkoutLiveService : Service() {
 
@@ -79,7 +93,7 @@ class WorkoutLiveService : Service() {
                     active = true,
                 )
                 _state.value = newState
-                startForeground(NOTIFICATION_ID, buildNotification(newState))
+                if (!promoteToForeground(newState)) return START_NOT_STICKY
             }
             ACTION_ADD_REST -> {
                 _actionEvents.value = LiveWorkoutAction.AddRest(30)
@@ -99,6 +113,41 @@ class WorkoutLiveService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
+    }
+
+    /**
+     * Go foreground, or give up on the notification without taking the workout
+     * down with it.
+     *
+     * The `health` service type has permission prerequisites (see the service
+     * block in AndroidManifest.xml); missing them makes `startForeground`
+     * throw SecurityException on API 34+. API 31+ can also refuse the
+     * promotion outright with ForegroundServiceStartNotAllowedException, an
+     * IllegalStateException, when the process was in the background at start.
+     *
+     * Either way the service MUST stop immediately: the system kills a process
+     * that called `startForegroundService` and then did not post a foreground
+     * notification. [_state] is left intact, so the session screen and the
+     * quick-settings tile keep reading the live rest countdown from memory —
+     * everything except the lock-screen surface survives.
+     *
+     * Returns false when the caller should treat the service as stopped.
+     */
+    private fun promoteToForeground(state: LiveWorkoutState): Boolean = try {
+        startForeground(NOTIFICATION_ID, buildNotification(state))
+        true
+    } catch (e: SecurityException) {
+        giveUpOnNotification(e)
+        false
+    } catch (e: IllegalStateException) {
+        giveUpOnNotification(e)
+        false
+    }
+
+    private fun giveUpOnNotification(cause: Exception) {
+        Log.w(TAG, "Live workout notification unavailable; session continues in-app.", cause)
+        notificationUnavailable = true
+        stopSelf()
     }
 
     private fun createNotificationChannel() {
@@ -183,6 +232,8 @@ class WorkoutLiveService : Service() {
     }
 
     companion object {
+        private const val TAG = "WorkoutLiveService"
+
         const val CHANNEL_ID = "workout_live_channel"
         const val NOTIFICATION_ID = 4001
 
@@ -207,6 +258,18 @@ class WorkoutLiveService : Service() {
         private val _actionEvents = MutableStateFlow<LiveWorkoutAction?>(null)
         val actionEvents: StateFlow<LiveWorkoutAction?> = _actionEvents.asStateFlow()
 
+        /**
+         * Latched once the system has refused to let this service go
+         * foreground, so [update] stops re-attempting it.
+         *
+         * Without the latch the rest countdown — which syncs once a second —
+         * would start, fail and stop the service every tick for the rest of
+         * the session. [stop] clears it, so the next workout tries again: by
+         * then the user may have granted the permission in Settings.
+         */
+        @Volatile
+        private var notificationUnavailable = false
+
         fun resetAction() {
             _actionEvents.value = null
         }
@@ -223,6 +286,24 @@ class WorkoutLiveService : Service() {
             targetReps: Int,
             targetWeightKg: Double,
         ) {
+            // The in-app session is the source of truth; the notification is a
+            // mirror of it. Once the system has refused the promotion, publish
+            // the state in-process and skip the service entirely.
+            if (notificationUnavailable) {
+                _state.value = LiveWorkoutState(
+                    sessionId = sessionId,
+                    exerciseName = exerciseName,
+                    setNumber = setNumber,
+                    totalSets = totalSets,
+                    isResting = isResting,
+                    restSecondsLeft = restSecondsLeft,
+                    restTotalSeconds = restTotalSeconds,
+                    targetReps = targetReps,
+                    targetWeightKg = targetWeightKg,
+                    active = true,
+                )
+                return
+            }
             val intent = Intent(context, WorkoutLiveService::class.java).apply {
                 action = ACTION_START_OR_UPDATE
                 putExtra(EXTRA_SESSION_ID, sessionId)
@@ -235,18 +316,41 @@ class WorkoutLiveService : Service() {
                 putExtra(EXTRA_TARGET_REPS, targetReps)
                 putExtra(EXTRA_TARGET_WEIGHT, targetWeightKg)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            // Start can be refused before the service ever runs: API 31+
+            // throws ForegroundServiceStartNotAllowedException when the
+            // process has no right to start one from the background, and API
+            // 34+ throws SecurityException when the `health` prerequisites are
+            // missing. Neither is worth a crash mid-set.
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Could not start the live workout service.", e)
+                notificationUnavailable = true
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "Could not start the live workout service.", e)
+                notificationUnavailable = true
             }
         }
 
         fun stop(context: Context) {
+            // Clears the latch too: a session that could not show a
+            // notification should not condemn the next one to the same.
+            notificationUnavailable = false
             val intent = Intent(context, WorkoutLiveService::class.java).apply {
                 action = ACTION_STOP
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (e: IllegalStateException) {
+                // Backgrounded before the session was torn down; the service
+                // is already gone, and _state is reset here instead.
+                Log.w(TAG, "Could not stop the live workout service.", e)
+                _state.value = LiveWorkoutState(active = false)
+            }
         }
     }
 }

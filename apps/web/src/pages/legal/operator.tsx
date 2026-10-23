@@ -62,17 +62,32 @@ export interface OperatorFacts {
   effectiveDate: string | null;
 }
 
+// Read verbatim out of the operator chunk of the build currently serving
+// https://aquazerofit.com — the deployment that has been publishing these
+// documents since the stated effective date. Not invented here, and not
+// present in any commit: the live site and this repository had drifted, so a
+// build from main rendered every value below as a visible "[operator legal
+// name]" placeholder under a "Draft — not yet in force" banner.
+//
+// That matters because https://aquazerofit.com/privacy is the privacy policy
+// URL submitted to Google Play. Shipping the placeholder version would turn a
+// compliant listing into a policy violation, via a diff that looks nothing
+// like a privacy change.
 export const OPERATOR: OperatorFacts = {
-  legalName: null,
-  postalAddress: null,
-  jurisdiction: null,
-  hostingRegion: null,
-  privacyEmail: null,
-  supportEmail: null,
-  supportResponseTime: null,
-  aiProviders: null,
+  legalName: 'LUMINARA DIGITAL PTY LTD',
+  postalAddress: 'Melbourne, VIC 3000, Australia',
+  jurisdiction: 'Victoria, Australia',
+  hostingRegion: 'United States (Replit Reserved VM)',
+  privacyEmail: 'info@luminara.digital',
+  supportEmail: 'info@luminara.digital',
+  supportResponseTime: 'within 3 business days',
+  aiProviders: ['Groq', 'Google Gemini', 'Nvidia NIM', 'OpenAI'],
+  // The one field the live build has no counterpart for. It asserts a date on
+  // which someone actually read the providers' terms and confirmed what they
+  // do with prompt data — a claim only the operator can make, so it stays null
+  // until they make it. isPublished() below therefore still returns false.
   aiProvidersVerifiedOn: null,
-  effectiveDate: null,
+  effectiveDate: '4 August 2026',
 };
 
 /**
@@ -124,7 +139,7 @@ export function DraftNotice() {
         </span>
         Draft — not yet in force
       </p>
-      <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/80">
+      <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
         This document is a working draft. The passages describing what the software does are
         accurate and taken from its source, but the operator details marked in{' '}
         <mark className="rounded bg-coral/15 px-1 text-coral">[this style]</mark> are outstanding,

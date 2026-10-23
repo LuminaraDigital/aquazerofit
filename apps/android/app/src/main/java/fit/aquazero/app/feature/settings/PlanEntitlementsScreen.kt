@@ -2,6 +2,8 @@ package fit.aquazero.app.feature.settings
 
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -37,7 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
+import fit.aquazero.app.core.data.PlanPeriod
 import fit.aquazero.app.core.data.PremiumOffer
+import fit.aquazero.app.core.data.PremiumOffers
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfChip
@@ -58,15 +63,9 @@ import fit.aquazero.app.core.ui.rememberToastSink
 /**
  * Your plan, and the one thing this app sells.
  *
- * The position leads: tier, and the credit balance that can actually be spent
- * today. What premium changes comes from the server's `premiumLanes` and
- * `costs` maps, so a lane the server adds and this screen has not heard of
- * still renders, described generically rather than dropped.
- *
- * The upgrade control is the only purchase surface in the app, and it appears
- * only when Google Play has actually quoted a price — a button that cannot
- * open a billing flow is exactly the "button that does nothing" this screen
- * used to refuse to show. Coach personas are still not for sale on any screen.
+ * The premium subscription is bought through Google Play. Nothing here decides
+ * a tier: a purchase produces a token, the server verifies it, and this screen
+ * then re-reads `/me/entitlements` and renders whatever came back.
  */
 @Composable
 fun PlanEntitlementsScreen(
@@ -75,75 +74,88 @@ fun PlanEntitlementsScreen(
     viewModel: PlanEntitlementsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val toastSink = rememberToastSink()
     val resources = LocalResources.current
-    val toasts = rememberToastSink()
-    val activity = LocalActivity.current
     val context = LocalContext.current
+    val activity = LocalActivity.current
 
-    LaunchedEffect(viewModel) {
+    LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is PlanEvent.Message -> toasts.show(
-                    resources.getString(event.messageRes),
-                    if (event.isError) ToastKind.Error else ToastKind.Success,
+                is PlanEvent.Message -> toastSink.show(
+                    message = resources.getString(event.messageRes),
+                    kind = if (event.isError) ToastKind.Error else ToastKind.Info,
                 )
             }
         }
     }
 
     Scaffold(
-        modifier = modifier.fillMaxSize(),
         topBar = {
-            AzfAppHeader(title = stringResource(R.string.plan_title), onBack = onBack)
+            AzfAppHeader(
+                title = stringResource(R.string.plan_title),
+                onBack = onBack,
+            )
         },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = AzfSpacing.ContainerMargin,
-                end = AzfSpacing.ContainerMargin,
-                top = AzfSpacing.ContainerMargin,
-                bottom = 40.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            val entitlements = state.entitlements
-            when {
-                state.loading && entitlements == null -> {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Skeleton(modifier = Modifier.fillMaxWidth().height(160.dp))
-                            Skeleton(modifier = Modifier.fillMaxWidth().height(120.dp))
-                        }
-                    }
+        containerColor = MaterialTheme.colorScheme.background,
+        modifier = modifier.fillMaxSize(),
+    ) { padding ->
+        when {
+            state.loading -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentPadding = PaddingValues(
+                        start = AzfSpacing.ContainerMargin,
+                        end = AzfSpacing.ContainerMargin,
+                        top = AzfSpacing.ContainerMargin,
+                        bottom = 40.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapMedium),
+                ) {
+                    item { Skeleton(modifier = Modifier.fillMaxWidth().height(160.dp)) }
+                    item { Skeleton(modifier = Modifier.fillMaxWidth().height(80.dp)) }
+                    item { Skeleton(modifier = Modifier.fillMaxWidth().height(120.dp)) }
                 }
-                state.failed || entitlements == null -> {
-                    item {
-                        ErrorState(
-                            title = stringResource(R.string.plan_title),
-                            message = stringResource(R.string.plan_error),
-                            retryLabel = stringResource(R.string.memory_retry),
-                            onRetry = viewModel::refresh,
-                        )
-                    }
-                }
-                else -> {
-                    item { PositionCard(entitlements, state.creditFraction) }
+            }
 
+            state.failed -> {
+                ErrorState(
+                    title = stringResource(R.string.plan_title),
+                    message = stringResource(R.string.plan_error),
+                    retryLabel = stringResource(R.string.memory_retry),
+                    onRetry = viewModel::refresh,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
+            }
+
+            state.entitlements != null -> {
+                val entitlements = state.entitlements!!
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentPadding = PaddingValues(
+                        start = AzfSpacing.ContainerMargin,
+                        end = AzfSpacing.ContainerMargin,
+                        top = AzfSpacing.ContainerMargin,
+                        bottom = 40.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapMedium),
+                ) {
                     item {
-                        Text(
-                            text = stringResource(R.string.plan_free_forever_note),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 4.dp),
+                        PositionCard(
+                            entitlements = entitlements,
+                            fraction = state.creditFraction,
                         )
                     }
 
                     item {
                         AzfSectionHeading(
-                            stringResource(
+                            text = stringResource(
                                 if (state.premium) {
                                     R.string.plan_difference_heading_premium
                                 } else {
@@ -164,22 +176,12 @@ fun PlanEntitlementsScreen(
                             }
                         }
                     } else {
-                        // Lane names are the server's own identifiers and
-                        // unique within the list, so they key it directly.
                         items(
                             items = entitlements.premiumLanes,
                             key = { it },
                             contentType = { "lane" },
                         ) { lane ->
                             LaneCard(lane = lane, premium = state.premium)
-                        }
-                        item {
-                            Text(
-                                text = stringResource(R.string.plan_difference_footnote),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 4.dp),
-                            )
                         }
                     }
 
@@ -197,12 +199,11 @@ fun PlanEntitlementsScreen(
                     if (!state.premium) {
                         item {
                             UpgradeCard(
-                                offer = state.offer,
+                                offers = state.offers,
+                                selectedPeriod = state.selectedPeriod,
+                                onSelectPeriod = viewModel::selectPeriod,
                                 offerLoading = state.offerLoading,
                                 purchasing = state.purchasing,
-                                // A null activity means this composition is not
-                                // attached to one (a preview, a test host), and
-                                // Play's flow has nothing to launch over.
                                 onUpgrade = { activity?.let(viewModel::upgrade) },
                             )
                         }
@@ -215,9 +216,6 @@ fun PlanEntitlementsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-                                // Cancelling is Play's to do, not ours, and
-                                // Play policy is that a subscriber must be able
-                                // to reach it rather than be told where to look.
                                 SecondaryButton(
                                     text = stringResource(R.string.plan_manage_subscription),
                                     onClick = { context.openPlaySubscriptions() },
@@ -275,8 +273,6 @@ private fun PositionCard(entitlements: EntitlementsDto, fraction: Float) {
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
-        // Decorative: the numbers above already say it, so the bar is hidden
-        // from screen readers rather than announced as an unlabelled shape.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -300,16 +296,6 @@ private fun PositionCard(entitlements: EntitlementsDto, fraction: Float) {
     }
 }
 
-/**
- * How the balance grows, in the server's own numbers.
- *
- * The grant tops the balance up towards `maxBankedCredits` and stops there, so
- * the sentence has to name that ceiling — an unqualified "carries over" is the
- * promise this app used to make and can no longer keep. A server that predates
- * the ceiling sends no such number (see [EntitlementsDto.maxBankedCredits]);
- * that build keeps the uncapped sentence rather than being told its savings
- * stop at zero.
- */
 @Composable
 private fun creditsExplainer(entitlements: EntitlementsDto): String = when {
     entitlements.maxBankedCredits <= 0 -> if (entitlements.dailyCredits == 1) {
@@ -352,13 +338,16 @@ private fun LaneCard(lane: String, premium: Boolean) {
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.size(4.dp))
-                // The state is spelled out, never carried by the icon alone.
                 Text(
                     text = stringResource(
-                        if (premium) R.string.plan_lane_on else R.string.plan_lane_locked,
+                        if (premium) {
+                            R.string.plan_lane_on
+                        } else {
+                            R.string.plan_lane_locked
+                        },
                     ),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (premium) {
@@ -369,7 +358,7 @@ private fun LaneCard(lane: String, premium: Boolean) {
                 )
             }
         }
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = laneBody(lane),
             style = MaterialTheme.typography.bodySmall,
@@ -405,17 +394,13 @@ private fun CostRow(task: String, cost: Int) {
 }
 
 /**
- * The upgrade offer.
- *
- * Three states, and none of them is a live button that cannot open Play:
- * while the price is loading the CTA is a skeleton; when Play quoted no price
- * the card says so in plain words and offers nothing; only a real [offer] gets
- * a button, labelled with Play's own formatted price so the amount on screen is
- * the amount charged.
+ * The upgrade offer card with interactive Annual vs Monthly selection and 7-day free trial.
  */
 @Composable
 private fun UpgradeCard(
-    offer: PremiumOffer?,
+    offers: PremiumOffers?,
+    selectedPeriod: PlanPeriod,
+    onSelectPeriod: (PlanPeriod) -> Unit,
     offerLoading: Boolean,
     purchasing: Boolean,
     onUpgrade: () -> Unit,
@@ -448,24 +433,175 @@ private fun UpgradeCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(16.dp))
+
         when {
-            offerLoading -> Skeleton(modifier = Modifier.fillMaxWidth().height(56.dp))
-            offer == null -> Text(
+            offerLoading -> Skeleton(modifier = Modifier.fillMaxWidth().height(140.dp))
+            offers == null || (offers.annual == null && offers.monthly == null) -> Text(
                 text = stringResource(R.string.plan_upgrade_unavailable),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             else -> {
+                val annualOffer = offers.annual
+                val monthlyOffer = offers.monthly
+                val savings = offers.annualSavingsPercent ?: 50
+
+                if (annualOffer != null) {
+                    PlanOptionCard(
+                        title = stringResource(R.string.plan_period_annual),
+                        priceText = stringResource(
+                            R.string.plan_period_annual_price_sub,
+                            annualOffer.formattedPrice,
+                        ),
+                        badgeText = stringResource(R.string.plan_period_annual_discount, savings),
+                        subBadgeText = if (annualOffer.hasFreeTrial) {
+                            stringResource(R.string.plan_period_trial_badge)
+                        } else {
+                            null
+                        },
+                        selected = selectedPeriod == PlanPeriod.ANNUAL,
+                        onClick = { onSelectPeriod(PlanPeriod.ANNUAL) },
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                if (monthlyOffer != null) {
+                    PlanOptionCard(
+                        title = stringResource(R.string.plan_period_monthly),
+                        priceText = stringResource(
+                            R.string.plan_period_monthly_price_sub,
+                            monthlyOffer.formattedPrice,
+                        ),
+                        badgeText = null,
+                        subBadgeText = null,
+                        selected = selectedPeriod == PlanPeriod.MONTHLY,
+                        onClick = { onSelectPeriod(PlanPeriod.MONTHLY) },
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                val activeOffer = offers.offerFor(selectedPeriod)
+                val ctaText = when {
+                    selectedPeriod == PlanPeriod.ANNUAL &&
+                        (activeOffer?.hasFreeTrial == true || annualOffer?.hasFreeTrial == true) ->
+                        stringResource(R.string.plan_upgrade_cta_trial)
+                    selectedPeriod == PlanPeriod.ANNUAL && activeOffer != null ->
+                        stringResource(R.string.plan_upgrade_cta_annual, activeOffer.formattedPrice)
+                    selectedPeriod == PlanPeriod.MONTHLY && activeOffer != null ->
+                        stringResource(R.string.plan_upgrade_cta_monthly, activeOffer.formattedPrice)
+                    else ->
+                        stringResource(
+                            R.string.plan_upgrade_cta,
+                            activeOffer?.formattedPrice.orEmpty(),
+                        )
+                }
+
                 PrimaryButton(
-                    text = stringResource(R.string.plan_upgrade_cta, offer.formattedPrice),
+                    text = ctaText,
                     onClick = onUpgrade,
                     loading = purchasing,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+
+                val termsText = if (selectedPeriod == PlanPeriod.ANNUAL && annualOffer != null) {
+                    stringResource(R.string.plan_upgrade_terms_annual, annualOffer.formattedPrice)
+                } else if (monthlyOffer != null) {
+                    stringResource(R.string.plan_upgrade_terms_monthly, monthlyOffer.formattedPrice)
+                } else {
+                    stringResource(R.string.plan_upgrade_terms)
+                }
+
                 Text(
-                    text = stringResource(R.string.plan_upgrade_terms),
+                    text = termsText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanOptionCard(
+    title: String,
+    priceText: String,
+    badgeText: String?,
+    subBadgeText: String?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val borderColor = if (selected) {
+        AzfColors.PrimaryFixedDim
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+    val containerColor = if (selected) {
+        AzfColors.PrimaryContainer.copy(alpha = 0.25f)
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(AzfShapes.Card)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = borderColor,
+                shape = AzfShapes.Card,
+            )
+            .background(containerColor, AzfShapes.Card)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (badgeText != null) {
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(AzfColors.SecondaryContainer, AzfShapes.Pill)
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                text = badgeText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AzfColors.SecondaryFixedDim,
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = priceText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (subBadgeText != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "• $subBadgeText",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AzfColors.PrimaryFixedDim,
+                    )
+                }
+            }
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Outlined.CheckCircle,
+                    contentDescription = null,
+                    tint = AzfColors.PrimaryFixedDim,
+                    modifier = Modifier.size(22.dp),
                 )
             }
         }
@@ -476,7 +612,6 @@ private fun UpgradeCard(
 // Server-keyed labels
 // ---------------------------------------------------------------------------
 
-/** A lane the app has copy for; anything else keeps the server's own id. */
 @Composable
 private fun laneTitle(lane: String): String = when (lane) {
     "insightBatch" -> stringResource(R.string.plan_lane_insight_title)
@@ -489,13 +624,6 @@ private fun laneBody(lane: String): String = when (lane) {
     else -> stringResource(R.string.plan_lane_generic_body)
 }
 
-/**
- * A priced task the app has copy for.
- *
- * The `else` keeps the server's raw key so a newly priced task still shows its
- * price rather than vanishing — but it shows it as `exerciseSwap`, which is a
- * bug, not a design. Every key the server prices belongs on this list.
- */
 @Composable
 private fun taskLabel(task: String): String = when (task) {
     "chatTurn" -> stringResource(R.string.plan_task_chat_turn)
@@ -530,7 +658,26 @@ private fun PlanPreview() {
             )
             LaneCard(lane = "insightBatch", premium = false)
             UpgradeCard(
-                offer = PremiumOffer(productId = "azf_premium_monthly", formattedPrice = "£3.99"),
+                offers = PremiumOffers(
+                    annual = PremiumOffer(
+                        productId = "azf_premium_annual",
+                        period = PlanPeriod.ANNUAL,
+                        formattedPrice = "$59.99",
+                        priceAmountMicros = 59990000L,
+                        currencyCode = "USD",
+                        hasFreeTrial = true,
+                    ),
+                    monthly = PremiumOffer(
+                        productId = "azf_premium_monthly",
+                        period = PlanPeriod.MONTHLY,
+                        formattedPrice = "$9.99",
+                        priceAmountMicros = 9990000L,
+                        currencyCode = "USD",
+                        hasFreeTrial = false,
+                    ),
+                ),
+                selectedPeriod = PlanPeriod.ANNUAL,
+                onSelectPeriod = {},
                 offerLoading = false,
                 purchasing = false,
                 onUpgrade = {},

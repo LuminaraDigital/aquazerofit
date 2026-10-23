@@ -1,7 +1,6 @@
 package fit.aquazero.app.feature.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,7 +19,6 @@ import androidx.compose.material.icons.outlined.Balance
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.WaterDrop
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -47,12 +45,14 @@ import fit.aquazero.app.core.designsystem.AzfConsentRow
 import fit.aquazero.app.core.designsystem.AzfOptionCard
 import fit.aquazero.app.core.designsystem.AzfSegmentOption
 import fit.aquazero.app.core.designsystem.AzfSegmented
+import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.RingProgress
 import fit.aquazero.app.core.designsystem.SecondaryButton
+import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.model.ActivityLevel
 import fit.aquazero.app.core.model.DerivedTargetsDto
 import fit.aquazero.app.core.model.Goal
@@ -104,8 +104,20 @@ fun SetupScreen(
 
 @Composable
 private fun SetupLoading(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = AzfColors.PrimaryFixedDim)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(AzfSpacing.ContainerMargin),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(modifier = Modifier.height(48.dp))
+        Skeleton(modifier = Modifier.size(48.dp), shape = AzfShapes.Pill)
+        Skeleton(modifier = Modifier.fillMaxWidth(0.6f).height(28.dp))
+        Skeleton(modifier = Modifier.fillMaxWidth(0.8f).height(16.dp))
+        Skeleton(modifier = Modifier.size(160.dp), shape = AzfShapes.Pill)
+        Skeleton(modifier = Modifier.fillMaxWidth().height(72.dp), shape = AzfShapes.Card)
+        Skeleton(modifier = Modifier.fillMaxWidth().height(56.dp), shape = AzfShapes.Card)
     }
 }
 

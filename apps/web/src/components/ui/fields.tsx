@@ -32,7 +32,7 @@ export function Switch({
     >
       <span
         aria-hidden="true"
-        className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+        className={`inline-block h-5 w-5 rounded-full bg-on-surface shadow transition-transform ${
           checked ? 'translate-x-[22px]' : 'translate-x-[2px]'
         }`}
       />

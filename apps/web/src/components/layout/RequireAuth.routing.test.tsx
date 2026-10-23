@@ -32,6 +32,19 @@ vi.mock('../../lib/api', () => ({
 }));
 vi.mock('../../lib/telegram', () => ({ isTMA: mocks.isTMA }));
 vi.mock('../../lib/queries', () => ({ useProfile: mocks.useProfile }));
+vi.mock('../../lib/AuthProvider', () => ({
+  useFirebaseAuth: () => ({
+    isLoading: false,
+    firebaseEnabled: false,
+    firebaseUser: null,
+    idToken: null,
+    signInEmail: vi.fn(),
+    registerEmail: vi.fn(),
+    resetPassword: vi.fn(),
+    signOutFirebase: vi.fn(),
+    mapError: (err: unknown) => String(err),
+  }),
+}));
 
 import { RequireAuth } from './RequireAuth';
 

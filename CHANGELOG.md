@@ -5,18 +5,50 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-This history was reconstructed from the repository's tags and commit log. Only
-`v1.0.0` and `v1.1.0` were ever tagged; everything since sits under
-*Unreleased*.
+This history was reconstructed from the repository's tags and commit log.
+Tagged releases are `v1.0.0`, `v1.1.0`, `v1.2.0` and `v1.3.0`. Anything after
+`v1.3.0` sits under *Unreleased*.
 
 ## [Unreleased]
 
 ### Added
 
-- **Native Android application** (`apps/android`), a multi-module Gradle build:
-  foundation, design system and an offline-first sync core, with the dashboard,
-  nutrition day view, training and progress features built on top. Not yet
-  merged to the default branch.
+- Staging promotion path (`feature` to `staging` to `main`), with disjoint
+  staging and production environment examples, and retention telemetry for
+  onboarding, first value, error and abandon (commit `4e3f335`).
+- Optional Firebase Auth verification on the API beside the existing access
+  JWT, plus Firebase Hosting configuration for the web client (commit
+  `5649e23`).
+
+### Changed
+
+- Web UI production hardening: skeletons, semantic tokens and accessibility
+  (commits `ffcbe52`, `6f7ba97`).
+
+## [1.3.0] - 2026-09-14
+
+Annotated tag: Android Play release. The tag message records a signed AAB
+built by `android-release` for Play internal testing, with `versionCode`
+10300 derived from the tag.
+
+### Changed
+
+- The native Android client is on `main` (merge `d6fc467`). The `v1.2.0` tag
+  already contained `apps/android`. This release is that merge onto the
+  default branch, plus the Play build named by the tag.
+
+## [1.2.0] - 2026-08-30
+
+Lightweight tag on `f137564`, "Ship Android production readiness and Play
+release pipeline" (2026-08-30). The entries below are the changes that were
+previously listed as unreleased and that this tag already contains.
+
+### Added
+
+- **Native Android application** (`apps/android`): foundation, design system
+  and an offline-first sync core, with the dashboard, nutrition day view,
+  training and progress features built on top. Present in the `v1.2.0` tree.
+  The merge onto `main` is `v1.3.0`.
 - **Coach roster, gamification and first-run flow**, including Telegram Stars
   purchases with idempotent, roster-priced grants.
 - **Observability**: request-id correlation through the stack, `/metrics`
@@ -93,6 +125,8 @@ First public release, prepared for the capstone submission (NIT3004).
   third-party dependency and dataset licences recorded in
   `THIRD_PARTY_NOTICES.md`.
 
-[Unreleased]: https://github.com/LuminaraDigital/aquazerofit/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/LuminaraDigital/aquazerofit/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/LuminaraDigital/aquazerofit/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/LuminaraDigital/aquazerofit/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/LuminaraDigital/aquazerofit/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/LuminaraDigital/aquazerofit/releases/tag/v1.0.0

@@ -2,12 +2,12 @@
  * PostgresStore: durable backing for the in-memory document store.
  *
  * WHY THIS EXISTS. The managed host gives a deployed app no persistent
- * filesystem — it resets on every deploy. JsonStore's per-container
+ * filesystem. It resets on every deploy. JsonStore's per-container
  * files therefore vanish on every deploy, taking users, health logs, chat and
  * AI memory with them. The host injects DATABASE_URL for its managed Postgres,
  * so the same working set is mirrored into a single `documents` table instead.
  *
- * WHAT THIS DOES NOT ACHIEVE — read before scaling the deployment:
+ * WHAT THIS DOES NOT ACHIEVE. Read before scaling the deployment:
  *
  *   This gives durable persistence for a SINGLE instance. It does NOT make the
  *   app multi-instance / Autoscale safe. Every instance hydrates its own
@@ -19,10 +19,10 @@
  *   The one exception is refresh-token rotation: compareAndSwapRefreshToken
  *   executes a genuine atomic UPDATE against the database itself (not the
  *   local copy), so two instances rotating the same token concurrently still
- *   produce exactly one success — the loser sees zero rows and revokes the
+ *   produce exactly one success. The loser sees zero rows and revokes the
  *   family. Session anti-theft is multi-instance safe; app data reads are not.
  *
- * Driver: the plain `pg` package, not @neondatabase/serverless — the host
+ * Driver: the plain `pg` package, not @neondatabase/serverless. The host
  * migrated its managed database off Neon, so the serverless HTTP driver is the
  * wrong client for it now. The pool is deliberately small (max 5): a single
  * app instance flushes writes through one serialized queue and never needs
@@ -109,6 +109,14 @@ const KNOWN_CONTAINERS = new Set<string>(CONTAINERS);
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
+/**
+ * Cloud SQL connector socket directory. Project, region, and instance are the
+ * connection-name segments Google mounts at `/cloudsql/PROJECT:REGION:INSTANCE`.
+ * Dots are excluded so `..` and arbitrary socket paths cannot match.
+ */
+const CLOUD_SQL_SOCKET =
+  /^\/cloudsql\/[a-z][a-z0-9-]*:[a-z0-9-]+:[a-z][a-z0-9-]*$/;
+
 /** True when the URL's host is this machine, where plaintext is acceptable. */
 export function isLoopbackConnectionString(connectionString: string): boolean {
   try {
@@ -119,14 +127,59 @@ export function isLoopbackConnectionString(connectionString: string): boolean {
 }
 
 /**
- * True when the URL either targets loopback or negotiates TLS with the
- * server. Non-loopback URLs must carry an sslmode that is not `disable` /
+ * `host` query value, decoded once. Parsed from the query string alone because
+ * `new URL` throws ERR_INVALID_URL on the official Cloud Run form
+ * `postgres://user:pass@/db?host=/cloudsql/...` (empty host).
+ */
+function connectionQueryParam(connectionString: string, name: string): string | null {
+  const queryStart = connectionString.indexOf('?');
+  if (queryStart < 0) return null;
+  const query = connectionString.slice(queryStart + 1).split('#')[0];
+  return new URLSearchParams(query).get(name);
+}
+
+/** Cloud SQL unix-socket directory, or null when `host` is not that socket. */
+export function cloudSqlSocketDirectory(connectionString: string): string | null {
+  const host = connectionQueryParam(connectionString, 'host');
+  if (!host || host.includes('..') || host.includes('\\') || host.includes('\0')) return null;
+  return CLOUD_SQL_SOCKET.test(host) ? host : null;
+}
+
+/**
+ * True when bytes never leave the machine: loopback TCP, or the Cloud SQL
+ * connector socket. Both are local transports. A public IP is not.
+ */
+export function usesLocalDatabaseTransport(connectionString: string): boolean {
+  return (
+    isLoopbackConnectionString(connectionString) ||
+    cloudSqlSocketDirectory(connectionString) !== null
+  );
+}
+
+/**
+ * `ssl` flag passed to `pg.Pool`. Undefined means the driver speaks plaintext,
+ * which is correct for loopback and for a Cloud SQL unix socket (forcing TLS
+ * on that socket fails the handshake). Remote hosts get `ssl: true` unless
+ * the caller already opted out.
+ */
+export function databaseSslOption(
+  connectionString: string,
+  options: { ssl?: boolean; allowInsecureSsl?: boolean } = {},
+): boolean | undefined {
+  if (options.ssl !== undefined) return options.ssl;
+  if (options.allowInsecureSsl || usesLocalDatabaseTransport(connectionString)) return undefined;
+  return true;
+}
+
+/**
+ * True when the URL targets a local transport or negotiates TLS with the
+ * server. Remote URLs must carry an sslmode that is not `disable` /
  * `allow` / `prefer` (those all permit plaintext fallback), or `ssl=true`,
- * which managed offerings (Cosmos, and others) use when their certificates are
- * not publicly anchored and `verify-full` would fail validation.
+ * which managed offerings use when their certificates are not publicly
+ * anchored and `verify-full` would fail validation.
  */
 export function isSecureConnectionString(connectionString: string): boolean {
-  if (isLoopbackConnectionString(connectionString)) return true;
+  if (usesLocalDatabaseTransport(connectionString)) return true;
   try {
     const params = new URL(connectionString).searchParams;
     const sslmode = params.get('sslmode')?.toLowerCase();
@@ -150,7 +203,7 @@ export class PostgresStore extends MemoryBackedStore {
   private hydrated = false;
 
   /**
-   * `executor` is whatever runs the SQL — a real pool in production, a fake in
+   * `executor` is whatever runs the SQL: a real pool in production, a fake in
    * the tests. `pool` is passed only when this instance owns it and must close
    * it on shutdown.
    */
@@ -163,7 +216,7 @@ export class PostgresStore extends MemoryBackedStore {
   /**
    * Open a pool against `connectionString`. `pg` is imported here rather than
    * at module scope so the driver is only ever loaded by a process that has a
-   * database — the file-backed dev/test path never reaches this module.
+   * database. The file-backed dev/test path never reaches this module.
    *
    * Pool shape is deliberately conservative: max 5 connections (one instance
    * flushes through a single serialized queue and never needs more, and
@@ -172,11 +225,17 @@ export class PostgresStore extends MemoryBackedStore {
    * pinning a pooled connection forever.
    *
    * TLS is enforced at the connection-string level: a plain `postgres://` URL
-   * to a non-loopback host is accepted only when it carries an sslmode that
+   * to a remote host is accepted only when it carries an sslmode that
    * verifies (`verify-ca` / `verify-full`), or `ssl=true` for managed
-   * offerings (Cosmos and others) whose certs are not publicly anchored. An
-   * off-host URL with no SSL is rejected outright — credentials and refresh
-   * tokens must never cross the network in cleartext.
+   * offerings whose certs are not publicly anchored. A remote URL with no SSL
+   * is rejected outright. Credentials and refresh tokens must never cross the
+   * network in cleartext.
+   *
+   * The Cloud Run Cloud SQL connector is a unix socket
+   * (`host=/cloudsql/PROJECT:REGION:INSTANCE`), including the empty-host form
+   * `postgres://user:pass@/db?host=/cloudsql/...` that `new URL` cannot parse.
+   * That socket is a local transport: plaintext on the socket is correct, and
+   * `ssl: true` would break the handshake. A public IP is still remote.
    */
   static async connect(
     connectionString: string,
@@ -186,9 +245,10 @@ export class PostgresStore extends MemoryBackedStore {
     const secure = isSecureConnectionString(connectionString);
     if (!secure && !options.allowInsecureSsl) {
       throw new Error(
-        'DATABASE_URL must use TLS for a non-loopback host: use a postgres:// URL with ' +
+        'DATABASE_URL must use TLS for a remote host: use a postgres:// URL with ' +
           'sslmode=verify-full (or ssl=true for managed databases that require it). ' +
-          'Plaintext connections are allowed only to localhost.',
+          'Plaintext is allowed only for localhost or a Cloud SQL unix socket ' +
+          '(host=/cloudsql/PROJECT:REGION:INSTANCE).',
       );
     }
     const { default: pg } = await import('pg');
@@ -198,13 +258,10 @@ export class PostgresStore extends MemoryBackedStore {
       idleTimeoutMillis: 30_000,
       statement_timeout: 15_000,
       // `ssl: true` alone would skip certificate verification; the secure-url
-      // check above is what makes this safe. When the URL is loopback the
-      // driver talks plaintext on the local interface and `ssl` is moot.
-      ssl:
-        options.ssl ??
-        (options.allowInsecureSsl || isLoopbackConnectionString(connectionString)
-          ? undefined
-          : true),
+      // check above is what makes a remote URL safe. Local transports
+      // (loopback, Cloud SQL socket) leave `ssl` unset so the driver does not
+      // attempt a TLS handshake on a socket that does not speak it.
+      ssl: databaseSslOption(connectionString, options),
     });
     // Probe the pool now: pg connects lazily, so without this a bad URL or
     // unreachable server would surface only inside hydrate() as a bare driver
@@ -216,7 +273,7 @@ export class PostgresStore extends MemoryBackedStore {
 
   /**
    * Create the table if absent and load the whole corpus into memory. Must be
-   * awaited before the first getStore() — see initStore() in ./store.
+   * awaited before the first getStore(). See initStore() in ./store.
    */
   async hydrate(): Promise<void> {
     if (this.hydrated) return;
@@ -259,7 +316,7 @@ export class PostgresStore extends MemoryBackedStore {
       // Read the document out of memory at flush time, not at write time: many
       // writes to the same id inside one macrotask collapse into a single row.
       // An id that was written and then removed after the batch was snapshotted
-      // is simply gone from memory — its delete rides the next batch.
+      // is simply gone from memory. Its delete rides the next batch.
       const docs = [...delta.changed]
         .map((id) => this.byId<StoredDoc>(name, id))
         .filter((doc): doc is StoredDoc => doc !== undefined);

@@ -3,7 +3,7 @@
  *
  * No database anywhere: PostgresStore takes an injected QueryExecutor, so the
  * suite asserts on the exact SQL and bind parameters it would have sent. That
- * is deliberate — the store is only durable if the dirty tracking is per
+ * is deliberate. The store is only durable if the dirty tracking is per
  * document id (a per-container rewrite would push all ~995 `content` rows on
  * every meal log) and if the batched statements are shaped correctly.
  */
@@ -17,8 +17,10 @@ import {
   buildUpsert,
   CREATE_TABLE_SQL,
   UPSERT_CHUNK_SIZE,
+  databaseSslOption,
   isLoopbackConnectionString,
   isSecureConnectionString,
+  usesLocalDatabaseTransport,
   type QueryExecutor,
 } from '../platform/pgStore';
 import type { StoredDoc } from '../platform/store';
@@ -252,7 +254,7 @@ describe('dirty tracking', () => {
     const store = newStore();
     await store.hydrate();
 
-    // No setImmediate has fired yet — flush() must still drain this write,
+    // No setImmediate has fired yet. flush() must still drain this write,
     // which is what the SIGTERM handler in index.ts relies on.
     store.upsert('logs', { id: 'l1' });
     await store.flush();
@@ -290,7 +292,7 @@ describe('compareAndSwapRefreshToken', () => {
         const usedAtJson = (values as unknown[])[3] as string;
         const row = this.docs.get(id);
         // Mirror the WHERE clause: no row matched when the hash differs or
-        // the token is already consumed/revoked — that is the loser branch
+        // the token is already consumed/revoked. That is the loser branch
         // a second concurrent UPDATE takes once the row lock is released.
         if (
           !row ||
@@ -339,7 +341,7 @@ describe('compareAndSwapRefreshToken', () => {
 
   it('two concurrent rotations on one token: exactly one succeeds, loser gets undefined', async () => {
     const { store } = casStore();
-    // Concurrent calls — the fake serializes on the emulated row lock, same
+    // Concurrent calls. The fake serializes on the emulated row lock, same
     // as Postgres serializes the second UPDATE behind the first's lock.
     const [first, second] = await Promise.all([
       store.compareAndSwapRefreshToken(tokenDoc.id, 'hash-abc', '2026-08-17T00:00:00.000Z'),
@@ -382,6 +384,42 @@ describe('connection string safety', () => {
 
   it('rejects malformed URLs as insecure', () => {
     expect(isSecureConnectionString('not-a-url')).toBe(false);
+  });
+
+  it('treats a Cloud SQL unix socket as local and a public IP as remote', () => {
+    const socket =
+      'postgres://azf:pw@/aquazerofit?host=/cloudsql/aquazerofit:australia-southeast1:azf-pg';
+    expect(isLoopbackConnectionString(socket)).toBe(false);
+    expect(usesLocalDatabaseTransport(socket)).toBe(true);
+    expect(isSecureConnectionString(socket)).toBe(true);
+    expect(databaseSslOption(socket, {})).toBeUndefined();
+
+    const encoded =
+      'postgres://azf:pw@/aquazerofit?host=%2Fcloudsql%2Faquazerofit%3Aaustralia-southeast1%3Aazf-pg';
+    expect(usesLocalDatabaseTransport(encoded)).toBe(true);
+    expect(isSecureConnectionString(encoded)).toBe(true);
+
+    const remote = 'postgres://u:p@35.189.27.65:5432/aquazerofit';
+    expect(usesLocalDatabaseTransport(remote)).toBe(false);
+    expect(isSecureConnectionString(remote)).toBe(false);
+    expect(databaseSslOption(remote, {})).toBe(true);
+
+    expect(usesLocalDatabaseTransport('postgres://u:p@db.example.com/azf?host=/tmp/pg.sock')).toBe(
+      false,
+    );
+    expect(isSecureConnectionString('postgres://u:p@db.example.com/azf?host=/tmp/pg.sock')).toBe(
+      false,
+    );
+    expect(
+      usesLocalDatabaseTransport(
+        'postgres://u:p@/aquazerofit?host=/cloudsql/aquazerofit:australia-southeast1:../azf-pg',
+      ),
+    ).toBe(false);
+    expect(
+      usesLocalDatabaseTransport(
+        'postgres://azf:pw@localhost/aquazerofit?host=/cloudsql/aquazerofit:australia-southeast1:azf-pg',
+      ),
+    ).toBe(true);
   });
 
   it('connect() refuses an insecure off-host URL before touching the network', async () => {

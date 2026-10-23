@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
-  "description": "AquaZeroFit — AI-powered wellness platform (web + Telegram Mini App). An AquaZero product.",
+  "description": "AquaZeroFit: AI-powered wellness platform (web + Telegram Mini App). An AquaZero product.",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -12,7 +12,7 @@
     "dev": "npm run dev --workspace apps/web",
     "api": "npm run dev --workspace apps/api",
     "build": "npm run build --workspace packages/shared && npm run build --workspace apps/api && npm run build --workspace apps/web",
-    "test": "npm run test --workspace packages/shared --if-present && npm run test --workspace apps/api --if-present && npm run test --workspace apps/web --if-present",
+    "test": "npm run test --workspace packages/shared --if-present && npm run test --workspace apps/api --if-present && npm run test --workspace apps/web --if-present && npm test --prefix cloudflare",
     "test:coverage": "npm run test:coverage --workspace apps/api && npm run test:coverage --workspace apps/web",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "seed": "npm run seed --workspace apps/api",

@@ -1,8 +1,13 @@
 version: 2
 updates:
   # Root manifest covers the npm workspaces (apps/*, packages/*).
+  # target-branch is staging so dependency PRs enter through the promotion
+  # path. GitHub reads this file from the default branch (main); the retarget
+  # applies only after a staging -> main promotion. See
+  # docs/BRANCHING_AND_STAGING.md.
   - package-ecosystem: npm
     directory: /
+    target-branch: staging
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -12,7 +17,7 @@ updates:
       # Majors are deliberately excluded from the groups so they arrive as
       # their own PRs. Grouping them together meant a single major needing a
       # real migration (react-router 6 -> 7) held every security patch in the
-      # same PR hostage behind work nobody had scheduled — the group went red
+      # same PR hostage behind work nobody had scheduled. The group went red
       # and stayed red. Patches and minors now merge on their own schedule;
       # each major gets its own PR and its own migration.
       dev-dependencies:
@@ -23,8 +28,10 @@ updates:
         update-types: ['minor', 'patch']
 
   # Outside the workspaces on purpose (see tools/docgen/package.json).
+  # Same staging base as the root npm updates.
   - package-ecosystem: npm
     directory: /tools/docgen
+    target-branch: staging
     schedule:
       interval: monthly
     open-pull-requests-limit: 2
@@ -35,8 +42,10 @@ updates:
   # between us and a compromised upstream tag, and an unmaintained pin is its
   # own risk. Dependabot rewrites both the SHA and the trailing `# vX.Y.Z`
   # comment, so the comment stays honest about what the SHA actually is.
+  # Same staging base as the npm updates.
   - package-ecosystem: github-actions
     directory: /
+    target-branch: staging
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

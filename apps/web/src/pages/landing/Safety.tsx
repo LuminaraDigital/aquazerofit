@@ -304,7 +304,7 @@ export default function SafetyPage() {
               rows={[
                 ['Access token lifetime', '15 minutes'],
                 ['Refresh token lifetime', '30 days, rotated on use'],
-                ['Password hashing', 'bcrypt, cost 10'],
+                ['Password hashing', 'bcrypt, cost 12'],
                 ['Failed sign-in throttle', 'per account and IP, 1 hour window'],
               ]}
               caption="Sign-in failures are counted per account and per network, so a spray across many accounts is throttled as readily as a run at one."

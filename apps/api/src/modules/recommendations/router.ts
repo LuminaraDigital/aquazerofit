@@ -29,6 +29,7 @@ import { complete } from '../ai/gateway';
 import { post as postGuardrail } from '../ai/guardrails';
 import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { assertLaneAllowed } from '../ai/tierPolicy';
+import { loadPrompt } from '../ai/prompts';
 import { hasConsent } from '../me/service';
 import { todayFor } from '../../platform/dates';
 import {
@@ -295,6 +296,9 @@ recommendationsRouter.post(
       const result = await complete(
         'planStructured',
         [
+          // Real providers rank against P-02's schema and rules; without it they
+          // saw only the context block. The offline engine grounds on context.
+          { role: 'system', content: loadPrompt('P-02').content },
           {
             role: 'user',
             content: `Recommend a ${mealType} within remaining budget ${JSON.stringify(remaining)}.`,

@@ -12,7 +12,10 @@ const HowItWorksPage = lazy(() => import('./pages/landing/HowItWorks'));
    signed-in chat screen and must not be shadowed. */
 const AquaCoachPage = lazy(() => import('./pages/landing/AquaCoach'));
 const SafetyPage = lazy(() => import('./pages/landing/Safety'));
+const GooglePlayPage = lazy(() => import('./pages/landing/GooglePlay'));
 const PrivacyPage = lazy(() => import('./pages/legal/Privacy'));
+/* The privacy-policy URL declared in Play Console; keep the path stable. */
+const GooglePlayPrivacyPage = lazy(() => import('./pages/legal/GooglePlayPrivacy'));
 const TermsPage = lazy(() => import('./pages/legal/Terms'));
 const SupportPage = lazy(() => import('./pages/legal/Support'));
 /* Public account-deletion instructions. Play requires this reachable WITHOUT the
@@ -88,7 +91,9 @@ export default function App() {
         <Route path="/how-it-works" element={<HowItWorksPage />} />
         <Route path="/aqua-coach" element={<AquaCoachPage />} />
         <Route path="/safety" element={<SafetyPage />} />
+        <Route path="/google-play" element={<GooglePlayPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/google-play/privacy-policy" element={<GooglePlayPrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/support" element={<SupportPage />} />
         <Route path="/account/deletion" element={<AccountDeletionPage />} />

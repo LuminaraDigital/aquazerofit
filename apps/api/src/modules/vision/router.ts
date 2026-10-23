@@ -27,6 +27,7 @@ import type { Food, MealLog, MealType, VisionJob, VisionPrediction } from '@aqua
 import { complete } from '../ai/gateway';
 import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { post as postGuardrail } from '../ai/guardrails';
+import { loadPrompt } from '../ai/prompts';
 import { assertLaneAllowed } from '../ai/tierPolicy';
 import { todayFor } from '../../platform/dates';
 import { asyncHandler, byIdDoc, deleteDoc, getUser, newId, nowIso, round1, upsertDoc, whereDocs } from '../ai/util';
@@ -245,6 +246,54 @@ function pickVariant(variants: StoredImageVariant[], accept: string | undefined)
 }
 
 /**
+ * Boot-time recovery for jobs a restart left queued or processing. Their
+ * processJob timer died with the old process, so without this the user
+ * watches a spinner until the 2-hour sweep quietly deletes the job.
+ *
+ * A job whose photo survived is re-queued with createdAt re-stamped, so the
+ * sweep that runs straight after boot cannot reclaim it. A job whose photo
+ * is gone (ephemeral filesystem, redeploy) fails with a retriable message and
+ * its credit hold returned.
+ *
+ * The release is written BEFORE the failed status on purpose: interrupted
+ * between the two, the job is still non-terminal and the next boot retries
+ * the (idempotent) release. The other order would leave a terminal job that
+ * recovery skips and a hold that only the 24-hour sweep ever frees.
+ *
+ * Awaited from index.ts before the first sweep; exported for tests.
+ */
+export async function recoverStuckVisionJobs(): Promise<{ requeued: number; failed: number }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stuck = await whereDocs<StoredVisionJob>('ai', (d: any) =>
+    d?.type === 'cvJob' && (d?.status === 'queued' || d?.status === 'processing'),
+  );
+  let requeued = 0;
+  let failed = 0;
+  for (const job of stuck) {
+    if (job.imagePath && existsSync(job.imagePath)) {
+      job.status = 'queued';
+      job.createdAt = nowIso();
+      await upsertDoc('ai', job);
+      const jobId = job.id;
+      setTimeout(() => {
+        void processJob(jobId);
+      }, 0);
+      requeued += 1;
+      continue;
+    }
+    if (job.reservationId) await creditLedger.release(job.reservationId);
+    job.status = 'failed';
+    job.error = 'The photo was not retained across a server restart. Please try uploading again.';
+    job.completedAt = nowIso();
+    await upsertDoc('ai', job);
+    // Same data-minimisation rule as any failed job: drop whatever variant is left.
+    deleteJobImage(job);
+    failed += 1;
+  }
+  return { requeued, failed };
+}
+
+/**
  * TTL sweep: photo files (and their job docs) for jobs that reached a terminal
  * state more than 24 hours ago are deleted. Runs on boot and hourly
  * (scheduled from index.ts); exported for tests.
@@ -347,24 +396,36 @@ async function processJob(jobId: string): Promise<void> {
     const foods = await whereDocs<Food>('content', (d: any) => d?.type === 'food');
     const seedKey = path.basename(job.imagePath);
     
-    // AI-04: Compute image hash for mock engine acknowledgment (dev parity)
+    // The stored JPEG is what the model must actually analyse; the mock seeds
+    // on its hash instead (AI-04 dev parity). A missing file (sweeper race,
+    // disk fault) degrades to the text-only prompt rather than failing the job
+    // — the mock still grounds on the candidate catalog either way.
     let imageHash: string | undefined;
+    let images: string[] | undefined;
     if (existsSync(job.imagePath)) {
       const imageBuffer = readFileSync(job.imagePath);
-      const hash = crypto.createHash('sha256').update(imageBuffer).digest('hex');
-      imageHash = hash.slice(0, 16); // Short hash for seed
+      imageHash = crypto.createHash('sha256').update(imageBuffer).digest('hex').slice(0, 16);
+      images = [`data:${STORED_JPEG_MIME};base64,${imageBuffer.toString('base64')}`];
+    } else {
+      console.warn('[vision] stored photo unreadable, falling back to text-only prompt', jobId);
     }
-    
-    const result = await complete('visionPrimary', [{ role: 'user', content: `Identify foods in photo ${seedKey}` }], {
-      json: true,
-      promptId: 'P-01',
-      context: {
-        seedKey,
-        candidates: visionCandidates(foods),
-        // AI-04: Pass image hash for mock dev parity
-        imageHash,
+
+    // Real providers need P-01 itself — the output schema, the grounding rule
+    // and the examples. Without it they saw only the context block and
+    // answered with schema-mismatched or empty predictions.
+    const result = await complete(
+      'visionPrimary',
+      [
+        { role: 'system', content: loadPrompt('P-01').content },
+        { role: 'user', content: `Identify foods in photo ${seedKey}` },
+      ],
+      {
+        json: true,
+        promptId: 'P-01',
+        images,
+        context: { seedKey, candidates: visionCandidates(foods), imageHash },
       },
-    });
+    );
 
     if (result.text) {
       const outCheck = postGuardrail(result.text, { userId: job.userId });
@@ -469,8 +530,9 @@ visionRouter.post(
     const dir = uploadsDir();
 
     // imagePath stays the JPEG. It is the canonical copy — the fallback the
-    // serve route falls back TO, and what processJob hashes — so the variant
-    // list records it as well rather than treating it as a separate thing.
+    // serve route falls back TO, and what processJob sends to the model — so
+    // the variant list records it as well rather than treating it as a
+    // separate thing.
     const imagePath = path.join(dir, `${jobId}${STORED_JPEG_EXT}`);
     writeFileSync(imagePath, encoded.jpeg);
     const imageVariants: StoredImageVariant[] = [{ path: imagePath, mime: STORED_JPEG_MIME }];

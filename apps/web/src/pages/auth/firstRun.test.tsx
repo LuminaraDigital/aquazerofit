@@ -91,12 +91,12 @@ vi.mock('../../components/layout/AppLayout', async () => {
 });
 
 const { default: App } = await import('../../App');
-// /setup is the one lazy route this suite renders for real (the essentials
-// form is the thing under test). Pre-warm its module: under full-suite
-// parallel load a cold transform of Setup's dependency graph can exceed
-// findBy*'s 1s timeout, leaving the Suspense spinner on screen — a flake,
-// not a regression.
-await import('./Setup');
+// Setup and FirstRun are the lazy routes this suite renders for real (the
+// essentials form at /setup, the first-run home at / and /onboarding). Pre-warm
+// both modules: under full-suite parallel load a cold transform can exceed
+// findBy*'s 1s timeout, leaving the Suspense spinner on screen — a flake, not
+// a regression.
+await Promise.all([import('./Setup'), import('./FirstRun')]);
 
 function renderAt(path: string) {
   return render(

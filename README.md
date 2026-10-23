@@ -257,7 +257,7 @@ API refuses to boot in production until these are set.
 | --- | --- |
 | `RESEND_API_KEY` | API key for [Resend](https://resend.com). Its presence selects the `resend` transport (**required in production**) |
 | `MAIL_FROM` | Envelope sender, e.g. `AquaZeroFit <no-reply@yourdomain>`. Must be a domain verified with the provider or messages are dropped silently (**required in production**) |
-| `APP_PUBLIC_URL` | Public origin used to build links inside mail, e.g. `https://app.yourdomain` (**required in production**) |
+| `APP_PUBLIC_URL` | Public origin used to build links inside mail, e.g. `https://app.yourdomain`. GET requests to `www.` + its host are 301-redirected to it (**required in production**) |
 | `MAIL_PROVIDER` | `resend`, `console` (dev: prints the message) or `memory` (tests). Defaults to `resend` when `RESEND_API_KEY` is set, `console` otherwise |
 
 ### AI Provider Keys (all optional - gateway falls back to offline engine)

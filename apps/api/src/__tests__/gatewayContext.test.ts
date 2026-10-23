@@ -109,6 +109,20 @@ describe('complete() with a real (stubbed) provider', () => {
     await complete('chatFast', BASE_MESSAGES, {});
     expect((calls[0]!.body.messages as GatewayMessage[])).toEqual(BASE_MESSAGES);
   });
+
+  // gemini-2.0-flash was shut down on 2026-06-01; a pinned id there 404s on
+  // every call and silently drops the chain to the next provider or the mock.
+  it.each([
+    ['visionPrimary', 'gemini-flash-latest'],
+    ['chatFast', 'gemini-flash-latest'],
+  ] as const)('names the %s Gemini model as %s', async (task, model) => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    const { calls } = stubProvider();
+    const result = await complete(task, BASE_MESSAGES, {});
+    expect(result.meta.provider).toBe('gemini');
+    expect(calls[0]!.url).toContain('generativelanguage.googleapis.com');
+    expect(calls[0]!.body.model).toBe(model);
+  });
 });
 
 describe('complete() mock terminal fallback', () => {

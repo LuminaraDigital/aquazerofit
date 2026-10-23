@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import type { MealType } from '@aquazerofit/shared';
 import { MEAL_PHOTO_MAX_BYTES } from '@aquazerofit/shared';
 import { api } from '@/lib/api';
+import { compressPhoto } from '@/lib/compressPhoto';
 import { Chip } from '@/components/ui/Chip';
 import { useToast } from '@/components/ui/Toast';
 import { MEAL_LABEL, MEAL_TYPES, mealTypeForNow, todayLocalDate } from '../dashboard/lib';
@@ -59,20 +60,22 @@ export default function CaptureMeal() {
     onError: () => show('Upload failed — check your connection and try again'),
   });
 
-  const onFileChosen = (chosen: File | undefined) => {
+  const onFileChosen = async (chosen: File | undefined) => {
     setError(null);
     if (!chosen) return;
     if (!isAcceptedFile(chosen)) {
       setError('That file type is not supported. Please use a JPEG, PNG or HEIC photo.');
       return;
     }
-    if (chosen.size > MEAL_PHOTO_MAX_BYTES) {
+    // Compress before the size check so the limit applies to what actually uploads.
+    const photo = await compressPhoto(chosen).catch(() => chosen);
+    if (photo.size > MEAL_PHOTO_MAX_BYTES) {
       setError('That photo is over 10MB. Try a smaller photo or lower the camera resolution.');
       return;
     }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setFile(chosen);
-    setPreviewUrl(URL.createObjectURL(chosen));
+    setFile(photo);
+    setPreviewUrl(URL.createObjectURL(photo));
   };
 
   return (

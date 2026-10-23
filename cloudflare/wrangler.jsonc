@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "aquazerofit",
+  "account_id": "2373013c66331e9660e47ffa3ae40f5c",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-23",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  },
+  "vars": {
+    "API_ORIGIN": "https://aquazerofit-api-592686987043.australia-southeast1.run.app"
+  },
+  "assets": {
+    "directory": "../apps/web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "routes": [
+    { "pattern": "aquazerofit.com", "custom_domain": true },
+    { "pattern": "www.aquazerofit.com", "custom_domain": true }
+  ]
+}

@@ -36,7 +36,7 @@ coverage/
 **/coverage/
 *.lcov
 
-# Built assets (web is built separately; API image does not serve it by default)
+# Host web dist is stale relative to this build. The image runs vite itself.
 apps/web/dist/
 
 # Documentation and design assets - not needed at runtime
@@ -47,10 +47,14 @@ evals/
 tools/
 # prompts/ is NOT excluded: the API loads the P-*.md prompt files at boot.
 
-# Reports and planning artifacts
+# Reports and planning artifacts. prompts/*.md must survive: loadPrompt reads
+# them at boot, and a pattern without a slash matches in every directory.
 *.md
 !README.md
 !LICENSE
+!prompts/
+!prompts/**
+!prompts/*.md
 
 # OS / editor noise
 .DS_Store
@@ -61,3 +65,6 @@ Thumbs.db
 # ~326 MB of sources, build output and 209 MB of exercise media that was
 # being streamed to the Docker daemon as build context on every single build.
 apps/android/
+
+# Public edge. Deployed with wrangler, not baked into the API image.
+cloudflare/

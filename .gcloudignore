@@ -1,0 +1,30 @@
+# Upload filter for `gcloud builds submit`. Independent of .gitignore so a
+# dependency or Android tree is not sent to Cloud Build.
+#
+# Keep the Docker build inputs: Dockerfile, package-lock.json, apps/api,
+# apps/web source, packages, and prompts. The image compiles the SPA itself.
+
+.git
+.github
+.cursor
+.claude
+.windsurf
+node_modules
+**/node_modules
+apps/android
+coverage
+**/coverage
+data
+apps/api/uploads
+apps/api/.data
+**/.data
+apps/web/dist
+.env
+.env.*
+*.log
+docs
+design
+content
+evals
+tools
+cloudflare

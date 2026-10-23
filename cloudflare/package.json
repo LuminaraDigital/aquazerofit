@@ -1,0 +1,15 @@
+{
+  "name": "aquazerofit-edge",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test src/proxy.test.ts",
+    "types": "wrangler types",
+    "deploy": "wrangler deploy",
+    "dry-run": "wrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "wrangler": "^4.20.0"
+  }
+}

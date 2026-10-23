@@ -29,7 +29,7 @@ import {
   type WorkoutSession,
 } from '@aquazerofit/shared';
 import { getStore, indexKey, LOGS_BY_USER_TYPE } from '../../platform/store';
-import { addDays, lastNDates } from '../../platform/dates';
+import { addDays, daysBetween, lastNDates } from '../../platform/dates';
 import { targetsId, type TargetsDoc } from '../me/service';
 
 /**
@@ -95,13 +95,6 @@ const COLD_START_HEADLINE =
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-/** Whole days from `from` to `to`, both YYYY-MM-DD (UTC-safe, like addDays). */
-function daysBetween(from: string, to: string): number {
-  return Math.round(
-    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000,
-  );
 }
 
 export function modeForScore(score: number): ReadinessMode {

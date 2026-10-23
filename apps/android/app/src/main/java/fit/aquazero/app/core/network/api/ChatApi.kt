@@ -8,7 +8,6 @@ import fit.aquazero.app.core.model.MealType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
-import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -83,9 +82,6 @@ interface ChatApi {
 
     @GET("chat/sessions/{id}/messages")
     suspend fun messages(@Path("id") sessionId: String): ChatMessagesDto
-
-    @DELETE("chat/sessions/{id}")
-    suspend fun deleteSession(@Path("id") sessionId: String)
 
     /** Play AI-GC compliance: user-initiated report of an assistant message. */
     @POST("chat/messages/{id}/report")

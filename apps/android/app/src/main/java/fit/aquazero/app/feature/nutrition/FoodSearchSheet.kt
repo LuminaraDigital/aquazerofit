@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -208,7 +210,10 @@ private fun PortionPane(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(AzfShapes.Pill)
-            .clickable(onClick = onBack)
+            .clickable(role = Role.Button, onClick = onBack)
+            // 18dp chevron + 12dp padding is a 30dp target for the one
+            // control that gets a user out of the portion pane.
+            .minimumInteractiveComponentSize()
             .padding(vertical = 6.dp, horizontal = 4.dp),
     ) {
         Icon(
@@ -380,7 +385,12 @@ private fun FoodRow(food: FoodDto, onClick: () -> Unit) {
                 BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 AzfShapes.Inner,
             )
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -420,7 +430,12 @@ private fun ServingChip(label: String, selected: Boolean, onClick: () -> Unit) {
         text = label,
         style = MaterialTheme.typography.labelMedium,
         color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+        // The 48dp minimum wraps the background rather than sitting inside it,
+        // so the chip keeps its slim pill and only the tap area grows.
         modifier = Modifier
+            .clip(AzfShapes.Pill)
+            .clickable(role = Role.Button, onClick = onClick)
+            .minimumInteractiveComponentSize()
             .clip(AzfShapes.Pill)
             .background(
                 if (selected) accent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerLow,
@@ -432,7 +447,6 @@ private fun ServingChip(label: String, selected: Boolean, onClick: () -> Unit) {
                 ),
                 AzfShapes.Pill,
             )
-            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     )
 }

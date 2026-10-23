@@ -10,7 +10,9 @@ import fit.aquazero.app.core.data.AccountRepository
 import fit.aquazero.app.core.data.BillingFailure
 import fit.aquazero.app.core.data.BillingOutcome
 import fit.aquazero.app.core.data.BillingRepository
+import fit.aquazero.app.core.data.PlanPeriod
 import fit.aquazero.app.core.data.PremiumOffer
+import fit.aquazero.app.core.data.PremiumOffers
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.model.EntitlementsDto
@@ -29,13 +31,17 @@ data class PlanUiState(
     val loading: Boolean = true,
     val entitlements: EntitlementsDto? = null,
     val failed: Boolean = false,
-    /** Play's price for the subscription; null until it loads, or when Play cannot quote one. */
-    val offer: PremiumOffer? = null,
+    /** Available Play subscription offers. */
+    val offers: PremiumOffers? = null,
+    val selectedPeriod: PlanPeriod = PlanPeriod.ANNUAL,
     val offerLoading: Boolean = true,
     /** Play's sheet is open, or the purchase behind it is still being verified. */
     val purchasing: Boolean = false,
 ) {
     val premium: Boolean get() = entitlements?.tier == UserTier.PREMIUM
+
+    /** Active offer for the selected billing period. */
+    val offer: PremiumOffer? get() = offers?.offerFor(selectedPeriod)
 
     /**
      * Denominator for the credit bar, never smaller than the balance: unspent
@@ -105,7 +111,7 @@ class PlanEntitlementsViewModel @Inject constructor(
             }
         }
         refresh()
-        loadOffer()
+        loadOffers()
     }
 
     /** Pull the live balance; the daily grant is applied server-side on read. */
@@ -126,15 +132,20 @@ class PlanEntitlementsViewModel @Inject constructor(
         }
     }
 
+    /** Switch between Annual and Monthly subscription plans. */
+    fun selectPeriod(period: PlanPeriod) {
+        _uiState.value = _uiState.value.copy(selectedPeriod = period)
+    }
+
     /**
      * Ask Play what the subscription costs. Kept off [refresh] because the two
      * fail independently: a device without Play billing still has a plan to
      * show, and a server outage does not stop Play quoting a price.
      */
-    private fun loadOffer() {
+    private fun loadOffers() {
         viewModelScope.launch {
-            val offer = billingRepository.premiumOffer()
-            _uiState.value = _uiState.value.copy(offer = offer, offerLoading = false)
+            val offers = billingRepository.premiumOffers()
+            _uiState.value = _uiState.value.copy(offers = offers, offerLoading = false)
         }
     }
 
@@ -149,7 +160,7 @@ class PlanEntitlementsViewModel @Inject constructor(
         if (_uiState.value.purchasing) return
         _uiState.value = _uiState.value.copy(purchasing = true)
         viewModelScope.launch {
-            val outcome = billingRepository.purchasePremium(activity)
+            val outcome = billingRepository.purchasePremium(activity, _uiState.value.selectedPeriod)
             _uiState.value = _uiState.value.copy(purchasing = false)
             when (outcome) {
                 BillingOutcome.Verified -> {

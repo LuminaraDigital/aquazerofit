@@ -1,0 +1,100 @@
+name: Deploy Gates
+
+# Staging and production deploy gates. Actual host credentials live in GitHub
+# Environments (`staging`, `production`). Without those secrets the job still
+# runs verify + smoke so a broken build cannot be promoted silently.
+on:
+  push:
+    branches: [staging, main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Environment to gate (staging or production)'
+        required: true
+        default: staging
+        type: choice
+        options: [staging, production]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (with coverage thresholds)
+        run: npm run test:coverage
+
+      - name: Safety eval gate
+        run: npm run eval
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke (local artifacts)
+        run: npm run smoke
+
+  gate-staging:
+    needs: verify
+    if: github.ref_name == 'staging' || (github.event_name == 'workflow_dispatch' && inputs.target == 'staging')
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Remote smoke against staging
+        env:
+          SMOKE_BASE_URL: ${{ vars.STAGING_PUBLIC_URL }}
+        run: |
+          if [ -z "$SMOKE_BASE_URL" ]; then
+            echo "::warning::STAGING_PUBLIC_URL is not set on the staging environment."
+            echo "Deploy the image with your host's pipeline, then set the variable and re-run."
+            exit 0
+          fi
+          node scripts/smoke-check.mjs
+
+  gate-production:
+    needs: verify
+    if: github.ref_name == 'main' || (github.event_name == 'workflow_dispatch' && inputs.target == 'production')
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Refuse production without staging lineage
+        if: github.event_name == 'push'
+        run: |
+          # main must only receive merges from staging (branch-safety.yml +
+          # required status checks). This step is a belt-and-braces log.
+          echo "Production gate on main after verify. Confirm staging was green before merge."
+
+      - name: Remote smoke against production
+        env:
+          SMOKE_BASE_URL: ${{ vars.PRODUCTION_PUBLIC_URL }}
+        run: |
+          if [ -z "$SMOKE_BASE_URL" ]; then
+            echo "::warning::PRODUCTION_PUBLIC_URL is not set on the production environment."
+            echo "Set it after the first production deploy so post-merge smoke is live."
+            exit 0
+          fi
+          node scripts/smoke-check.mjs

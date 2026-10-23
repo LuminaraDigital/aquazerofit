@@ -33,8 +33,8 @@ const { getStore } = await import('../platform/store');
 const app = createApp();
 const base = '/api/v1';
 
-const CHAT_MODEL = 'llama-3.3-70b-versatile'; // groq chatFast lane
-const EXTRACTION_MODEL = 'llama-3.1-8b-instant'; // groq safetyCheap lane (P-10)
+const CHAT_MODEL = 'qwen/qwen3.8-27b'; // groq chatFast lane
+const EXTRACTION_MODEL = 'openai/gpt-oss-20b'; // groq safetyCheap lane (P-10)
 const FACT_TEXT = 'Follows a strict vegetarian diet (consent context marker)';
 const DISPLAY_NAME = 'Samushka';
 

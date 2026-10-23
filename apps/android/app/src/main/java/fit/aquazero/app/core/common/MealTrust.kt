@@ -9,9 +9,6 @@ enum class MatchConfidenceBand {
 
 object MealTrust {
 
-    const val FAT_CAUTION_NOTE =
-        "Photo and AI estimates often miss cooking oil and sauces. Add fat if needed and confirm portions."
-
     fun confidenceBandFromScore(score: Int): MatchConfidenceBand = when {
         score >= 80 -> MatchConfidenceBand.HIGH
         score >= 55 -> MatchConfidenceBand.MODERATE
@@ -48,9 +45,10 @@ object MealTrust {
         CookingFatPreset("tbsp-sauce", "1 tbsp sauce", 15.0, 30.0, 2.0),
     )
 
-    fun portionCorrectionWorthRemembering(defaultGrams: Int, confirmedGrams: Int): Boolean {
+    /** True when the user corrected a default portion enough to remember next time. */
+    fun portionCorrectionWorthRemembering(defaultGrams: Double, confirmedGrams: Double): Boolean {
         if (defaultGrams <= 0 || confirmedGrams <= 0) return false
-        val ratio = confirmedGrams.toDouble() / defaultGrams
+        val ratio = confirmedGrams / defaultGrams
         return ratio < 0.8 || ratio > 1.2
     }
 }

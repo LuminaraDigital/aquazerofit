@@ -2,25 +2,20 @@
  * Small shared helpers for the AI-owned modules (ai, chat, vision, recommendations).
  * Kept local to avoid cross-team file conflicts; platform owns the global
  * express Request augmentation, so we read req.user through getUser().
+ *
+ * Date helpers and asyncHandler live in platform (SSOT); re-exported here so
+ * existing AI-lane imports keep working.
  */
 import crypto from 'node:crypto';
 import { computeTargets } from '../me/targets';
-import type { Request, Response, NextFunction, RequestHandler } from 'express';
-import { AppError } from '../../platform/errors';
+import type { Request } from 'express';
+import { AppError, asyncHandler } from '../../platform/errors';
+import { localToday } from '../../platform/dates';
 import { store } from '../../platform/store';
-import {
-  ACTIVITY_FACTORS,
-  FAT_KCAL_FRACTION_MIN,
-  KCAL_FLOOR,
-  KCAL_PER_G,
-  KCAL_PER_KG,
-  PROTEIN_G_PER_KG,
-  WATER_ML_MAX,
-  WATER_ML_MIN,
-  WATER_ML_PER_KG,
-  WEEKLY_LOSS_FRACTION,
-} from '@aquazerofit/shared';
 import type { UserRole, UserTier, WellnessProfile } from '@aquazerofit/shared';
+
+export { asyncHandler };
+export { localToday };
 
 export interface RequestUser {
   id: string;
@@ -37,24 +32,11 @@ export function getUser(req: Request): RequestUser {
   return user;
 }
 
-/** Express 4 does not catch async errors — every async route goes through this. */
-export function asyncHandler(
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>,
-): RequestHandler {
-  return (req, res, next) => {
-    fn(req, res, next).catch(next);
-  };
-}
-
 /**
  * Ids for chat sessions, messages and meal-log rows.
  *
- * Unguessable: crypto.randomUUID, not a timestamp plus a counter. The previous
- * shape was Date.now() in base36, a module-level sequence and four base36
- * characters of Math.random() — roughly twenty bits of non-cryptographic
- * entropy hung off a value the caller already knows, with the counter leaking
- * how much traffic the process had served. These ids address rows a request
- * can name, so they must not be enumerable.
+ * Unguessable: crypto.randomUUID, not a timestamp plus a counter. Prefix uses
+ * underscore (`cm_…`) so these stay distinct from store.newId's hyphen form.
  */
 export function newId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID()}`;
@@ -62,14 +44,6 @@ export function newId(prefix: string): string {
 
 export function nowIso(): string {
   return new Date().toISOString();
-}
-
-export function localToday(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -116,12 +90,6 @@ export async function deleteDoc(container: string, id: string): Promise<void> {
   await c.delete(id);
 }
 
-// ---------------------------------------------------------------------------
-// Deterministic target derivation (fallback duplicate of TargetCalculator —
-// deliberately duplicated per the team boundary so the AI lane never imports
-// another team's service; formulas come from shared constants, AQF-09 §2.2).
-// ---------------------------------------------------------------------------
-
 export interface TargetsLike {
   kcalTarget: number;
   proteinG: number;
@@ -139,23 +107,8 @@ const DEFAULT_TARGETS: TargetsLike = {
 };
 
 /**
- * The coach's view of a user's targets — the SAME numbers the dashboard shows.
- *
- * This used to be a second implementation of the formula in
- * `modules/me/targets.ts`, and the two had drifted three ways: 'unspecified'
- * took the female sex offset instead of its own, `lose` used the top of the
- * 0.5–1.0 %/wk band instead of the midpoint, and `gain` was a flat +250
- * instead of the computed surplus. Up to ~220 kcal/day apart.
- *
- * That divergence was not cosmetic. `readTargets` feeds coach chat, batch
- * insights and recommendations, so the coach could tell a user to eat one
- * number while their own dashboard showed another — and the coach is the
- * surface people are most likely to believe. Delegating means there is one
- * formula, and `FORMULA_VERSION` continues to describe it honestly.
- *
- * `computeTargets` returns a superset of [TargetsLike]; the extra fields
- * (bmr, tdee, clamp reason, formula version) are for the profile screen and
- * are dropped here on purpose rather than leaked into model context.
+ * The coach's view of a user's targets - the SAME numbers the dashboard shows.
+ * Delegates to `computeTargets` so coach chat and the profile screen cannot drift.
  */
 export function deriveTargetsFromProfile(profile: WellnessProfile): TargetsLike {
   const targets = computeTargets(profile);
@@ -167,7 +120,6 @@ export function deriveTargetsFromProfile(profile: WellnessProfile): TargetsLike 
     waterMl: targets.waterMl,
   };
 }
-
 
 export async function readProfile(userId: string): Promise<WellnessProfile | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

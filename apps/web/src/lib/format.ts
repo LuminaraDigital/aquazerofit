@@ -8,8 +8,13 @@ import type { UnitPreference } from '@aquazerofit/shared';
 export const KG_PER_LB = 0.45359237;
 export const CM_PER_IN = 2.54;
 
-function round1(n: number): number {
+export function round1(n: number): number {
   return Math.round(n * 10) / 10;
+}
+
+/** Integer with thousands separator for kcal-style displays. */
+export function fmtInt(n: number): string {
+  return Math.round(n).toLocaleString('en-US');
 }
 
 // ---------- nutrition ----------
@@ -18,12 +23,6 @@ function round1(n: number): number {
 export function formatKcal(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—';
   return Math.round(n).toLocaleString('en-US');
-}
-
-/** "82 g" — em dash for missing values. */
-export function formatGrams(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return '—';
-  return `${Math.round(n)} g`;
 }
 
 /** "1,250 ml" or "1.3 L" when >= 1000. */
@@ -149,4 +148,19 @@ export function addDays(dateStr: string, n: number): string {
   const d = parseLocalDate(dateStr);
   d.setDate(d.getDate() + n);
   return toLocalDate(d);
+}
+
+/** Alias kept for call sites that prefer the "shift" name. */
+export const shiftLocalDate = addDays;
+
+/** "Tuesday, 29 July" style label for a YYYY-MM-DD local date. */
+export function formatLocalDate(date: string): string {
+  const d = parseLocalDate(date);
+  return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+/** Short "Tue 29" label. */
+export function formatShortDate(date: string): string {
+  const d = parseLocalDate(date);
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 }

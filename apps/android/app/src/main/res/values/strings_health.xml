@@ -22,8 +22,6 @@
     <string name="health_privacy_note">Your health data stays on this device. AquaZeroFit reads it to draw the figures below and never uploads it, includes it in diagnostics, or shares it.</string>
 
     <!-- Availability states. -->
-    <string name="health_unavailable_title">Not available on this device</string>
-    <string name="health_unavailable_body">Health Connect needs Android 8 or newer, and the Health Connect app on Android 13 and below.</string>
     <string name="health_install_title">Health Connect isn\'t installed</string>
     <string name="health_install_body">On Android 13 and below, Health Connect is a separate free app from Google.</string>
     <string name="health_install_action">Get Health Connect</string>
@@ -57,8 +55,5 @@
     <string name="health_value_kcal">%1$d kcal</string>
     <string name="health_value_sleep_hours_minutes">%1$dh %2$dm</string>
     <string name="health_value_sleep_minutes">%1$dm</string>
-
-    <!-- Accessibility. -->
-    <string name="health_refresh_action">Refresh health figures</string>
 
 </resources>

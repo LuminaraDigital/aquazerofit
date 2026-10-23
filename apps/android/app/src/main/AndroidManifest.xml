@@ -8,14 +8,35 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
 
-    <!-- Health Connect (Settings → Health Connect). Play Console health declaration required. -->
+    <!--
+      Prerequisite for the `health` foreground service type, not a feature in
+      its own right — see the WorkoutLiveService comment below for why that
+      type was chosen. Runtime/dangerous from API 29, so it is requested at the
+      moment the user taps "Start workout" (WorkoutSessionScreen), never at
+      launch, and a denial only costs the ongoing notification.
+    -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <!--
+      Health Connect (Settings → Health Connect). Play Console health
+      declaration required.
+
+      Read-only, deliberately. WRITE_WEIGHT was declared here and requested
+      from every user, and nothing ever wrote a record: `publishWeight` had no
+      caller and LogWeight never reached it. Because `hasAllPermissions()`
+      requires the whole set, that dormant permission was also a gate — a user
+      who granted the four reads but declined the write saw no figures at all,
+      for a capability the app did not have. Removed rather than wired up; if
+      weight sync is ever built, this line, the write permission in
+      HealthConnectManager.permissions and the Play health declaration go back
+      together, in that order.
+    -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
-    <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
@@ -46,10 +67,66 @@
         android:name="com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE"
         tools:node="remove" />
 
+    <!--
+      Both of these exist to stop an IMPLIED `uses-feature` narrowing Play
+      distribution, and neither describes a capability the app actually
+      demands.
+
+      The general rule, because the next dangerous permission someone adds
+      falls into the same trap: aapt derives a `uses-feature` from certain
+      permissions, and an implied feature defaults to
+      `android:required="true"`. Play filters the store listing on
+      `uses-feature`, so the permission silently becomes a hardware
+      requirement and every device without that hardware stops seeing the
+      app — a distribution decision made by a permission declaration, in a
+      file where nobody is looking for one. Declaring the feature explicitly
+      with `required="false"` is the only way to say "we use it if it is
+      there".
+
+      CAMERA implies `android.hardware.camera`; RECORD_AUDIO implies
+      `android.hardware.microphone`. Marking both optional is safe here
+      precisely because neither is load-bearing — each degrades rather than
+      breaks:
+
+      - Camera: meal capture and the barcode scanner are one way in among
+        several; search and manual entry cover the same ground.
+      - Microphone: dictation in the coach composer, reached only when the
+        user taps the mic. CoachVoiceEngine already checks
+        `SpeechRecognizer.isRecognitionAvailable` before it starts, the
+        permission is requested at that tap rather than at launch, and both
+        the declined and permanently-blocked cases have their own copy
+        (`coach_mic_denied` / `coach_mic_blocked`). A user who never grants
+        it loses dictation and keeps the keyboard.
+
+      If a future feature genuinely cannot work without one of these, the
+      honest change is `required="true"` plus a note in the store listing —
+      not deleting the line and letting the implication decide.
+    -->
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
 
+    <!--
+      Cleartext is declared twice on purpose, and the two are not redundant.
+
+      `networkSecurityConfig` is the one that decides: from API 24 upward
+      (minSdk here is 26, so always) the config file OVERRIDES
+      `usesCleartextTraffic` entirely. That is what lets the debug source set
+      swap in its own config permitting cleartext to 10.0.2.2 while this
+      attribute still reads `false` — the debug override cannot reach the
+      release artifact, because build types do not merge resources into one
+      another and the release APK only ever contains
+      `src/main/res/xml/network_security_config.xml`.
+
+      `usesCleartextTraffic="false"` stays as the declared intent and as the
+      backstop for anything that reads the manifest rather than the config —
+      Play's pre-launch scan and lint among them. Do NOT flip it to `true` to
+      "fix" a debug build: it would not fix one (the config wins), and it
+      would make the shipped manifest claim something untrue.
+    -->
     <application
         android:name=".AzfApplication"
         android:allowBackup="true"
@@ -96,9 +173,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Long-press shortcuts. The destinations they name are not read
-                 yet (see the SHORTCUT_DESTINATION extra), so all three
-                 currently land on the default surface. -->
+            <!-- Long-press shortcuts. Each carries a SHORTCUT_DESTINATION
+                 extra naming its destination; DeepLinkStore.parseShortcutIntent
+                 reads it (from onCreate on a cold start, from onNewIntent when
+                 the task is already running) and the authed shell routes it in
+                 MainShell. The extra is stripped from the intent as it is read
+                 and onCreate only parses on a fresh launch, so a rotation or a
+                 process restore does not re-navigate. An unrecognised value is
+                 dropped and the app opens on the default surface. -->
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -157,21 +239,71 @@
                 tools:node="remove" />
         </provider>
 
-        <!-- Live Workout Foreground Service -->
+        <!--
+          Live workout session and rest timer: the ongoing notification that
+          carries the rest countdown and its +30s / skip actions to the lock
+          screen.
+
+          `health`, NOT `specialUse`. The `specialUse` subtype string is
+          hand-reviewed in the Play Console, and Play's policy is to pick the
+          type that best matches the usage; the platform's own description of
+          `health` is "any long-running use cases to support apps in the
+          fitness category such as exercise trackers", which is precisely this
+          service. The previous `specialUse` declaration, with its "Live
+          workout tracking and rest timer" subtype string, handed a reviewer
+          the argument for its own rejection.
+
+          `health` is gated: the platform requires at least one prerequisite
+          permission to be held, or `startForeground` throws SecurityException
+          on API 34+. Two satisfy it here. ACTIVITY_RECOGNITION (declared
+          above) is the one we can ask for — it covers step counts and physical
+          activity, which is what HealthExpenditureBridge turns into the day's
+          active burn. A granted Health Connect READ_HEART_RATE also qualifies,
+          so users who linked Health Connect are covered even if they decline
+          the runtime prompt.
+
+          Deliberately NOT declared: HIGH_SAMPLING_RATE_SENSORS. It is the one
+          install-time way onto that prerequisite list and would remove the
+          runtime prompt entirely — but it means ">200 Hz raw motion-sensor
+          sampling", and this app registers no SensorEventListener at all. It
+          would be a capability claim with nothing behind it, in the same
+          manifest that strips four ad permissions to stay honest.
+
+          If neither prerequisite is held the service fails safe: it catches
+          the SecurityException, drops the notification, and lets the workout
+          run in-app (WorkoutLiveService.notificationUnavailable). Reverting
+          this block to `specialUse` would trade a working, reviewable
+          declaration for a hand-review the fitness use case is expected to
+          lose.
+        -->
         <service
             android:name=".core.service.WorkoutLiveService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Live workout tracking and rest timer" />
-        </service>
+            android:foregroundServiceType="health" />
 
-        <!-- Health Connect permission rationale (Android 14+ / Play Health apps). -->
+        <!--
+          Health Connect permission rationale. TWO declarations are required and
+          they cover different Android versions:
+
+          - This intent filter is the pre-Android-14 path. Health Connect ships
+            as an APK there and launches the rationale with
+            `androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE`. minSdk is 26,
+            so most of the install base takes this route; without it the
+            "why does this app want my data" link goes nowhere.
+          - The activity-alias below is the Android 14+ path, where Health
+            Connect moved into the platform and the entry point became
+            VIEW_PERMISSION_USAGE + CATEGORY_HEALTH_PERMISSIONS.
+
+          A reachable rationale is a Play Health apps requirement, not a nicety.
+        -->
         <activity
             android:name=".HealthPermissionRationaleActivity"
             android:exported="true"
-            android:theme="@style/Theme.AquaZeroFit" />
+            android:theme="@style/Theme.AquaZeroFit">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
         <activity-alias
             android:name="ViewPermissionUsageActivity"
             android:exported="true"

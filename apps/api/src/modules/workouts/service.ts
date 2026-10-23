@@ -28,7 +28,7 @@ import type {
 } from '@aquazerofit/shared';
 import { AppError } from '../../platform/errors';
 import { getStore } from '../../platform/store';
-import { addDays } from '../../platform/dates';
+import { addDays, daysBetween } from '../../platform/dates';
 import { creditLedger } from '../ai/creditLedger';
 import { tierOf } from '../billing/entitlements';
 import {
@@ -44,14 +44,6 @@ import {
   type RuleKind,
 } from '../plans/progression';
 import { getProfile } from '../me/service';
-
-const DAY_MS = 24 * 3600 * 1000;
-
-function daysBetween(fromDate: string, toDate: string): number {
-  return Math.round(
-    (new Date(`${toDate}T00:00:00Z`).getTime() - new Date(`${fromDate}T00:00:00Z`).getTime()) / DAY_MS,
-  );
-}
 
 export function planPositionFor(
   plan: TrainingPlan,
@@ -483,11 +475,6 @@ export function queryExercises(query: ExerciseQuery): { items: Exercise[]; total
   const offset = query.offset ?? 0;
   const limit = query.limit ?? 50;
   return { items: list.slice(offset, offset + limit), total };
-}
-
-/** Backward-compatible wrapper over queryExercises (legacy signature). */
-export function searchExercises(search: string, category?: string): Exercise[] {
-  return queryExercises({ search, category: category as Exercise['category'] | undefined }).items;
 }
 
 /**

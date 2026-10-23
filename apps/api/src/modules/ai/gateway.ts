@@ -111,10 +111,10 @@ const PROVIDERS: ProviderDef[] = [
     keyEnv: 'GROQ_API_KEY',
     models: {
       visionPrimary: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      chatFast: 'llama-3.3-70b-versatile',
-      planStructured: 'llama-3.3-70b-versatile',
-      safetyCheap: 'llama-3.1-8b-instant',
-      insightBatch: 'llama-3.3-70b-versatile',
+      chatFast: 'qwen/qwen3.8-27b',
+      planStructured: 'qwen/qwen3.8-27b',
+      safetyCheap: 'openai/gpt-oss-20b',
+      insightBatch: 'qwen/qwen3.8-27b',
     },
   },
   {
@@ -147,11 +147,11 @@ const PROVIDERS: ProviderDef[] = [
     baseUrlEnv: 'NVIDIA_BASE_URL',
     keyEnv: 'NVIDIA_API_KEY',
     models: {
-      visionPrimary: 'meta/llama-3.2-90b-vision-instruct',
-      chatFast: 'meta/llama-3.3-70b-instruct',
-      planStructured: 'meta/llama-3.3-70b-instruct',
-      safetyCheap: 'meta/llama-3.1-8b-instruct',
-      insightBatch: 'meta/llama-3.3-70b-instruct',
+      visionPrimary: 'meta/llama-3.2-11b-vision-instruct',
+      chatFast: 'meta/llama-3.2-11b-vision-instruct',
+      planStructured: 'meta/llama-3.2-11b-vision-instruct',
+      safetyCheap: 'meta/llama-3.2-11b-vision-instruct',
+      insightBatch: 'meta/llama-3.2-11b-vision-instruct',
     },
   },
   {
@@ -169,6 +169,12 @@ const PROVIDERS: ProviderDef[] = [
     },
   },
 ];
+
+function modelFor(provider: ProviderDef, task: ModelGroup): string {
+  const specificEnv = `${provider.name.toUpperCase()}_MODEL_${task.toUpperCase()}`;
+  const generalEnv = `${provider.name.toUpperCase()}_MODEL`;
+  return process.env[specificEnv]?.trim() || process.env[generalEnv]?.trim() || provider.models[task];
+}
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 /**
@@ -394,7 +400,7 @@ async function callProvider(
   const key = process.env[provider.keyEnv];
   if (!key && !provider.keyOptional) throw new ProviderError(`missing ${provider.keyEnv}`, false);
   const baseUrl = (provider.baseUrlEnv && process.env[provider.baseUrlEnv]) || provider.baseUrl;
-  const model = provider.models[task];
+  const model = modelFor(provider, task);
   const controller = new AbortController();
   // AbortController rather than a race, so a timed-out request is actually
   // cancelled instead of left running against a socket nobody reads.
@@ -570,7 +576,7 @@ export async function complete(
         const failure = classify(err);
         logAiCall({
           provider: provider.name,
-          model: provider.models[task],
+          model: modelFor(provider, task),
           promptVersion,
           latencyMs: Date.now() - started,
           tokens: { prompt: promptTokens },
@@ -712,7 +718,7 @@ export async function complete(
           const key = process.env[provider.keyEnv];
           if (!key && !provider.keyOptional) throw new ProviderError(`missing ${provider.keyEnv}`, false);
           const baseUrl = (provider.baseUrlEnv && process.env[provider.baseUrlEnv]) || provider.baseUrl;
-          const model = provider.models[task];
+          const model = modelFor(provider, task);
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), budget);
         
@@ -820,7 +826,7 @@ export async function complete(
           const failure = classify(err);
           logAiCall({
             provider: provider.name,
-            model: provider.models[task],
+            model: modelFor(provider, task),
             promptVersion,
             latencyMs: Date.now() - started,
             tokens: { prompt: promptTokens },

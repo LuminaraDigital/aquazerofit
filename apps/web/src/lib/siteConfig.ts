@@ -9,5 +9,3 @@
 import { resolveSiteConfig } from './site';
 
 export const SITE = resolveSiteConfig(import.meta.env as unknown as Record<string, string | undefined>);
-
-export const { siteOrigin: SITE_ORIGIN, telegramBotUsername: TELEGRAM_BOT_USERNAME } = SITE;

@@ -49,7 +49,7 @@ export function TargetsNotSetCard({ returnTo }: { returnTo?: string }) {
       >
         Set up my targets
       </Link>
-      <p className="text-xs text-on-surface-variant/70 text-center mt-2">
+      <p className="text-xs text-on-surface-variant text-center mt-2">
         Five questions, about thirty seconds.
       </p>
     </GlassCard>

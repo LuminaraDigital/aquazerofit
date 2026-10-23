@@ -22,6 +22,7 @@ import {
   type WorkoutSession,
 } from '@aquazerofit/shared';
 import { api, ApiError, mediaUrl } from '@/lib/api';
+import { asList, orNull } from '@/lib/envelopes';
 import { todayWorkoutQuery, unwrapWorkoutSession } from '@/lib/queries';
 import { EQUIPMENT_ICONS, EQUIPMENT_LABELS } from '@/lib/equipmentMeta';
 import { normalizeExercisesPage } from '@/lib/contracts';
@@ -36,6 +37,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
 import { BottomSheet } from './BottomSheet';
+
+export { asList };
 
 const PAGE_SIZE = 24;
 
@@ -62,25 +65,6 @@ const MUSCLES = [
   { key: 'calves', label: 'Calves' },
 ] as const;
 
-/** Treat NOT_FOUND as "no data yet" rather than an error. */
-async function orNull<T>(fn: () => Promise<T>): Promise<T | null> {
-  try {
-    return await fn();
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return null;
-    throw e;
-  }
-}
-
-export function asList<T>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === 'object' && Array.isArray((data as { items?: unknown }).items)) {
-    return (data as { items: T[] }).items;
-  }
-  return [];
-}
-
-/** /plans/current responds { plan }; accept both wrapped and bare shapes. */
 function unwrapPlan(data: unknown): TrainingPlan | null {
   if (!data || typeof data !== 'object') return null;
   const maybe = (data as { plan?: unknown }).plan ?? data;
@@ -545,7 +529,7 @@ export default function WorkoutLibrary() {
                         : isToday
                           ? 'border-2 border-primary text-primary shadow-[0_0_15px_rgba(138,235,255,0.3)]'
                           : day.isRest
-                            ? 'bg-surface-container text-on-surface-variant/50'
+                            ? 'bg-surface-container text-outline'
                             : 'bg-surface-container text-on-surface-variant'
                     }`}
                   >

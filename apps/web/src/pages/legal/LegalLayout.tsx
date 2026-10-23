@@ -36,7 +36,7 @@ export function LegalPage({
         <div className="lp-floor" aria-hidden="true" />
         <div className="relative mx-auto max-w-6xl px-5">
           <Reveal>
-            <nav aria-label="Breadcrumb" className="text-[12px] text-on-surface-variant/70">
+            <nav aria-label="Breadcrumb" className="text-[12px] text-on-surface-variant">
               <Link to="/landing" className="transition-colors hover:text-primary">
                 Home
               </Link>
@@ -60,7 +60,7 @@ export function LegalPage({
           </Reveal>
 
           <Reveal delay={200}>
-            <p className="mt-5 text-[12px] text-on-surface-variant/70">
+            <p className="mt-5 text-[12px] text-on-surface-variant">
               Effective <Fact name="effectiveDate" hint="effective date" />
               {OPERATOR.legalName && (
                 <>
@@ -77,7 +77,7 @@ export function LegalPage({
         <div className="grid gap-12 lg:grid-cols-[220px_1fr] lg:gap-16">
           <Reveal className="lg:sticky lg:top-24 lg:self-start">
             <nav aria-label="Contents">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/70">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
                 Contents
               </h2>
               <ol className="mt-4 space-y-2.5 border-l border-white/8 pl-4">
@@ -87,7 +87,7 @@ export function LegalPage({
                       href={`#${clause.id}`}
                       className="text-sm text-on-surface-variant/75 transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
                     >
-                      <span className="tabular-nums text-on-surface-variant/70">{i + 1}.</span>{' '}
+                      <span className="tabular-nums text-on-surface-variant">{i + 1}.</span>{' '}
                       {clause.heading}
                     </a>
                   </li>
@@ -134,7 +134,7 @@ export function Section({
 
 /** Body paragraph. */
 export function P({ children }: { children: React.ReactNode }) {
-  return <p className="text-[15px] leading-relaxed text-on-surface-variant/80">{children}</p>;
+  return <p className="text-[15px] leading-relaxed text-on-surface-variant">{children}</p>;
 }
 
 /** Bulleted list of plain strings or nodes. */
@@ -142,7 +142,7 @@ export function List({ items }: { items: React.ReactNode[] }) {
   return (
     <ul className="space-y-2.5">
       {items.map((item, i) => (
-        <li key={i} className="flex gap-3 text-[15px] leading-relaxed text-on-surface-variant/80">
+        <li key={i} className="flex gap-3 text-[15px] leading-relaxed text-on-surface-variant">
           <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary/60" aria-hidden="true" />
           <span>{item}</span>
         </li>
@@ -170,7 +170,7 @@ export function Table({
               <th
                 key={heading}
                 scope="col"
-                className="px-5 py-3 text-[11px] uppercase tracking-[0.14em] text-on-surface-variant/70"
+                className="px-5 py-3 text-[11px] uppercase tracking-[0.14em] text-on-surface-variant"
               >
                 {heading}
               </th>
@@ -216,7 +216,7 @@ export function Notice({
       <span className="material-symbols-outlined shrink-0 text-[18px]" aria-hidden="true">
         {icon}
       </span>
-      <div className="text-[14px] leading-relaxed text-on-surface-variant/80">{children}</div>
+      <div className="text-[14px] leading-relaxed text-on-surface-variant">{children}</div>
     </div>
   );
 }

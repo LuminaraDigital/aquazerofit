@@ -70,12 +70,27 @@ describe('legal pages', () => {
     }
   });
 
-  it('marks missing operator facts visibly rather than leaving a blank', () => {
-    expect(OPERATOR.legalName).toBeNull();
+  it('marks a missing operator fact visibly rather than leaving a blank', () => {
+    // Retargeted when the nine facts already in force on the live deployment
+    // were ported into OPERATOR. The guarantee is unchanged — an unsupplied
+    // fact must render as a conspicuous marker rather than a silent gap that
+    // reads like a finished sentence — but it now has to be asserted against a
+    // field that is genuinely still null, or it proves nothing.
+    expect(OPERATOR.aiProvidersVerifiedOn).toBeNull();
     renderAt('/privacy', <PrivacyPage />);
 
-    expect(screen.getAllByText(/\[operator legal name\]/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/\[governing jurisdiction\]/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\[date provider terms last verified\]/i).length).toBeGreaterThan(0);
+  });
+
+  it('renders the supplied operator facts, so the notice reads as prose', () => {
+    // This is the reason the file exists: a build from this repo must reproduce
+    // the notice actually in force at https://aquazerofit.com, which is the
+    // privacy policy URL submitted to Google Play. If these revert to
+    // placeholders, that URL starts serving a draft.
+    renderAt('/privacy', <PrivacyPage />);
+
+    expect(screen.getAllByText(/LUMINARA DIGITAL PTY LTD/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/\[operator legal name\]/i)).toBeNull();
   });
 });
 

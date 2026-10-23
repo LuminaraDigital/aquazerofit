@@ -1,6 +1,9 @@
 /**
  * Confirm-first trust helpers shared across web and API tests.
- * Keep in sync with apps/api/src/modules/chat/mealTrust.ts.
+ *
+ * This is the single definition. The API lane used to re-export it through
+ * apps/api/src/modules/chat/mealTrust.ts; that barrel was removed once nothing
+ * imported it, so callers on both sides import from @aquazerofit/shared direct.
  */
 
 export type MatchConfidenceBand = 'high' | 'moderate' | 'low';

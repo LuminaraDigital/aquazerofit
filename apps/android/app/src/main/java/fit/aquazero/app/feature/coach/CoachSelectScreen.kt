@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -238,7 +239,12 @@ private fun CoachTile(
                 ),
                 AzfShapes.Card,
             )
-            .clickable(interactionSource = interaction, indication = null, onClick = onSelect)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onSelect,
+            )
             .semantics { contentDescription = description },
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {

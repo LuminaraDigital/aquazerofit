@@ -148,7 +148,7 @@ export default function SafetyPage() {
                   <p className="mt-2 flex-1 text-sm leading-relaxed text-on-surface-variant/75">
                     {item.body}
                   </p>
-                  <p className="mt-4 border-t border-white/6 pt-3 text-[12px] leading-relaxed text-on-surface-variant/70">
+                  <p className="mt-4 border-t border-white/6 pt-3 text-[12px] leading-relaxed text-on-surface-variant">
                     <span className="font-semibold uppercase tracking-[0.14em] text-secondary">
                       Enforced by
                     </span>

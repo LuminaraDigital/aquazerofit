@@ -19,6 +19,7 @@ import type {
   WorkoutSession,
 } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
+import { trackFirstValueWorkout } from '@/lib/retention';
 import {
   unwrapResolved,
   type CompleteExerciseInput,
@@ -286,6 +287,7 @@ export default function WorkoutDetail() {
     }) => api<WorkoutSession>(`/workouts/${sessionId}/complete`, { method: 'POST', body: payload }),
     ...completePatch,
     onSuccess: async () => {
+      trackFirstValueWorkout('workout_complete');
       toast.success('Workout complete - great session!');
       const mins = durationMinutes();
       setSharePayload({
@@ -426,7 +428,6 @@ export default function WorkoutDetail() {
               <h1 className="heading-display font-heading text-3xl leading-tight text-on-surface">
                 {session.focus}
               </h1>
-              <p className="text-sm text-on-surface-variant">Aqua Coach • personalised session</p>
             </div>
           </section>
 
@@ -626,7 +627,7 @@ export default function WorkoutDetail() {
                         }
                         placeholder="BW"
                         aria-label={`Weight in kilograms for set ${(setsDone[exerciseIdx] ?? 0) + 1} of ${current.name}`}
-                        className="w-full rounded-lg border border-outline-variant bg-surface-container px-2 py-2 text-center font-bold text-on-surface tabular-nums placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full rounded-lg border border-outline-variant bg-surface-container px-2 py-2 text-center font-bold text-on-surface tabular-nums placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -658,7 +659,7 @@ export default function WorkoutDetail() {
                         onChange={(e) => setActualInput((s) => ({ ...s, rir: e.target.value }))}
                         placeholder="-"
                         aria-label={`Reps in reserve for set ${(setsDone[exerciseIdx] ?? 0) + 1} of ${current.name}`}
-                        className="w-full rounded-lg border border-outline-variant bg-surface-container px-2 py-2 text-center font-bold text-on-surface tabular-nums placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full rounded-lg border border-outline-variant bg-surface-container px-2 py-2 text-center font-bold text-on-surface tabular-nums placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </label>
                   </div>

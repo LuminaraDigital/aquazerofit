@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -45,6 +46,8 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -98,8 +101,10 @@ internal fun DaySwitcher(
                     .clickable(
                         interactionSource = interaction,
                         indication = null,
+                        role = Role.Button,
                         onClick = onOpenCalendar,
                     )
+                    .minimumInteractiveComponentSize()
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
                 Text(
@@ -127,7 +132,9 @@ internal fun DaySwitcher(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .clip(AzfShapes.Pill)
-                        .clickable(onClick = onBackToToday)
+                        .clickable(role = Role.Button, onClick = onBackToToday)
+                        // labelSmall + 4dp padding is barely 24dp tall.
+                        .minimumInteractiveComponentSize()
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
@@ -189,9 +196,11 @@ internal fun CaloriesRemainingCard(
             NutritionFormat.fmtInt(nutrition.kcalRemaining),
         )
         Row(
+            // The four cells are one sentence; cleared so TalkBack reads the
+            // formula once instead of nine disconnected numbers.
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics { contentDescription = formulaDescription },
+                .clearAndSetSemantics { contentDescription = formulaDescription },
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             FormulaCell(
@@ -269,7 +278,8 @@ internal fun MicronutrientCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(AzfShapes.Inner)
-                .clickable(onClick = onToggle)
+                .clickable(role = Role.Button, onClick = onToggle)
+                .minimumInteractiveComponentSize()
                 .semantics { contentDescription = toggleLabel },
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -459,7 +469,7 @@ internal fun MealSection(
                         BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         AzfShapes.Inner,
                     )
-                    .clickable(onClick = onAdd)
+                    .clickable(role = Role.Button, onClick = onAdd)
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -667,8 +677,19 @@ private fun KcalBar(
     modifier: Modifier = Modifier,
 ) {
     val extended = LocalAzfExtended.current
+    // Bar height is the only thing carrying the value, and the visible label
+    // is a single letter. Without this the whole chart reads "M T W T F S S".
+    val barDescription = stringResource(
+        if (selected) R.string.weekly_bar_selected_cd else R.string.weekly_bar_cd,
+        NutritionFormat.fullWeekday(point.date),
+        // Grouped, like every other spoken calorie figure: "1,840" is read as
+        // a number, "1840" is read as four digits.
+        NutritionFormat.fmtInt(point.value),
+    )
     Column(
-        modifier = modifier.fillMaxHeight(),
+        modifier = modifier
+            .fillMaxHeight()
+            .clearAndSetSemantics { contentDescription = barDescription },
         verticalArrangement = Arrangement.Bottom,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -732,6 +753,7 @@ private fun RoundIconButton(
                 interactionSource = interaction,
                 indication = null,
                 enabled = enabled,
+                role = Role.Button,
                 onClick = onClick,
             ),
         contentAlignment = Alignment.Center,
@@ -819,6 +841,7 @@ private fun QuickAction(
                 interactionSource = interaction,
                 indication = null,
                 enabled = enabled,
+                role = Role.Button,
                 onClick = onClick,
             )
             .padding(16.dp),

@@ -1,5 +1,6 @@
 package fit.aquazero.app.feature.dashboard
 
+import fit.aquazero.app.core.common.Hydration
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.database.UserEntity
 import fit.aquazero.app.core.model.ApiResult
@@ -68,7 +69,7 @@ class DashboardMidnightTest {
         advanceUntilIdle()
 
         assertEquals(
-            listOf(DashboardViewModel.WATER_INCREMENT_ML to NEXT_DAY),
+            listOf(Hydration.WATER_INCREMENT_ML to NEXT_DAY),
             data.loggedWater,
         )
         assertEquals(NEXT_DAY, viewModel.uiState.value.today)

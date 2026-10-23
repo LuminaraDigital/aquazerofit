@@ -20,13 +20,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ChatMessage, ChatSession, ChatToolCall, MealType } from '@aquazerofit/shared';
 import { AQUA_CHARACTER, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
 import { api, ApiError, streamChat } from '@/lib/api';
-import { useCoachRoster, type CoachCardData } from '@/lib/queries';
+import { asList } from '@/lib/envelopes';
+import { todayLocalDate } from '@/lib/format';
+import { useDraftPersistence } from '@/lib/useDraftPersistence';
+import { trackFirstValueMeal } from '@/lib/retention';
+import { queryKeys, useCoachRoster, type CoachCardData } from '@/lib/queries';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Chip } from '@/components/ui/Chip';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { CoachSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
 import { BottomSheet } from '@/pages/training/BottomSheet';
@@ -44,12 +48,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 /** The user's own calendar day, which is the day a meal belongs to. */
-function localToday(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
-}
+const localToday = todayLocalDate;
 
 const TOOL_LABELS: Record<string, string> = {
   getTodayNutrition: "Today's nutrition",
@@ -137,21 +136,9 @@ function timeOf(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-/** Accept bare arrays and the API's { items } / { sessions } / { messages } envelopes. */
-function asList<T>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === 'object') {
-    const record = data as Record<string, unknown>;
-    for (const key of ['items', 'sessions', 'messages']) {
-      if (Array.isArray(record[key])) return record[key] as T[];
-    }
-  }
-  return [];
-}
-
 /**
  * Byline above each assistant turn. Shows the user's selected coach, falling
- * back to the Aqua mascot before the roster query resolves — the alternative
+ * back to the Aqua mascot before the roster query resolves - the alternative
  * (an empty slot that pops in) makes the first paint of every conversation
  * flicker on the slowest connections, which is where it is most visible.
  */
@@ -197,8 +184,8 @@ export default function Coach() {
   // already warm by the time the chat mounts.
   const roster = useCoachRoster();
   const activeCoach = roster.data?.roster.find((c) => c.id === roster.data?.activeCoachId);
-  // Every user-facing mention of "who you are talking to" — composer label,
-  // typing indicator, live-region announcements, empty-state greeting — names
+  // Every user-facing mention of "who you are talking to" - composer label,
+  // typing indicator, live-region announcements, empty-state greeting - names
   // the ACTIVE coach, falling back to the default character until the roster
   // loads. The message bubbles already did this (AssistantByline).
   const coachName = activeCoach ? activeCoach.name.split(' ')[0] : AQUA_CHARACTER.name;
@@ -216,10 +203,23 @@ export default function Coach() {
   const endRef = useRef<HTMLDivElement>(null);
   const creatingRef = useRef(false);
 
+  const onRestoreComposer = useCallback((stored: string) => {
+    setInput(stored);
+  }, []);
+  const { clear: clearComposerDraft } = useDraftPersistence({
+    storageKey: 'azf_coach_composer_v1',
+    value: input,
+    enabled: !streaming,
+    isDirty: (v) => v.trim().length > 0,
+    surface: 'coach',
+    onRestore: onRestoreComposer,
+  });
+
   // ---- session bootstrap ----
   const sessionsQuery = useQuery({
     queryKey: ['chat', 'sessions'],
-    queryFn: async () => asList<ChatSession>(await api<unknown>('/chat/sessions')),
+    queryFn: async () =>
+      asList<ChatSession>(await api<unknown>('/chat/sessions'), ['items', 'sessions']),
   });
 
   const createSession = useMutation({
@@ -246,7 +246,10 @@ export default function Coach() {
   const messagesQuery = useQuery({
     queryKey: ['chat', 'messages', sessionId],
     queryFn: async () =>
-      asList<ChatMessage>(await api<unknown>(`/chat/sessions/${sessionId}/messages`)),
+      asList<ChatMessage>(
+        await api<unknown>(`/chat/sessions/${sessionId}/messages`),
+        ['items', 'messages'],
+      ),
     enabled: sessionId !== '',
   });
   const messages = useMemo(() => messagesQuery.data ?? [], [messagesQuery.data]);
@@ -277,6 +280,7 @@ export default function Coach() {
       const text = content.trim();
       if (!text || streaming || !sessionId) return;
       setInput('');
+      clearComposerDraft();
       setPendingUser(text);
       setStreaming(true);
       setStreamText('');
@@ -310,7 +314,7 @@ export default function Coach() {
         setPendingUser(null);
       }
     },
-    [sessionId, streaming, queryClient, coachName],
+    [sessionId, streaming, queryClient, coachName, clearComposerDraft],
   );
 
   // ---- chat-native logging: propose → confirm ----
@@ -322,6 +326,7 @@ export default function Coach() {
       }),
     onSuccess: (data) => {
       setInput('');
+      clearComposerDraft();
       setDraft(data.draft);
       void queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
     },
@@ -343,11 +348,13 @@ export default function Coach() {
       }),
     onSuccess: async (data) => {
       setDraft(null);
+      trackFirstValueMeal('coach_confirm');
       toast.success(`Logged ${Math.round(data.mealLog.totalKcal)} kcal`);
       await queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
       // The dashboard and food log read the same rows this just wrote.
       void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
-      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.progress });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutToday });
     },
     onError: (e) =>
       toast.error(e instanceof ApiError ? e.message : 'Could not log that meal. Please try again.'),
@@ -467,11 +474,7 @@ export default function Coach() {
       {/* ---- message list ---- */}
       <main className="flex flex-1 flex-col gap-5 px-container-margin py-5" aria-label="Conversation with Aqua Coach">
         {sessionsQuery.isPending || (sessionId !== '' && messagesQuery.isPending) ? (
-          <div className="space-y-4">
-            <Skeleton className="h-20 w-3/4 rounded-card" />
-            <Skeleton className="ml-auto h-14 w-2/3 rounded-card" />
-            <Skeleton className="h-24 w-3/4 rounded-card" />
-          </div>
+          <CoachSkeleton />
         ) : sessionsQuery.isError ? (
           <ErrorState
             message="Could not open the coach."
@@ -712,7 +715,7 @@ export default function Coach() {
             value={input}
             disabled={streaming || sessionId === ''}
             onChange={(e) => setInput(e.target.value)}
-            className="flex-1 border-none bg-transparent px-2 text-base text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:ring-0 disabled:opacity-60"
+            className="flex-1 border-none bg-transparent px-2 text-base text-on-surface placeholder:text-outline focus:outline-none focus:ring-0 disabled:opacity-60"
           />
           {/* Logging is a separate, explicit action rather than something the
               coach infers from a chat turn: guessing "I ate X" from a sentence

@@ -147,7 +147,7 @@ export default function SupportPage() {
                   <h3 className="font-heading text-lg font-semibold text-on-surface">
                     {item.question}
                   </h3>
-                  <p className="mt-3 text-sm leading-relaxed text-on-surface-variant/80">
+                  <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
                     {item.answer}
                   </p>
                 </div>
@@ -184,7 +184,7 @@ export default function SupportPage() {
                   Anything about your account, a number that looks wrong, or a feature behaving
                   oddly: <Fact name="supportEmail" hint="support contact" />.
                 </p>
-                <p className="mt-3 text-[12px] leading-relaxed text-on-surface-variant/70">
+                <p className="mt-3 text-[12px] leading-relaxed text-on-surface-variant">
                   Typical response time: <Fact name="supportResponseTime" hint="response time" />
                 </p>
               </div>

@@ -37,7 +37,7 @@ class ProgressRepository @Inject constructor(
             is ApiResult.Success -> {
                 progressDao.upsertSummary(
                     ProgressSummaryEntity(
-                        userId = "me",
+                        userId = ProgressSummaryEntity.PROGRESS_SUMMARY_KEY,
                         docJson = AzfJson.encodeToString(ProgressSummaryDto.serializer(), result.data),
                         cachedAt = System.currentTimeMillis(),
                     ),

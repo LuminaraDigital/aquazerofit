@@ -72,7 +72,9 @@ afterAll(async () => {
   await getStore().flush();
   delete process.env.TELEGRAM_WEBHOOK_SECRET;
   delete process.env.TELEGRAM_BOT_TOKEN;
-  fs.rmSync(dataDir, { recursive: true, force: true });
+  // Overlay filesystems (the API image build) can return ENOTEMPTY while a
+  // recursive delete is in progress. maxRetries covers that.
+  fs.rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 });
 
 function seedPaid(chargeId: string): void {

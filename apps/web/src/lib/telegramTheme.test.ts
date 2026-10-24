@@ -163,7 +163,13 @@ describe('inside Telegram, light host', () => {
     expect(document.documentElement.classList.contains('tg-active')).toBe(true);
 
     const surface: Rgb = [255, 255, 255];
-    for (const token of ['--azf-primary', '--azf-secondary', '--azf-coral', '--azf-error']) {
+    for (const token of [
+      '--azf-primary',
+      '--azf-secondary',
+      '--azf-coral',
+      '--azf-error',
+      '--azf-tertiary-container',
+    ]) {
       const fg = toRgb(styleOf(token));
       expect(contrastRatio(fg, surface), token).toBeGreaterThanOrEqual(4.5);
     }
@@ -171,6 +177,27 @@ describe('inside Telegram, light host', () => {
     const onPrimary = toRgb(styleOf('--azf-on-primary'));
     expect(contrastRatio(onPrimary, primary)).toBeGreaterThanOrEqual(4.5);
     expect(styleOf('--azf-cta-text')).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('keeps brand ink at AA on a 25% chip wash', () => {
+    const { vars } = resolveTelegramAppearance(LIGHT_TELEGRAM, 'light');
+    const page: Rgb = [255, 255, 255];
+    const over = (fg: Rgb, alpha: number): Rgb => {
+      const mixed = fg.map((channel, index) =>
+        Math.round(page[index] + (channel - page[index]) * alpha),
+      );
+      return [mixed[0] ?? 0, mixed[1] ?? 0, mixed[2] ?? 0];
+    };
+    for (const token of [
+      '--azf-primary',
+      '--azf-primary-fixed-dim',
+      '--azf-secondary',
+      '--azf-coral',
+      '--azf-tertiary-container',
+    ]) {
+      const fg = toRgb(vars[token] ?? '');
+      expect(contrastRatio(fg, over(fg, 0.25)), token).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it('keeps the shipped dark palette when colorScheme is dark but the background is white', () => {

@@ -252,6 +252,13 @@ export type Rgb = readonly [number, number, number];
 const AA_TEXT_CONTRAST = 4.5;
 
 /**
+ * Floor used when painting ink. A step coarser than 4.5, so the colour axe
+ * measures still clears AA after rounding and after it sits on a card that is
+ * a hair darker than the page.
+ */
+const AA_INK_CONTRAST = 4.8;
+
+/**
  * Shipped brand foregrounds. On a dark host they stay as written. They are
  * also the contrast floor for adopting a dark host background: if any of
  * them would fall under AA, the background is not a dark theme. Mirrors the
@@ -358,6 +365,7 @@ const LIGHT_BRAND: Readonly<Record<string, Rgb>> = {
   '--azf-warning': [255, 196, 90],
   '--azf-info': [138, 235, 255],
   '--azf-coral': [255, 178, 185],
+  '--azf-tertiary-container': [255, 170, 178],
   '--azf-surface-tint': [47, 217, 244],
   '--azf-primary-fixed-dim': [47, 217, 244],
   '--azf-secondary-fixed-dim': [69, 223, 164],
@@ -372,6 +380,7 @@ const ON_ROLE: Readonly<Record<string, string>> = {
   '--azf-success': '--azf-on-success',
   '--azf-warning': '--azf-on-warning',
   '--azf-info': '--azf-on-info',
+  '--azf-tertiary-container': '--azf-on-tertiary-container',
 };
 
 /** Every property the binding may write, so a failed rebind can clear cleanly. */
@@ -388,10 +397,23 @@ export interface TelegramAppearance {
   scheme: 'light' | 'dark' | null;
 }
 
+/** Colour painted at `alpha` over the page. Chip washes are this composite. */
+function over(color: Rgb, background: Rgb, alpha: number): Rgb {
+  return mix(background, color, alpha);
+}
+
+/**
+ * Darken until the ink clears AA on the page and on a 25% wash of itself.
+ * Chips render the same token as text on `bg-token/15` and `/25`. Meeting AA
+ * only against the page leaves those labels short of 4.5:1.
+ */
 function darkenUntil(color: Rgb, background: Rgb): Rgb {
-  for (let step = 0; step <= 24; step += 1) {
-    const candidate = mix(color, [0, 0, 0], step / 24);
-    if (contrastRatio(candidate, background) >= AA_TEXT_CONTRAST) return candidate;
+  const steps = 60;
+  for (let step = 0; step <= steps; step += 1) {
+    const candidate = mix(color, [0, 0, 0], step / steps);
+    const onPage = contrastRatio(candidate, background) >= AA_INK_CONTRAST;
+    const onChip = contrastRatio(candidate, over(candidate, background, 0.25)) >= AA_TEXT_CONTRAST;
+    if (onPage && onChip) return candidate;
   }
   return [0, 0, 0];
 }
@@ -431,7 +453,7 @@ function neutralVars(
   if (hint) {
     for (let step = 0; step <= 10; step += 1) {
       const candidate = mix(hint, anchor, step / 10);
-      if (contrastRatio(candidate, background) >= AA_TEXT_CONTRAST) {
+      if (contrastRatio(candidate, background) >= AA_INK_CONTRAST) {
         bound['--azf-on-surface-variant'] = channels(candidate);
         break;
       }

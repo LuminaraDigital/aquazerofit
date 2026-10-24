@@ -79,7 +79,10 @@ export function CoachCard() {
             </h2>
             <span
               className="text-[11px] uppercase tracking-wider px-1.5 py-0.5 rounded"
-              style={{ color: coach.colour, backgroundColor: `${coach.colour}1a` }}
+              style={{
+                color: `var(--azf-coach-ink, ${coach.colour})`,
+                backgroundColor: `var(--azf-coach-chip, ${coach.colour}1a)`,
+              }}
             >
               Bond {data.bondLevel}
             </span>

@@ -17,7 +17,6 @@ import { todayWorkoutQuery, queryKeys, useProgressInsight, useReadiness } from '
 import { useTelegramMainAction } from '@/lib/useTelegramChrome';
 import { MacroBar } from './MacroBar';
 import { WaterCard } from './WaterCard';
-const Sparkline = lazy(() => import('./Sparkline').then((m) => ({ default: m.Sparkline })));
 import { SuggestMealCard } from './SuggestMealCard';
 import {
   asUser,
@@ -27,6 +26,8 @@ import {
   formatLocalDate,
   todayLocalDate,
 } from './lib';
+
+const Sparkline = lazy(() => import('./Sparkline').then((m) => ({ default: m.Sparkline })));
 
 interface TrendsResponse {
   kcal?: TrendPoint[];

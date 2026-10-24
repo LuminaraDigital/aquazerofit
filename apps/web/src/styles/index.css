@@ -705,3 +705,69 @@ html.tg-active .min-h-screen {
     }
   }
 }
+
+/* Light Mini App surfaces.
+   The glass cards are tuned for a dark ocean: translucent fills, a 7% white
+   edge, and brand inks at partial alpha. On a white host those same rules
+   drop body text and the macro fills under WCAG AA. These overrides apply
+   only while a light Telegram theme is bound. Dark hosts and the browser
+   keep the glass system above. */
+html[data-tg-theme='light'] .card-hero,
+html[data-tg-theme='light'] .glass-card,
+html[data-tg-theme='light'] .card-compact {
+  background: #ffffff;
+  background-image: none;
+  border: 1px solid rgb(var(--azf-outline));
+  box-shadow:
+    0 1px 2px rgb(23 29 31 / 0.08),
+    0 14px 32px -18px rgb(23 29 31 / 0.38);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-tg-theme='light'] .glass-blur {
+  background: rgb(var(--azf-surface));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-tg-theme='light'] {
+  --azf-ring-aqua: rgb(var(--azf-primary));
+  --azf-ring-green: rgb(var(--azf-secondary));
+  --azf-ring-coral: rgb(var(--azf-tertiary-container));
+  --azf-ring-navy: rgb(var(--azf-primary));
+  --azf-ring-track: rgb(var(--azf-outline));
+  --azf-coach-ink: rgb(var(--azf-primary));
+  --azf-coach-chip: rgb(var(--azf-primary) / 0.12);
+}
+
+/* Partial-alpha text utilities are how the dark theme quiets inactive labels.
+   On either bound host the 60% mix falls under 4.5:1. Restore the full token,
+   which the theme binder already lifts to AA. The browser target is untouched. */
+html[data-tg-theme] .text-on-surface-variant\/40,
+html[data-tg-theme] .text-on-surface-variant\/60,
+html[data-tg-theme] .text-on-surface-variant\/75 {
+  color: rgb(var(--azf-on-surface-variant));
+}
+
+html[data-tg-theme='light'] .text-primary\/60,
+html[data-tg-theme='light'] .text-primary\/70,
+html[data-tg-theme='light'] .text-primary\/80,
+html[data-tg-theme='light'] .text-primary\/90 {
+  color: rgb(var(--azf-primary));
+}
+
+html[data-tg-theme='light'] .text-secondary\/60,
+html[data-tg-theme='light'] .text-secondary\/80 {
+  color: rgb(var(--azf-secondary));
+}
+
+html[data-tg-theme='light'] [role='progressbar'] {
+  background-color: rgb(var(--azf-outline-variant));
+}
+
+/* Macro percentages dim the whole glyph with opacity. 75% of the hint colour
+   on a light pill is about 3:1. Full opacity keeps the AA hint token. */
+html[data-tg-theme='light'] .tabular-nums.opacity-75 {
+  opacity: 1;
+}

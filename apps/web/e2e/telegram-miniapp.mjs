@@ -7,7 +7,7 @@
  * dependency, because its install downloads browsers.
  *
  *   npm run build -w @aquazerofit/web
- *   npm install --prefix /tmp/azf-pw playwright-core
+ *   npm install --prefix /tmp/azf-pw playwright-core axe-core
  *   node apps/web/e2e/telegram-miniapp.mjs
  */
 import { createServer } from 'node:http';
@@ -23,6 +23,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(here, '../dist');
 const outDir = process.env.AZF_SHOTS || '/opt/cursor/artifacts/telegram-miniapp';
 const chromePath = process.env.CHROME_PATH || '/usr/bin/google-chrome';
+const axePath = process.env.AXE_CORE || '/tmp/azf-pw/node_modules/axe-core/axe.min.js';
+const axeSource = await readFile(axePath, 'utf8');
 
 const { contentSecurityPolicy } = await import(
   new URL('../../../cloudflare/src/securityHeaders.ts', import.meta.url).href,
@@ -397,6 +399,58 @@ const LIGHT = {
   },
 };
 
+async function settle(page) {
+  await page.evaluate(async () => {
+    const deadline = performance.now() + 3000;
+    const fading = () =>
+      [...document.querySelectorAll('.reveal')].some(
+        (el) => Number.parseFloat(getComputedStyle(el).opacity) < 0.99,
+      );
+    while (fading() && performance.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+    const animations = document.getAnimations().filter((animation) => {
+      const timing = animation.effect && animation.effect.getTiming ? animation.effect.getTiming() : {};
+      return timing.iterations !== Infinity;
+    });
+    await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
+  });
+}
+
+async function contrastViolations(page) {
+  return page.evaluate(async () => {
+    if (!window.axe) return [{ id: 'axe-missing', target: '', html: '', summary: 'axe did not load' }];
+    const seen = new Set();
+    const rows = [];
+    const step = Math.max(200, Math.floor(window.innerHeight * 0.75));
+    const height = Math.max(document.documentElement.scrollHeight, window.innerHeight);
+    for (let y = 0; y < height; y += step) {
+      window.scrollTo(0, y);
+      const result = await window.axe.run(document, {
+        runOnly: { type: 'rule', values: ['color-contrast'] },
+        resultTypes: ['violations'],
+      });
+      for (const item of result.violations) {
+        for (const node of item.nodes) {
+          const target = node.target.join(' ');
+          const html = (node.html || '').slice(0, 220);
+          const key = `${target}|${html}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          rows.push({
+            id: item.id,
+            target,
+            html,
+            summary: node.failureSummary || '',
+          });
+        }
+      }
+    }
+    window.scrollTo(0, 0);
+    return rows;
+  });
+}
+
 function luminance(rgb) {
   const channels = rgb.match(/\d+(\.\d+)?/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
   const lin = channels.map((channel) => {
@@ -413,6 +467,7 @@ async function shoot(browser, origin, theme, filename, unknown) {
   });
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(String(error)));
+  await page.addInitScript({ content: axeSource });
   await page.addInitScript({ content: mockSource(theme) });
   const before = unknown.length;
   await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
@@ -430,6 +485,8 @@ async function shoot(browser, origin, theme, filename, unknown) {
       new Promise((resolve) => setTimeout(resolve, 4000)),
     ]),
   );
+  await settle(page);
+  const contrast = await contrastViolations(page);
   const report = await page.evaluate(() => {
     const header = document.querySelector('header');
     const nav = document.querySelector('nav[aria-label="Main navigation"]');
@@ -483,6 +540,7 @@ async function shoot(browser, origin, theme, filename, unknown) {
     problems.push(`dark heading is too dim (${report.headingColor})`);
   }
   if (report.csp.length) problems.push(`CSP violations: ${JSON.stringify(report.csp)}`);
+  if (contrast.length) problems.push(`color contrast: ${JSON.stringify(contrast)}`);
   if (pageErrors.length) problems.push(`page errors: ${pageErrors.join(' | ')}`);
   if (problems.length) {
     throw new Error(
@@ -492,8 +550,25 @@ async function shoot(browser, origin, theme, filename, unknown) {
   }
   const file = path.join(outDir, filename);
   await page.screenshot({ path: file, fullPage: false });
+  let nutritionContrast = null;
+  if (theme.colorScheme === 'light') {
+    await page.getByRole('link', { name: 'Nutrition' }).click();
+    await page.getByRole('heading', { name: 'Nutrition' }).waitFor({ timeout: 15000 });
+    await settle(page);
+    nutritionContrast = await contrastViolations(page);
+    if (nutritionContrast.length) {
+      throw new Error(`nutrition light contrast\n${JSON.stringify(nutritionContrast, null, 2)}`);
+    }
+  }
   await page.close();
-  return { file, headerColor, backgroundColor, mainText: mainParams.text, staticBg: report.staticBg };
+  return {
+    file,
+    headerColor,
+    backgroundColor,
+    mainText: mainParams.text,
+    staticBg: report.staticBg,
+    nutritionContrast,
+  };
 }
 
 async function main() {

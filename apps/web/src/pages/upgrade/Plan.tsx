@@ -12,24 +12,34 @@
  *    copy. Server constants are the truth; a hand-written feature list is a
  *    claim that goes stale silently, which on a paid tier is a lie with a price
  *    attached.
- * 3. There is no purchase step, because there is no payment provider in this
- *    product yet. That is stated plainly instead of being papered over with a
- *    button that looks live and does nothing — and there is deliberately no
- *    control here that changes `tier`, since with nothing to pay that would be
- *    an entitlement any caller could grant themselves.
+ * 3. The purchase step appears only when the deployment can actually take a
+ *    payment (Stripe configured and its price readable), with that price on
+ *    the button. Otherwise it says plainly that upgrading is not available
+ *    here, rather than showing a button that looks live and does nothing.
+ *    Nothing here changes `tier`: the page opens Stripe's checkout, and only
+ *    a payment the server confirms with Stripe grants premium.
  *
  * A premium account sees its position and what is switched on, not a sales
  * page it has already bought.
  */
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { Chip } from '@/components/ui/Chip';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useEntitlements, type Entitlements } from '@/lib/queries';
+import {
+  useBillingConfig,
+  useEntitlements,
+  useStartStripeCheckout,
+  useStripeCheckoutSync,
+  type BillingConfig,
+  type Entitlements,
+} from '@/lib/queries';
+import { isTMA } from '@/lib/telegram';
 
 /**
  * What each premium model lane means to a person, keyed by the lane id the API
@@ -197,11 +207,88 @@ function LaneList({ lanes, premium }: { lanes: string[]; premium: boolean }) {
   );
 }
 
+type StripePrice = NonNullable<NonNullable<BillingConfig['stripe']>['price']>;
+
+/** "A$9.99" from 999 minor units — the currency's own decimals, so ¥ prices read right too. */
+function formatAmount({ amount, currency }: StripePrice): string {
+  const format = new Intl.NumberFormat(undefined, { style: 'currency', currency });
+  return format.format(amount / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2));
+}
+
+/** The purchase step: Stripe's price, on the button, and where the payment happens. */
+function SubscribeCard({ price }: { price: StripePrice }) {
+  const checkout = useStartStripeCheckout();
+  const amount = formatAmount(price);
+
+  return (
+    <section aria-labelledby="plan-subscribe">
+      <GlassCard className="p-card-padding space-y-3">
+        <h2
+          id="plan-subscribe"
+          className="font-heading font-semibold uppercase tracking-wide text-base text-on-surface"
+        >
+          Go premium
+        </h2>
+        <p className="flex items-baseline gap-2">
+          <span className="font-heading font-bold text-3xl tabular-nums text-primary">{amount}</span>
+          <span className="text-sm text-on-surface-variant">per {price.interval}</span>
+        </p>
+        <p className="text-sm leading-relaxed text-on-surface-variant">
+          Renews each {price.interval}. You pay on Stripe&apos;s secure checkout page, and
+          AquaZeroFit never sees your card. To cancel, contact{' '}
+          <Link to="/support" className="text-primary underline-offset-2 hover:underline">
+            Support
+          </Link>
+          .
+        </p>
+        <PrimaryButton loading={checkout.isPending} onClick={() => checkout.mutate()}>
+          Subscribe for {amount} / {price.interval}
+        </PrimaryButton>
+        {checkout.isError && (
+          <p role="alert" className="text-sm text-error">
+            We could not open checkout. Nothing was charged. Try again in a moment.
+          </p>
+        )}
+      </GlassCard>
+    </section>
+  );
+}
+
+/** Shown where Stripe sends the buyer back: cancelled, or paid and being confirmed. */
+function CheckoutReturn({ state, sessionId }: { state: string | null; sessionId: string | null }) {
+  const sync = useStripeCheckoutSync(state === 'success' ? sessionId : null);
+
+  let message: string | null = null;
+  if (state === 'cancelled') message = 'Checkout cancelled. Nothing was charged.';
+  else if (state === 'success') {
+    if (sync.isError) {
+      message =
+        'We could not confirm this checkout yet. If you were charged, premium switches on by itself shortly. If it does not, contact Support.';
+    } else if (sync.data?.tier === 'premium') message = 'Payment received. Premium is on.';
+    else if (sync.isSuccess) {
+      message = 'Stripe is still confirming your payment. Premium switches on as soon as it settles.';
+    } else message = 'Confirming your payment…';
+  }
+  if (!message) return null;
+
+  return (
+    <GlassCard className="p-card-padding border-l-4 border-l-primary">
+      <p role="status" className="text-sm leading-relaxed text-on-surface">
+        {message}
+      </p>
+    </GlassCard>
+  );
+}
+
 // ---------- page ----------
 
 export default function Plan() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { data: entitlements, isLoading, isError, refetch } = useEntitlements();
+  const billing = useBillingConfig();
+  // Telegram requires its own Stars for digital goods inside a Mini App.
+  const stripePrice = !isTMA() && billing.data?.stripe?.available ? billing.data.stripe.price : null;
 
   if (isLoading) {
     return (
@@ -240,6 +327,7 @@ export default function Plan() {
       <AppHeader back title="Your plan" />
 
       <main className="pt-6 px-container-margin space-y-section-gap pb-6">
+        <CheckoutReturn state={params.get('checkout')} sessionId={params.get('session_id')} />
         <PositionCard entitlements={entitlements} />
 
         <section aria-labelledby="plan-difference">
@@ -274,12 +362,14 @@ export default function Plan() {
         <CostsCard costs={entitlements.costs} />
 
         {/*
-          The purchase step. No payment provider is integrated, so there is no
-          checkout and no control here that could change a tier — and no
-          disabled-looking button either, because a button is a promise that
-          something will happen when it is pressed.
+          The purchase step. Offered only with a readable price; otherwise an
+          honest sentence, never a disabled-looking button, because a button
+          is a promise that something will happen when it is pressed. Nothing
+          renders while the billing config loads, so the "not available" card
+          cannot flash up and then turn into a button.
         */}
-        {!premium && (
+        {!premium && stripePrice && <SubscribeCard price={stripePrice} />}
+        {!premium && !stripePrice && !billing.isLoading && (
           <section aria-labelledby="plan-availability">
             <GlassCard className="p-card-padding space-y-3 border-l-4 border-l-outline-variant">
               <div className="flex items-center gap-2">
@@ -293,13 +383,13 @@ export default function Plan() {
                   id="plan-availability"
                   className="font-heading font-semibold uppercase tracking-wide text-base text-on-surface"
                 >
-                  Upgrading is not available yet
+                  Upgrading is not available here yet
                 </h2>
               </div>
               <p className="text-sm leading-relaxed text-on-surface-variant">
-                There is no way to buy premium in AquaZeroFit today — payment is not built yet. We
-                would rather tell you that than show you a button that does nothing. When there is
-                something to buy, it will appear on this page, with the price on it.
+                You cannot buy premium from this screen yet. We would rather tell you that than
+                show you a button that does nothing. When there is something to buy here, it will
+                appear on this page, with the price on it.
               </p>
               <p className="text-sm leading-relaxed text-on-surface-variant">
                 Until then your free plan keeps working exactly as it does now, and nothing you use

@@ -1,5 +1,6 @@
 /**
- * /billing — the routes that turn a Play purchase into an entitlement.
+ * /billing — the routes that turn a Play or Stripe purchase into an
+ * entitlement. The Stripe half is at the bottom; Play's is described here.
  *
  * Two surfaces with opposite threat models:
  *
@@ -30,17 +31,33 @@ import {
   effectiveTier,
   grantPremium,
   revokePremium,
+  tierOf,
   type EntitlementGrant,
 } from './entitlements';
 import { obfuscatedAccountIdFor, playBillingConfigured, verifyPurchase } from './play';
+import {
+  createCheckoutSession,
+  handleStripeEvent,
+  premiumPrice,
+  stripeSignatureValid,
+  syncCheckoutSession,
+  type StripeEvent,
+} from './stripe';
 import type { User } from '@aquazerofit/shared';
 
 export const billingRouter = Router();
 
 /** Advertised so a client can hide the buy button rather than offer a dead one. */
-billingRouter.get('/config', (_req, res) => {
-  res.json({ play: { available: playBillingConfigured() } });
-});
+billingRouter.get(
+  '/config',
+  asyncHandler(async (_req, res) => {
+    const price = await premiumPrice();
+    res.json({
+      play: { available: playBillingConfigured() },
+      stripe: { available: price !== null, price },
+    });
+  }),
+);
 
 const verifySchema = z.object({
   purchaseToken: z.string().min(1).max(4096),
@@ -285,5 +302,73 @@ billingRouter.post(
     }
 
     res.status(200).json({ ok: true });
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Stripe Checkout (web)
+// ---------------------------------------------------------------------------
+
+/**
+ * Open a Checkout page. Refused for an account that is already premium from
+ * any source: a second subscription would bill the user twice for one tier.
+ */
+billingRouter.post(
+  '/stripe/checkout',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    if (tierOf(userId) === 'premium') {
+      throw new AppError('CONFLICT', 'This account is already on premium.');
+    }
+    res.json({ url: await createCheckoutSession(userId) });
+  }),
+);
+
+const syncSchema = z.object({
+  // Shape-checked before it is spliced into a Stripe URL path.
+  sessionId: z.string().regex(/^cs_[A-Za-z0-9_]{1,250}$/),
+});
+
+/** The success redirect's catch-up: settle the session now rather than wait for the webhook. */
+billingRouter.post(
+  '/stripe/sync',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { sessionId } = syncSchema.parse(req.body ?? {});
+    const userId = userIdOf(req);
+    await syncCheckoutSession(userId, sessionId);
+    const user = getStore().byId<User>('users', userId);
+    res.json({ tier: user ? effectiveTier(user) : 'free', premiumUntil: user?.premiumUntil ?? null });
+  }),
+);
+
+/**
+ * Stripe's event deliveries. `req.body` is the raw Buffer here — app.ts mounts
+ * `express.raw` for this path ahead of `express.json`, because the signature
+ * covers the exact bytes and a re-serialised object cannot be verified.
+ *
+ * Unlike Pub/Sub, Stripe's retries are bounded (about three days), so an
+ * unexpected failure is allowed to 500 and be redelivered — a paid invoice
+ * that was never granted is the expensive outcome. An AppError is final (the
+ * account is gone, the payload is not one we can settle) and is acknowledged.
+ */
+billingRouter.post(
+  '/stripe/webhook',
+  asyncHandler(async (req, res) => {
+    const raw = Buffer.isBuffer(req.body) ? req.body : null;
+    if (!raw || !stripeSignatureValid(raw, req.get('stripe-signature'), config.stripeWebhookSecret)) {
+      logEvent('stripe_webhook_rejected', { reason: 'signature' });
+      res.status(401).json({ code: 'AUTH_INVALID', message: 'Invalid webhook signature.' });
+      return;
+    }
+    const event = JSON.parse(raw.toString('utf8')) as StripeEvent;
+    try {
+      handleStripeEvent(event);
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      logEvent('stripe_webhook_unsettled', { type: event.type, reason: err.message });
+    }
+    res.json({ received: true });
   }),
 );

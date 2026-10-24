@@ -361,6 +361,28 @@ export const config = {
     return process.env.PLAY_RTDN_SECRET?.trim() ?? '';
   },
 
+  /**
+   * Stripe secret key. Test-mode (`sk_test_`) on staging, live on production,
+   * never the same set on both. Absent, or without STRIPE_PRICE_ID, means no
+   * Stripe checkout is offered — same asymmetry as the Play credentials.
+   */
+  get stripeSecretKey(): string {
+    return process.env.STRIPE_SECRET_KEY?.trim() ?? '';
+  },
+
+  /** The recurring Price premium is sold at. Its amount is read from Stripe. */
+  get stripePriceId(): string {
+    return process.env.STRIPE_PRICE_ID?.trim() ?? '';
+  },
+
+  /**
+   * Signing secret (`whsec_`) of the webhook endpoint. Unset means the webhook
+   * trusts nobody: it is an unauthenticated route that grants subscriptions.
+   */
+  get stripeWebhookSecret(): string {
+    return process.env.STRIPE_WEBHOOK_SECRET?.trim() ?? '';
+  },
+
   get dailyTokenBudget(): number {
     const raw = process.env.AZF_DAILY_TOKEN_BUDGET?.trim();
     if (!raw) return 0;

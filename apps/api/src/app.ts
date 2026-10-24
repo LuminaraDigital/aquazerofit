@@ -105,6 +105,9 @@ export function createApp() {
     }),
   );
   app.use(cors({ origin: config.corsOrigins, credentials: false }));
+  // Stripe signs the exact bytes it sends, so its webhook gets the raw body.
+  // express.raw marks the body as read and express.json then leaves it alone.
+  app.use(`${config.basePath}/billing/stripe/webhook`, express.raw({ type: 'application/json', limit: '1mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger);
 

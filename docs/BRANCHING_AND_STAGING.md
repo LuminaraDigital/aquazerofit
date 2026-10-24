@@ -92,7 +92,8 @@ Filled `.env`, `.env.staging`, and `.env.production` files are gitignored.
 
 Commented names in `.env.example` (not a second secret store):
 
-- `STRIPE_*`: unused / reserved. Nothing in the API or web app reads them yet.
+- `STRIPE_*`: read by the API for web Checkout. Staging gets test-mode keys
+  and its own webhook endpoint and signing secret; production gets live ones.
 - `VITE_FIREBASE_*` and `FIREBASE_*`: web client and Admin SDK. Hosting and
   Auth use Firebase project `aquazerofit` (see `.firebaserc`). Public ids in
   the comments match `apps/web/src/lib/firebase.ts`. Leave the API key and

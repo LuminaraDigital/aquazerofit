@@ -114,6 +114,29 @@ export const config = {
   },
 
   /**
+   * Refuse with 403 every request that does not carry the Worker's
+   * ORIGIN_SHARED_SECRET (requireWorkerOrigin in platform/clientIp.ts).
+   *
+   * Cloud Run ingress cannot be narrowed to one Cloudflare Worker, so the
+   * *.run.app URL answers anyone who finds it, and a caller there skips
+   * everything the edge does. Only this process can say no. /health and
+   * /ready stay open: Cloud Run's probes and uptime checks dial the origin
+   * directly and cannot present the secret.
+   *
+   * OFF by default, and that default is the rollout order rather than a
+   * weakening. Switched on before both sides hold the same secret, or while a
+   * provider webhook (Telegram, Stripe, Play RTDN) is still registered on
+   * run.app instead of the public host, it refuses real users and real
+   * payments. None of those providers can add a custom header, so a webhook
+   * aimed at run.app can never pass. docs/OPERATIONS.md has the sequence. On
+   * with no secret is refused at boot (assertOriginSecretConfigured below).
+   */
+  get requireOriginSecret(): boolean {
+    const raw = process.env.REQUIRE_ORIGIN_SECRET?.trim().toLowerCase();
+    return raw === 'true' || raw === '1';
+  },
+
+  /**
    * Auth-lane requests per minute for one client IP.
    *
    * 60 is one request a second. A Mini App open is a couple of /auth calls,
@@ -673,6 +696,29 @@ export function assertSingleInstance(): void {
       'Apps: min=max=1), and unset ' +
       `${INSTANCE_COUNT_ENV} or set it to 1. Scaling out requires the async getStore() ` +
       'refactor first, so reads go to Postgres rather than to a per-instance memory copy.',
+  );
+}
+
+/**
+ * Origin-gate guard: refuse to boot with REQUIRE_ORIGIN_SECRET on and no
+ * ORIGIN_SHARED_SECRET to compare against.
+ *
+ * An empty secret never matches (originSecretMatches in platform/clientIp.ts),
+ * so the gate would refuse every request - the whole site and every webhook -
+ * while /health and /ready, which are exempt, kept answering 200. The
+ * platform would read that revision as healthy and send it all the traffic.
+ * A failed deploy keeps the previous revision serving instead.
+ *
+ * Not skipped under test, unlike assertSingleInstance: it reads two getters
+ * and only index.ts calls it, so the suite can exercise it directly.
+ */
+export function assertOriginSecretConfigured(): void {
+  if (!config.requireOriginSecret || config.originSharedSecret) return;
+  throw new Error(
+    'Refusing to start: REQUIRE_ORIGIN_SECRET is on but ORIGIN_SHARED_SECRET is empty, so every ' +
+      'request except /health and /ready would be refused with 403 while the probes stayed green. ' +
+      'Set ORIGIN_SHARED_SECRET to the value the Worker holds (`npx wrangler secret put ' +
+      'ORIGIN_SHARED_SECRET` in cloudflare/), or unset REQUIRE_ORIGIN_SECRET.',
   );
 }
 

@@ -10,7 +10,7 @@ This document defines the production observability surface of the AquaZeroFit AP
 | `GET /ready` | none | Readiness. Store hydrated AND (Postgres-backed) pool answers `SELECT 1`. Returns 503 with `NOT_READY` while unfit for traffic. |
 | `GET /metrics` | none | In-process counters as JSON: `requestsTotal`, `responsesByClass` (2xx/3xx/4xx/5xx), `aiCallsTotal`, `aiCallsBlocked`, `startedAt`. No user data. |
 
-All three are registered before the rate limiter so platform probes cannot be throttled into a restart loop.
+All three are registered before the rate limiter so platform probes cannot be throttled into a restart loop. With `REQUIRE_ORIGIN_SECRET=true` (below), `/health` and `/ready` stay open but `/metrics` needs the Worker's secret like every other path, and the Worker does not proxy it, so a poller on the run.app URL gets 403.
 
 ## Structured logs (stdout)
 
@@ -69,6 +69,70 @@ Per platform:
 ### Lifting the restriction
 
 Raising `AZF_INSTANCE_COUNT` does not make the deployment scalable; it makes the data loss permitted. The prerequisite is the **async `getStore()` refactor**, which routes reads through to Postgres instead of a per-instance memory copy. It is tracked as its own piece of work because it touches roughly 77 call sites. Until it lands, one instance is the only correct configuration, and the per-process rate limiter and login lockout noted in `PRODUCTION_READINESS.md` are a second, independent reason not to scale out.
+
+## Closing the run.app bypass (`REQUIRE_ORIGIN_SECRET`)
+
+Cloud Run ingress is `all` and cannot be limited to the Worker, so `https://aquazerofit-api-592686987043.australia-southeast1.run.app` answers anyone and skips the edge. With `REQUIRE_ORIGIN_SECRET=true` the API refuses, with `403 {"code":"FORBIDDEN"}`, every request whose `X-Origin-Shared-Secret` does not match `ORIGIN_SHARED_SECRET`. `/health` and `/ready` are exempt for Cloud Run's probes. The switch is off by default, and boot is refused if it is on while `ORIGIN_SHARED_SECRET` is empty (`requireWorkerOrigin` in `apps/api/src/platform/clientIp.ts`, `assertOriginSecretConfigured` in `platform/config.ts`).
+
+Refusals write at most one line a minute: `kind:"security"`, `event:"origin_secret_rejected"`, `refusedSinceLastLog`, and the `reason` and `path` of the request that tripped it. `secret_missing` is a direct caller. `secret_mismatch` on real traffic means the Worker and Cloud Run hold different values.
+
+Telegram, Stripe and Pub/Sub cannot add a custom header. Only the Worker adds it, so after step 5 a webhook registered on run.app is refused outright. Every step is an operator action; nothing in this repository applies them.
+
+1. **One value, one shell, both sides.**
+   ```bash
+   SECRET="$(openssl rand -hex 32)"
+   ```
+2. **Worker**, from `cloudflare/`:
+   ```bash
+   printf %s "$SECRET" | npx wrangler secret put ORIGIN_SHARED_SECRET
+   ```
+3. **Cloud Run.** Create the Secret Manager secret and mount it, which rolls one revision. If the runtime service account (`azf-api`) is granted secrets one by one rather than project-wide, grant it `roles/secretmanager.secretAccessor` on this secret first.
+   ```bash
+   printf %s "$SECRET" | gcloud secrets create ORIGIN_SHARED_SECRET \
+     --project=aquazerofit --replication-policy=automatic --data-file=-
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --update-secrets=ORIGIN_SHARED_SECRET=ORIGIN_SHARED_SECRET:latest
+   ```
+4. **Every provider webhook must be on `https://aquazerofit.com`.** Check each one against the provider's own record. The repository only documents the Telegram URL as `https://<host>/...`, so the docs do not settle this.
+
+   | Provider | Must be | Check |
+   | --- | --- | --- |
+   | Telegram | `https://aquazerofit.com/api/v1/telegram/webhook` | `curl -s "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"`, field `url` |
+   | Stripe (live and test) | `https://aquazerofit.com/api/v1/billing/stripe/webhook` | Dashboard, Developers, Webhooks: endpoint URL |
+   | Play RTDN | `https://aquazerofit.com/api/v1/billing/play/webhook` | `gcloud pubsub subscriptions list --format='table(name,pushConfig.pushEndpoint)'` in the RTDN topic's project |
+
+   To move Telegram, re-run the full `setWebhook` command under "Rotating `TELEGRAM_WEBHOOK_SECRET`" with the new URL. Leaving out `secret_token` clears it, and the route then refuses everything. To move Stripe, edit the endpoint URL; the signing secret does not change. To move Pub/Sub, run `gcloud pubsub subscriptions modify-push-config` and keep any `?secret=` query. Uptime checks or schedulers on run.app need the same treatment. Anything you missed will show up in `origin_secret_rejected` lines after step 5.
+5. **Flip the switch.** `cloudbuild.yaml` updates only the variables it names, so the setting survives later deploys.
+   ```bash
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --update-env-vars=REQUIRE_ORIGIN_SECRET=true
+   ```
+6. **Verify.**
+   ```bash
+   RUN=https://aquazerofit-api-592686987043.australia-southeast1.run.app
+   curl -s -o /dev/null -w '%{http_code}\n' "$RUN/api/v1/auth/captcha"                 # 403
+   curl -s -o /dev/null -w '%{http_code}\n' "$RUN/health"                              # 200
+   curl -s -o /dev/null -w '%{http_code}\n' https://aquazerofit.com/api/v1/auth/captcha # 200
+   gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="aquazerofit-api" AND jsonPayload.event="origin_secret_rejected"' \
+     --project=aquazerofit --freshness=1h
+   ```
+   A 403 through `aquazerofit.com`, a `secret_mismatch` line, or a line whose `path` is a webhook means roll back now, then fix the cause:
+   ```bash
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --update-env-vars=REQUIRE_ORIGIN_SECRET=false
+   ```
+7. **Rotate the Stripe live secret key and the Resend API key.** Both are held only by the operator. The secret ids below assume each matches its env name; confirm with `gcloud run services describe aquazerofit-api --region=australia-southeast1`.
+   - Stripe, live mode: Developers, API keys, secret key, **Roll key**. Give the old key an expiry (an hour is enough) so the serving revision keeps working until the new one is up.
+   - Resend: create a new API key with sending access. Do not delete the old one yet.
+   ```bash
+   printf %s "$NEW_STRIPE_KEY" | gcloud secrets versions add STRIPE_SECRET_KEY --project=aquazerofit --data-file=-
+   printf %s "$NEW_RESEND_KEY" | gcloud secrets versions add RESEND_API_KEY --project=aquazerofit --data-file=-
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --update-secrets=STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,RESEND_API_KEY=RESEND_API_KEY:latest
+   ```
+   `:latest` is read when an instance starts, so a new revision has to be serving before the new keys take effect; check with `gcloud run revisions list --service=aquazerofit-api --region=australia-southeast1`. Then confirm the plan page on `aquazerofit.com` shows the Stripe price and a password reset reaches an operator mailbox. After that, delete the old Resend key. The old Stripe key expires on its own.
+
+To rotate `ORIGIN_SHARED_SECRET` later, set `REQUIRE_ORIGIN_SECRET=false` first. The two sides cannot change at the same instant, and with the gate on every request between the two updates is refused.
 
 ## Rotating `TELEGRAM_WEBHOOK_SECRET`
 

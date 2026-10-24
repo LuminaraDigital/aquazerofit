@@ -70,10 +70,23 @@ spec:
               value: https://aquazerofit.com
             - name: APP_PUBLIC_URL
               value: https://aquazerofit.com
-            # Grey-cloud DNS to Cloud Run is one hop. Do not raise this to 2
-            # until an orange-cloud proxy is actually in front of run.app.
+            # The Worker fronts this service. It replaces X-Forwarded-For with
+            # the client address and Google's front end appends the Worker's
+            # Cloudflare egress, so with one trusted hop req.ip is that shared
+            # egress address. Rate limits do not use req.ip: they trust
+            # CF-Connecting-IP only behind ORIGIN_SHARED_SECRET
+            # (apps/api/src/platform/clientIp.ts). Leave this at 1. A 2 lets a
+            # direct run.app caller pick req.ip with a forged X-Forwarded-For
+            # whenever REQUIRE_ORIGIN_SECRET is off.
             - name: TRUST_PROXY
               value: "1"
+            # Refuse requests without the Worker's secret (403; /health and
+            # /ready exempt). Off until the runbook in docs/OPERATIONS.md
+            # ("Closing the run.app bypass") has been followed: the secret on
+            # both sides and every provider webhook on aquazerofit.com. On with
+            # an empty ORIGIN_SHARED_SECRET, boot is refused.
+            - name: REQUIRE_ORIGIN_SECRET
+              value: "false"
             - name: MFA_REQUIRE_ADMIN
               value: "true"
             - name: MAIL_PROVIDER
@@ -91,6 +104,13 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: JWT_ACCESS_SECRET
+                  key: latest
+            # Same value as the Worker secret of the same name. The Secret
+            # Manager id must exist before anything references it.
+            - name: ORIGIN_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ORIGIN_SHARED_SECRET
                   key: latest
             - name: MAIL_FROM
               valueFrom:

@@ -11,7 +11,12 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(here, '..', '..', '..', '.env') });
 
 import { createApp } from './app';
-import { config, assertProductionSecrets, assertSingleInstance } from './platform/config';
+import {
+  config,
+  assertOriginSecretConfigured,
+  assertProductionSecrets,
+  assertSingleInstance,
+} from './platform/config';
 import { warnIfBotProtectionUnconfigured } from './platform/botProtection';
 import { describeStoreInitFailure, getStore, initStore } from './platform/store';
 import { sweepExpiredDeletions } from './modules/me/service';
@@ -29,6 +34,10 @@ assertProductionSecrets();
 // SERVING API processes, and the one-shot CLI entrypoints (seed, importers)
 // import config too and must stay runnable alongside a running server.
 assertSingleInstance();
+// Fail fast: an origin gate with nothing to compare against refuses every
+// request while the exempt probes stay green. Serving-process only, like the
+// guard above: the CLI entrypoints never mount the gate.
+assertOriginSecretConfigured();
 // Advisory rather than fatal: an unprotected signup form is a real weakness,
 // but killing a deploy over incomplete Cloudflare onboarding is a worse one.
 warnIfBotProtectionUnconfigured();

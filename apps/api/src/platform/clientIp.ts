@@ -12,10 +12,14 @@
  * before the IP is trusted. Anything else uses the socket address, which is
  * the Cloud Run peer and is shared on purpose: unauthenticated direct traffic
  * does not get a per-user bucket.
+ *
+ * With REQUIRE_ORIGIN_SECRET on, the same compare also gates the whole app
+ * (requireWorkerOrigin below): direct traffic is refused rather than bucketed.
  */
 import crypto from 'node:crypto';
-import type { Request } from 'express';
+import type { Request, RequestHandler } from 'express';
 import { config } from './config';
+import { AppError } from './errors';
 
 export const ORIGIN_SHARED_SECRET_HEADER = 'x-origin-shared-secret';
 export const CF_CONNECTING_IP_HEADER = 'cf-connecting-ip';
@@ -87,3 +91,66 @@ export function clientIpForRateLimit(req: Request): string {
   warnIfSecretUnset(req);
   return socketAddress(req);
 }
+
+/**
+ * One security line a minute at most, counting every refusal since the last
+ * line. A scanner on the run.app URL can send thousands a minute; a line each
+ * is a log bill, not a signal, and the count keeps the volume visible. The
+ * reason and path are those of the request that tripped the line.
+ * `secret_missing` is a direct caller, or a provider webhook still registered
+ * on run.app (the path says which). `secret_mismatch` from real traffic means
+ * the Worker and Cloud Run hold different values: a rotation half done.
+ */
+const ORIGIN_REFUSAL_LOG_INTERVAL_MS = 60_000;
+let originRefusalLoggedAt = 0;
+let originRefusalsSinceLog = 0;
+
+export function resetOriginRefusalLog(): void {
+  originRefusalLoggedAt = 0;
+  originRefusalsSinceLog = 0;
+}
+
+function logOriginRefusal(req: Request, reason: 'secret_missing' | 'secret_mismatch'): void {
+  originRefusalsSinceLog += 1;
+  const now = Date.now();
+  if (now - originRefusalLoggedAt < ORIGIN_REFUSAL_LOG_INTERVAL_MS) return;
+  // eslint-disable-next-line no-console
+  console.warn(
+    JSON.stringify({
+      t: new Date(now).toISOString(),
+      kind: 'security',
+      event: 'origin_secret_rejected',
+      reason,
+      method: req.method,
+      path: req.path,
+      refusedSinceLastLog: originRefusalsSinceLog,
+    }),
+  );
+  originRefusalLoggedAt = now;
+  originRefusalsSinceLog = 0;
+}
+
+/**
+ * With REQUIRE_ORIGIN_SECRET on, refuse any request that did not come through
+ * the Worker. The compare above, used as a gate rather than as a hint. Off,
+ * this is a no-op, so the rollout order in docs/OPERATIONS.md decides when it
+ * starts refusing.
+ *
+ * /health and /ready are exempt because Cloud Run's startup and liveness
+ * probes, and uptime checks, dial the origin directly with no secret;
+ * refusing them would have the platform kill a healthy revision. The match is
+ * exact. Express also routes /health/ and /HEALTH to the probe handler, and
+ * refusing those is the safe side of that difference.
+ *
+ * The refusal goes straight to errorHandler, so it skips the request log; the
+ * line above is its record.
+ */
+export const requireWorkerOrigin: RequestHandler = (req, _res, next) => {
+  if (!config.requireOriginSecret || req.path === '/health' || req.path === '/ready') return next();
+  const presented = singleHeader(req.headers[ORIGIN_SHARED_SECRET_HEADER]);
+  if (originSecretMatches(presented, config.originSharedSecret)) return next();
+  logOriginRefusal(req, presented ? 'secret_mismatch' : 'secret_missing');
+  next(
+    new AppError('FORBIDDEN', `Direct requests to this origin are refused. Use ${config.appPublicUrl}.`),
+  );
+};

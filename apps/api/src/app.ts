@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './platform/config';
+import { requireWorkerOrigin } from './platform/clientIp';
 import { errorHandler, notFoundHandler } from './platform/errors';
 import { assertTrustProxyHeaders, enforceHttps, redirectWwwToCanonical } from './platform/https';
 import { requestLogger, metrics } from './platform/telemetry';
@@ -26,8 +27,16 @@ export function createApp() {
 
   app.disable('x-powered-by');
 
-  // Transport security runs before everything else: a plaintext request should
-  // be turned away without this process parsing a body or touching the store.
+  // Origin gate ahead of everything, transport included. With
+  // REQUIRE_ORIGIN_SECRET on, a caller of the run.app URL that skipped the
+  // Worker is refused before this process redirects, parses or logs it, and
+  // before its forwarding headers, which the Worker never built, can trip the
+  // trust-proxy check below. A no-op while the switch is off.
+  app.use(requireWorkerOrigin);
+
+  // Transport security runs next, before anything that does work: a plaintext
+  // request should be turned away without this process parsing a body or
+  // touching the store.
   // The trust-proxy check sits first because enforceHttps reads `req.secure`,
   // which is only trustworthy when TRUST_PROXY matches the real topology.
   app.use(assertTrustProxyHeaders);

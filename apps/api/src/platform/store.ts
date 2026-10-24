@@ -7,9 +7,9 @@
  * so a burst of writes can never interleave and corrupt the backing copy.
  *
  * Two backings share that memory layer:
- *   - JsonStore    — one JSON file per container under config.dataDir. Local
+ *   - JsonStore    - one JSON file per container under config.dataDir. Local
  *                    dev and the whole test suite run on this.
- *   - PostgresStore — a single `documents` table (see ./pgStore). Selected when
+ *   - PostgresStore - a single `documents` table (see ./pgStore). Selected when
  *                    DATABASE_URL is present outside tests, because the managed
  *                    host's filesystem is wiped on every deploy.
  *
@@ -22,7 +22,7 @@
  * read a slice at a time. The `logs` container is the latter: it holds every
  * meal, water, weight, workout-session, buddy-challenge and idempotency record
  * for every user, and "one user's meals on one day" walked all of it. Hence
- * SECONDARY_INDEXES below — maintained in-process, exact-match on a composite
+ * SECONDARY_INDEXES below - maintained in-process, exact-match on a composite
  * key, and always re-checked against the caller's predicate so an index that
  * ever went wrong can only ever be slow, never wrong. See whereIndexed().
  *
@@ -105,7 +105,7 @@ export function indexKey(...parts: string[]): string {
 /**
  * One maintained lookup over one container.
  *
- * `key` returns undefined for a document the index does not cover — that
+ * `key` returns undefined for a document the index does not cover - that
  * document simply is not filed, and a lookup can never return it. Every doc in
  * the `logs` container that is not a user-dated record (there are none today,
  * but nothing enforces that) falls out this way rather than being filed under
@@ -115,6 +115,26 @@ export interface SecondaryIndexSpec {
   readonly name: string;
   readonly container: ContainerName;
   readonly key: (doc: StoredDoc) => string | undefined;
+  /**
+   * When set, a second document in this container with the same key is
+   * rejected by upsert. Hydration still loads whatever is already on disk:
+   * a boot must not crash because a historical duplicate exists. The Postgres
+   * unique index is what stops that duplicate from being written again.
+   */
+  readonly unique?: boolean;
+}
+
+/** Thrown by upsert when a unique secondary index already holds another id. */
+export class DuplicateIndexError extends Error {
+  readonly index: string;
+  readonly key: string;
+
+  constructor(index: string, key: string) {
+    super(`Duplicate value for unique index ${index}`);
+    this.name = 'DuplicateIndexError';
+    this.index = index;
+    this.key = key;
+  }
 }
 
 /** Shape the log indexes read. Everything is optional: docs are opaque here. */
@@ -131,7 +151,7 @@ export const LOGS_BY_USER_TYPE_DATE = 'logs.userId+type+localDate';
  * Coarser index: one user, one record type, all dates.
  *
  * This exists because weightLogsInRange asks a RANGE question, and a hash
- * index on an exact composite key cannot answer one — you would have to
+ * index on an exact composite key cannot answer one - you would have to
  * enumerate every date in the range and probe each, which is wrong the moment
  * a caller asks for an open-ended or very wide window. Scanning this bucket
  * instead is honest: it is O(that user's weight logs) rather than O(every log
@@ -152,17 +172,36 @@ function userTypeKey(doc: StoredDoc): string | undefined {
   return indexKey(d.userId, d.type);
 }
 
+/** Stars purchases, one row per Telegram charge id. Unique. */
+export const LEDGER_BY_STARS_CHARGE = 'ledger.starsPurchase.telegramPaymentChargeId';
+
+function starsChargeKey(doc: StoredDoc): string | undefined {
+  const d = doc as { type?: unknown; telegramPaymentChargeId?: unknown };
+  if (d.type !== 'starsPurchase') return undefined;
+  if (typeof d.telegramPaymentChargeId !== 'string' || d.telegramPaymentChargeId.length === 0) {
+    return undefined;
+  }
+  return indexKey(d.telegramPaymentChargeId);
+}
+
 /**
  * Declared indexes, built by every backing at construction.
  *
- * Kept to the `logs` container deliberately. Each index costs a Map entry per
- * key plus a Set entry per document plus one extractor call per write, so they
- * are worth it only where reads are both hot and selective. Adding one for
- * another container is a one-line change here — but measure the read first.
+ * The log indexes exist because those reads are hot. The Stars charge index
+ * exists because a second purchase with the same charge id is a double credit,
+ * and the check has to be a key lookup rather than a scan that a later edit
+ * could forget. The Postgres unique index in pgStore is the durable copy of
+ * the same rule.
  */
 export const SECONDARY_INDEXES: readonly SecondaryIndexSpec[] = [
   { name: LOGS_BY_USER_TYPE_DATE, container: 'logs', key: userTypeDateKey },
   { name: LOGS_BY_USER_TYPE, container: 'logs', key: userTypeKey },
+  {
+    name: LEDGER_BY_STARS_CHARGE,
+    container: 'ledger',
+    key: starsChargeKey,
+    unique: true,
+  },
 ];
 
 /** Runtime state of one declared index. */
@@ -185,7 +224,7 @@ interface SecondaryIndex {
 
 /**
  * In-memory working set + the write-coalescing machinery. Subclasses supply
- * only `persist()` — how a batch of dirty ids reaches durable storage.
+ * only `persist()` - how a batch of dirty ids reaches durable storage.
  *
  * Deliberately declares every *instance* member the concrete stores need, so
  * that JsonStore adds none of its own. That keeps `MemoryBackedStore` and
@@ -211,8 +250,8 @@ export abstract class MemoryBackedStore {
     this.dataDir = dataDir;
     fs.mkdirSync(this.dataDir, { recursive: true });
     for (const name of CONTAINERS) this.data.set(name, new Map());
-    // Built before any hydration so every path into memory — JsonStore's
-    // constructor, PostgresStore.hydrate(), and every later write — files
+    // Built before any hydration so every path into memory - JsonStore's
+    // constructor, PostgresStore.hydrate(), and every later write - files
     // through the same maintenance code. An index that is attached after the
     // fact is an index that is already missing rows.
     for (const spec of SECONDARY_INDEXES) {
@@ -260,7 +299,7 @@ export abstract class MemoryBackedStore {
    *
    * The re-file case is the one that matters: when the extracted key changes,
    * the id must leave its OLD bucket. Dropping that step is the classic
-   * secondary-index bug — the stale entry stays behind and the old key keeps
+   * secondary-index bug - the stale entry stays behind and the old key keeps
    * answering with a document that no longer belongs to it.
    */
   private indexPut(name: ContainerName, doc: StoredDoc): void {
@@ -295,7 +334,7 @@ export abstract class MemoryBackedStore {
   }
 
   /**
-   * Drop an id from one bucket, dropping the bucket itself when it empties —
+   * Drop an id from one bucket, dropping the bucket itself when it empties -
    * otherwise a long-lived process accumulates one empty Set per key it has
    * ever seen, which for a per-user-per-day key is unbounded growth.
    */
@@ -336,13 +375,13 @@ export abstract class MemoryBackedStore {
    *
    *  1. `pred` is applied to every candidate the index returns. The index
    *     narrows the search; the predicate decides the answer. So the result is
-   *     always a SUBSET of what `where(name, pred)` would return — an index
+   *     always a SUBSET of what `where(name, pred)` would return - an index
    *     that somehow over-files can only cost time, never change an answer.
    *  2. An index that is not declared for this container is not an error; the
    *     call degrades to the full scan it replaced. Deleting a line from
    *     SECONDARY_INDEXES makes the app slower, not wrong.
    *
-   * What neither property covers is an index that UNDER-files — a document
+   * What neither property covers is an index that UNDER-files - a document
    * that should be in the bucket and is not. That is the only failure mode
    * left, and it is exactly what the maintenance in indexPut/indexDrop and the
    * tests in __tests__/storeIndexes.test.ts exist to rule out.
@@ -386,7 +425,28 @@ export abstract class MemoryBackedStore {
     return bucket ? [...bucket] : [];
   }
 
+  /**
+   * Refuse a write that would put a second id under a unique index key.
+   * Same-id updates are allowed: that is an edit of the row that already
+   * owns the key, not a second credit.
+   */
+  private assertUnique(name: ContainerName, doc: StoredDoc): void {
+    const forContainer = this.indexes.get(name);
+    if (!forContainer) return;
+    for (const index of forContainer.values()) {
+      if (!index.spec.unique) continue;
+      const next = index.spec.key(doc);
+      if (next === undefined) continue;
+      const bucket = index.buckets.get(next);
+      if (!bucket) continue;
+      for (const id of bucket) {
+        if (id !== doc.id) throw new DuplicateIndexError(index.spec.name, next);
+      }
+    }
+  }
+
   upsert<T extends StoredDoc>(name: ContainerName, doc: T): T {
+    this.assertUnique(name, doc);
     this.container(name).set(doc.id, doc);
     // Before markDirty, so a persist() that reads memory can never observe a
     // document whose index entry has not caught up.
@@ -458,7 +518,7 @@ export abstract class MemoryBackedStore {
       .catch((err) => {
         // eslint-disable-next-line no-console
         console.error('[store] flush failed', err);
-        // Re-mark the failed batch dirty so the next flush retries it —
+        // Re-mark the failed batch dirty so the next flush retries it -
         // otherwise these ids are only re-persisted if they happen to change
         // again, which under per-id backing (Postgres) loses them on restart.
         // Merge UNDER any newer dirt: changes recorded since the failure are
@@ -484,7 +544,7 @@ export abstract class MemoryBackedStore {
   /**
    * Write one coalesced batch of dirty ids to the backing store.
    *
-   * Internal hook — callers use flush(). It is public rather than protected
+   * Internal hook - callers use flush(). It is public rather than protected
    * only because TypeScript compares an overridden *protected* member
    * nominally: with `protected persist()` re-declared in each subclass,
    * MemoryBackedStore would stop being assignable to JsonStore and every call
@@ -523,7 +583,7 @@ export abstract class MemoryBackedStore {
 /**
  * Local JSON persistence: one file per container under dataDir. Writes go
  * through a tmp file + rename so a crash mid-write cannot truncate a
- * container. Adds no instance members of its own — see MemoryBackedStore.
+ * container. Adds no instance members of its own - see MemoryBackedStore.
  */
 export class JsonStore extends MemoryBackedStore {
   constructor(dataDir: string) {
@@ -632,7 +692,7 @@ export async function initStore(): Promise<MemoryBackedStore> {
   if (singleton) return singleton;
   if (!postgresEnabled()) return getStore();
 
-  // Imported lazily so `pg` is never loaded — nor required to be installed —
+  // Imported lazily so `pg` is never loaded - nor required to be installed -
   // in the file-backed dev/test path.
   const { PostgresStore } = await import('./pgStore');
   // DATABASE_URL_ALLOW_INSECURE_SSL opts out of TLS enforcement for hosts that
@@ -681,7 +741,7 @@ export function describeStoreInitFailure(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
   switch (code) {
     case 'ECONNREFUSED':
-      return `Postgres refused the connection (${message}). The server behind DATABASE_URL is not accepting connections — check that the database is running and the host and port are right.`;
+      return `Postgres refused the connection (${message}). The server behind DATABASE_URL is not accepting connections - check that the database is running and the host and port are right.`;
     case 'ENOTFOUND':
     case 'EAI_AGAIN':
       return `The Postgres host in DATABASE_URL could not be resolved (${message}). Check the hostname for typos and that DNS is reachable from this process.`;
@@ -690,7 +750,7 @@ export function describeStoreInitFailure(err: unknown): string {
       return `The connection to Postgres timed out or was dropped (${message}). Check network access and firewall rules between this process and the database.`;
     case '28P01':
     case '28000':
-      return `Postgres rejected the credentials in DATABASE_URL (${message}). Check the username and password — authentication failed.`;
+      return `Postgres rejected the credentials in DATABASE_URL (${message}). Check the username and password - authentication failed.`;
     case '3D000':
       return `The database named in DATABASE_URL does not exist (${message}). Create it, or fix the database name in the connection string.`;
     case '57P03':
@@ -703,8 +763,8 @@ export function describeStoreInitFailure(err: unknown): string {
 /**
  * Synchronous store access. Under the file backing this still constructs and
  * seeds lazily on first call (unchanged). Under the Postgres backing there is
- * nothing safe to return before hydration — an empty store would look like a
- * brand new database and re-seed over live data — so it throws instead.
+ * nothing safe to return before hydration - an empty store would look like a
+ * brand new database and re-seed over live data - so it throws instead.
  */
 export function getStore(): MemoryBackedStore {
   if (postgresEnabled()) {

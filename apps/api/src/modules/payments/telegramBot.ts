@@ -6,7 +6,7 @@
  * a long-polling loop, a middleware stack and a dispatcher to a stateless API
  * that wants none of them. Three fetches is the whole dependency.
  *
- * Nothing here throws on a Telegram-side failure — every method returns a
+ * Nothing here throws on a Telegram-side failure - every method returns a
  * discriminated result. A payment path that throws on a transport hiccup turns
  * "the invoice did not open" into a 500, and a webhook that throws makes
  * Telegram retry forever.
@@ -107,15 +107,62 @@ export async function answerPreCheckoutQuery(
   });
 }
 
-/** Send a message to a linked Telegram user. Used for receipts and nudges. */
+/** One inline button. `webAppUrl` opens the Mini App; `url` opens a browser. */
+export interface OutboundButton {
+  text: string;
+  webAppUrl?: string;
+  url?: string;
+}
+
+function inlineKeyboard(buttons: OutboundButton[] | undefined): Record<string, unknown> | undefined {
+  if (!buttons || buttons.length === 0) return undefined;
+  const rows = buttons
+    .map((button) => {
+      if (button.webAppUrl) return [{ text: button.text, web_app: { url: button.webAppUrl } }];
+      if (button.url) return [{ text: button.text, url: button.url }];
+      return [];
+    })
+    .filter((row) => row.length > 0);
+  if (rows.length === 0) return undefined;
+  return { inline_keyboard: rows };
+}
+
+/**
+ * Send a message to a linked Telegram user. Used for receipts, nudges, and
+ * the four bot commands. HTML stays the default so existing receipts keep
+ * their formatting; command copy passes `plain` because the text is built
+ * from configured URLs and must not be parsed as markup.
+ */
 export async function sendBotMessage(
   chatId: number,
   text: string,
+  options?: { buttons?: OutboundButton[]; parseMode?: 'HTML' | 'plain' },
 ): Promise<BotResult<unknown>> {
+  const markup = inlineKeyboard(options?.buttons);
   return callBot<unknown>('sendMessage', {
     chat_id: chatId,
     text,
-    parse_mode: 'HTML',
+    ...(options?.parseMode === 'plain' ? {} : { parse_mode: 'HTML' }),
     link_preview_options: { is_disabled: true },
+    ...(markup ? { reply_markup: markup } : {}),
+  });
+}
+
+/**
+ * Refund a Telegram Stars payment.
+ *
+ * `user_id` is the Telegram user who paid, not our account id.
+ * Returns Telegram's boolean result, or a failure the caller can classify.
+ * A repeated call for an already-refunded charge fails with
+ * CHARGE_ALREADY_REFUNDED; the caller treats that as success and still
+ * revokes the local entitlement.
+ */
+export async function refundStarPayment(
+  telegramUserId: number,
+  telegramPaymentChargeId: string,
+): Promise<BotResult<boolean>> {
+  return callBot<boolean>('refundStarPayment', {
+    user_id: telegramUserId,
+    telegram_payment_charge_id: telegramPaymentChargeId,
   });
 }

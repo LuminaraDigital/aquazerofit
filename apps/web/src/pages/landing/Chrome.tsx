@@ -2,7 +2,7 @@
  * Shared chrome for the public marketing surface (landing page + /features).
  *
  * Kept in one place deliberately: the moment a second marketing route exists,
- * a copied header and footer start drifting — different nav items, a stale
+ * a copied header and footer start drifting - different nav items, a stale
  * copyright line, one CTA updated and the other not. Both pages render these.
  */
 import { Link } from 'react-router-dom';
@@ -43,7 +43,7 @@ const FOOTER_PRODUCT: Array<{ label: string; to?: string; href?: string }> = [
  *
  * The target is `/`, which now serves the marketing page in place for
  * signed-out web visitors. It used to be `/landing`, because `/` redirected
- * there and a <Navigate> drops the fragment — everyone clicking "Safety" from
+ * there and a <Navigate> drops the fragment - everyone clicking "Safety" from
  * /features arrived at the top of the page instead. Serving marketing at `/`
  * removed the redirect, and with it that bug.
  */
@@ -82,7 +82,7 @@ export function CtaButton({
  * The conversion button: hand the visitor to the Mini App.
  *
  * A plain `<a>` rather than a router Link, because the destination is another
- * origin entirely — this is the one control on the marketing site whose job is
+ * origin entirely - this is the one control on the marketing site whose job is
  * to leave it.
  *
  * The href is built at render from stored attribution, so whatever brought the
@@ -99,7 +99,7 @@ export function TelegramCta({
 }: {
   children?: React.ReactNode;
   variant?: 'primary' | 'ghost';
-  /** Which CTA on the page this is — the only way to tell them apart later. */
+  /** Which CTA on the page this is - the only way to tell them apart later. */
   placement: string;
   className?: string;
 }) {
@@ -124,8 +124,8 @@ export function TelegramCta({
 
 /**
  * The browser path, for the segment whose network or workplace blocks
- * Telegram. It is a real, complete route into the same product — not a
- * consolation prize — and it is tracked separately so that segment shows up in
+ * Telegram. It is a real, complete route into the same product - not a
+ * consolation prize - and it is tracked separately so that segment shows up in
  * the funnel instead of bouncing silently.
  */
 export function WebFallbackLink({
@@ -159,7 +159,7 @@ export function TopBar({ onLanding = false }: { onLanding?: boolean }) {
           aria-label="Primary"
         >
           <Link to="/" className="flex items-center gap-2.5">
-            {/* Fixed top bar — in the viewport from the first paint. */}
+            {/* Fixed top bar - in the viewport from the first paint. */}
             <img
               src="/logo.png"
               alt=""
@@ -225,7 +225,7 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
       <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            {/* Footer sits below a long landing page — defer it. */}
+            {/* Footer sits below a long landing page - defer it. */}
             <img
               src="/logo.png"
               alt=""
@@ -278,6 +278,7 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
               { to: '/privacy', label: 'Privacy notice' },
               { to: '/google-play/privacy-policy', label: 'Google Play privacy policy' },
               { to: '/terms', label: 'Terms of use' },
+              { to: '/refund', label: 'Refunds' },
               { to: '/support', label: 'Support' },
             ].map((item) => (
               <li key={item.to}>

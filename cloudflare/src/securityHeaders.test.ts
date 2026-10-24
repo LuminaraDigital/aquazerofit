@@ -138,6 +138,29 @@ test('HTML JSON-LD receives a script nonce and other responses do not', async ()
   assert.equal(sources(plain.headers.get('Content-Security-Policy') ?? '', 'script-src').some((s) => s.startsWith("'nonce-")), false);
 });
 
+test('a slashless legal URL is followed and then given the SPA policy', async () => {
+  const html =
+    '<html><head><script type="application/ld+json">{"@type":"WebPage"}</script></head><body>refund</body></html>';
+  const response = await worker.fetch(new Request('https://aquazerofit.com/refund'), {
+    API_ORIGIN,
+    ASSETS: {
+      fetch: async (request: Request) => {
+        const url = new URL(request.url);
+        if (url.pathname === '/refund') {
+          return new Response(null, { status: 307, headers: { Location: '/refund/' } });
+        }
+        return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      },
+    },
+  } as never);
+  assert.equal(response.status, 200);
+  const body = await response.text();
+  assert.match(body, /nonce=/);
+  assert.match(body, /refund/);
+  assert.match(response.headers.get('Content-Security-Policy') ?? '', /'nonce-/);
+  assert.equal(response.headers.get('X-Frame-Options'), null);
+});
+
 test('the asset path applies those headers and does not invent X-Frame-Options', async () => {
   const response = await worker.fetch(
     new Request('https://aquazerofit.com/'),

@@ -7,7 +7,7 @@
  * document id (a per-container rewrite would push all ~995 `content` rows on
  * every meal log) and if the batched statements are shaped correctly.
  */
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -16,7 +16,10 @@ import {
   buildDelete,
   buildUpsert,
   CREATE_TABLE_SQL,
+  STARS_CHARGE_DUPLICATE_COUNT_SQL,
+  STARS_CHARGE_UNIQUE_INDEX_SQL,
   UPSERT_CHUNK_SIZE,
+  starsChargeDuplicateCount,
   databaseSslOption,
   isLoopbackConnectionString,
   isSecureConnectionString,
@@ -34,9 +37,14 @@ interface Call {
 class FakeExecutor implements QueryExecutor {
   readonly calls: Call[] = [];
   rows: unknown[] = [];
+  /** Value returned by the pre-index duplicate count. Zero creates the index. */
+  duplicateGroups = 0;
 
   async query(text: string, values?: unknown[]): Promise<{ rows: unknown[] }> {
     this.calls.push({ text, values: values ?? [] });
+    if (text.includes('duplicate_groups')) {
+      return { rows: [{ duplicate_groups: this.duplicateGroups }] };
+    }
     return { rows: text.startsWith('SELECT') ? this.rows : [] };
   }
 
@@ -93,7 +101,13 @@ describe('hydrate', () => {
 
     expect(exec.calls[0]!.text).toBe(CREATE_TABLE_SQL);
     expect(exec.calls[0]!.text).toContain('CREATE TABLE IF NOT EXISTS documents');
-    expect(exec.calls[1]!.text).toBe('SELECT container, id, doc FROM documents');
+    expect(exec.calls[1]!.text).toBe(STARS_CHARGE_DUPLICATE_COUNT_SQL);
+    expect(exec.calls[1]!.text).toContain('duplicate_groups');
+    expect(exec.calls[2]!.text).toBe(STARS_CHARGE_UNIQUE_INDEX_SQL);
+    expect(exec.calls[2]!.text).toContain('CREATE UNIQUE INDEX IF NOT EXISTS documents_stars_charge_uidx');
+    expect(exec.calls[2]!.text).toContain("doc->>'telegramPaymentChargeId'");
+    expect(exec.calls[2]!.text).toContain("doc->>'type' = 'starsPurchase'");
+    expect(exec.calls[3]!.text).toBe('SELECT container, id, doc FROM documents');
     expect(store.count('users')).toBe(1);
     expect(store.count('logs')).toBe(2);
     expect(store.byId('users', 'u1')).toEqual({ id: 'u1', email: 'a@b.c' });
@@ -115,7 +129,62 @@ describe('hydrate', () => {
     const store = newStore();
     await store.hydrate();
     await store.hydrate();
-    expect(exec.calls).toHaveLength(2);
+    expect(exec.calls).toHaveLength(4);
+  });
+
+  it('skips the charge unique index when duplicate charge ids are already stored', async () => {
+    const chargeId = 'chg-do-not-log';
+    exec.duplicateGroups = 2;
+    exec.rows = [
+      {
+        container: 'ledger',
+        id: 'sp1',
+        doc: {
+          id: 'sp1',
+          type: 'starsPurchase',
+          telegramPaymentChargeId: chargeId,
+          payload: 'secret-body',
+        },
+      },
+      {
+        container: 'ledger',
+        id: 'sp2',
+        doc: {
+          id: 'sp2',
+          type: 'starsPurchase',
+          telegramPaymentChargeId: chargeId,
+          payload: 'secret-body',
+        },
+      },
+    ];
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((message?: unknown) => {
+      lines.push(String(message));
+    });
+    try {
+      const store = newStore();
+      await expect(store.hydrate()).resolves.toBeUndefined();
+      expect(store.count('ledger')).toBe(2);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(exec.calls.map((call) => call.text)).not.toContain(STARS_CHARGE_UNIQUE_INDEX_SQL);
+    expect(exec.calls.some((call) => call.text === 'SELECT container, id, doc FROM documents')).toBe(true);
+    const skipped = lines.find((line) => line.includes('documents_stars_charge_uidx'));
+    expect(skipped).toContain('2');
+    expect(lines.join('\n')).not.toContain(chargeId);
+    expect(lines.join('\n')).not.toContain('sp1');
+    expect(lines.join('\n')).not.toContain('secret-body');
+  });
+});
+
+describe('starsChargeDuplicateCount', () => {
+  it('reads the group count and treats a missing value as zero', () => {
+    expect(starsChargeDuplicateCount([{ duplicate_groups: 4 }])).toBe(4);
+    expect(starsChargeDuplicateCount([{ duplicate_groups: '2' }])).toBe(2);
+    expect(starsChargeDuplicateCount([])).toBe(0);
+    expect(starsChargeDuplicateCount([{ duplicate_groups: null }])).toBe(0);
   });
 });
 

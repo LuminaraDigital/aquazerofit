@@ -506,7 +506,13 @@ export function linkTelegram(
   }
   const updated: User = { ...user, tgId, tgUsername };
   store.upsert('users', updated);
-  auditDataAccess(userId, replacing ? 'telegram.relinked' : 'telegram.linked', { tgId });
+  // The raw Telegram id is an identifier. The audit log keeps a short hash,
+  // the same scheme purge uses, so a log export cannot be joined back to a
+  // person who only knows this file. A first link and a confirmed replacement
+  // both store that hash; the action name is what distinguishes them.
+  auditDataAccess(userId, replacing ? 'telegram.relinked' : 'telegram.linked', {
+    tgIdHash: sha256Hex(String(tgId)).slice(0, 16),
+  });
   return toPublicUser(updated);
 }
 

@@ -21,6 +21,48 @@ export function isProxiedPath(pathname: string): boolean {
   );
 }
 
+/**
+ * Legal pages published without a trailing slash. Cloudflare's default HTML
+ * handling answers `/terms` (a folder with index.html) with 307 to `/terms/`.
+ * Telegram's review of the terms, privacy and refund URLs treats that redirect
+ * as the page not being there.
+ */
+export const LEGAL_PAGE_PATHS = ['/terms', '/privacy', '/refund'] as const;
+
+/** Slashless form of a legal path, or null when this path is not one of them. */
+export function canonicalLegalPath(pathname: string): string | null {
+  const bare = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  return (LEGAL_PAGE_PATHS as readonly string[]).includes(bare) ? bare : null;
+}
+
+/**
+ * Where to fetch the legal page directly, when the asset host answered with a
+ * trailing-slash redirect. One hop, same origin, same page. Anything else
+ * (another path, another host, a redirect that goes nowhere new) is left for
+ * the client.
+ */
+export function legalRedirectTarget(
+  requestUrl: string,
+  status: number,
+  location: string | null,
+): string | null {
+  if ((status !== 307 && status !== 308) || !location) return null;
+  let request: URL;
+  let target: URL;
+  try {
+    request = new URL(requestUrl);
+    target = new URL(location, request);
+  } catch {
+    return null;
+  }
+  if (target.origin !== request.origin) return null;
+  const requested = canonicalLegalPath(request.pathname);
+  const landed = canonicalLegalPath(target.pathname);
+  if (!requested || requested !== landed) return null;
+  if (target.pathname === request.pathname && target.search === request.search) return null;
+  return target.href;
+}
+
 /** www is a second custom domain. Sessions and canonical links live on the apex. */
 export function canonicalRedirect(url: URL): string | null {
   if (url.hostname !== WWW_HOST) return null;

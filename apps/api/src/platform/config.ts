@@ -6,6 +6,7 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveSupportEmail } from '@aquazerofit/shared';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** apps/api/.data by default, regardless of process cwd. */
@@ -182,7 +183,7 @@ export const config = {
   /**
    * Where meal photographs are written while a vision job is in flight.
    *
-   * Defaults to apps/api/uploads. On a host whose filesystem is ephemeral  - 
+   * Defaults to apps/api/uploads. On a host whose filesystem is ephemeral -
    * many managed hosts reset it on every deploy - point UPLOADS_DIR at a mounted
    * persistent volume, or in-flight photos vanish on redeploy. The blast
    * radius is deliberately small (the sweep deletes them within 24 hours
@@ -514,6 +515,40 @@ export const config = {
   },
 
   /**
+   * Mailbox named on the legal pages and in /paysupport. The rule lives in
+   * resolveSupportEmail: a blank value falls through to info@luminara.digital.
+   */
+  get supportEmail(): string {
+    return resolveSupportEmail(process.env.SUPPORT_EMAIL);
+  },
+
+  /**
+   * HTTPS URL the /start button opens as a Mini App. Falls back to
+   * appPublicUrl when TELEGRAM_MINI_APP_URL is unset or not https.
+   * The trailing slash is preserved: BotFather matches the URL exactly.
+   */
+  get telegramMiniAppUrl(): string {
+    return httpUrl(process.env.TELEGRAM_MINI_APP_URL, this.appPublicUrl, true);
+  },
+
+  /** /terms links. Each falls back to a page on the public origin. */
+  get termsUrl(): string {
+    return httpUrl(process.env.TERMS_URL, publicPath('/terms'));
+  },
+
+  get privacyUrl(): string {
+    return httpUrl(process.env.PRIVACY_URL, publicPath('/privacy'));
+  },
+
+  get refundUrl(): string {
+    return httpUrl(process.env.REFUND_URL, publicPath('/refund'));
+  },
+
+  get accountDeletionUrl(): string {
+    return httpUrl(process.env.ACCOUNT_DELETION_URL, publicPath('/account/deletion'));
+  },
+
+  /**
    * Envelope sender for outbound mail. Must be a domain verified with the mail
    * provider or every message is silently dropped by the provider.
    */
@@ -543,6 +578,25 @@ export const config = {
     return raw === 'true' || raw === '1';
   },
 };
+
+function publicPath(path: string): string {
+  const base = config.appPublicUrl.replace(/\/+$/, '');
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+/**
+ * An absolute http(s) URL from the environment, or `fallback`.
+ * `httpsOnly` is for the Mini App button, which Telegram rejects otherwise.
+ * Fragments are allowed so an override can point at a heading.
+ */
+function httpUrl(raw: string | undefined, fallback: string, httpsOnly = false): string {
+  const value = raw?.trim() ?? '';
+  const scheme = httpsOnly ? 'https:' : 'https?:';
+  if (value.length > 0 && value.length <= 2048 && new RegExp(`^${scheme}\\/\\/\\S+$`, 'i').test(value)) {
+    return value;
+  }
+  return fallback;
+}
 
 /** True when at least one configured AI provider has a non-empty API key. */
 export function hasAnyAiProviderKey(): boolean {

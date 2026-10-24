@@ -17,6 +17,7 @@ const PrivacyPage = lazy(() => import('./pages/legal/Privacy'));
 /* The privacy-policy URL declared in Play Console; keep the path stable. */
 const GooglePlayPrivacyPage = lazy(() => import('./pages/legal/GooglePlayPrivacy'));
 const TermsPage = lazy(() => import('./pages/legal/Terms'));
+const RefundPage = lazy(() => import('./pages/legal/Refund'));
 const SupportPage = lazy(() => import('./pages/legal/Support'));
 /* Public account-deletion instructions. Play requires this reachable WITHOUT the
    app installed and without signing in, so it sits with the legal pages rather
@@ -95,6 +96,7 @@ export default function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/google-play/privacy-policy" element={<GooglePlayPrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/refund" element={<RefundPage />} />
         <Route path="/support" element={<SupportPage />} />
         <Route path="/account/deletion" element={<AccountDeletionPage />} />
         <Route path="/welcome" element={<Welcome />} />

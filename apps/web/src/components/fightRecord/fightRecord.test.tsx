@@ -86,7 +86,10 @@ function renderWithClient(node: React.ReactNode) {
   );
 }
 
-const BANNED = /\b(lost|lose|losing|broken|break|reset|streak|hurry|only|last chance|expires?)\b/i;
+// Stems, not whole words: "No streaks here", "resets each season" and
+// "losing nothing" must fail too (AZF-W3-05 §2.7).
+const BANNED =
+  /\b(lost|los(e|es|ing)|broke\w*|break\w*|reset\w*|streak\w*|hurr\w*|only|last chance|expir\w*)\b/i;
 
 afterEach(() => {
   cleanup();

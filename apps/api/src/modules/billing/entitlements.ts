@@ -282,6 +282,28 @@ export function revokePremium(
 }
 
 /**
+ * revokePremium at most once per `externalId`, for a rail whose revoke key
+ * names one settled event (a Stripe deletion, refund or dispute). A
+ * redelivered notification then writes nothing, rather than a second revoke
+ * that would sort after any period paid since and retire it.
+ *
+ * revokePremium itself keeps appending on every call, deliberately: Play's
+ * `rtdn:<token>:<type>` key repeats legitimately when one subscription lapses
+ * the same way twice, and the second lapse must still revoke.
+ */
+export function revokePremiumOnce(
+  userId: string,
+  source: EntitlementSource,
+  externalId: string,
+  reason?: string,
+  providerRef?: string,
+  revokesExternalId?: string,
+): void {
+  if (grantsFor(externalId).length > 0) return;
+  revokePremium(userId, source, externalId, reason, providerRef, revokesExternalId);
+}
+
+/**
  * Entitlement history for one account, newest first. Support-facing.
  *
  * Reversed before sorting because `createdAt` is millisecond-resolution and a

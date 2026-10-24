@@ -305,22 +305,6 @@ describe('POST /billing/stripe/webhook', () => {
       logEvent.mockClear();
     });
 
-    it.each(['canceled', 'unpaid', 'incomplete_expired'])(
-      'ends premium when the subscription becomes %s',
-      async (status) => {
-        await deliver(
-          event('invoice.paid', invoice({ id: `in_${status}`, sub: `sub_${status}`, uid: userId, end: inDaysS(30) })),
-        );
-        expect(effectiveTier(userDoc())).toBe('premium');
-
-        const res = await deliver(event('customer.subscription.updated', updated(`sub_${status}`, { status })));
-
-        expect(res.status).toBe(200);
-        expect(effectiveTier(userDoc())).toBe('free');
-        expect(revokes()[0]?.providerRef).toBe(`sub_${status}`);
-      },
-    );
-
     it('keeps the paid period when the subscriber cancels at period end', async () => {
       const end = inDaysS(30);
       await deliver(event('invoice.paid', invoice({ id: 'in_cape', sub: 'sub_cape', uid: userId, end })));
@@ -336,30 +320,30 @@ describe('POST /billing/stripe/webhook', () => {
     });
 
     /*
-     * `unpaid` is not terminal: the customer can settle the open invoice and
-     * the subscription goes back to active. A redelivery of the old lapse must
-     * not take away the period that payment bought.
+     * Regression: an `unpaid` update used to revoke the whole subscription.
+     * Its first delivery failed, the customer paid the open invoice, and
+     * Stripe's retry of the old update then retired the period just paid
+     * for. Only a paid invoice grants, so a lapse needs no revoke at all.
      */
-    it('settles a replayed lapse once, so it cannot retire a period paid after it', async () => {
-      await deliver(event('invoice.paid', invoice({ id: 'in_lapse1', sub: 'sub_lapse', uid: userId, end: inDaysS(2) })));
-      const lapse = event('customer.subscription.updated', updated('sub_lapse', { status: 'unpaid' }));
-      await deliver(lapse);
-      expect(effectiveTier(userDoc())).toBe('free');
-
+    it('leaves a renewal standing when an older lapse is delivered after it', async () => {
+      await deliver(event('invoice.paid', invoice({ id: 'in_late1', sub: 'sub_late', uid: userId, end: inDaysS(2) })));
       const end = inDaysS(30);
-      await deliver(event('invoice.paid', invoice({ id: 'in_lapse2', sub: 'sub_lapse', uid: userId, end })));
-      expect((await deliver(lapse)).status).toBe(200);
+      await deliver(event('invoice.paid', invoice({ id: 'in_late2', sub: 'sub_late', uid: userId, end })));
 
+      const late = await deliver(event('customer.subscription.updated', updated('sub_late', { status: 'unpaid' })));
+
+      expect(late.status).toBe(200);
       expect(effectiveTier(userDoc())).toBe('premium');
       expect(userDoc().premiumUntil).toBe(iso(end));
-      expect(revokes()).toHaveLength(1);
+      expect(revokes()).toHaveLength(0);
     });
 
-    it('settles a canceled update and the deletion of the same subscription once', async () => {
-      await deliver(event('invoice.paid', invoice({ id: 'in_both', sub: 'sub_both', uid: userId, end: inDaysS(30) })));
+    it('settles a redelivered deletion once', async () => {
+      await deliver(event('invoice.paid', invoice({ id: 'in_twice', sub: 'sub_twice', uid: userId, end: inDaysS(30) })));
+      const deleted = event('customer.subscription.deleted', subscription('sub_twice', userId));
 
-      await deliver(event('customer.subscription.updated', updated('sub_both', { status: 'canceled' })));
-      await deliver(event('customer.subscription.deleted', subscription('sub_both', userId)));
+      await deliver(deleted);
+      await deliver(deleted);
 
       expect(effectiveTier(userDoc())).toBe('free');
       expect(revokes()).toHaveLength(1);
@@ -412,29 +396,84 @@ describe('POST /billing/stripe/webhook', () => {
       expect(asked.searchParams.getAll('expand[]')).toContain('data.invoice');
     });
 
-    it('retires the disputed payment\'s period when a chargeback opens', async () => {
+    /*
+     * A lookup that failed because Stripe was unreachable or throttling must
+     * not be acknowledged: that would drop the revoke for good. Nothing is
+     * written before the lookup, so the redelivery starts clean.
+     */
+    it.each([503, 429])(
+      'answers non-2xx when the invoice lookup gets %i, and the redelivery revokes once',
+      async (status) => {
+        const refundedInvoice = invoice({ id: `in_outage_${status}`, sub: 'sub_outage', uid: userId, end: inDaysS(30) });
+        await deliver(event('invoice.paid', refundedInvoice));
+        const refund = event('charge.refunded', charge(`ch_outage_${status}`));
+        stubStripe({ error: { message: 'unavailable' } }, status);
+
+        const first = await deliver(refund);
+
+        expect(first.status).toBe(503);
+        expect(effectiveTier(userDoc())).toBe('premium');
+        expect(revokes()).toHaveLength(0);
+
+        vi.restoreAllMocks();
+        stubStripe(paymentsFor(refundedInvoice));
+        expect((await deliver(refund)).status).toBe(200);
+        expect((await deliver(refund)).status).toBe(200);
+
+        expect(effectiveTier(userDoc())).toBe('free');
+        expect(revokes()).toHaveLength(1);
+      },
+    );
+
+    const dispute = (id: string, status: string) => ({
+      id,
+      object: 'dispute',
+      charge: `ch_${id}`,
+      payment_intent: `pi_${id}`,
+      amount: 999,
+      reason: 'fraudulent',
+      status,
+    });
+
+    it('retires the disputed payment\'s period once, whether created or funds_withdrawn says so', async () => {
       const disputedInvoice = invoice({ id: 'in_disputed', sub: 'sub_disputed', uid: userId, end: inDaysS(30) });
       await deliver(event('invoice.paid', disputedInvoice));
       stubStripe(paymentsFor(disputedInvoice));
 
-      const res = await deliver(
-        event('charge.dispute.created', {
-          id: 'dp_1',
-          object: 'dispute',
-          charge: 'ch_disputed',
-          payment_intent: 'pi_disputed',
-          amount: 999,
-          reason: 'fraudulent',
-          status: 'needs_response',
-        }),
-      );
+      const res = await deliver(event('charge.dispute.created', dispute('dp_1', 'needs_response')));
+      await deliver(event('charge.dispute.funds_withdrawn', dispute('dp_1', 'needs_response')));
 
       expect(res.status).toBe(200);
       expect(effectiveTier(userDoc())).toBe('free');
+      expect(revokes()).toHaveLength(1);
       expect(revokes()[0]).toMatchObject({
         externalId: 'stripe:dispute:dp_1',
         revokesExternalId: 'stripe:in_disputed',
       });
+    });
+
+    /*
+     * An inquiry (status warning_*) is the issuer asking a question: no money
+     * has moved and most never escalate. If one does, Stripe moves the same
+     * dispute to a chargeback and takes the funds, which funds_withdrawn
+     * reports.
+     */
+    it('keeps premium through an inquiry and retires it when the inquiry escalates', async () => {
+      const disputedInvoice = invoice({ id: 'in_inquiry', sub: 'sub_inquiry', uid: userId, end: inDaysS(30) });
+      await deliver(event('invoice.paid', disputedInvoice));
+      const stripe = stubStripe(paymentsFor(disputedInvoice));
+
+      const inquiry = await deliver(event('charge.dispute.created', dispute('dp_inq', 'warning_needs_response')));
+
+      expect(inquiry.status).toBe(200);
+      expect(effectiveTier(userDoc())).toBe('premium');
+      expect(stripe).not.toHaveBeenCalled();
+      expect(logEvent).toHaveBeenCalledWith('stripe_dispute_inquiry', expect.objectContaining({ dispute: 'dp_inq' }));
+
+      await deliver(event('charge.dispute.funds_withdrawn', dispute('dp_inq', 'needs_response')));
+
+      expect(effectiveTier(userDoc())).toBe('free');
+      expect(revokes()[0]?.externalId).toBe('stripe:dispute:dp_inq');
     });
 
     it('logs a partial refund and keeps premium, without asking Stripe anything', async () => {

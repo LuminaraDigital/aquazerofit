@@ -177,12 +177,14 @@ Each environment's endpoint (`<APP_PUBLIC_URL>/api/v1/billing/stripe/webhook`, A
 | --- | --- | --- |
 | `invoice.paid` | Grants through the paid period. | `stripe_invoice_unmapped` |
 | `customer.subscription.deleted` | Ends that subscription's premium now. | |
-| `customer.subscription.updated` | Ends premium when status becomes `canceled`, `unpaid` or `incomplete_expired`. `cancel_at_period_end` changes nothing: the paid period stands. | |
 | `invoice.payment_failed` | Nothing revoked; Stripe retries. For dunning. | `stripe_invoice_payment_failed` |
 | `charge.refunded` | A full refund retires the period that payment bought. A partial refund only logs. | `stripe_charge_partially_refunded`, `stripe_charge_unmapped` |
-| `charge.dispute.created` | Retires the period the disputed payment bought. A dispute later won does not restore it; re-grant with `POST /api/v1/admin/users/:id/premium`. | `stripe_charge_unmapped` |
+| `charge.dispute.created` | A chargeback retires the period the disputed payment bought. An inquiry (status `warning_*`) only logs. | `stripe_dispute_inquiry`, `stripe_charge_unmapped` |
+| `charge.dispute.funds_withdrawn` | Same revoke, settled once with `created`; this is the event that reports an inquiry escalating to a chargeback. A dispute later won does not restore premium; re-grant with `POST /api/v1/admin/users/:id/premium`. | `stripe_charge_unmapped` |
 
-`stripe_charge_unmapped` means a refund or dispute could not be traced to an account through Stripe's invoice payments, so nothing was revoked; check the charge in the Dashboard. `stripe_webhook_unsettled` means handling stopped on a final error, including Stripe being unreachable during that lookup; resend the event from the Dashboard once the cause is fixed.
+`customer.subscription.updated` is deliberately not subscribed: only a paid invoice grants, so a lapsed subscription already ends with its last paid period, and Stripe sends `customer.subscription.deleted` whenever a subscription ends.
+
+`stripe_charge_unmapped` means a refund or dispute could not be traced to an account through Stripe's invoice payments, so nothing was revoked; check the charge in the Dashboard. `stripe_webhook_deferred` means Stripe was unreachable during that lookup: the delivery got a 503 and Stripe retries it for about three days, so it needs action only if it repeats. `stripe_webhook_unsettled` means handling stopped on a final error (the account no longer exists, or Stripe does not recognise the payment); resend the event from the Dashboard once the cause is fixed.
 
 ## What is NOT here (deliberately)
 

@@ -35,7 +35,7 @@ class FightRecordRepositoryTest {
         assertEquals(BeltTier.BLUE, (result as ApiResult.Success).data!!.current.tier)
         assertEquals(BeltTier.BLUE, repository.cached().first()!!.fightRecord!!.current.tier)
         assertEquals(setOf(ProgressSummaryEntity.FIGHT_RECORD_KEY), dao.rows.value.keys)
-        assertNull(dao.summary().first())
+        assertNull(dao.snapshot(ProgressSummaryEntity.PROGRESS_SUMMARY_KEY).first())
     }
 
     @Test

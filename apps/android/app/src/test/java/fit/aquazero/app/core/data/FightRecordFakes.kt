@@ -37,9 +37,9 @@ class FakeFightRecordApi : FightRecordApi {
 }
 
 /**
- * In-memory [ProgressDao] that honours the keyed reads the real queries make:
- * [summary] sees only the progress key and [snapshot] only the key it is given.
- * Trend series are stubs; nothing under test writes them.
+ * In-memory [ProgressDao] that honours the keyed read the real query makes:
+ * [snapshot] sees only the key it is given. Trend series are stubs; nothing
+ * under test writes them.
  */
 class FakeProgressDao : ProgressDao {
 
@@ -48,9 +48,6 @@ class FakeProgressDao : ProgressDao {
     override suspend fun upsertSummary(summary: ProgressSummaryEntity) {
         rows.value = rows.value + (summary.userId to summary)
     }
-
-    override fun summary(): Flow<ProgressSummaryEntity?> =
-        rows.map { it[ProgressSummaryEntity.PROGRESS_SUMMARY_KEY] }
 
     override fun snapshot(key: String): Flow<ProgressSummaryEntity?> = rows.map { it[key] }
 

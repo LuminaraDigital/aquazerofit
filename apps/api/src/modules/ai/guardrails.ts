@@ -51,6 +51,12 @@ const EXTREME_DIET_PATTERNS: RegExp[] = [
 const OUT_OF_SCOPE_PATTERNS: RegExp[] = [
   /\b(legal\s+advice|lawyer|solicitor|lawsuit|sue\s+(my|them|someone)|contract\s+(law|dispute)|visa\s+application|immigration)\b/i,
   /\b(invest\w*|stocks?|shares?|etfs?|crypto\w*|bitcoin|superannuation|mortgage|tax(es|\s+return)?|financial\s+advice|pay\s+off\s+(my\s+)?debt)\b/i,
+  // Digital assets (AZF-W3-05 GR-10). Fight Record belts are free, carry no
+  // money value and cannot be sold, so the coach must never speculate about
+  // tokens, NFTs or what a belt is "worth": an answer there is the kind of
+  // statement that turns a badge into an implied financial product. "Token"
+  // and "coin" alone are deliberately not matched, only their market senses.
+  /\b(nfts?|non[-\s]?fungible|airdrops?|meme\s?coins?|altcoins?|stablecoins?|toncoin|web3|blockchain|solana|ethereum|azxf|tokenomics|staking|seed\s+phrase|(coin|token)s?\s+(price|value|launch|sale)|(sell|trade|flip)\s+(my\s+)?(belts?|badges?))\b|\bwhat(\s+is|'s)\s+my\s+(belt|badge)\s+worth\b/i,
   // mental-health treatment (signpost, not treat — AQF-11 §1)
   /\b(therap(y|ist)|counsell?(ing|or)|psychiatrist|psychologist|antidepressants?|anxiety\s+(medication|treatment)|depression\s+(treatment|medication)|treat\s+my\s+(depression|anxiety|adhd))\b/i,
 ];

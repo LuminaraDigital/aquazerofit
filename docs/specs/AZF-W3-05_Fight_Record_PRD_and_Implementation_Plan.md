@@ -54,7 +54,7 @@ test that proves it.
 
 | Release | Contents | Code status | Can go live when |
 |---|---|---|---|
-| Phase 0 | P0 blockers | In-repo fixes on four branches (§1). Operator steps listed | All P0s verified in production |
+| Phase 0 | P0 blockers | In-repo fixes on seven branches, reviewed and verified (§1.1). Operator steps listed | All P0s verified in production |
 | **R1a** | Seasons, Consistency Belts, Fight Record page, dashboard card, celebration, belt share card and Telegram story, Telegram emoji status, guardrail eval cases | **Built** behind `FIGHT_RECORD_ENABLED` (default off) | Phase 0 exit, counsel §C1, C3, E3, E4 and K1 answered, copy review passed |
 | R1b | Squad belts in huddles, prepared inline messages, coach cosmetics (Stars) | Specified (§8.4) | R1a live 2 weeks; cosmetics also need counsel C4 and art |
 | R2 | Verifiable credentials, verify page, status list, issuer-key mirror | Specified (§9.1) | R1a live 4 weeks, counsel E5 to E8, Privacy Policy updated |
@@ -101,6 +101,27 @@ Found in passing and added to the Phase 0 list:
 - Manual `gcloud builds submit` leaves `$COMMIT_SHA` empty, so a manual deploy
   is untagged and unattributable. Deploy from triggers only.
 - `Privacy.tsx` admits it has no committed response time. P0-3 adds one.
+
+### 1.1 Status after the build (25 Oct 2026)
+
+Every in-repo fix below is on its own branch, reviewed independently against
+correctness, security, maintainability and file-size rules, fixed, and
+verified together on one integration branch (§13). Nothing here is deployed;
+each row still needs its operator step before the Phase 0 exit.
+
+| P0 | Status in code | Branch | Operator step still needed |
+|---|---|---|---|
+| P0-1 | Fixed. Every deploy pins min = max = 1 instance and sets `AZF_INSTANCE_COUNT=1`; on Cloud Run an unset count refuses boot | `fix/p0-platform-hardening` | Confirm with `gcloud run services describe` after the next deploy |
+| P0-2 | Fixed. In production, keyless offline output is degraded (`no_provider`) and every paid lane releases its credit hold; a self-hosted Ollama counts as configured; boot warning when nothing is. `gateway.ts` split into `providerChain.ts` (1,052 → 737 lines) | `fix/p0-no-billing-for-keyless-mock` | Set provider keys with spend caps; re-check marketing claims against real output |
+| P0-3 | Facts corrected: Sydney hosting, recipients table incl. Google Fonts, APP 8, OAIC path, export; web Firebase Analytics removed (it would have started without consent). Three operator facts (AI terms check date, backup and log locations, response time) keep the page unpublished until filled | `fix/p0-privacy-facts` | Fill the operator facts; counsel review; publish |
+| P0-4 | Webhooks fixed: `invoice.payment_failed` logs; full refunds and chargebacks retire only the period that payment bought; inquiries log until `charge.dispute.funds_withdrawn`; a Stripe outage during the lookup answers 503 so Stripe retries. `customer.subscription.updated` is deliberately not handled (a late "unpaid" event could otherwise wipe a period just paid for). Self-serve cancel is PR #44 | `fix/p0-stripe-lifecycle-webhooks` | Subscribe the six events (`docs/OPERATIONS.md`); rebase PR #44 and restore its `entitlementHistory` import; configure the live Customer Portal |
+| P0-5 | Open; no code surface | none | PITR, HA or documented RPO/RTO, restore drill |
+| P0-6 | Open; vendor decision pending (§11) | none | Choose the error tracker; uptime checks; alert routing |
+| P0-7 | Fixed. One `publicOrigin` feeds every BuildConfig URL and the App Link host | `fix/p0-android-release-origin` | Add the Play App Signing SHA-256 to `assetlinks.json`; rebuild the AAB |
+| P0-8 | Fixed in code. Opt-in `REQUIRE_ORIGIN_SECRET` gate; placeholder or short secrets refused; rotation without opening the gate (`ORIGIN_SHARED_SECRET_PREVIOUS`); `/ready` no longer returns store errors | `fix/p0-platform-hardening` | Rotate `sk_live` and Resend keys; set the secret on both sides; move provider webhooks to the apex; enable the gate |
+| P0-9 | Open; no code surface. Staging deliberately bills nothing (`NODE_ENV=production`, no AI keys) | none | Create the staging service, database, bot, Stripe test keys and Worker route |
+| Retention baseline | Built: `GET /api/v1/admin/retention` (D1, D7, D30 by signup week; weekly active loggers by account surface) | `feat/p0-retention-baseline` | Record weekly for four weeks before R1a |
+| Found in review | The production admin seed, synthetic Telegram and Firebase account addresses and the default site origin all used `aquazero.fit`, a domain this project does not own. Production admin now only at `ADMIN_EMAIL`; no mail is sent to that domain; site origin default corrected | `fix/admin-seed-domain` | Set `ADMIN_EMAIL`; register `aquazero.fit` (or confirm nothing in production depends on it) and change or delete any account on it |
 
 **Rule:** R1a's code may merge while Phase 0 is open because it ships dark.
 `FIGHT_RECORD_ENABLED` is not set in production until every row above reads
@@ -858,3 +879,59 @@ The Kit credential is an R2 credential issued on Stripe
 | TD §5 Cloud Tasks and anchor worker | Replaced by one daily R3a job | §9.2 |
 | TD §6 DB flags and admin route | Replaced by env flags | §4.5 |
 | TD §11 rollout | Rewritten with gates and percentages | §8.6 |
+
+---
+
+## 13. Build and verification record (25 Oct 2026)
+
+### 13.1 Branches and merge order
+
+All branches start from `origin/staging` 85d6952 except the Android display,
+which starts from the Fight Record API commit it consumes. Recommended order of
+pull requests into `staging`, security first and the dark feature last:
+
+| # | Branch | What it carries |
+|---|---|---|
+| 1 | `fix/admin-seed-domain` | Admin seed and mail no longer trust the unregistered domain; site origin default |
+| 2 | `fix/p0-no-billing-for-keyless-mock` | P0-2, and the `gateway.ts` decomposition |
+| 3 | `fix/p0-stripe-lifecycle-webhooks` | P0-4 webhooks; then rebase PR #44 on top of it |
+| 4 | `fix/p0-platform-hardening` | P0-1 and P0-8 |
+| 5 | `fix/p0-privacy-facts` | P0-3 facts (page stays draft) |
+| 6 | `fix/p0-android-release-origin` | P0-7 |
+| 7 | `feat/p0-retention-baseline` | Phase 0 exit measurement |
+| 8 | `feat/fight-record` then `feat/fight-record-android` | R1a, dark behind `FIGHT_RECORD_ENABLED` |
+
+Several branches each append a section to `docs/OPERATIONS.md`; the second to
+merge will show a conflict there whose resolution is to keep both sections.
+
+### 13.2 Verification
+
+- **Combined:** every branch merged on `integration/w3-fight-record`;
+  `npm run verify` (typecheck, tests, eval) passes: API 98 files and
+  1,274 tests, web 39 files and 293 tests, Worker 13 of 13,
+  and the eval gate with the new digital-asset cases.
+- **Android:** `./gradlew ktlintCheck detekt testDebugUnitTest assembleDebug` passes on the
+  merged tree: 569 unit tests, 0 failures, and the merged manifest's App Link
+  host is `aquazerofit.com`. The instrumented tests the Android branch touched
+  (19) passed on a local emulator.
+- **Browser:** the Season card, celebration, share card and Fight Record page
+  were rendered at 390×844 in Chromium against the local API with the flag on;
+  no console errors; axe WCAG 2.2 AA reports zero violations on the Fight
+  Record page. Two violations exist on the dashboard in components this work
+  did not touch (the coach "BOND" chip contrast at 4.33:1 and the achievements
+  strip's unfocusable scroll region), recorded as a follow-up.
+- **Tests that guard the fixes were seen to fail without them**, including the
+  emoji-status race, the Stripe late-lapse and outage cases, the keyless
+  billing case, the origin-gate exemptions and the site-origin default.
+- **Reviews:** five independent reviews (Fight Record, money paths, platform
+  and legal and Android origin, Android display) against the ponytail, pstack
+  and thermo-nuclear standards. Every must-fix and should-fix was applied or,
+  where a reviewer and the author disagreed, decided in the branch with the
+  reason in its commit message.
+
+### 13.3 Not verified here
+
+Real Telegram clients (story editor, emoji status on Premium and non-Premium
+accounts, the exact revoke wording), live Stripe API calls, instrumented
+Android tests on a device, a staging deploy, and anything in the operator
+column of §1.1. These are release-checklist items (§8.6), not code gaps.

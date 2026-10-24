@@ -6,7 +6,7 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveSupportEmail } from '@aquazerofit/shared';
+import { BELT_TIERS, resolveSupportEmail, type BeltTier } from '@aquazerofit/shared';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** apps/api/.data by default, regardless of process cwd. */
@@ -633,6 +633,54 @@ export const config = {
   get adaptiveTargets(): boolean {
     const raw = process.env.ADAPTIVE_TARGETS?.trim().toLowerCase();
     return raw === 'true' || raw === '1';
+  },
+
+  /**
+   * Fight Record master switch (AZF-W3-05 §4.5). Off unless set, because the
+   * feature ships dark and is released only after the Phase 0 exit. Turning it
+   * back off is also the kill switch: every surface disappears and no award is
+   * written, while the awards people already hold are kept for when it returns.
+   */
+  get fightRecordEnabled(): boolean {
+    const raw = process.env.FIGHT_RECORD_ENABLED?.trim().toLowerCase();
+    return raw === 'true' || raw === '1';
+  },
+
+  /**
+   * Share of users inside the Fight Record rollout, 0 to 100, bucketed by a
+   * stable hash of the user id so raising it only ever adds people. Unset
+   * means 100, so the master switch alone decides. Set but unparseable ("10%",
+   * "12.5") means 0: a typo in a rollout control must fail toward fewer
+   * people, never toward everyone.
+   */
+  get fightRecordRolloutPercent(): number {
+    const raw = process.env.FIGHT_RECORD_ROLLOUT_PERCENT;
+    return Math.min(100, readNonNegativeInt(raw, raw?.trim() ? 0 : 100));
+  },
+
+  /**
+   * Belt tier → Telegram custom emoji id, as JSON (printed by
+   * tools/belts/create-emoji-set.mjs). Null unless every tier has a non-empty
+   * id: a partial set would leave someone's status blank at exactly the moment
+   * they earned a belt, so the emoji status is offered all-or-nothing.
+   */
+  get telegramBeltEmojiIds(): Record<BeltTier, string> | null {
+    const raw = process.env.TELEGRAM_BELT_EMOJI_IDS?.trim();
+    if (!raw) return null;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (parsed === null || typeof parsed !== 'object') return null;
+    const ids = {} as Record<BeltTier, string>;
+    for (const tier of BELT_TIERS) {
+      const id = (parsed as Record<string, unknown>)[tier];
+      if (typeof id !== 'string' || id.trim() === '') return null;
+      ids[tier] = id.trim();
+    }
+    return ids;
   },
 };
 

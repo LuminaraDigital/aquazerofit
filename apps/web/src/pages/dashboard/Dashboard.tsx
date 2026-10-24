@@ -10,6 +10,7 @@ import { Skeleton, DashboardSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { CoachCard } from '@/components/coach/CoachCard';
 import { ConsistencyCard } from '@/components/progress/ConsistencyCard';
+import { SeasonCard } from '@/components/fightRecord/SeasonCard';
 import { ConsistencyChip } from '@/components/progress/ConsistencyChip';
 import { ReadinessChip } from '@/components/progress/ReadinessChip';
 import { WeeklyInsightCard } from '@/components/progress/WeeklyInsightCard';
@@ -289,6 +290,11 @@ export default function Dashboard() {
             consistency={progress?.consistency}
             loading={progressQuery.isPending}
           />
+        </section>
+
+        {/* Fight Record season and belt. Renders nothing while the feature is off. */}
+        <section className="mb-5 reveal reveal-4 empty:hidden" aria-label="Season">
+          <SeasonCard />
         </section>
 
         {/* Weekly insight */}

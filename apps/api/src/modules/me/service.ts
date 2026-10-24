@@ -24,6 +24,7 @@ import {
   goalAdjustmentKcal,
 } from './adaptive';
 import { removeUserFromChallenges } from '../challenges/service';
+import { clearEmojiStatusOnErasure } from '../fightRecord/emojiStatus';
 import { effectiveTier } from '../billing/entitlements';
 import { addDays } from '../../platform/dates';
 import type { TrendPoint } from '@aquazerofit/shared';
@@ -404,6 +405,12 @@ export async function purgeUser(userId: string): Promise<void> {
       /* already gone */
     }
   }
+
+  // A belt shown as the user's Telegram emoji status is on their profile, not
+  // in our store, so the sweep below cannot reach it. Take it down first, while
+  // the preference that says it was set still exists. Best-effort and silent:
+  // it expires at season end regardless, and the user can always clear it.
+  await clearEmojiStatusOnErasure(userId, existing?.tgId);
 
   // Ledger is retained anonymised for financial integrity; audit is retained
   // anonymised per AQF-06 §6. Everything else user-scoped is erased. The

@@ -3,6 +3,7 @@ export * from './errors';
 export * from './constants';
 export * from './coaches';
 export * from './gamification';
+export * from './fightRecord';
 export * from './schemas';
 export * from './wger';
 export * from './mealTrust';

@@ -69,7 +69,8 @@ describe('telegram link audit', () => {
       refused = err;
     }
     expect(refused).toBeInstanceOf(AppError);
-    expect((refused as AppError).code).toBe('CONFLICT');
+    if (!(refused instanceof AppError)) throw new Error('expected AppError');
+    expect(refused.code).toBe('CONFLICT');
     expect(getStore().byId<{ id: string; tgId?: number }>('users', 'usr-relink')?.tgId).toBe(first);
 
     linkTelegram('usr-relink', second, 'linker', true);

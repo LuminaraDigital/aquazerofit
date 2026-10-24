@@ -1,6 +1,6 @@
 # tools/
 
-Four generators. None of them run in CI and none are needed to build or test
+Five generators. None of them run in CI and none are needed to build or test
 the application — they exist to turn source material (character renders, card
 masters, screen captures, Markdown) into the committed artefacts the app and
 the document set consume.
@@ -18,6 +18,7 @@ Root-level npm scripts exist for each, so they are discoverable from
 | `npm run assets:coaches -- <source-dir>` | `tools/coaches/build-art.mjs` |
 | `npm run assets:cards -- <card.svg> <fighter.png> [out.png]` | `tools/cards/build-card.mjs` |
 | `npm run screenshots:optimise` | `tools/screenshots/optimise.mjs` |
+| `npm run assets:belts` | `tools/belts/build-belt-art.mjs` |
 | `npm run docs:setup` then `npm run docs:build -- <in.md> <out.docx>` | `tools/docgen/md-to-docx.js` |
 
 The `--` matters: it passes the arguments through npm to the script rather
@@ -170,3 +171,34 @@ Two companions:
 has to be regenerated. Note that most of the `AQF-*.docx` set has no Markdown
 source in the repository — those documents are maintained directly in Word and
 this renderer does not touch them.
+
+---
+
+## `tools/belts/` — Fight Record belt art
+
+```bash
+node tools/belts/build-belt-art.mjs
+```
+
+Renders one SVG belt design to the two raster sets Fight Record needs:
+
+```
+apps/web/public/belts/<tier>.png   1080x1920 story art, served publicly
+design/belts/emoji/<tier>.png      100x100 custom emoji for the emoji status
+```
+
+The story art is identical for everyone who holds a belt, which is what lets
+it be a public URL: Telegram's `shareToStory` fetches the media itself and
+cannot see a canvas blob in the page. The colours mirror `BELT_COLOUR` in
+`apps/web/src/lib/fightRecord.ts`; change both together.
+
+`tools/belts/create-emoji-set.mjs` is an operator step, run once per bot
+(staging and production separately):
+
+```bash
+TELEGRAM_BOT_TOKEN=... node tools/belts/create-emoji-set.mjs --owner <telegram-user-id>
+```
+
+It uploads the emoji PNGs as a custom-emoji set named
+`azf_belts_by_<bot username>` and prints the `TELEGRAM_BELT_EMOJI_IDS` value
+for the API. Re-running it prints the ids again without uploading.

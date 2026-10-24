@@ -24,6 +24,7 @@
     "start": "npm run start --workspace apps/api",
     "assets:coaches": "node tools/coaches/build-art.mjs",
     "assets:cards": "node tools/cards/build-card.mjs",
+    "assets:belts": "node tools/belts/build-belt-art.mjs",
     "screenshots:optimise": "node tools/screenshots/optimise.mjs",
     "docs:setup": "npm --prefix tools/docgen install",
     "docs:build": "node tools/docgen/md-to-docx.js"

@@ -14,12 +14,12 @@
  * OFF usage policy: a descriptive custom User-Agent is mandatory; search is
  * paced at ≤10 requests/minute.
  */
-import { ALLERGENS, type Allergen, type Food } from '@aquazerofit/shared';
+import { ALLERGENS, DEFAULT_SUPPORT_EMAIL, type Allergen, type Food } from '@aquazerofit/shared';
 import { getStore, type JsonStore } from '../../platform/store';
 
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
 /** OFF policy: User-Agent must identify the app and provide a contact. */
-export const OFF_USER_AGENT = 'AquaZeroFit/1.0 (https://aquazero.fit; dev@aquazero.fit)';
+export const OFF_USER_AGENT = `AquaZeroFit/1.0 (https://aquazerofit.com; ${DEFAULT_SUPPORT_EMAIL})`;
 const OFF_PAGE_SIZE = 100;
 /** 10 requests/minute ceiling → 6.5 s spacing leaves headroom. */
 const SEARCH_MIN_INTERVAL_MS = 6_500;

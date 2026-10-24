@@ -1,3 +1,4 @@
+import java.net.URI
 import java.util.Properties
 
 plugins {
@@ -34,6 +35,16 @@ val versionNameOverride: String? =
     ?.trim()
     ?.takeIf { it.isNotEmpty() }
 
+/**
+ * The public origin: the Worker that serves the web app and proxies /api and
+ * /uploads to Cloud Run. Release API and media URLs, the legal pages every
+ * build links to, and the App Link host (the `appLinkHost` manifest
+ * placeholder, which DeepLinkStore matches by reading WEB_BASE_URL) all come
+ * from here. The host used to be written out five times, which is how an
+ * unregistered domain survived in every one of them.
+ */
+val publicOrigin = "https://aquazerofit.com"
+
 android {
   namespace = "fit.aquazero.app"
   compileSdk = 37
@@ -59,6 +70,8 @@ android {
     // comes in through.
     versionCode = versionCodeOverride ?: defaultVersionCode
     versionName = versionNameOverride ?: defaultVersionName
+
+    manifestPlaceholders["appLinkHost"] = URI(publicOrigin).host
   }
 
   // Release signing configuration: loads from keystore.properties (local)
@@ -106,7 +119,7 @@ android {
       buildConfigField("String", "MEDIA_BASE_URL", "\"http://10.0.2.2:4000\"")
       // Legal/support pages are always the published ones: a debug build must
       // not show a privacy policy served off a dev laptop.
-      buildConfigField("String", "WEB_BASE_URL", "\"https://app.aquazero.fit\"")
+      buildConfigField("String", "WEB_BASE_URL", "\"$publicOrigin\"")
     }
     release {
       isMinifyEnabled = true
@@ -115,9 +128,9 @@ android {
         signingConfig = signingConfigs.getByName("release")
       }
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      buildConfigField("String", "API_BASE_URL", "\"https://app.aquazero.fit/api/v1\"")
-      buildConfigField("String", "MEDIA_BASE_URL", "\"https://app.aquazero.fit\"")
-      buildConfigField("String", "WEB_BASE_URL", "\"https://app.aquazero.fit\"")
+      buildConfigField("String", "API_BASE_URL", "\"$publicOrigin/api/v1\"")
+      buildConfigField("String", "MEDIA_BASE_URL", "\"$publicOrigin\"")
+      buildConfigField("String", "WEB_BASE_URL", "\"$publicOrigin\"")
     }
   }
   compileOptions {

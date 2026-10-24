@@ -1,7 +1,9 @@
 package fit.aquazero.app.core.navigation
 
+import fit.aquazero.app.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DeepLinkStoreTest {
@@ -10,19 +12,19 @@ class DeepLinkStoreTest {
 
     @Test
     fun parseJoinChallengeIntent_acceptsCodeQuery() {
-        val link = store.parseJoinChallengeUri("https://app.aquazero.fit/challenges?code=AQUA1234")
+        val link = store.parseJoinChallengeUri("https://aquazerofit.com/challenges?code=AQUA1234")
         assertEquals(PendingDeepLink.JoinChallenge("AQUA1234"), link)
     }
 
     @Test
     fun parseJoinChallengeIntent_acceptsChallengeQuery() {
-        val link = store.parseJoinChallengeUri("https://app.aquazero.fit/challenges?challenge=AQUA5678")
+        val link = store.parseJoinChallengeUri("https://aquazerofit.com/challenges?challenge=AQUA5678")
         assertEquals(PendingDeepLink.JoinChallenge("AQUA5678"), link)
     }
 
     @Test
     fun parseJoinChallengeIntent_rejectsInvalidCode() {
-        assertNull(store.parseJoinChallengeUri("https://app.aquazero.fit/challenges?code=AQ"))
+        assertNull(store.parseJoinChallengeUri("https://aquazerofit.com/challenges?code=AQ"))
     }
 
     // --- origin checks ------------------------------------------------------
@@ -35,23 +37,23 @@ class DeepLinkStoreTest {
 
     @Test
     fun parseJoinChallengeUri_rejectsForeignScheme() {
-        assertNull(store.parseJoinChallengeUri("evil://app.aquazero.fit/challenges?code=AQUA1234"))
-        assertNull(store.parseJoinChallengeUri("http://app.aquazero.fit/challenges?code=AQUA1234"))
+        assertNull(store.parseJoinChallengeUri("evil://aquazerofit.com/challenges?code=AQUA1234"))
+        assertNull(store.parseJoinChallengeUri("http://aquazerofit.com/challenges?code=AQUA1234"))
     }
 
     @Test
     fun parseJoinChallengeUri_rejectsForeignHost() {
         assertNull(store.parseJoinChallengeUri("https://evil.example/challenges?code=AQUA1234"))
-        assertNull(store.parseJoinChallengeUri("https://aquazero.fit.evil.example/challenges?code=AQUA1234"))
+        assertNull(store.parseJoinChallengeUri("https://aquazerofit.com.evil.example/challenges?code=AQUA1234"))
     }
 
     @Test
     fun parseJoinChallengeUri_rejectsUserinfoImpersonatingTheHost() {
-        // `https://app.aquazero.fit@evil.example/...` has host `evil.example`;
+        // `https://aquazerofit.com@evil.example/...` has host `evil.example`;
         // the real origin appears only as userinfo. Matching on the raw string
         // rather than the parsed host is how this one gets through.
         assertNull(
-            store.parseJoinChallengeUri("https://app.aquazero.fit@evil.example/challenges?code=AQUA1234"),
+            store.parseJoinChallengeUri("https://aquazerofit.com@evil.example/challenges?code=AQUA1234"),
         )
     }
 
@@ -60,7 +62,7 @@ class DeepLinkStoreTest {
         // Scheme and host are case-insensitive per RFC 3986, and a link that
         // has been through a mail client or a QR round-trip may arrive cased
         // differently from how it was sent.
-        val link = store.parseJoinChallengeUri("HTTPS://App.AquaZero.Fit/challenges?code=AQUA1234")
+        val link = store.parseJoinChallengeUri("HTTPS://AquaZeroFit.Com/challenges?code=AQUA1234")
         assertEquals(PendingDeepLink.JoinChallenge("AQUA1234"), link)
     }
 
@@ -73,9 +75,16 @@ class DeepLinkStoreTest {
     }
 
     @Test
+    fun joinChallengeUrl_usesTheWebOrigin() {
+        // The host comes from WEB_BASE_URL, the same value the manifest's App
+        // Link placeholder is built from, so an invite never names another host.
+        assertTrue(DeepLinkStore.joinChallengeUrl("AQUA1234").startsWith("${BuildConfig.WEB_BASE_URL}/"))
+    }
+
+    @Test
     fun joinChallengeUrl_normalizesCode() {
         assertEquals(
-            "https://app.aquazero.fit/challenges?code=AQUA1234",
+            "https://aquazerofit.com/challenges?code=AQUA1234",
             DeepLinkStore.joinChallengeUrl("aqua1234"),
         )
     }

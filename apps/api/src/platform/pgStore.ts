@@ -76,16 +76,47 @@ export const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS documents (
  * excluded, and Postgres treats those NULLs as distinct anyway.
  *
  * Created at hydrate, same as the table: there is no separate migration
- * runner. IF NOT EXISTS keeps a restart a no-op. If historical duplicates
- * already exist, this statement fails and the process refuses to boot rather
- * than serving a ledger that can double-credit. Deduplicate those rows, then
- * start again.
+ * runner. IF NOT EXISTS keeps a restart a no-op once the index exists.
+ *
+ * If historical duplicates are already stored, creating this index fails and
+ * would stop the API from booting. hydrate() counts those groups first
+ * (STARS_CHARGE_DUPLICATE_COUNT_SQL) and, when the count is above zero, skips
+ * the index and logs only that count. The in-app idempotency guard still
+ * refuses a second credit for a charge id this process has loaded.
  */
 export const STARS_CHARGE_UNIQUE_INDEX_SQL = `CREATE UNIQUE INDEX IF NOT EXISTS documents_stars_charge_uidx
   ON documents ((doc->>'telegramPaymentChargeId'))
   WHERE container = 'ledger'
     AND doc->>'type' = 'starsPurchase'
     AND COALESCE(doc->>'telegramPaymentChargeId', '') <> '';`;
+
+/**
+ * How many Stars charge ids are stored more than once.
+ *
+ * The inner query groups inside Postgres and projects a constant, so the only
+ * value that comes back to the process is the group count. Charge ids and
+ * document bodies stay in the table.
+ */
+export const STARS_CHARGE_DUPLICATE_COUNT_SQL = `SELECT COUNT(*)::int AS duplicate_groups
+FROM (
+  SELECT 1
+  FROM documents
+  WHERE container = 'ledger'
+    AND doc->>'type' = 'starsPurchase'
+    AND COALESCE(doc->>'telegramPaymentChargeId', '') <> ''
+  GROUP BY doc->>'telegramPaymentChargeId'
+  HAVING COUNT(*) > 1
+) duplicates`;
+
+/** Reads the count query. A missing or non-numeric value counts as zero. */
+export function starsChargeDuplicateCount(rows: readonly unknown[]): number {
+  const first = rows[0];
+  if (!first || typeof first !== 'object') return 0;
+  const raw = (first as { duplicate_groups?: unknown }).duplicate_groups;
+  const count = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : Number.NaN;
+  if (!Number.isFinite(count) || count <= 0) return 0;
+  return Math.floor(count);
+}
 
 /**
  * Rows per INSERT. Postgres caps a statement at 65535 bind parameters and we
@@ -299,7 +330,22 @@ export class PostgresStore extends MemoryBackedStore {
   async hydrate(): Promise<void> {
     if (this.hydrated) return;
     await this.exec.query(CREATE_TABLE_SQL);
-    await this.exec.query(STARS_CHARGE_UNIQUE_INDEX_SQL);
+    const counted = await this.exec.query(STARS_CHARGE_DUPLICATE_COUNT_SQL);
+    const duplicateGroups = starsChargeDuplicateCount(counted.rows);
+    if (duplicateGroups > 0) {
+      // A unique index cannot be built over existing duplicates, and failing
+      // the statement here would stop the process from starting. Skip it.
+      // The in-memory guard still rejects a second purchase for a charge id
+      // this process has loaded. The log carries the group count only.
+      // eslint-disable-next-line no-console
+      console.log(
+        `[store] skipped documents_stars_charge_uidx: ${duplicateGroups} duplicate charge-id ${
+          duplicateGroups === 1 ? 'group' : 'groups'
+        } already stored. In-app idempotency still applies.`,
+      );
+    } else {
+      await this.exec.query(STARS_CHARGE_UNIQUE_INDEX_SQL);
+    }
     const { rows } = await this.exec.query('SELECT container, id, doc FROM documents');
 
     const byContainer = new Map<ContainerName, StoredDoc[]>();

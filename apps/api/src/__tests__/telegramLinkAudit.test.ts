@@ -14,6 +14,7 @@ process.env.AZF_DATA_DIR = dataDir;
 const { getStore } = await import('../platform/store');
 const { linkTelegram } = await import('../modules/me/service');
 const { sha256Hex } = await import('../platform/auth');
+const { AppError } = await import('../platform/errors');
 
 afterAll(async () => {
   await getStore().flush();
@@ -44,5 +45,46 @@ describe('telegram link audit', () => {
     expect(detail.tgId).toBeUndefined();
     expect(detail.tgIdHash).toBe(sha256Hex(String(tgId)).slice(0, 16));
     expect(JSON.stringify(events[0])).not.toContain(String(tgId));
+  });
+
+  it('hashes tgId on a confirmed replacement and refuses an unconfirmed one', () => {
+    const first = 920011;
+    const second = 920022;
+    getStore().upsert('users', {
+      id: 'usr-relink',
+      email: 'relink@example.com',
+      emailVerified: true,
+      tier: 'free',
+      role: 'user',
+      displayName: 'Relink',
+      createdAt: new Date().toISOString(),
+    });
+
+    linkTelegram('usr-relink', first, 'linker');
+
+    let refused: unknown;
+    try {
+      linkTelegram('usr-relink', second, 'linker');
+    } catch (err) {
+      refused = err;
+    }
+    expect(refused).toBeInstanceOf(AppError);
+    expect((refused as AppError).code).toBe('CONFLICT');
+    expect(getStore().byId<{ id: string; tgId?: number }>('users', 'usr-relink')?.tgId).toBe(first);
+
+    linkTelegram('usr-relink', second, 'linker', true);
+
+    const relinked = getStore().where<{ id: string; action?: string; detail?: Record<string, unknown> }>(
+      'audit',
+      (d) => (d as { action?: string }).action === 'telegram.relinked',
+    );
+    expect(relinked).toHaveLength(1);
+    const detail = relinked[0]!.detail ?? {};
+    expect(detail.tgId).toBeUndefined();
+    expect(detail.tgIdHash).toBe(sha256Hex(String(second)).slice(0, 16));
+    const serialised = JSON.stringify(relinked[0]);
+    expect(serialised).not.toContain(String(first));
+    expect(serialised).not.toContain(String(second));
+    expect(getStore().byId<{ id: string; tgId?: number }>('users', 'usr-relink')?.tgId).toBe(second);
   });
 });

@@ -235,7 +235,7 @@ Telegram" button on its own landing page at somebody else's bot.
 | --- | --- |
 | `VITE_TELEGRAM_BOT_USERNAME` | Bot hosting the Mini App, with or without the leading `@` (default `AquaZeroFitBot`) |
 | `VITE_TELEGRAM_MINI_APP_SHORT_NAME` | Mini App short name from BotFather's `/newapp` (default `app`). Set it to an empty string for a bot with no registered Mini App; links then fall back to `t.me/<bot>` |
-| `VITE_SITE_ORIGIN` | Public origin of the marketing site, e.g. `https://aquazero.fit`. Canonical tags, the sitemap and absolute OG image URLs are built from it - a stale value points every canonical at another domain while the site looks perfectly healthy |
+| `VITE_SITE_ORIGIN` | Public origin of the marketing site, e.g. `https://aquazerofit.com`. Canonical tags, the sitemap and absolute OG image URLs are built from it - a stale value points every canonical at another domain while the site looks perfectly healthy |
 | `VITE_API_BASE_URL` | Origin of the API when it is served from a different host to the SPA. Unset means same origin |
 | `VITE_MEDIA_BASE_URL` | Origin serving exercise media under `/uploads`. Unset means same origin |
 

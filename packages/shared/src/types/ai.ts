@@ -66,8 +66,9 @@ export interface AiMetadata {
   confidence?: number;
   generatedAt: string;
   /**
-   * True when a configured provider failed and the offline engine answered.
-   * Absent on older records. Callers must not treat that output as a model answer.
+   * True when a configured provider failed and the offline engine answered,
+   * or when production has no provider configured at all. Absent on older
+   * records. Callers must not treat that output as a model answer.
    */
   degraded?: boolean;
 }
@@ -132,8 +133,9 @@ export interface VisionJob {
   predictions: VisionPrediction[];
   ai: AiMetadata | null;
   /**
-   * True when real providers were configured and the offline fallback answered.
-   * The review screen must say so. Absent on jobs written before this field.
+   * True when the offline fallback answered: real providers failed, or
+   * production has none configured. The review screen must say so. Absent on
+   * jobs written before this field.
    */
   aiDegraded?: boolean;
   error?: string;

@@ -8,7 +8,13 @@
  * as concrete request counts.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { complete, resetProviderCircuits, type GatewayMessage } from '../modules/ai/gateway';
+import {
+  complete,
+  resetProviderCircuits,
+  stream,
+  warnIfNoAiProviderConfigured,
+  type GatewayMessage,
+} from '../modules/ai/gateway';
 
 const PROVIDER_ENV = [
   'GROQ_API_KEY',
@@ -303,7 +309,7 @@ describe('max_tokens ceiling', () => {
 });
 
 describe('degraded flag', () => {
-  it('is FALSE on the designed keyless path — the mock IS the product offline', async () => {
+  it('is FALSE on the designed keyless path outside production — the mock IS the product offline', async () => {
     // No provider keys at all. The key-optional local Ollama probe still runs
     // and fails; that is not a degradation, it is the offline configuration.
     stubFetch(() => Promise.reject(new Error('offline')));
@@ -349,5 +355,110 @@ describe('degraded flag', () => {
     expect(keyless.meta.degraded).toBe(false);
     // Same input, byte-identical mock output regardless of why we landed there.
     expect(failed.text).toBe(keyless.text);
+  });
+});
+
+/*
+ * Production with no provider configured at all. The offline engine still
+ * answers, because no AI outage may take a core journey down, but the paid
+ * lanes bill whatever is not flagged degraded. Before this, a production
+ * deployment with no keys sold template text as AI output at full price.
+ * Development, the test suite and the eval runner keep the keyless path
+ * undegraded: there the offline engine is the intended product.
+ */
+describe('degraded flag in production with no provider configured', () => {
+  const savedNodeEnv = process.env.NODE_ENV;
+
+  beforeEach(() => {
+    process.env.NODE_ENV = 'production';
+  });
+
+  afterEach(() => {
+    if (savedNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = savedNodeEnv;
+  });
+
+  it('marks the offline answer degraded with reason no_provider', async () => {
+    stubFetch(() => Promise.reject(new Error('offline')));
+
+    const result = await complete('chatFast', MESSAGES, {});
+
+    expect(result.meta.provider).toBe('mock');
+    expect(result.meta.degraded).toBe(true);
+    expect(result.meta.degradedReason).toBe('no_provider');
+  });
+
+  it('marks the streaming lane the same way, since chat bills through it', async () => {
+    stubFetch(() => Promise.reject(new Error('offline')));
+
+    const iterator = stream('chatFast', MESSAGES, {});
+    let step = await iterator.next();
+    while (!step.done) step = await iterator.next();
+
+    expect(step.value.meta.provider).toBe('mock');
+    expect(step.value.meta.degraded).toBe(true);
+    expect(step.value.meta.degradedReason).toBe('no_provider');
+  });
+
+  it('serves text byte-identical to the keyless development path', async () => {
+    const context = { nutrition: { kcalTarget: 1900, kcalConsumed: 1450, kcalRemaining: 450 } };
+    stubFetch(() => Promise.reject(new Error('offline')));
+
+    const production = await complete('chatFast', MESSAGES, { context });
+    process.env.NODE_ENV = 'test';
+    const development = await complete('chatFast', MESSAGES, { context });
+
+    expect(development.meta.degraded).toBe(false);
+    expect(development.meta.degradedReason).toBeUndefined();
+    expect(production.text).toBe(development.text);
+  });
+
+  it('still reports the real cause when a configured provider failed', async () => {
+    process.env.GROQ_API_KEY = 'test-key';
+    stubFetch(() => response(503, {}));
+
+    const result = await complete('chatFast', MESSAGES, {});
+
+    expect(result.meta.degradedReason).toBe('provider_failure');
+  });
+});
+
+describe('boot warning for a production deployment with no AI provider', () => {
+  const savedNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    if (savedNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = savedNodeEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('emits one structured line naming the condition', () => {
+    process.env.NODE_ENV = 'production';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    warnIfNoAiProviderConfigured();
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    const line = JSON.parse(String(warn.mock.calls[0]![0])) as Record<string, unknown>;
+    expect(line.kind).toBe('event');
+    expect(line.name).toBe('ai_provider_unconfigured');
+  });
+
+  it('stays silent when any provider key is configured', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.GEMINI_API_KEY = 'test-key';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    warnIfNoAiProviderConfigured();
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('stays silent outside production, where keyless is the designed setup', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    warnIfNoAiProviderConfigured();
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });

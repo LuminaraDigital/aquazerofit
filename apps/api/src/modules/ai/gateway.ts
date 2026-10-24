@@ -34,6 +34,7 @@
  *  goes, which is a legal defect, not a cosmetic one.
  */
 import { AppError } from '../../platform/errors';
+import { config } from '../../platform/config';
 import { logAiCall } from '../../platform/telemetry';
 import type { AiMetadata, ModelGroup } from '@aquazerofit/shared';
 import { mockComplete, type MockMessage } from './providers/mock';
@@ -112,8 +113,12 @@ export function withImageParts(messages: GatewayMessage[], images: string[] | un
   );
 }
 
-/** Why a result came from the offline engine instead of a real model. */
-export type DegradedReason = 'provider_failure' | 'deadline_exceeded' | 'budget_exhausted';
+/**
+ * Why a result came from the offline engine instead of a real model.
+ * `no_provider`: production with no credentialed provider at all, so no model
+ * was ever going to answer.
+ */
+export type DegradedReason = 'provider_failure' | 'deadline_exceeded' | 'budget_exhausted' | 'no_provider';
 
 /**
  * Additive extension of AiMetadata. Optional so existing callers (and the eval
@@ -122,9 +127,10 @@ export type DegradedReason = 'provider_failure' | 'deadline_exceeded' | 'budget_
 export interface GatewayMeta extends AiMetadata {
   /**
    * True when the caller is holding template output from the offline engine
-   * after real providers were tried and failed. False on the designed keyless
-   * path, where the mock IS the product. Callers that bill credits or present
-   * the text as a model answer must branch on this.
+   * after real providers were tried and failed, or in production when none is
+   * configured. False on the keyless path in development and tests, where the
+   * mock IS the product. Callers that bill credits or present the text as a
+   * model answer must branch on this.
    */
   degraded?: boolean;
   degradedReason?: DegradedReason;
@@ -584,6 +590,66 @@ function classify(err: unknown): ProviderError {
 }
 
 /**
+ * Whether an answer the offline engine is about to give is degraded, and why.
+ * One function for complete() and stream(), so the two cannot drift on what
+ * the paid lanes bill.
+ *
+ * Budget first: past the operator's ceiling no provider was asked at all, and
+ * the user must not be charged for the operator's limit.
+ *
+ * Production with no credentialed provider is degraded too. The keyless path
+ * exists so development, the test suite and the eval runner work with zero
+ * keys, and there the template output IS the product. A production
+ * deployment sells the product as AI-powered, and every paid lane commits
+ * credits for whatever is not flagged here, so a missing key used to bill
+ * paying users full price for template text. Flagging it sends every lane down
+ * the release path it already has for a provider outage. NODE_ENV=production
+ * covers staging too, whose credits are the same product currency. The text
+ * itself is untouched: only the billing verdict changes.
+ */
+function offlineVerdict(
+  realProviderInPlay: boolean,
+  budgetStopped: boolean,
+  deadlineExceeded: boolean,
+): { degraded: boolean; degradedReason?: DegradedReason } {
+  if (budgetStopped) return { degraded: true, degradedReason: 'budget_exhausted' };
+  if (realProviderInPlay) {
+    return { degraded: true, degradedReason: deadlineExceeded ? 'deadline_exceeded' : 'provider_failure' };
+  }
+  if (config.isProduction) return { degraded: true, degradedReason: 'no_provider' };
+  return { degraded: false };
+}
+
+/**
+ * One structured line at boot when a production process has no credentialed
+ * AI provider. Advisory, not fatal: the offline engine keeps every journey
+ * working and offlineVerdict stops anything it says from being billed. But
+ * from the outside that deployment looks healthy - every request succeeds,
+ * every answer reads fluently - and the only symptom is that no model is
+ * answering anyone, so without this line nobody finds out.
+ *
+ * Uses the provider chain's own `credentialed` test, so the warning and the
+ * billing rule cannot disagree about what "configured" means. Called once,
+ * from index.ts.
+ */
+export function warnIfNoAiProviderConfigured(): void {
+  if (!config.isProduction) return;
+  if (PROVIDERS.some((provider) => !!process.env[provider.keyEnv])) return;
+  // eslint-disable-next-line no-console
+  console.warn(
+    JSON.stringify({
+      t: new Date().toISOString(),
+      kind: 'event',
+      name: 'ai_provider_unconfigured',
+      detail:
+        `No AI provider key is set (${PROVIDERS.map((provider) => provider.keyEnv).join(', ')}). ` +
+        'Every AI lane answers from the offline template engine; those answers are marked degraded ' +
+        '(no_provider) and are never billed.',
+    }),
+  );
+}
+
+/**
  * Route a completion through the fallback chain for the given logical lane.
  * Never rejects for provider trouble — the mock engine is the terminal
  * fallback. Only truly unexpected internal failures surface, and callers wrap
@@ -627,7 +693,8 @@ export async function complete(
   };
   // A credentialed provider that was tried (or skipped because its breaker is
   // open) is what separates "everything real failed" from "no keys are
-  // configured, the offline engine is the intended answer".
+  // configured, the offline engine is the intended answer" (outside
+  // production; see offlineVerdict).
   let realProviderInPlay = false;
   let deadlineExceeded = false;
 
@@ -736,17 +803,7 @@ export async function complete(
   // never retried and never timed out: the eval runner and test suite depend on
   // its output being byte-identical.
   const started = Date.now();
-  // Budget-stopped counts as degraded so callers release credit holds: the
-  // user asked for a model answer, got template output, and must not be
-  // charged for the operator's ceiling.
-  const degraded = realProviderInPlay || budgetStopped;
-  const degradedReason: DegradedReason | undefined = degraded
-    ? budgetStopped
-      ? 'budget_exhausted'
-      : deadlineExceeded
-        ? 'deadline_exceeded'
-        : 'provider_failure'
-    : undefined;
+  const verdict = offlineVerdict(realProviderInPlay, budgetStopped, deadlineExceeded);
   try {
     const result = mockComplete(task, messages as MockMessage[], {
       context: opts.context,
@@ -782,8 +839,7 @@ export async function complete(
         model: `mock-${task}`,
         promptVersion,
         generatedAt: new Date().toISOString(),
-        degraded,
-        ...(degradedReason ? { degradedReason } : {}),
+        ...verdict,
       },
     };
   } catch (err) {
@@ -981,14 +1037,7 @@ export async function complete(
 
     // Fallback to mock engine
     const started = Date.now();
-    const degraded = realProviderInPlay || budgetStopped;
-    const degradedReason: DegradedReason | undefined = degraded
-      ? budgetStopped
-        ? 'budget_exhausted'
-        : deadlineExceeded
-          ? 'deadline_exceeded'
-          : 'provider_failure'
-      : undefined;
+    const verdict = offlineVerdict(realProviderInPlay, budgetStopped, deadlineExceeded);
 
     try {
       const result = mockComplete(task, messages as MockMessage[], {
@@ -1035,8 +1084,7 @@ export async function complete(
           model: `mock-${task}`,
           promptVersion,
           generatedAt: new Date().toISOString(),
-          degraded,
-          ...(degradedReason ? { degradedReason } : {}),
+          ...verdict,
         },
       };
     } catch (err) {

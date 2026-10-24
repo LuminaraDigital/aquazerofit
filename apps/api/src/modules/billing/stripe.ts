@@ -4,7 +4,7 @@
  * Same posture as the Play rail next door: Stripe is the only authority on
  * what was paid. The browser never reports a payment, a period or an amount;
  * it can only ask us to open a Checkout Session, and later ask us to look one
- * up. Anything that grants premium reads it from Stripe — a signed webhook
+ * up. Anything that grants premium reads it from Stripe  -  a signed webhook
  * delivery, or our own authenticated API call.
  *
  * NO NEW DEPENDENCY, for the reason `play.ts` gives: the SDK would be a large
@@ -26,7 +26,7 @@ import { AppError } from '../../platform/errors';
 import { config } from '../../platform/config';
 import { secureEquals } from '../../platform/auth';
 import { logEvent } from '../../platform/telemetry';
-import { entitlementHistory, grantPremium, revokePremium } from './entitlements';
+import { grantPremium, revokePremium } from './entitlements';
 import { fetchWithTimeout } from './play';
 
 const STRIPE_API = 'https://api.stripe.com/v1';
@@ -165,7 +165,7 @@ export async function createCheckoutSession(userId: string): Promise<string> {
 
 /**
  * Grant the period a paid invoice covers. The service period lives on the
- * line items — Stripe's docs say so explicitly of `invoice.period_end`, which
+ * line items  -  Stripe's docs say so explicitly of `invoice.period_end`, which
  * is an invoicing window, not what was bought.
  */
 function grantFromInvoice(userId: string, invoice: StripeInvoice): void {
@@ -189,7 +189,7 @@ function grantFromInvoice(userId: string, invoice: StripeInvoice): void {
 /**
  * Settle a Checkout Session the buyer has just returned from.
  *
- * The webhook would get there on its own, usually within seconds — but
+ * The webhook would get there on its own, usually within seconds  -  but
  * "usually" is the user staring at a free plan they have just paid for, and on
  * a deployment whose webhook is misconfigured it is never. Both paths key the
  * grant on the same invoice id, so whichever lands second is a duplicate.
@@ -209,7 +209,7 @@ export async function syncCheckoutSession(userId: string, sessionId: string): Pr
 
 /**
  * Verify a `Stripe-Signature` header against the exact bytes received.
- * https://docs.stripe.com/webhooks#verify-manually — v1 only (v0 is a test
+ * https://docs.stripe.com/webhooks#verify-manually  -  v1 only (v0 is a test
  * decoy and anything else is a downgrade), constant-time compared, and refused
  * outside the tolerance window so a captured delivery cannot be replayed.
  */
@@ -252,15 +252,11 @@ export function handleStripeEvent(event: StripeEvent): void {
     const userId = subscription.metadata?.userId;
     if (!userId) return;
     /*
-     * Only when this subscription is still the account's latest entitlement.
-     * Stripe does not order deliveries: the deletion of a subscription the
-     * user has since replaced — or one superseded by a Play renewal — must
-     * not end the period they paid for elsewhere.
+     * Retires this subscription's grants only. activePremiumUntil then keeps
+     * any Play or Stars period, and any later Stripe subscription, through
+     * its own end. Periods are not added together and a deleted subscription
+     * does not wipe the others.
      */
-    if (entitlementHistory(userId)[0]?.providerRef !== subscription.id) {
-      logEvent('stripe_deletion_superseded', { userId });
-      return;
-    }
     revokePremium(
       userId,
       'stripe',

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { DailyNutrition, ProgressSummary, TrendPoint } from '@aquazerofit/shared';
@@ -16,7 +17,7 @@ import { todayWorkoutQuery, queryKeys, useProgressInsight, useReadiness } from '
 import { useTelegramMainAction } from '@/lib/useTelegramChrome';
 import { MacroBar } from './MacroBar';
 import { WaterCard } from './WaterCard';
-import { Sparkline } from './Sparkline';
+const Sparkline = lazy(() => import('./Sparkline').then((m) => ({ default: m.Sparkline })));
 import { SuggestMealCard } from './SuggestMealCard';
 import {
   asUser,
@@ -397,7 +398,9 @@ export default function Dashboard() {
                     <span className="text-sm text-on-surface-variant ml-1">kg</span>
                   </p>
                 )}
-                <Sparkline points={weightSeries.slice(-14)} />
+                <Suspense fallback={null}>
+                  <Sparkline points={weightSeries.slice(-14)} />
+                </Suspense>
               </>
             )}
           </GlassCard>

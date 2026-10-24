@@ -11,8 +11,12 @@
  * token instead. 401 recovery then prefers Firebase getIdToken(true) before
  * the legacy cookie refresh.
  */
-import { isApiErrorBody, type ApiErrorBody, type AuthResponse } from '@aquazerofit/shared';
-import { getFirebaseAuth, isFirebaseAuthEnabled } from './firebase';
+import {
+  isApiErrorBody,
+  type ApiErrorBody,
+} from '../../../../packages/shared/src/errors';
+import type { AuthResponse } from '@aquazerofit/shared';
+import { isFirebaseAuthEnabled, loadFirebaseSdk } from './firebase';
 import { getTelegramInitData, isTMA } from './telegram';
 
 /**
@@ -82,8 +86,8 @@ function isJwtLike(token: string): boolean {
 
 async function tryFirebaseRefresh(): Promise<boolean> {
   if (!isFirebaseAuthEnabled()) return false;
-  const auth = getFirebaseAuth();
-  const user = auth?.currentUser;
+  const sdk = await loadFirebaseSdk();
+  const user = sdk.auth?.currentUser;
   if (!user) return false;
   try {
     const token = await user.getIdToken(true);

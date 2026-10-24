@@ -71,6 +71,7 @@ export function replyForCommand(command: BotCommandName, ctx: CommandContext): C
           'Payment help for AquaZeroFit.',
           `${contact} and include the account that paid and what you bought.`,
           'A Stars refund is done by support on request.',
+          'That covers a coach purchase or a premium subscription charge.',
           `Refunds: ${ctx.refundUrl}`,
           `Terms: ${ctx.termsUrl}`,
           'Sending /paysupport does not refund a payment by itself. Telegram support cannot refund a purchase made in this bot.',
@@ -82,6 +83,7 @@ export function replyForCommand(command: BotCommandName, ctx: CommandContext): C
         text: [
           'How to stop.',
           'Telegram Stars coach purchases do not renew. For a refund, send /paysupport.',
+          'Premium paid with Stars in the Mini App renews every 30 days while that subscription is active. It is not extended when a renewal payment does not arrive. The app has no cancel button. To ask about a charge, send /paysupport.',
           'Premium from Google Play: cancel in the Play Store. You keep access until the period you already paid for ends.',
           'Premium paid by card: contact support. The same period rule applies.',
           `Delete your account and data: ${ctx.deletionUrl}`,

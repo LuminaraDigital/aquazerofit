@@ -1,8 +1,14 @@
+import { lazy, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { BottomNav } from '../ui/BottomNav';
-import { AppBackground } from './AppBackground';
-import { DesktopAmbient } from './DesktopAmbient';
 import { ErrorBoundary } from './ErrorBoundary';
+
+const AppBackground = lazy(() =>
+  import('./AppBackground').then((m) => ({ default: m.AppBackground })),
+);
+const DesktopAmbient = lazy(() =>
+  import('./DesktopAmbient').then((m) => ({ default: m.DesktopAmbient })),
+);
 
 /**
  * Mobile-first shell: WebGL background layers + centered column + bottom nav.
@@ -14,14 +20,18 @@ export function AppLayout() {
   const { pathname } = useLocation();
   return (
     <>
-      <AppBackground />
+      <Suspense fallback={null}>
+        <AppBackground />
+      </Suspense>
       <div className="azf-content max-w-md mx-auto min-h-screen relative safe-bottom">
         <ErrorBoundary resetKey={pathname}>
           <Outlet />
         </ErrorBoundary>
         <BottomNav />
       </div>
-      <DesktopAmbient />
+      <Suspense fallback={null}>
+        <DesktopAmbient />
+      </Suspense>
     </>
   );
 }

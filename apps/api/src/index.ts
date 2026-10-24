@@ -56,9 +56,9 @@ const app = createApp();
 // ----- background sweeps (boot + interval; timers unref'ed so they never
 // keep a shutting-down process alive) -----
 
-function runDeletionSweep(): void {
+async function runDeletionSweep(): Promise<void> {
   try {
-    const purged = sweepExpiredDeletions();
+    const purged = await sweepExpiredDeletions();
     if (purged > 0) console.log(`[sweep] purged ${purged} account(s) past deletion grace`);
   } catch (err) {
     console.error('[sweep] deletion sweep failed', err);
@@ -120,7 +120,7 @@ async function runVisionRecovery(): Promise<void> {
   }
 }
 
-runDeletionSweep();
+void runDeletionSweep();
 runGrowthEventSweep();
 runReservationSweep();
 // Prune on boot as well as on the interval: a process that restarts more often

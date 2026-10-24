@@ -74,6 +74,13 @@ describe('resolveSiteConfig', () => {
     expect(resolveSiteConfig({})).toEqual(SITE_DEFAULTS);
   });
 
+  // aquazero.fit is not a domain this project owns: a build that forgot
+  // VITE_SITE_ORIGIN would otherwise publish canonical links, OG images and
+  // JSON-LD for it. The default is the domain production actually serves.
+  it('defaults the site origin to the domain production serves', () => {
+    expect(new URL(SITE_DEFAULTS.siteOrigin).hostname).toBe('aquazerofit.com');
+  });
+
   it('strips a trailing slash from the origin so canonicals never double up', () => {
     expect(resolveSiteConfig({ VITE_SITE_ORIGIN: 'https://x.test/' }).siteOrigin).toBe(
       'https://x.test',

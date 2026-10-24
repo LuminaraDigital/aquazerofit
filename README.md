@@ -206,6 +206,7 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | `APP_VERSION` | Build identity returned by `/health` and `/ready` |
 | `AZF_SEED_DEMO` | Set to `false` to skip demo/admin account seeding (accounts are never seeded in production) |
 | `ADMIN_PASSWORD` | Production-only: seeds the admin account with this password; without it no admin account is created |
+| `ADMIN_EMAIL` | Production: the admin account's address, required alongside `ADMIN_PASSWORD`. Use a mailbox you control: the seeder refuses any address on `aquazero.fit`, which this project does not own |
 | `EXPOSE_DEV_TOKENS` | Dev-only: echo password-reset tokens in API responses/logs when `true` (requires non-production `NODE_ENV`) |
 | `UPLOADS_DIR` | Where in-flight meal photographs are written (default `apps/api/uploads`). Point this at a persistent volume on hosts with an ephemeral filesystem, or a redeploy loses photos mid-analysis |
 | `ENABLE_LLM_SAFETY` | Override LLM second stage for input guardrails (`true`/`false`; defaults on when any AI provider key is set) |
@@ -235,7 +236,7 @@ Telegram" button on its own landing page at somebody else's bot.
 | --- | --- |
 | `VITE_TELEGRAM_BOT_USERNAME` | Bot hosting the Mini App, with or without the leading `@` (default `AquaZeroFitBot`) |
 | `VITE_TELEGRAM_MINI_APP_SHORT_NAME` | Mini App short name from BotFather's `/newapp` (default `app`). Set it to an empty string for a bot with no registered Mini App; links then fall back to `t.me/<bot>` |
-| `VITE_SITE_ORIGIN` | Public origin of the marketing site, e.g. `https://aquazero.fit`. Canonical tags, the sitemap and absolute OG image URLs are built from it - a stale value points every canonical at another domain while the site looks perfectly healthy |
+| `VITE_SITE_ORIGIN` | Public origin of the marketing site, e.g. `https://aquazerofit.com`. Canonical tags, the sitemap and absolute OG image URLs are built from it - a stale value points every canonical at another domain while the site looks perfectly healthy |
 | `VITE_API_BASE_URL` | Origin of the API when it is served from a different host to the SPA. Unset means same origin |
 | `VITE_MEDIA_BASE_URL` | Origin serving exercise media under `/uploads`. Unset means same origin |
 

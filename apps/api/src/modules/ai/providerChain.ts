@@ -108,6 +108,21 @@ export const PROVIDERS: ProviderDef[] = [
   },
 ];
 
+/**
+ * Is this provider a configured dependency? Its key is set, or, for a
+ * key-optional provider, its base URL is: a self-hosted Ollama named by
+ * OLLAMA_BASE_URL is as real as a keyed API. A key-optional provider with
+ * neither is the opportunistic localhost probe and does not count.
+ *
+ * The single answer for both provider loops and the boot warning, so what
+ * gets retried, what marks a fallback degraded and what the warning calls
+ * "configured" cannot drift apart.
+ */
+export function isConfigured(provider: ProviderDef): boolean {
+  if (process.env[provider.keyEnv]) return true;
+  return !!provider.keyOptional && !!provider.baseUrlEnv && !!process.env[provider.baseUrlEnv]?.trim();
+}
+
 export function modelFor(provider: ProviderDef, task: ModelGroup): string {
   const specificEnv = `${provider.name.toUpperCase()}_MODEL_${task.toUpperCase()}`;
   const generalEnv = `${provider.name.toUpperCase()}_MODEL`;
@@ -143,7 +158,7 @@ export function deadlineCeilingMs(task: ModelGroup, env: NodeJS.ProcessEnv = pro
 }
 
 /**
- * Time held back for the next credentialed vision provider, so a Groq timeout
+ * Time held back for the next configured vision provider, so a Groq timeout
  * still leaves NVIDIA a full attempt inside the photo deadline.
  */
 export function visionHopBudgetMs(deadlineMs: number): number {

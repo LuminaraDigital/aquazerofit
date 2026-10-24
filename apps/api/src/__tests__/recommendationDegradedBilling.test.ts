@@ -117,16 +117,11 @@ it('releases the meal-recommendation reservation when meta.degraded is true', as
  * and the hold is released exactly as for a provider outage.
  */
 it('releases the reservation in production when no provider is configured at all', async () => {
-  const keys = ['NODE_ENV', 'GROQ_API_KEY', 'JWT_ACCESS_SECRET', 'FORCE_HTTPS'] as const;
-  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
-  // Read before the flip: production refuses the dev signing fallback, and the
-  // bearer token above was minted with whatever secret is in force now.
-  const signingSecret = config.jwtAccessSecret;
+  const savedKey = process.env.GROQ_API_KEY;
   delete process.env.GROQ_API_KEY;
-  process.env.NODE_ENV = 'production';
-  process.env.JWT_ACCESS_SECRET = signingSecret;
-  // supertest speaks plaintext http; production would refuse the POST.
-  process.env.FORCE_HTTPS = 'false';
+  // Production as the gateway reads it. NODE_ENV itself would also arm the
+  // JWT and HTTPS boot guards, which have nothing to do with billing.
+  vi.spyOn(config, 'isProduction', 'get').mockReturnValue(true);
   try {
     await creditLedger.grantDailyIfNeeded(userId);
     const before = await creditLedger.balance(userId);
@@ -150,9 +145,8 @@ it('releases the reservation in production when no provider is configured at all
     expect(settlement.some((d) => (d as { kind?: string }).kind === 'commit')).toBe(false);
     expect(res.body.recommendation.ai.degradedReason).toBe('no_provider');
   } finally {
-    for (const k of keys) {
-      if (saved[k] === undefined) delete process.env[k];
-      else process.env[k] = saved[k];
-    }
+    vi.restoreAllMocks();
+    if (savedKey === undefined) delete process.env.GROQ_API_KEY;
+    else process.env.GROQ_API_KEY = savedKey;
   }
 });

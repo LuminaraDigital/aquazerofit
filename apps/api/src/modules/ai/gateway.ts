@@ -54,6 +54,7 @@ import {
   classify,
   deadlineCeilingMs,
   estimateTokens,
+  isConfigured,
   modelFor,
   parseRetryAfter,
   recordProviderFailure,
@@ -148,7 +149,7 @@ export function withImageParts(messages: GatewayMessage[], images: string[] | un
 
 /**
  * Why a result came from the offline engine instead of a real model.
- * `no_provider`: production with no credentialed provider at all, so no model
+ * `no_provider`: production with no configured provider at all, so no model
  * was ever going to answer.
  */
 export type DegradedReason = 'provider_failure' | 'deadline_exceeded' | 'budget_exhausted' | 'no_provider';
@@ -283,7 +284,7 @@ export function validateOutputForInjection(text: string): { safe: boolean; reaso
  * Budget first: past the operator's ceiling no provider was asked at all, and
  * the user must not be charged for the operator's limit.
  *
- * Production with no credentialed provider is degraded too. The keyless path
+ * Production with no configured provider is degraded too. The keyless path
  * exists so development, the test suite and the eval runner work with zero
  * keys, and there the template output IS the product. A production
  * deployment sells the product as AI-powered, and every paid lane commits
@@ -292,35 +293,39 @@ export function validateOutputForInjection(text: string): { safe: boolean; reaso
  * the release path it already has for a provider outage. NODE_ENV=production
  * covers staging too, whose credits are the same product currency. The text
  * itself is untouched: only the billing verdict changes.
+ *
+ * Pure: the caller passes `isProduction` in, so the rule is tested as a table
+ * rather than by flipping the process environment.
  */
-function offlineVerdict(
-  realProviderInPlay: boolean,
-  budgetStopped: boolean,
-  deadlineExceeded: boolean,
-): { degraded: boolean; degradedReason?: DegradedReason } {
-  if (budgetStopped) return { degraded: true, degradedReason: 'budget_exhausted' };
-  if (realProviderInPlay) {
-    return { degraded: true, degradedReason: deadlineExceeded ? 'deadline_exceeded' : 'provider_failure' };
+export function offlineVerdict(state: {
+  realProviderInPlay: boolean;
+  budgetStopped: boolean;
+  deadlineExceeded: boolean;
+  isProduction: boolean;
+}): { degraded: boolean; degradedReason?: DegradedReason } {
+  if (state.budgetStopped) return { degraded: true, degradedReason: 'budget_exhausted' };
+  if (state.realProviderInPlay) {
+    return { degraded: true, degradedReason: state.deadlineExceeded ? 'deadline_exceeded' : 'provider_failure' };
   }
-  if (config.isProduction) return { degraded: true, degradedReason: 'no_provider' };
+  if (state.isProduction) return { degraded: true, degradedReason: 'no_provider' };
   return { degraded: false };
 }
 
 /**
- * One structured line at boot when a production process has no credentialed
- * AI provider. Advisory, not fatal: the offline engine keeps every journey
+ * One structured line at boot when a production process has no configured AI
+ * provider. Advisory, not fatal: the offline engine keeps every journey
  * working and offlineVerdict stops anything it says from being billed. But
  * from the outside that deployment looks healthy - every request succeeds,
  * every answer reads fluently - and the only symptom is that no model is
  * answering anyone, so without this line nobody finds out.
  *
- * Uses the provider chain's own `credentialed` test, so the warning and the
- * billing rule cannot disagree about what "configured" means. Called once,
- * from index.ts.
+ * Asks isConfigured, the same question both provider loops ask, so a
+ * self-hosted Ollama named by OLLAMA_BASE_URL is not reported missing.
+ * Called once, from index.ts.
  */
 export function warnIfNoAiProviderConfigured(): void {
   if (!config.isProduction) return;
-  if (PROVIDERS.some((provider) => !!process.env[provider.keyEnv])) return;
+  if (PROVIDERS.some(isConfigured)) return;
   // eslint-disable-next-line no-console
   console.warn(
     JSON.stringify({
@@ -328,7 +333,8 @@ export function warnIfNoAiProviderConfigured(): void {
       kind: 'event',
       name: 'ai_provider_unconfigured',
       detail:
-        `No AI provider key is set (${PROVIDERS.map((provider) => provider.keyEnv).join(', ')}). ` +
+        `No AI provider is configured (${PROVIDERS.map((provider) => provider.keyEnv).join(', ')}, ` +
+        'or OLLAMA_BASE_URL). ' +
         'Every AI lane answers from the offline template engine; those answers are marked degraded ' +
         '(no_provider) and are never billed.',
     }),
@@ -440,15 +446,15 @@ export async function complete(
     if (task !== 'visionPrimary') return 0;
     for (let i = index + 1; i < PROVIDERS.length; i += 1) {
       const next = PROVIDERS[i];
-      if (!next || !process.env[next.keyEnv]) continue;
+      if (!next || !isConfigured(next)) continue;
       if (hasImages && !next.supportsVision) continue;
       if (circuitIsOpen(next.name)) continue;
       return visionHopBudgetMs(activeDeadline);
     }
     return 0;
   };
-  // A credentialed provider that was tried (or skipped because its breaker is
-  // open) is what separates "everything real failed" from "no keys are
+  // A configured provider that was tried (or skipped because its breaker is
+  // open) is what separates "everything real failed" from "nothing is
   // configured, the offline engine is the intended answer" (outside
   // production; see offlineVerdict).
   let realProviderInPlay = false;
@@ -469,18 +475,18 @@ export async function complete(
   if (budgetStopped) recordSuppressed();
 
   outer: for (const [index, provider] of (budgetStopped ? [] : PROVIDERS).entries()) {
-    const credentialed = !!process.env[provider.keyEnv];
-    if (!credentialed && !provider.keyOptional) continue;
+    const configured = isConfigured(provider);
+    if (!configured && !provider.keyOptional) continue;
     // Counted before the breaker and vision checks: a provider skipped because
     // it is failing, or cannot see the photo, is still a real dependency the
     // user did not get, so a mock answer after it is degraded (and not billed).
-    realProviderInPlay = realProviderInPlay || credentialed;
+    realProviderInPlay = realProviderInPlay || configured;
     if (hasImages && !provider.supportsVision) continue;
     if (circuitIsOpen(provider.name)) continue;
-    // A key-optional provider with no key is an opportunistic local probe
-    // (Ollama on localhost), not a configured dependency: one shot, no retries,
-    // and it never marks the result degraded.
-    const maxAttempts = credentialed ? 1 + MAX_RETRIES_PER_PROVIDER : 1;
+    // A key-optional provider with neither key nor base URL is an
+    // opportunistic local probe (Ollama on localhost), not a configured
+    // dependency: one shot, no retries, and it never marks the result degraded.
+    const maxAttempts = configured ? 1 + MAX_RETRIES_PER_PROVIDER : 1;
     const reserve = reserveFor(index);
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -561,7 +567,7 @@ export async function complete(
     opts,
     promptVersion,
     promptTokens,
-    offlineVerdict(realProviderInPlay, budgetStopped, deadlineExceeded),
+    offlineVerdict({ realProviderInPlay, budgetStopped, deadlineExceeded, isProduction: config.isProduction }),
   );
 }
 
@@ -602,11 +608,11 @@ export async function complete(
     if (budgetStopped) recordSuppressed();
 
     outer: for (const provider of budgetStopped ? [] : PROVIDERS) {
-      const credentialed = !!process.env[provider.keyEnv];
-      if (!credentialed && !provider.keyOptional) continue;
-      realProviderInPlay = realProviderInPlay || credentialed;
+      const configured = isConfigured(provider);
+      if (!configured && !provider.keyOptional) continue;
+      realProviderInPlay = realProviderInPlay || configured;
       if (circuitIsOpen(provider.name)) continue;
-      const maxAttempts = credentialed ? 1 + MAX_RETRIES_PER_PROVIDER : 1;
+      const maxAttempts = configured ? 1 + MAX_RETRIES_PER_PROVIDER : 1;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         const budget = Math.min(remainingMs(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
@@ -750,7 +756,7 @@ export async function complete(
       opts,
       promptVersion,
       promptTokens,
-      offlineVerdict(realProviderInPlay, budgetStopped, deadlineExceeded),
+      offlineVerdict({ realProviderInPlay, budgetStopped, deadlineExceeded, isProduction: config.isProduction }),
     );
     for (const word of result.text.split(/(\s+)/).filter((w) => w.length > 0)) {
       opts.onToken?.(word);

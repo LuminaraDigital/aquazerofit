@@ -114,6 +114,22 @@ export const config = {
   },
 
   /**
+   * The value ORIGIN_SHARED_SECRET held before a rotation, accepted beside it
+   * until the Worker sends the new one.
+   *
+   * The two sides cannot change at the same instant, and with the gate on
+   * every request in between would be refused. The other escape, turning the
+   * gate off for the rotation, reopens run.app at exactly the moment a leak
+   * made rotating urgent. Empty, the default and the resting state, accepts
+   * nothing extra. Set it only for the overlap in docs/OPERATIONS.md and
+   * remove it once the Worker is switched: while it is set, the old value
+   * still opens the origin.
+   */
+  get originSharedSecretPrevious(): string {
+    return process.env.ORIGIN_SHARED_SECRET_PREVIOUS?.trim() ?? '';
+  },
+
+  /**
    * Refuse with 403 every request that does not carry the Worker's
    * ORIGIN_SHARED_SECRET (requireWorkerOrigin in platform/clientIp.ts).
    *
@@ -757,6 +773,10 @@ export function assertOriginSecretConfigured(): void {
     );
   }
   assertUnguessableOriginSecret('ORIGIN_SHARED_SECRET', secret);
+  // Optional, but a weak previous value opens the gate exactly as a weak
+  // current one would.
+  const previous = config.originSharedSecretPrevious;
+  if (previous) assertUnguessableOriginSecret('ORIGIN_SHARED_SECRET_PREVIOUS', previous);
 }
 
 function assertUnguessableOriginSecret(name: string, value: string): void {

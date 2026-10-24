@@ -19,7 +19,11 @@ import { ORIGIN_SHARED_SECRET_HEADER, resetOriginRefusalLog } from '../platform/
 import { assertOriginSecretConfigured } from '../platform/config';
 import { bindIsolatedDataDir, createIsolatedDataDir } from './helpers/integrationIsolation';
 
-const KEYS = ['REQUIRE_ORIGIN_SECRET', 'ORIGIN_SHARED_SECRET'] as const;
+const KEYS = [
+  'REQUIRE_ORIGIN_SECRET',
+  'ORIGIN_SHARED_SECRET',
+  'ORIGIN_SHARED_SECRET_PREVIOUS',
+] as const;
 const ORIGINAL = Object.fromEntries(KEYS.map((k) => [k, process.env[k]])) as Record<
   string,
   string | undefined
@@ -27,6 +31,7 @@ const ORIGINAL = Object.fromEntries(KEYS.map((k) => [k, process.env[k]])) as Rec
 // Shaped like the documented recipe (`openssl rand -hex 32`): the boot guard
 // refuses anything shorter than 32 characters.
 const SECRET = 'a'.repeat(64);
+const PREVIOUS = 'b'.repeat(64);
 
 // /ready reads the store, so it needs a data directory of its own.
 const dataDir = createIsolatedDataDir('azf-origin-gate-');
@@ -83,6 +88,21 @@ describe('requireWorkerOrigin', () => {
     enforce();
     const res = await request(createApp()).get('/metrics').set(ORIGIN_SHARED_SECRET_HEADER, SECRET);
     expect(res.status).toBe(200);
+  });
+
+  it('accepts the previous secret during a rotation, and nothing else', async () => {
+    // Rotation overlap: Cloud Run holds the new value as current and the old
+    // one as previous while the Worker is switched over, so the gate never
+    // has to come off - which matters most when the rotation is for a leak.
+    enforce();
+    process.env.ORIGIN_SHARED_SECRET_PREVIOUS = PREVIOUS;
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const app = createApp();
+    const withSecret = (value: string) =>
+      request(app).get('/metrics').set(ORIGIN_SHARED_SECRET_HEADER, value);
+    expect((await withSecret(SECRET)).status).toBe(200);
+    expect((await withSecret(PREVIOUS)).status).toBe(200);
+    expect((await withSecret('c'.repeat(64))).status).toBe(403);
   });
 
   it('leaves /health and /ready open so Cloud Run probes never see a 403', async () => {
@@ -158,6 +178,20 @@ describe('assertOriginSecretConfigured', () => {
     expect(message).toContain('31 characters');
     expect(message).not.toContain('x'.repeat(31));
     process.env.ORIGIN_SHARED_SECRET = 'x'.repeat(32);
+    expect(() => assertOriginSecretConfigured()).not.toThrow();
+  });
+
+  it('applies the same rules to ORIGIN_SHARED_SECRET_PREVIOUS when it is set', () => {
+    enforce();
+    for (const value of ['replace-with-production-only-origin-secret', 'y'.repeat(31)]) {
+      process.env.ORIGIN_SHARED_SECRET_PREVIOUS = value;
+      expect(() => assertOriginSecretConfigured()).toThrow(
+        /Refusing to start: ORIGIN_SHARED_SECRET_PREVIOUS/,
+      );
+    }
+    process.env.ORIGIN_SHARED_SECRET_PREVIOUS = PREVIOUS;
+    expect(() => assertOriginSecretConfigured()).not.toThrow();
+    delete process.env.ORIGIN_SHARED_SECRET_PREVIOUS;
     expect(() => assertOriginSecretConfigured()).not.toThrow();
   });
 

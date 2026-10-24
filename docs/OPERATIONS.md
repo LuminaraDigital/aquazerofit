@@ -134,7 +134,28 @@ Telegram, Stripe and Pub/Sub cannot add a custom header. Only the Worker adds it
    ```
    `:latest` is read when an instance starts, so a new revision has to be serving before the new keys take effect; check with `gcloud run revisions list --service=aquazerofit-api --region=australia-southeast1`. Then confirm the plan page on `aquazerofit.com` shows the Stripe price and a password reset reaches an operator mailbox. After that, delete the old Resend key. The old Stripe key expires on its own.
 
-To rotate `ORIGIN_SHARED_SECRET` later, set `REQUIRE_ORIGIN_SECRET=false` first. The two sides cannot change at the same instant, and with the gate on every request between the two updates is refused.
+### Rotating `ORIGIN_SHARED_SECRET`
+
+The gate stays on. The two sides cannot change at the same instant, so Cloud Run accepts the old value as `ORIGIN_SHARED_SECRET_PREVIOUS` beside the new one while the Worker is switched, and no request is refused at any point. Turning the gate off instead would reopen run.app exactly when a leak made the rotation urgent. While the previous value is set it still opens the origin, so finish step 4 as soon as step 3 is clean. It is held to the same boot rules as the current value. This assumes the Secret Manager mount from step 3 above.
+
+1. **Cloud Run holds both.** Record the version serving now, add the new one, and mount new as current and old as previous in one update:
+   ```bash
+   OLD="$(gcloud secrets versions describe latest --secret=ORIGIN_SHARED_SECRET      --project=aquazerofit --format='value(name.basename())')"
+   NEW="$(openssl rand -hex 32)"
+   printf %s "$NEW" | gcloud secrets versions add ORIGIN_SHARED_SECRET --project=aquazerofit --data-file=-
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1      --update-secrets="ORIGIN_SHARED_SECRET=ORIGIN_SHARED_SECRET:latest,ORIGIN_SHARED_SECRET_PREVIOUS=ORIGIN_SHARED_SECRET:${OLD}"
+   ```
+   Wait until `gcloud run revisions list --service=aquazerofit-api --region=australia-southeast1` shows the new revision serving.
+2. **Worker**, from `cloudflare/`:
+   ```bash
+   printf %s "$NEW" | npx wrangler secret put ORIGIN_SHARED_SECRET
+   ```
+3. **Verify** that `https://aquazerofit.com/api/v1/auth/captcha` returns 200 and that the log query in step 6 above shows no new `secret_mismatch` line.
+4. **Drop the old value**, then disable its version. Disable it only once the removal is serving: a revision that mounts a disabled version fails to start.
+   ```bash
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1      --remove-secrets=ORIGIN_SHARED_SECRET_PREVIOUS
+   gcloud secrets versions disable "$OLD" --secret=ORIGIN_SHARED_SECRET --project=aquazerofit
+   ```
 
 ## Rotating `TELEGRAM_WEBHOOK_SECRET`
 

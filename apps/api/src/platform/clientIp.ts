@@ -42,6 +42,17 @@ export function originSecretMatches(presented: string | undefined, expected: str
   return crypto.timingSafeEqual(left, right);
 }
 
+/**
+ * The Worker's secret: the current one or, during a rotation overlap,
+ * ORIGIN_SHARED_SECRET_PREVIOUS (see config). Both compares run whenever both
+ * are set, so the time taken does not say which one matched.
+ */
+function isWorkerSecret(presented: string | undefined): boolean {
+  const current = originSecretMatches(presented, config.originSharedSecret);
+  const previous = originSecretMatches(presented, config.originSharedSecretPrevious);
+  return current || previous;
+}
+
 function singleHeader(value: string | string[] | undefined): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
@@ -87,7 +98,7 @@ function warnIfSecretUnset(req: Request): void {
 export function clientIpForRateLimit(req: Request): string {
   const presented = singleHeader(req.headers[ORIGIN_SHARED_SECRET_HEADER]);
   const cfIp = plausibleClientIp(singleHeader(req.headers[CF_CONNECTING_IP_HEADER]));
-  if (cfIp && originSecretMatches(presented, config.originSharedSecret)) return cfIp;
+  if (cfIp && isWorkerSecret(presented)) return cfIp;
   warnIfSecretUnset(req);
   return socketAddress(req);
 }
@@ -148,7 +159,7 @@ function logOriginRefusal(req: Request, reason: 'secret_missing' | 'secret_misma
 export const requireWorkerOrigin: RequestHandler = (req, _res, next) => {
   if (!config.requireOriginSecret || req.path === '/health' || req.path === '/ready') return next();
   const presented = singleHeader(req.headers[ORIGIN_SHARED_SECRET_HEADER]);
-  if (originSecretMatches(presented, config.originSharedSecret)) return next();
+  if (isWorkerSecret(presented)) return next();
   logOriginRefusal(req, presented ? 'secret_mismatch' : 'secret_missing');
   next(
     new AppError('FORBIDDEN', `Direct requests to this origin are refused. Use ${config.appPublicUrl}.`),

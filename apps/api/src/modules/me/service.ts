@@ -16,6 +16,7 @@ import { AppError } from '../../platform/errors';
 import { config } from '../../platform/config';
 import { getStore, newId, type ContainerName } from '../../platform/store';
 import { revokeAllForUser, sha256Hex } from '../../platform/auth';
+import { removeFirebaseIdentity } from '../../platform/firebaseAdmin';
 import { computeTargets } from './targets';
 import {
   ADAPTIVE_FORMULA_VERSION,
@@ -148,7 +149,7 @@ export function toPublicUser(user: User): PublicUser {
 /**
  * Identity mutation: displayName (previously registration-only) and optional
  * IANA timezone. The audit event records which fields changed, never the new
- * values — displayName is an identifier and would otherwise need scrubbing on
+ * values. displayName is an identifier and would otherwise need scrubbing on
  * purge (see IDENTIFIER_DETAIL_KEYS).
  */
 export function updateIdentity(
@@ -173,8 +174,8 @@ export function updateIdentity(
  *
  * The client collects this in two waves: the six fields the calculator reads
  * (weight, height, age, sex, activity level, goal) up front, and the
- * personalisation fields — training experience, equipment, dietary preferences,
- * allergies — later, from Settings. Both waves arrive here as a whole profile,
+ * personalisation fields (training experience, equipment, dietary preferences,
+ * allergies) later, from Settings. Both waves arrive here as a whole profile,
  * so there is no partial-profile shape to persist: an account either has a
  * profile the calculator can run on or it has none at all, and `hasProfile` on
  * PublicUser stays the single source of truth for which.
@@ -217,7 +218,7 @@ export function getTargets(userId: string): TargetsDoc {
   if (!profile) {
     throw new AppError(
       'NOT_FOUND',
-      'Targets are calculated from your height, weight, age and activity — add those essentials to see them.',
+      'Targets are calculated from your height, weight, age and activity. Add those essentials to see them.',
     );
   }
   const targets: TargetsDoc = {
@@ -267,7 +268,7 @@ export function hasConsent(userId: string, key: keyof Omit<ConsentState, 'update
  * Consent revocation note (memory feature Phase 1): revoking aiPersonalisation
  * does NOT delete the user's AI memory doc. The memory endpoints (and
  * getMemoryForPrompt) check consent on every access, so revocation makes the
- * data immediately unreadable and unwritable — but it is retained so the user
+ * data immediately unreadable and unwritable, but it is retained so the user
  * can re-enable the consent without losing their memory. Permanent removal is
  * the user's explicit choice: DELETE /me/memory (wipe) or account deletion
  * (purgeUser erases the whole `ai` container for the user).
@@ -314,13 +315,15 @@ export function exportUserData(userId: string): Record<string, unknown> {
  * Two-step deletion (AQF-06 §6): the first call flags the account and starts
  * the grace period; a second call while flagged purges immediately.
  */
-export function requestDeletion(userId: string): { purged: boolean; deletionRequestedAt: string } {
+export async function requestDeletion(
+  userId: string,
+): Promise<{ purged: boolean; deletionRequestedAt: string }> {
   const store = getStore();
   const user = store.byId<User>('users', userId);
   if (!user) throw new AppError('NOT_FOUND', 'Account not found');
 
   if (user.deletionRequestedAt) {
-    purgeUser(userId);
+    await purgeUser(userId);
     return { purged: true, deletionRequestedAt: user.deletionRequestedAt };
   }
   const flaggedAt = new Date().toISOString();
@@ -355,7 +358,7 @@ function scrubDetail(detail: unknown): unknown {
  * reference and challenge code in `attribution`. Left alone they re-link a
  * purged account to the huddles it joined and the person who invited it, which
  * is precisely what anonymising the subject id is meant to prevent. The event
- * itself survives — the aggregate is what the record is for.
+ * itself survives. The aggregate is what the record is for.
  */
 function scrubGrowthIdentifiers<T extends { id: string }>(doc: T): T {
   const raw = doc as unknown as Record<string, unknown>;
@@ -370,10 +373,25 @@ function scrubGrowthIdentifiers<T extends { id: string }>(doc: T): T {
   return { ...doc, props, attribution } as T;
 }
 
-export function purgeUser(userId: string): void {
+export async function purgeUser(userId: string): Promise<void> {
   const store = getStore();
 
-  // Meal photo files on disk belong to the user's vision jobs — remove them
+  // Firebase first, then local data. removeFirebaseIdentity revokes refresh
+  // tokens and deletes the Auth user. auth/user-not-found is success. Any
+  // other Firebase error is logged as firebase_account_delete_failed and
+  // thrown here, before the writes below, so the local account is not left
+  // half-deleted. A uid that is not linked skips Firebase entirely.
+  const existing = store.byId<User>('users', userId);
+  const accountType = (existing as { type?: string } | undefined)?.type;
+  const firebaseUid =
+    existing && (accountType === undefined || accountType === 'user')
+      ? existing.firebaseUid
+      : undefined;
+  if (firebaseUid) {
+    await removeFirebaseIdentity(firebaseUid);
+  }
+
+  // Meal photo files on disk belong to the user's vision jobs. Remove them
   // before the job docs go (missing files are tolerated: best-effort cleanup).
   const jobs = store.where<{ id: string; userId?: string; type?: string; imagePath?: string }>(
     'ai',
@@ -388,7 +406,7 @@ export function purgeUser(userId: string): void {
   }
 
   // Ledger is retained anonymised for financial integrity; audit is retained
-  // anonymised per AQF-06 §6. Everything else user-scoped is erased — the
+  // anonymised per AQF-06 §6. Everything else user-scoped is erased. The
   // `ai` sweep includes the userMemory doc (DELETE /me therefore removes
   // memory implicitly via this purge).
   for (const container of ['profiles', 'logs', 'plans', 'ai'] as ContainerName[]) {
@@ -396,7 +414,7 @@ export function purgeUser(userId: string): void {
   }
 
   // Buddy challenges live in `logs` but carry no top-level `userId`, so the
-  // sweep above cannot see them — membership has to be unwound explicitly.
+  // sweep above cannot see them. Membership has to be unwound explicitly.
   removeUserFromChallenges(userId);
 
   for (const container of ['ledger', 'audit'] as ContainerName[]) {
@@ -421,9 +439,11 @@ export function purgeUser(userId: string): void {
 /**
  * Deletion grace sweep (AQF-06 §6): purge accounts whose grace period elapsed
  * (deletionRequestedAt + config.deletionGraceDays < now). Runs on boot and
- * every 6 hours (scheduled in index.ts). Returns the number of purged users.
+ * every 6 hours (scheduled in index.ts). Returns the number of accounts
+ * actually purged. A Firebase identity error skips that account (local data
+ * stays) and the sweep continues with the rest.
  */
-export function sweepExpiredDeletions(now = new Date()): number {
+export async function sweepExpiredDeletions(now = new Date()): Promise<number> {
   const store = getStore();
   const cutoff = now.getTime() - config.deletionGraceDays * 24 * 3600 * 1000;
   const expired = store.where<User>(
@@ -433,8 +453,16 @@ export function sweepExpiredDeletions(now = new Date()): number {
       typeof (d as User).deletionRequestedAt === 'string' &&
       new Date((d as User).deletionRequestedAt!).getTime() < cutoff,
   );
+  let purged = 0;
   for (const user of expired) {
-    purgeUser(user.id);
+    try {
+      await purgeUser(user.id);
+    } catch {
+      // removeFirebaseIdentity already logged firebase_account_delete_failed
+      // and left this account in place. Keep going so one identity outage
+      // does not stall every other elapsed grace period.
+      continue;
+    }
     // Audit the sweep purge itself. The subject is already erased, so the
     // event is written anonymised with a hashed reference (re-identifiable
     // only with the original user id).
@@ -446,8 +474,9 @@ export function sweepExpiredDeletions(now = new Date()): number {
       detail: { userHash: sha256Hex(user.id).slice(0, 16) },
       createdAt: new Date().toISOString(),
     });
+    purged += 1;
   }
-  return expired.length;
+  return purged;
 }
 
 // ----- telegram link -----

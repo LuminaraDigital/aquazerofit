@@ -96,8 +96,13 @@ export function computeStreak(activity: UserActivity, today: string): number {
  * Deliberately duplicated from `computeStreak` rather than factored out of it:
  * `computeStreak` feeds the `streak` achievement rules and the chat tool, so
  * touching it would silently move earned thresholds for existing users.
+ *
+ * Exported because other derived views count exactly these dates: Fight
+ * Record belts and the admin retention report. One definition of an active
+ * day is what keeps them, the consistency card and XP's "Showed up" from
+ * ever disagreeing about whether someone came.
  */
-function activeDatesOf(activity: UserActivity): Set<string> {
+export function activeDatesOf(activity: UserActivity): Set<string> {
   const activeDates = new Set<string>();
   for (const l of activity.meals) activeDates.add(l.localDate);
   for (const l of activity.waters) activeDates.add(l.localDate);

@@ -287,6 +287,16 @@ These are unresolved, and the procedure above deliberately does not pretend othe
 3. **How long Telegram retries a refused update, and with what backoff.** The route's design assumes redelivery of non-2xx; the retry duration is not recorded anywhere here. If it is shorter than the rotation window, updates in that window are lost outright rather than delayed, and the `successful_payment` row of the cost table above becomes optimistic.
 4. **This procedure has not been executed against production.** Rehearse the first run against a staging bot with its own token and webhook URL before doing it live.
 
+## Retention baseline
+
+`GET /api/v1/admin/retention?weeks=12` (admin, with the MFA step-up) returns
+D1, D7 and D30 retention by signup week and weekly active loggers by account
+surface, derived on read from stored activity. Definitions live in
+`apps/api/src/modules/admin/retention.ts`; a cohort shows `null` for a day it
+has not reached yet, never `0`. The Fight Record release (AZF-W3-05 §1) needs
+four weeks of this baseline before it ships, so record the weekly reading:
+the response holds aggregate counts only and no account identifiers.
+
 ## Stripe webhook events
 
 Each environment's endpoint (`<APP_PUBLIC_URL>/api/v1/billing/stripe/webhook`, API version `2025-11-17.clover`) must be subscribed to all six events below; Stripe sends nothing it was not asked for. To extend an existing endpoint, open it in the Stripe Dashboard (Workbench → Webhooks), edit its events and add the missing ones. The signing secret does not change.

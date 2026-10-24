@@ -17,6 +17,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app';
 import { ORIGIN_SHARED_SECRET_HEADER, resetOriginRefusalLog } from '../platform/clientIp';
 import { assertOriginSecretConfigured } from '../platform/config';
+import { getStore } from '../platform/store';
 import { bindIsolatedDataDir, createIsolatedDataDir } from './helpers/integrationIsolation';
 
 const KEYS = [
@@ -181,6 +182,39 @@ describe('requireWorkerOrigin', () => {
     await request(app).get('/metrics').set(ORIGIN_SHARED_SECRET_HEADER, 'guessed');
     expect(refusals()).toHaveLength(2);
     expect(refusals()[1]).toMatchObject({ reason: 'secret_mismatch', refusedSinceLastLog: 3 });
+  });
+});
+
+describe('/ready on the open path', () => {
+  it('reports an unhealthy store without echoing its error, and logs the cause', async () => {
+    // /ready is one of the two paths run.app still serves to anyone, so a raw
+    // driver error naming the user, host or database belongs in the server
+    // log, not in the response. The status still tells the probe the truth.
+    enforce();
+    const store = getStore() as unknown as { ping?: () => Promise<void> };
+    store.ping = async () => {
+      throw new Error('password authentication failed for user "azf"');
+    };
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    // logError is silent under test; clear the markers for this one request.
+    const nodeEnv = process.env.NODE_ENV;
+    const vitest = process.env.VITEST;
+    process.env.NODE_ENV = 'development';
+    delete process.env.VITEST;
+    try {
+      const res = await request(createApp()).get('/ready');
+      expect(res.status).toBe(503);
+      expect(res.body.code).toBe('NOT_READY');
+      expect(JSON.stringify(res.body)).not.toContain('password authentication');
+    } finally {
+      process.env.NODE_ENV = nodeEnv;
+      if (vitest === undefined) delete process.env.VITEST;
+      else process.env.VITEST = vitest;
+      delete store.ping;
+    }
+    const logged = errors.mock.calls.map((call) => String(call[0]));
+    expect(logged.some((line) => line.includes('password authentication failed'))).toBe(true);
   });
 });
 

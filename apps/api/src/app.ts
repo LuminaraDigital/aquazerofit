@@ -8,7 +8,7 @@ import { config } from './platform/config';
 import { requireWorkerOrigin } from './platform/clientIp';
 import { errorHandler, notFoundHandler } from './platform/errors';
 import { assertTrustProxyHeaders, enforceHttps, redirectWwwToCanonical } from './platform/https';
-import { requestLogger, metrics } from './platform/telemetry';
+import { logError, requestLogger, metrics } from './platform/telemetry';
 import { budgetSnapshot } from './platform/aiBudget';
 import { rateLimiter } from './platform/rateLimiter';
 import { getStore } from './platform/store';
@@ -132,7 +132,7 @@ export function createApp() {
   // under the Postgres backing, a live round-trip succeeds. Hydration alone
   // says the snapshot was readable at boot; the pin checks the pool still
   // answers, which is what the first routed request will need.
-  app.get('/ready', async (_req, res) => {
+  app.get('/ready', async (req, res) => {
     try {
       const store = getStore();
       // SELECT 1 against the pool when Postgres-backed; a no-op resolution
@@ -141,11 +141,12 @@ export function createApp() {
       if (typeof maybePing === 'function') await maybePing.call(store);
       res.json({ status: 'ready', service: 'aquazerofit-api', version: config.version });
     } catch (err) {
-      res.status(503).json({
-        code: 'NOT_READY',
-        message: 'Data store is not available yet.',
-        details: { reason: err instanceof Error ? err.message : 'unknown' },
-      });
+      // The cause goes to the server log only. /ready is one of the two paths
+      // the origin gate leaves open on the run.app URL, and a raw driver error
+      // names the database user, host or database to whoever asks. The 503
+      // is all a probe needs.
+      logError(err, { requestId: (req as { requestId?: string }).requestId, route: '/ready' });
+      res.status(503).json({ code: 'NOT_READY', message: 'Data store is not available yet.' });
     }
   });
 

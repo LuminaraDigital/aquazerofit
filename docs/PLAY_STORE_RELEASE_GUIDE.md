@@ -395,19 +395,19 @@ Release builds bake these into `apps/android/app/build.gradle.kts`:
 
 | BuildConfig field | Current release value |
 | :--- | :--- |
-| `API_BASE_URL` | `https://app.aquazero.fit/api/v1` |
-| `MEDIA_BASE_URL` | `https://app.aquazero.fit` |
-| `WEB_BASE_URL` | `https://app.aquazero.fit` |
+| `API_BASE_URL` | `https://aquazerofit.com/api/v1` |
+| `MEDIA_BASE_URL` | `https://aquazerofit.com` |
+| `WEB_BASE_URL` | `https://aquazerofit.com` |
 
-Change all three together if your API lives on a different host (for example `https://api.aquazero.fit`), then cut a new version tag and rebuild.
+All three, and the App Link host in the manifest, come from `publicOrigin` near the top of that file. Change the origin there (give `API_BASE_URL` its own value only if the API moves to a different host, for example `https://api.aquazerofit.com`), then cut a new version tag and rebuild.
 
-Debug builds point `API_BASE_URL` and `MEDIA_BASE_URL` at `http://10.0.2.2:4000` (emulator loopback to a local API on port **4000**) but deliberately keep `WEB_BASE_URL` on `https://app.aquazero.fit`, so the legal pages, support and captcha bridge resolve without a local web server running. Do not "correct" that to loopback.
+Debug builds point `API_BASE_URL` and `MEDIA_BASE_URL` at `http://10.0.2.2:4000` (emulator loopback to a local API on port **4000**) but deliberately keep `WEB_BASE_URL` on `https://aquazerofit.com`, so the legal pages, support and captcha bridge resolve without a local web server running. Do not "correct" that to loopback.
 
 On the server, set matching public URLs:
 
 ```env
-APP_PUBLIC_URL=https://app.aquazero.fit
-CORS_ORIGINS=https://app.aquazero.fit
+APP_PUBLIC_URL=https://aquazerofit.com
+CORS_ORIGINS=https://aquazerofit.com
 PORT=4000
 ```
 
@@ -510,8 +510,8 @@ tester does.
 ### E. Smoke test after deploy
 
 ```bash
-curl https://app.aquazero.fit/health
-curl https://app.aquazero.fit/ready
+curl https://aquazerofit.com/health
+curl https://aquazerofit.com/ready
 ```
 
 On an internal-testing build: sign up (Turnstile captcha), sync a meal log, and exercise a subscription purchase if billing is live.
@@ -523,8 +523,8 @@ See [PLAY_STORE_COMPETITIVE_RELEASE_PLAN.md](PLAY_STORE_COMPETITIVE_RELEASE_PLAN
 Before promoting past Closed Beta:
 
 1. Set `ADAPTIVE_TARGETS=true` on the production API (see `.env.example`).
-2. Deploy `apps/web/public/.well-known/assetlinks.json` on `https://app.aquazero.fit`. The repo ships the **upload key** SHA-256 (`AD:0A:15:…` in section 2). After Play App Signing is enabled, replace that fingerprint with the **Play App Signing certificate** from Play Console if they differ, then redeploy web.
-3. Verify challenge invites open the app (or web fallback with Play Store CTA) via `https://app.aquazero.fit/challenges?code=AQUA…`.
+2. Deploy `apps/web/public/.well-known/assetlinks.json` on `https://aquazerofit.com` (the Worker serves `/.well-known` from the web build's static assets, so a web deploy is the deploy). The repo ships the **upload key** SHA-256 (`AD:0A:15:…` in section 2). After Play App Signing is enabled, add the **Play App Signing certificate** SHA-256 from Play Console (App integrity → App signing) alongside it - Play-delivered installs are signed with that key, not the upload key - then redeploy web.
+3. Verify challenge invites open the app (or web fallback with Play Store CTA) via `https://aquazerofit.com/challenges?code=AQUA…`.
 4. Run release APK smoke: guided workout foreground notification, readiness chip on Home/Workouts, achievement share sheet.
 5. Complete Health Connect Play Console declaration if shipping Health Connect in v1.
    Declare **four read types and no write type**: `READ_STEPS`, `READ_HEART_RATE`,
@@ -547,9 +547,9 @@ Run these on a **release** build against the production API, not debug:
 
 | Check | What to verify |
 | :--- | :--- |
-| **Billing credentials (blocking)** | Before inviting testers: confirm `PLAY_SERVICE_ACCOUNT_JSON` and `PLAY_PACKAGE_NAME` are set on the production API (§5C). `curl https://app.aquazero.fit/api/v1/billing/config` (unauthenticated) must return `{"play":{"available":true}}`. If it returns `false`, every purchase is charged, never granted, and auto-refunded after three days - do not let a reviewer or tester reach the upgrade button in that state. |
+| **Billing credentials (blocking)** | Before inviting testers: confirm `PLAY_SERVICE_ACCOUNT_JSON` and `PLAY_PACKAGE_NAME` are set on the production API (§5C). `curl https://aquazerofit.com/api/v1/billing/config` (unauthenticated) must return `{"play":{"available":true}}`. If it returns `false`, every purchase is charged, never granted, and auto-refunded after three days - do not let a reviewer or tester reach the upgrade button in that state. |
 | **App access credentials (blocking)** | Play Console -> App content -> App access lists a working, pre-created demo account with a completed profile (§4D). Sign in with exactly those credentials on a clean install before submitting. |
-| **App Links** | Host `/.well-known/assetlinks.json` on `https://app.aquazero.fit` with the Play App Signing SHA-256. Install the closed-track build, open a growth deep link (for example `https://app.aquazero.fit/challenges?code=AQUA…`), and confirm Android offers to open AquaZeroFit without a disambiguation sheet. |
+| **App Links** | Host `/.well-known/assetlinks.json` on `https://aquazerofit.com` with the Play App Signing SHA-256. Install the closed-track build, open a growth deep link (for example `https://aquazerofit.com/challenges?code=AQUA…`), and confirm Android offers to open AquaZeroFit without a disambiguation sheet. |
 | **Barcode scan (free)** | On Nutrition, scan a real packaged product barcode (EAN-13). Confirm GS1 check-digit validation, local mirror lookup, Open Food Facts fallback when needed, ODbL attribution on the result screen, and that logging still requires an explicit confirm tap. This path must work on the minified release APK; it was the surface broken by an earlier R8 strip. |
 | **Sign-up + sync** | Register through the Turnstile WebView bridge, log a meal, and complete one outbox sync cycle. |
 | **Billing (if live)** | Purchase or restore a subscription and confirm entitlement on cold start. |
@@ -670,8 +670,8 @@ between those two orderings is where a submission stalls.
 | # | Requirement | Answer / where |
 | :--- | :--- | :--- |
 | 4 | App category | **Health & Fitness** (`docs/ANDROID_IMPLEMENTATION_PLAN.md:225`). |
-| 5 | Contact details: support email (required), website, phone | **Owner action.** No support address exists anywhere in the repo. Whatever Console carries must be the address reachable from `https://app.aquazero.fit/support`, which is what the app links users to (`ExternalLinks.kt:32`). |
-| 6 | Privacy policy URL | `https://app.aquazero.fit/privacy` — `ExternalLinks.PRIVACY` (`ExternalLinks.kt:26`) resolved against `WEB_BASE_URL` (§5A); the route is served at `apps/web/src/App.tsx:91`. The app links to it in Settings, so a different URL in Console is a mismatch a reviewer can see. |
+| 5 | Contact details: support email (required), website, phone | **Owner action.** No support address exists anywhere in the repo. Whatever Console carries must be the address reachable from `https://aquazerofit.com/support`, which is what the app links users to (`ExternalLinks.kt:32`). |
+| 6 | Privacy policy URL | `https://aquazerofit.com/privacy` — `ExternalLinks.PRIVACY` (`ExternalLinks.kt:26`) resolved against `WEB_BASE_URL` (§5A); the route is served at `apps/web/src/App.tsx:91`. The app links to it in Settings, so a different URL in Console is a mismatch a reviewer can see. |
 | 7 | App icon — 512×512 32-bit PNG *(Google)* | **Owner action.** Not present in `docs/`; export from the launcher icon source. |
 | 8 | Feature graphic — 1024×500 *(Google)* | **Owner action.** No such asset exists in the repo. |
 | 9 | Phone screenshots — 2 to 8, 16:9 or 9:16 *(Google)* | `docs/screenshots/*.png` are 780×1688 (390×844 at 2×, per `tools/screenshots/optimise.mjs`), which satisfies the ratio and the size bounds. Draw from `03-dashboard`, `04-nutrition`, `05-capture-meal`, `07-coach`, `08-workouts`, `09-progress`. Re-capture on-device before upload (`ANDROID_IMPLEMENTATION_PLAN.md:225`). |
@@ -692,7 +692,7 @@ between those two orderings is where a submission stalls.
 | 19 | Government apps | **No.** |
 | 20 | Financial features | **None of these.** Play Billing subscriptions are declared as in-app products (row 23), not as a financial feature. |
 | 21 | News apps | **No.** |
-| 22 | Data deletion | **Both paths exist:** in-app under Settings → Delete account (`SettingsScreen.kt:676`, `DeletionCard`), and the web route `https://app.aquazero.fit/account/deletion` (`ExternalLinks.kt:39`) for people who no longer have the app installed. Declare both. See §7 for the subscription trap this flow does not warn about. |
+| 22 | Data deletion | **Both paths exist:** in-app under Settings → Delete account (`SettingsScreen.kt:676`, `DeletionCard`), and the web route `https://aquazerofit.com/account/deletion` (`ExternalLinks.kt:39`) for people who no longer have the app installed. Declare both. See §7 for the subscription trap this flow does not warn about. |
 
 ### D. Monetisation
 

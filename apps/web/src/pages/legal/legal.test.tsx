@@ -139,6 +139,10 @@ describe('privacy notice', () => {
 
     expect(screen.getAllByText(/Australia \(Google Cloud, Sydney\)/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Replit/)).toBeNull();
+    // Cloud SQL backups and Cloud Logging default to multi-region or global
+    // locations, so where they live is an operator fact, not a given.
+    const backups = OPERATOR.backupRegion ?? '[backup and log locations]';
+    expect(screen.getAllByText(backups, { exact: false }).length).toBeGreaterThan(0);
   });
 
   it('lists every outbound integration with what reaches it and where', () => {
@@ -161,12 +165,17 @@ describe('privacy notice', () => {
       'Stripe',
       'Google Play',
       'Firebase (Google)',
+      'Google Fonts',
       'Telegram',
       'Open Food Facts',
     ]) {
       const row = within(table).getByRole('rowheader', { name: recipient }).closest('tr');
       expect(row?.querySelectorAll('td')).toHaveLength(3);
     }
+    const firebase = within(table).getByRole('rowheader', { name: 'Firebase (Google)' });
+    expect(firebase.closest('tr')?.textContent).toMatch(/email address and password/);
+    // Four columns overflow at 320px; the card scrolls, so it must take focus.
+    expect(table.closest('[role="region"]')?.getAttribute('tabindex')).toBe('0');
   });
 
   it('states the APP 8 overseas disclosure, naming the countries', () => {
@@ -187,7 +196,11 @@ describe('privacy notice', () => {
     expect(screen.getByRole('link', { name: 'oaic.gov.au' }).getAttribute('href')).toBe(
       'https://www.oaic.gov.au',
     );
-    expect(screen.getAllByText(/within 30 days/).length).toBeGreaterThan(0);
+    // The response time is the operator's commitment, rendered from OPERATOR
+    // (or marked as missing), never a figure written into the page.
+    const responseTime = OPERATOR.privacyResponseTime ?? '[privacy response time]';
+    expect(screen.getAllByText(responseTime, { exact: false })).toHaveLength(2);
+    expect(screen.queryByText(/within 30 days/)).toBeNull();
   });
 
   it('points at the export that exists instead of denying there is one', () => {

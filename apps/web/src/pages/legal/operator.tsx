@@ -35,12 +35,25 @@ export interface OperatorFacts {
   jurisdiction: string | null;
   /** Where user data is stored and processed, e.g. "Australia (Azure australiaeast)". */
   hostingRegion: string | null;
+  /**
+   * Where database backups and request logs (which hold IP addresses) are
+   * kept. Cloud SQL backups and Cloud Logging buckets default to multi-region
+   * or global locations unless configured, so hostingRegion does not imply
+   * this. Only someone who has checked both settings can fill it in.
+   */
+  backupRegion: string | null;
   /** Mailbox for privacy requests and legal notices. */
   privacyEmail: string | null;
   /** Mailbox for general support. */
   supportEmail: string | null;
   /** Response time the operator commits to, e.g. "within 3 business days". */
   supportResponseTime: string | null;
+  /**
+   * Response time the operator commits to for privacy access, correction and
+   * complaint requests, e.g. "within 30 days" (the OAIC's guidance figure for
+   * access requests under APP 12).
+   */
+  privacyResponseTime: string | null;
   /**
    * AI providers configured in THIS deployment. The software supports several
    * and names none at runtime, so only the operator knows which are live.
@@ -83,13 +96,17 @@ export const OPERATOR: OperatorFacts = {
   // API left for Cloud Run and Cloud SQL in australia-southeast1
   // (deploy/cloudrun/service.yaml).
   hostingRegion: 'Australia (Google Cloud, Sydney)',
+  // Unconfirmed: neither location is pinned in this repository.
+  backupRegion: null,
   privacyEmail: 'info@luminara.digital',
   // One mailbox. SUPPORT_EMAIL overrides it at build time; blank falls through
   // to the address already published for this operator.
   supportEmail: resolveSupportEmail(import.meta.env.SUPPORT_EMAIL),
   supportResponseTime: 'within 3 business days',
+  // A commitment the operator has not made yet.
+  privacyResponseTime: null,
   aiProviders: ['Groq', 'Google Gemini', 'Nvidia NIM', 'OpenAI'],
-  // The one field the live build has no counterpart for. It asserts a date on
+  // A field the live build has no counterpart for. It asserts a date on
   // which someone actually read the providers' terms and confirmed what they
   // do with prompt data. A claim only the operator can make, so it stays null
   // until they make it. isPublished() below therefore still returns false.

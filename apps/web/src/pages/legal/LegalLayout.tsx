@@ -164,19 +164,26 @@ export function List({ items }: { items: React.ReactNode[] }) {
 
 /**
  * Definition table for retention periods and similar. The first cell of each
- * row is its header. Wider tables scroll inside the card at phone width.
+ * row is its header, and every row must have one cell per heading: a short
+ * row fails typecheck rather than rendering a misaligned table. Wider tables
+ * scroll inside the card at phone width, so the card takes keyboard focus.
  */
-export function Table({
+export function Table<const Head extends readonly string[]>({
   caption,
   head,
   rows,
 }: {
   caption: string;
-  head: string[];
-  rows: React.ReactNode[][];
+  head: Head;
+  rows: ReadonlyArray<{ readonly [K in keyof Head]: React.ReactNode }>;
 }) {
   return (
-    <div className="lp-card overflow-x-auto">
+    <div
+      role="region"
+      aria-label={caption}
+      tabIndex={0}
+      className="lp-card overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+    >
       <table className="w-full text-left text-sm" aria-label={caption}>
         <thead>
           <tr className="border-b border-white/8">
@@ -192,7 +199,7 @@ export function Table({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => (
+          {rows.map((row: readonly React.ReactNode[], i) => (
             <tr key={i} className={i > 0 ? 'border-t border-white/5' : ''}>
               <th
                 scope="row"

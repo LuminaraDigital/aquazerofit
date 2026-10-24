@@ -83,9 +83,12 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
           <Fact name="privacyEmail" hint="privacy contact" />.
         </P>
         <P>
-          Data is stored and processed in <Fact name="hostingRegion" hint="hosting region" />. It
-          reaches our servers through Cloudflare&apos;s global network. Sections 7 and 8 set out
-          who else receives it and where.
+          Our servers and primary database are in{' '}
+          <Fact name="hostingRegion" hint="hosting region" />. Database backups and request logs,
+          which hold IP addresses, are kept in{' '}
+          <Fact name="backupRegion" hint="backup and log locations" />. Requests reach our servers
+          through Cloudflare&apos;s global network. Sections 7 and 8 set out who else receives
+          data and where.
         </P>
       </Section>
 
@@ -210,8 +213,11 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
             [
               'Google Cloud',
               'Runs our servers and database.',
-              'Everything stored in your account.',
-              <Fact key="host" name="hostingRegion" hint="hosting region" />,
+              'Everything stored in your account, and request logs with your IP address.',
+              <>
+                <Fact name="hostingRegion" hint="hosting region" />; backups and logs in{' '}
+                <Fact name="backupRegion" hint="backup and log locations" />.
+              </>,
             ],
             [
               'Cloudflare',
@@ -223,7 +229,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
               <Fact key="ai" name="aiProviders" hint="configured AI providers" />,
               'Meal-photo analysis, plans, recipes and coach replies.',
               'The feature-specific slice described above, when you use an AI feature.',
-              'United States; Google Gemini runs on Google’s global infrastructure.',
+              'The United States and other countries where each provider operates.',
             ],
             [
               'Resend',
@@ -246,7 +252,13 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
             [
               'Firebase (Google)',
               'Crash reports and usage analytics from the Android app, only if you turn on anonymised analytics; web sign-in, where it is enabled.',
-              'App and installation identifiers, crash details, device model and in-app events; for sign-in, your email address.',
+              'App and installation identifiers, crash details, device model and in-app events; for sign-in, your email address and password.',
+              'Google’s global infrastructure.',
+            ],
+            [
+              'Google Fonts',
+              'Serves the typefaces and icons this site displays.',
+              'Your IP address and browser details, each time a page loads. Nothing about your account.',
               'Google’s global infrastructure.',
             ],
             [
@@ -268,16 +280,20 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
 
       <Section id="overseas" index={8} heading="Data sent outside Australia">
         <P>
-          Your account is stored in Australia, but some of the recipients above are not. Under
-          Australian Privacy Principle 8 of the Privacy Act 1988 (Cth), these are the countries your
-          personal information may be disclosed to:
+          Your account&apos;s primary database is in Australia, but some of the recipients above
+          are not. Under Australian Privacy Principle 8 of the Privacy Act 1988 (Cth), these are the
+          countries your personal information may be disclosed to:
         </P>
         <List
           items={[
-            'United States: the AI providers, Stripe and Resend.',
+            'United States: Stripe and Resend, and the AI providers, which may also process data in other countries where they operate.',
             'Japan: Resend sends our email from its Tokyo region.',
             'France: Open Food Facts, for barcode lookups.',
-            'Cloudflare, Google (Firebase, Google Play and Gemini) and Telegram run infrastructure in many countries, so what they handle may be processed wherever they operate.',
+            'Cloudflare, Google (Firebase, Google Fonts, Google Play and Gemini) and Telegram run infrastructure in many countries, so what they handle may be processed wherever they operate.',
+            <>
+              Database backups and request logs:{' '}
+              <Fact name="backupRegion" hint="backup and log locations" />.
+            </>,
           ]}
         />
         <P>Each receives only what the table above says reaches it.</P>
@@ -333,12 +349,12 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
           correct it, to restrict or object to processing, to portability, and to complain to a
           supervisory authority. For anything the app does not do for you, write to{' '}
           <Fact name="privacyEmail" hint="privacy contact" />. We respond to access and correction
-          requests within 30 days.
+          requests <Fact name="privacyResponseTime" hint="privacy response time" />.
         </P>
         <P>
           To complain about how we have handled your personal information, write to{' '}
-          <Fact name="privacyEmail" hint="privacy contact" /> first; we respond within 30 days. If you
-          are not satisfied with our response, you can complain to the Office of the Australian
+          <Fact name="privacyEmail" hint="privacy contact" /> first; we respond{' '}
+          <Fact name="privacyResponseTime" hint="privacy response time" />. If you are not satisfied with our response, you can complain to the Office of the Australian
           Information Commissioner (OAIC) at{' '}
           <a
             href="https://www.oaic.gov.au"

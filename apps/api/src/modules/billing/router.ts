@@ -391,8 +391,12 @@ billingRouter.post(
  *
  * Unlike Pub/Sub, Stripe's retries are bounded (about three days), so an
  * unexpected failure is allowed to 500 and be redelivered - a paid invoice
- * that was never granted is the expensive outcome. An AppError is final (the
- * account is gone, the payload is not one we can settle) and is acknowledged.
+ * that was never granted is the expensive outcome. PAYMENT_UNAVAILABLE is the
+ * same kind of failure: Stripe itself unreachable while a refund or dispute is
+ * traced to its invoice. It answers 503 so the delivery comes back, because
+ * acknowledging it would drop that revoke for good. Any other AppError is
+ * final (the account is gone, the payload is not one we can settle) and is
+ * acknowledged.
  */
 billingRouter.post(
   '/stripe/webhook',
@@ -405,9 +409,13 @@ billingRouter.post(
     }
     const event = JSON.parse(raw.toString('utf8')) as StripeEvent;
     try {
-      handleStripeEvent(event);
+      await handleStripeEvent(event);
     } catch (err) {
       if (!(err instanceof AppError)) throw err;
+      if (err.code === 'PAYMENT_UNAVAILABLE') {
+        logEvent('stripe_webhook_deferred', { type: event.type, reason: err.message });
+        throw err;
+      }
       logEvent('stripe_webhook_unsettled', { type: event.type, reason: err.message });
     }
     res.json({ received: true });

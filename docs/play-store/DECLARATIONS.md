@@ -74,13 +74,17 @@ that exists cannot be used (see below).
 
 ## The remaining blocker is the build, not the console
 
-`apps/android/app/build.gradle.kts:118` compiles
-`API_BASE_URL = https://app.aquazero.fit/api/v1` into `BuildConfig`.
-**`aquazero.fit` does not exist** — NXDOMAIN from both 1.1.1.1 and 8.8.8.8, and
-the parent domain is unregistered, not merely missing a subdomain.
+Earlier builds compiled `API_BASE_URL = https://app.aquazero.fit/api/v1` into
+`BuildConfig`. **`aquazero.fit` does not exist** — NXDOMAIN from both 1.1.1.1
+and 8.8.8.8, and the parent domain is unregistered, not merely missing a
+subdomain. Any AAB signed before the fix cannot reach the API.
 
-The same host is assumed by the App Links intent filter
-(`AndroidManifest.xml:195`), `DeepLinkStore.kt:108`, `CORS_ORIGINS`, and the
-in-app privacy/support/deletion links. Either register and point it at the same
-origin as aquazerofit.com, or repoint all of the above — then **rebuild**,
-because the URL is baked into the binary.
+The release build, the App Links intent filter (`AndroidManifest.xml:195`) and
+`DeepLinkStore.kt:108` now all use `https://aquazerofit.com`, the Worker that
+serves the web app and proxies `/api/*` to Cloud Run. Two steps remain:
+
+1. **Rebuild and upload** — the origin is baked into the binary.
+2. **App Links** — `apps/web/public/.well-known/assetlinks.json` carries only
+   the upload key. Add the Play App Signing SHA-256 (Play Console → App
+   integrity → App signing key certificate) and redeploy the web app, or
+   Android will not verify the link.

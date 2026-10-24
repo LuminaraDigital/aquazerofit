@@ -19,6 +19,8 @@ import {
 } from '../billing/entitlements';
 import { refundStarsPurchase } from '../payments/stars';
 import { refundStarsSubscription } from '../payments/starsSubscription';
+import { todayFor } from '../../platform/dates';
+import { retentionReport } from './retention';
 
 export const adminRouter = Router();
 /**
@@ -65,6 +67,23 @@ adminRouter.get('/users', (req, res) => {
   });
   auditDataAccess(req.user!.id, 'admin.users.list', { count: overview.length });
   res.json({ users: overview });
+});
+
+/**
+ * Retention baseline: D1/D7/D30 by signup week and weekly active loggers
+ * (see ./retention for the definitions). Aggregate counts only, so the
+ * response carries no account identifiers; the read is still audited because
+ * it walks every member's activity.
+ */
+const retentionQuerySchema = z.object({
+  weeks: z.coerce.number().int().min(1).max(52).default(12),
+});
+
+adminRouter.get('/retention', (req, res) => {
+  const { weeks } = retentionQuerySchema.parse(req.query);
+  const report = retentionReport(todayFor(req), weeks);
+  auditDataAccess(req.user!.id, 'admin.retention.read', { weeks });
+  res.json({ report });
 });
 
 /**

@@ -212,14 +212,16 @@ Empty, loading, error and populated states are all designed (§2.7).
 
 **US-10 Off means off.**
 Given the feature is off for me (flag off, or outside the rollout bucket), then
-the API answers `{ "fightRecord": null }`, no card, route link or sheet
-renders, and no belt award is written.
+the API answers `{ "fightRecord": null }`, no card, skeleton, error or sheet
+renders on the dashboard, `/fight-record` sends me home, and no belt award is
+written. The one write still allowed is withdrawing emoji-status consent, so a
+user dropped from the rollout can always take their belt off their profile.
 
 ### 2.6 Guardrails, enforcement and proof
 
 | ID | Guardrail | Enforced by | Proved by |
 |---|---|---|---|
-| GR-01 | Belts never depend on health outcomes | `deriveBeltProgress` takes only a set of ISO dates (`packages/shared/src/fightRecord.ts`) | Type signature; property test that random weights and calories leave the result unchanged (`apps/api/src/modules/fightRecord/fightRecord.test.ts`) |
+| GR-01 | Belts never depend on health outcomes | `activeDaysBySeason` takes only ISO dates (`packages/shared/src/fightRecord.ts`) | Type signature; property test that random weights and calories leave the result unchanged (`apps/api/src/__tests__/fightRecord.test.ts`) |
 | GR-02 | Nothing earned unlocks Premium, coaches or features | `billing/entitlements.ts` and `coaches/service.ts` untouched; Fight Record has no write path into either | Diff review; no import of Fight Record from either module |
 | GR-03 | No paid randomness | R1a sells nothing; R1b catalogue schema has no chance or rarity field | Schema review (R1b) |
 | GR-04 | Non-transferable | R1a has nothing to transfer | n/a until R3b |
@@ -236,9 +238,14 @@ renders, and no belt award is written.
 Approved strings live next to the components. Banned in every Fight Record
 string: lost, lose, broken, break, reset, streak, hurry, only, last chance,
 expires (except in the plain statement "your status clears at season end").
-Each surface ships four states: loading (skeleton, never a spinner), empty
-("Your first belt is 3 active days away"), error (the shared `ErrorState` with
-retry) and populated. Days left is plain text, never a ring or a timer.
+The `/fight-record` page ships four states: loading (skeleton, never a
+spinner), empty ("Your first belt is 3 active days away"), error (the shared
+`ErrorState` with retry) and populated. The dashboard card is deliberately
+different: it renders only once there is data, and nothing while loading, on
+error or when the feature is off, because a skeleton that collapses or an error
+card about a feature the user does not have would change the dashboard for
+everyone during a dark launch. Days left is plain text, never a ring or a
+timer.
 
 ---
 
@@ -313,9 +320,11 @@ stateDiagram-v2
   derived and the awarded tier.
 - Retroactive: every season with activity is evaluated, so a user who never
   opened Fight Record during a season still receives it.
-- Celebration state is a set of acknowledged award ids. Acknowledging an award
-  also acknowledges every lower tier in its season and everything from earlier
-  seasons, so a returning user is never shown a queue of stale celebrations.
+- Celebration state is one high-water mark, `celebratedThrough` (season, then
+  tier). Only the top of the shelf can be news, and only if it is above the
+  mark; acknowledging raises the mark. A returning user is never walked through
+  a queue of stale celebrations, and a log backfilled into a finished season
+  cannot resurrect one.
 
 ### 3.4 Emoji status lifecycle
 
@@ -437,9 +446,10 @@ award ids are a no-op `204` (nothing to acknowledge), so a stale client cannot
 probe ids.
 
 **`PUT /fight-record/emoji-status`** `{ enabled: boolean }` →
-`200 { emojiStatus: { available, enabled } }`. Errors: `FORBIDDEN` (minor, no
-linked Telegram account, emoji set not configured, or feature off), `CONFLICT`
-(Telegram refused the status when enabling; nothing is stored).
+`200 { emojiStatus: { available, enabled } }`. Errors when enabling:
+`FORBIDDEN` (minor, no linked Telegram account, emoji set not configured, or
+feature off for the user), `CONFLICT` (Telegram refused the status; nothing is
+stored). Disabling always succeeds, inside or outside the rollout.
 
 ### 4.4 Data
 
@@ -457,13 +467,15 @@ interface BeltAward {          // immutable
   awardedAt: string;           // ISO
 }
 
-interface FightRecordState {   // one per user
+interface FightRecordState {   // one per user, written only on change
   type: 'fightRecordState';
   id: `fight-record-${string}`;
   userId: string;
-  celebratedAwardIds: string[];
-  emojiStatus: { enabled: boolean; consentTextVersion: string | null;
-                 lastSetTier: BeltTier | null; updatedAt: string | null };
+  celebratedThrough: { seasonNumber: number; tier: BeltTier } | null;
+  emojiStatus:                 // a union: "off but remembering a status" cannot be stored
+    | { enabled: false }
+    | { enabled: true; consentTextVersion: string;
+        lastSet: { seasonId: string; tier: BeltTier } | null };
   updatedAt: string;
 }
 ```
@@ -485,7 +497,7 @@ Postgres read path so the platform has one relational story, not two.
 | Variable | Default | Effect |
 |---|---|---|
 | `FIGHT_RECORD_ENABLED` | `false` | Master switch and kill switch for every R1a surface and award write |
-| `FIGHT_RECORD_ROLLOUT_PERCENT` | `100` | Share of users (0 to 100) inside the rollout, by a stable hash of the user id |
+| `FIGHT_RECORD_ROLLOUT_PERCENT` | `100` | Share of users (0 to 100) inside the rollout, by a stable hash of the user id. Set but unparseable (`10%`, `12.5`) means 0: a typo fails toward nobody |
 | `TELEGRAM_BELT_EMOJI_IDS` | unset | JSON object, tier → custom emoji id. Emoji status is offered only when all five are present and the bot token is real |
 
 Bucket: `parseInt(sha256('fight-record:' + userId).slice(0, 8), 16) % 100 <

@@ -235,18 +235,33 @@ describe('Firebase Admin init', () => {
     });
   });
 
+  function fakeJwt(header: Record<string, unknown>): string {
+    const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
+    const encodedPayload = Buffer.from(JSON.stringify({ sub: 'uid-1' })).toString('base64url');
+    return `${encodedHeader}.${encodedPayload}.sig`;
+  }
+
+  it('does not initialise Admin for a legacy HS256 access token', async () => {
+    const legacy = fakeJwt({ alg: 'HS256', typ: 'JWT' });
+    await expect(verifyFirebaseIdToken(legacy)).resolves.toBeNull();
+    expect(sdk.verifyIdToken).not.toHaveBeenCalled();
+    expect(sdk.applicationDefault).not.toHaveBeenCalled();
+    expect(sdk.initializeApp).not.toHaveBeenCalled();
+  });
+
   it('treats email_verified as verified only when the claim is boolean true', async () => {
+    const firebaseToken = fakeJwt({ alg: 'RS256', kid: 'key-1' });
     sdk.verifyIdToken.mockResolvedValueOnce({
       uid: 'uid-1',
       email: 'a@b.c',
       email_verified: false,
       name: 'A',
     });
-    await expect(verifyFirebaseIdToken('token-a')).resolves.toMatchObject({
+    await expect(verifyFirebaseIdToken(firebaseToken)).resolves.toMatchObject({
       uid: 'uid-1',
       emailVerified: false,
     });
-    expect(sdk.verifyIdToken).toHaveBeenCalledWith('token-a', true);
+    expect(sdk.verifyIdToken).toHaveBeenCalledWith(firebaseToken, true);
 
     resetFirebaseAdminForTests();
     sdk.verifyIdToken.mockResolvedValueOnce({
@@ -254,14 +269,18 @@ describe('Firebase Admin init', () => {
       email: 'a@b.c',
       email_verified: true,
     });
-    await expect(verifyFirebaseIdToken('token-b')).resolves.toMatchObject({ emailVerified: true });
+    await expect(verifyFirebaseIdToken(fakeJwt({ alg: 'RS256', kid: 'key-1' }))).resolves.toMatchObject({
+      emailVerified: true,
+    });
 
     resetFirebaseAdminForTests();
     sdk.verifyIdToken.mockResolvedValueOnce({
       uid: 'uid-1',
       email_verified: 'true',
     });
-    await expect(verifyFirebaseIdToken('token-c')).resolves.toMatchObject({ emailVerified: false });
+    await expect(verifyFirebaseIdToken(fakeJwt({ alg: 'RS256', kid: 'key-1' }))).resolves.toMatchObject({
+      emailVerified: false,
+    });
   });
 });
 

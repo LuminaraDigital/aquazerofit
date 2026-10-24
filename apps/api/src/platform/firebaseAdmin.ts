@@ -154,11 +154,31 @@ export function getFirebaseAuth(): Auth | null {
 }
 
 /**
+ * Firebase ID tokens are RS256 and carry a key id. Legacy access JWTs are
+ * HS256 and do not. Reject that shape before the Admin SDK is touched:
+ * verifyIdToken asks ADC for a project id, and off GCP that metadata lookup
+ * waits until it times out. Cloud Run still verifies real tokens.
+ */
+function looksLikeFirebaseIdToken(token: string): boolean {
+  const headerPart = token.split('.');
+  if (headerPart.length !== 3 || !headerPart[0]) return false;
+  try {
+    const header = JSON.parse(Buffer.from(headerPart[0], 'base64url').toString('utf8')) as {
+      alg?: unknown;
+      kid?: unknown;
+    };
+    return header.alg === 'RS256' && typeof header.kid === 'string' && header.kid.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Verify a Firebase ID token with revocation checking.
- * Returns null when Admin did not initialise.
- * Throws when the token is present but invalid. requireAuth catches that and
- * falls through to the legacy JWT. email_verified must be the boolean true.
- * Any other claim value is unverified.
+ * Returns null when the token is not a Firebase ID token, or when Admin did
+ * not initialise. Throws when a Firebase-shaped token is invalid. requireAuth
+ * catches that and falls through to the legacy JWT. email_verified must be
+ * the boolean true. Any other claim value is unverified.
  */
 export async function verifyFirebaseIdToken(idToken: string): Promise<{
   uid: string;
@@ -166,6 +186,7 @@ export async function verifyFirebaseIdToken(idToken: string): Promise<{
   emailVerified: boolean;
   name?: string;
 } | null> {
+  if (!looksLikeFirebaseIdToken(idToken)) return null;
   const auth = getFirebaseAuth();
   if (!auth) return null;
   const decoded = await auth.verifyIdToken(idToken, true);

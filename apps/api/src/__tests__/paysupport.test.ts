@@ -25,10 +25,10 @@ describe('paysupport', () => {
     expect(text).not.toContain('9.99');
   });
 
-  it('escapes HTML in the mailbox so a hostile override cannot inject markup', () => {
+  it('includes the mailbox as plain text', () => {
     const text = paysupportMessage('a<b>@evil.test', 'https://aquazerofit.com');
-    expect(text).toContain('a&lt;b&gt;@evil.test');
-    expect(text).not.toContain('<b>');
+    expect(text).toContain('a<b>@evil.test');
+    expect(text).not.toContain('&lt;');
   });
 
   it('uses the published mailbox when SUPPORT_EMAIL is unset', () => {

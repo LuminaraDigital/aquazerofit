@@ -2,8 +2,8 @@
  * /refund: how to ask for a refund.
  *
  * Every sentence here is something the payment code actually does. There is
- * no refund button, no automatic Stripe refund, and no call to
- * refundStarPayment. A time limit, a promise to refund, or a promise to
+ * no refund button and no automatic Stripe refund. A Stars refund is done by
+ * support on request. A time limit, a promise to refund, or a promise to
  * refuse one would be a policy this repository does not contain, so none of
  * those appear.
  */
@@ -85,6 +85,7 @@ export default function RefundPage() {
           The same coach also unlocks when you reach the level the roster requires, and the app
           refuses the purchase if you already have that coach.
         </P>
+        <P>A Stars refund is done by support on request.</P>
       </Section>
 
       <Section id="play" index={4} heading="Google Play">

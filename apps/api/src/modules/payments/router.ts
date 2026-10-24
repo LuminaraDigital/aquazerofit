@@ -1,20 +1,27 @@
 /**
- * /telegram/webhook - the only unauthenticated route in this product that can
+ * /telegram/webhook: the only unauthenticated route in this product that can
  * grant an entitlement.
  *
  * Everything about its shape follows from that sentence:
  *
- *  - **It authenticates by shared secret, and fails closed.** Telegram echoes
+ *  - It authenticates by shared secret, and fails closed. Telegram echoes
  *    `secret_token` from setWebhook in a header on every delivery. If the
  *    secret is unset, the route rejects everything rather than trusting
- *    everything - an unconfigured webhook that accepts updates is a free
+ *    everything. An unconfigured webhook that accepts updates is a free
  *    coach roster for anyone who finds the URL.
- *  - **It always answers 200.** Telegram redelivers any non-2xx, so returning
- *    500 on a malformed update creates an infinite retry loop against a
- *    payload that will never parse. Failures are logged, acknowledged, dropped.
- *  - **It answers pre-checkout before doing anything slow.** Telegram cancels
+ *  - It always answers 200 once the secret matches. Telegram redelivers any
+ *    non-2xx, so returning 500 on a malformed update creates an infinite
+ *    retry loop against a payload that will never parse. Failures are logged,
+ *    acknowledged, dropped.
+ *  - It answers pre-checkout before doing anything slow. Telegram cancels
  *    the payment if `answerPreCheckoutQuery` does not arrive within ten
  *    seconds, and a cancelled payment mid-flow is the worst outcome available.
+ *    The call is awaited so a transport failure is logged. The invoice
+ *    payload is not part of that log.
+ *
+ * Bot commands (/start, /paysupport, /stop, /terms) are answered here. This
+ * process does not call setWebhook or setMyCommands. Both are operator steps.
+ * The setMyCommands body is TELEGRAM_BOT_COMMANDS in ./commands.ts.
  *
  * Registering the webhook (once, per deployment):
  *
@@ -24,36 +31,66 @@
  *     -d allowed_updates='["message","pre_checkout_query"]'
  */
 import { Router } from 'express';
+import { z } from 'zod';
 import { coachById, starsPriceOf } from '@aquazerofit/shared';
 import { config } from '../../platform/config';
 import { secureEquals } from '../../platform/auth';
+import { asyncHandler } from '../../platform/errors';
 import { logEvent } from '../../platform/telemetry';
+import { commandName, replyForCommand } from './commands';
 import { answerPreCheckoutQuery, sendBotMessage } from './telegramBot';
 import { completePayment, findPendingInvoice } from './stars';
-import { botCommand, paysupportMessage, supportEmail } from './paysupport';
 
 export const telegramWebhookRouter = Router();
 
-/** Shape of the slice of Telegram's Update we actually read. */
-interface TelegramUpdate {
-  pre_checkout_query?: {
-    id: string;
-    currency: string;
-    total_amount: number;
-    invoice_payload: string;
-  };
-  message?: {
-    text?: string;
-    chat?: { id?: number };
-    successful_payment?: {
-      currency: string;
-      total_amount: number;
-      invoice_payload: string;
-      telegram_payment_charge_id: string;
-      provider_payment_charge_id?: string;
-    };
-  };
-}
+/**
+ * The slice of an Update this route reads. Unknown fields are stripped, not
+ * rejected: Telegram adds fields and a strict schema would drop a real
+ * payment. Length caps are loose on purpose. A payment that fails validation
+ * is acknowledged and never granted, which is worse than accepting a long
+ * charge id.
+ */
+const telegramUserSchema = z.object({
+  id: z.number().int(),
+  is_bot: z.boolean().optional(),
+  username: z.string().max(64).optional(),
+});
+
+const telegramUpdateSchema = z.object({
+  update_id: z.number().int().optional(),
+  pre_checkout_query: z
+    .object({
+      id: z.string().min(1).max(256),
+      currency: z.string().min(1).max(16),
+      total_amount: z.number().int(),
+      invoice_payload: z.string().max(1024),
+    })
+    .optional(),
+  message: z
+    .object({
+      message_id: z.number().int().optional(),
+      text: z.string().max(4096).optional(),
+      from: telegramUserSchema.optional(),
+      chat: z
+        .object({
+          id: z.number().int(),
+          type: z.string().max(32).optional(),
+        })
+        .optional(),
+      successful_payment: z
+        .object({
+          currency: z.string().min(1).max(16),
+          total_amount: z.number().int(),
+          invoice_payload: z.string().max(1024),
+          telegram_payment_charge_id: z.string().min(1).max(256),
+          provider_payment_charge_id: z.string().max(256).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+type TelegramUpdate = z.infer<typeof telegramUpdateSchema>;
 
 function secretMatches(header: unknown): boolean {
   const expected = config.telegramWebhookSecret;
@@ -64,73 +101,120 @@ function secretMatches(header: unknown): boolean {
   return secureEquals(header, expected);
 }
 
-telegramWebhookRouter.post('/webhook', (req, res) => {
-  if (!secretMatches(req.get('x-telegram-bot-api-secret-token'))) {
-    // 401 rather than a silent 200: a real Telegram delivery always carries the
-    // header, so anything reaching here is either a misconfiguration worth
-    // surfacing loudly or a probe worth refusing plainly.
-    logEvent('telegram_webhook_rejected', { reason: 'secret_mismatch' });
-    res.status(401).json({ code: 'AUTH_INVALID', message: 'Invalid webhook secret.' });
-    return;
-  }
+function commandContext(chatType: string | undefined) {
+  return {
+    miniAppUrl: config.telegramMiniAppUrl,
+    supportEmail: config.supportEmail,
+    termsUrl: config.termsUrl,
+    privacyUrl: config.privacyUrl,
+    refundUrl: config.refundUrl,
+    deletionUrl: config.accountDeletionUrl,
+    chatType,
+  };
+}
 
-  const update = req.body as TelegramUpdate;
+function answerFailureReason(error: string): string {
+  if (/not configured/i.test(error)) return 'bot_not_configured';
+  if (/timeout|aborted/i.test(error)) return 'timeout';
+  return 'rejected';
+}
 
-  // --- Pre-checkout: last chance to decline, on a ten-second clock.
-  const query = update.pre_checkout_query;
-  if (query) {
-    const pending = findPendingInvoice(query.invoice_payload);
-    const coach = pending ? coachById(pending.coachId) : undefined;
-    const priceOk =
-      pending !== undefined &&
-      coach !== undefined &&
-      query.currency === 'XTR' &&
-      query.total_amount >= starsPriceOf(coach);
+async function handlePreCheckout(query: NonNullable<TelegramUpdate['pre_checkout_query']>): Promise<void> {
+  const pending = findPendingInvoice(query.invoice_payload);
+  const coach = pending ? coachById(pending.coachId) : undefined;
+  const priceOk =
+    pending !== undefined &&
+    coach !== undefined &&
+    query.currency === 'XTR' &&
+    query.total_amount >= starsPriceOf(coach);
 
-    void answerPreCheckoutQuery(
-      query.id,
-      priceOk,
-      priceOk ? undefined : 'This purchase is no longer available.',
-    );
-    if (!priceOk) {
-      logEvent('stars_precheckout_declined', { payload: query.invoice_payload });
-    }
-    res.status(200).json({ ok: true });
-    return;
-  }
-
-  // --- Payment cleared: grant, idempotently.
-  const payment = update.message?.successful_payment;
-  if (payment) {
-    const outcome = completePayment({
-      invoicePayload: payment.invoice_payload,
-      totalAmount: payment.total_amount,
-      currency: payment.currency,
-      telegramPaymentChargeId: payment.telegram_payment_charge_id,
-      providerPaymentChargeId: payment.provider_payment_charge_id,
+  const answered = await answerPreCheckoutQuery(
+    query.id,
+    priceOk,
+    priceOk ? undefined : 'This purchase is no longer available.',
+  );
+  if (!answered.ok) {
+    // Failure only. The invoice payload is a correlation secret and stays out.
+    logEvent('stars_precheckout_answer_failed', {
+      accepted: priceOk,
+      reason: answerFailureReason(answered.error),
     });
-    if (outcome.status === 'rejected') {
-      logEvent('stars_payment_rejected', { reason: outcome.reason });
-    }
-    res.status(200).json({ ok: true });
-    return;
   }
-
-  // /paysupport is the one command this bot answers. Telegram requires a bot
-  // that sells digital goods to tell the buyer where payment help lives, and
-  // to say that Telegram's own support cannot refund the purchase.
-  if (botCommand(update.message?.text) === 'paysupport') {
-    const chatId = update.message?.chat?.id;
-    if (typeof chatId === 'number') {
-      void sendBotMessage(chatId, paysupportMessage(supportEmail(), config.appPublicUrl));
-    } else {
-      logEvent('paysupport_without_chat', {});
-    }
-    res.status(200).json({ ok: true });
-    return;
+  if (!priceOk) {
+    logEvent('stars_precheckout_declined', { reason: 'unavailable' });
   }
+}
 
-  // Anything else (plain messages, edits) is acknowledged and ignored. The
-  // bot is a payment and notification channel, not a conversational surface.
-  res.status(200).json({ ok: true });
-});
+async function handleCommand(update: TelegramUpdate): Promise<void> {
+  const message = update.message;
+  const name = commandName(message?.text);
+  const chatId = message?.chat?.id;
+  if (!name || typeof chatId !== 'number') return;
+  const reply = replyForCommand(name, commandContext(message?.chat?.type));
+  const sent = await sendBotMessage(chatId, reply.text, {
+    buttons: reply.buttons,
+    parseMode: 'plain',
+  });
+  if (!sent.ok) {
+    logEvent('telegram_command_failed', {
+      command: name,
+      reason: answerFailureReason(sent.error),
+    });
+  }
+}
+
+telegramWebhookRouter.post(
+  '/webhook',
+  asyncHandler(async (req, res) => {
+    if (!secretMatches(req.get('x-telegram-bot-api-secret-token'))) {
+      // 401 rather than a silent 200: a real Telegram delivery always carries
+      // the header, so anything reaching here is either a misconfiguration
+      // worth surfacing loudly or a probe worth refusing plainly.
+      logEvent('telegram_webhook_rejected', { reason: 'secret_mismatch' });
+      res.status(401).json({ code: 'AUTH_INVALID', message: 'Invalid webhook secret.' });
+      return;
+    }
+
+    const parsed = telegramUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      logEvent('telegram_webhook_invalid', { reason: 'schema' });
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    try {
+      const update = parsed.data;
+      const query = update.pre_checkout_query;
+      if (query) {
+        await handlePreCheckout(query);
+        res.status(200).json({ ok: true });
+        return;
+      }
+
+      const payment = update.message?.successful_payment;
+      if (payment) {
+        const outcome = completePayment({
+          invoicePayload: payment.invoice_payload,
+          totalAmount: payment.total_amount,
+          currency: payment.currency,
+          telegramPaymentChargeId: payment.telegram_payment_charge_id,
+          providerPaymentChargeId: payment.provider_payment_charge_id,
+          telegramUserId: update.message?.from?.id,
+        });
+        if (outcome.status === 'rejected') {
+          logEvent('stars_payment_rejected', { reason: outcome.reason });
+        }
+        res.status(200).json({ ok: true });
+        return;
+      }
+
+      await handleCommand(update);
+      res.status(200).json({ ok: true });
+    } catch {
+      // A throw here would be a non-2xx, and Telegram would redeliver the
+      // same update forever. The secret already matched, so acknowledge.
+      logEvent('telegram_webhook_failed', { reason: 'handler' });
+      if (!res.headersSent) res.status(200).json({ ok: true });
+    }
+  }),
+);

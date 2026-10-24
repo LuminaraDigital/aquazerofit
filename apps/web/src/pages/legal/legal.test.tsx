@@ -236,6 +236,7 @@ describe('refund page', () => {
     expect(screen.getAllByText(DEFAULT_SUPPORT_EMAIL).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/\/paysupport/).length).toBeGreaterThan(0);
     expect(screen.getByText(/sold in Telegram Stars/i)).toBeTruthy();
+    expect(screen.getByText('A Stars refund is done by support on request.')).toBeTruthy();
     expect(screen.getByText(/subscription billed by Stripe/i)).toBeTruthy();
     expect(screen.queryByText(/full refund/i)).toBeNull();
     expect(screen.queryByText(/14 days/i)).toBeNull();

@@ -536,6 +536,8 @@ export const config = {
    * NaN means AZF_INSTANCE_COUNT was set to something that is not a positive
    * integer. That is not treated as "probably one" - a guard that cannot read
    * its own input has not verified anything, so it refuses.
+   *
+   * Unset reads as 1, which the guard accepts everywhere except Cloud Run.
    */
   get instanceCount(): number {
     const raw = process.env[INSTANCE_COUNT_ENV]?.trim();
@@ -672,30 +674,45 @@ function isProduction(): boolean {
  * horizontal scaling safe. Raising AZF_INSTANCE_COUNT before it lands does not
  * make the deployment scalable, it makes the data loss legal.
  *
+ * ON CLOUD RUN THE DEFAULT IS NOT ENOUGH. Cloud Run autoscales (to 100
+ * instances unless max-instances says otherwise), and cloudbuild.yaml deploys
+ * with `gcloud run deploy --image`, which keeps whatever scaling the live
+ * service already has. An unset variable there means nobody declared
+ * anything, and the default of 1 would wave through a service capped at 100.
+ * So when K_SERVICE is present (Cloud Run sets it on every revision) the
+ * variable must be set explicitly. cloudbuild.yaml sets it in the same
+ * command that pins min and max instances to 1, so the declaration and the
+ * scaling travel together.
+ *
  * Skipped under test (the suite runs many workers in one repo and never boots
- * a serving process) and satisfied silently by the default of 1, so ordinary
- * local development never sees it.
+ * a serving process) and, off Cloud Run, satisfied silently by the default of
+ * 1, so ordinary local development never sees it.
  */
 export function assertSingleInstance(): void {
   if (config.isTest) return;
-  const declared = config.instanceCount;
-  if (declared === 1) return;
-
   const raw = process.env[INSTANCE_COUNT_ENV]?.trim() ?? '';
-  const problem = Number.isNaN(declared)
-    ? `${INSTANCE_COUNT_ENV} is set to ${JSON.stringify(raw)}, which is not a positive integer`
-    : `${INSTANCE_COUNT_ENV}=${declared} declares ${declared} concurrent instances`;
+  const undeclaredOnCloudRun = raw === '' && Boolean(process.env.K_SERVICE?.trim());
+  const declared = config.instanceCount;
+  if (declared === 1 && !undeclaredOnCloudRun) return;
+
+  const problem = undeclaredOnCloudRun
+    ? `${INSTANCE_COUNT_ENV} is unset on Cloud Run, which autoscales unless max-instances is ` +
+      'pinned, so the default of 1 declares nothing'
+    : Number.isNaN(declared)
+      ? `${INSTANCE_COUNT_ENV} is set to ${JSON.stringify(raw)}, which is not a positive integer`
+      : `${INSTANCE_COUNT_ENV}=${declared} declares ${declared} concurrent instances`;
 
   throw new Error(
     `Refusing to start: ${problem}. This API is single-instance only. Each instance ` +
       'hydrates its own in-memory copy of the store at boot and never re-reads, so a write ' +
       'on one instance is invisible to the others and the last flush silently overwrites ' +
       "the other instances' version of the same document - health logs are lost with no " +
-      'error anywhere. Run exactly one instance (managed PaaS: one dedicated machine, NOT ' +
-      'autoscale; Docker Compose: do not use --scale on the api service; Azure Container ' +
-      'Apps: min=max=1), and unset ' +
-      `${INSTANCE_COUNT_ENV} or set it to 1. Scaling out requires the async getStore() ` +
-      'refactor first, so reads go to Postgres rather than to a per-instance memory copy.',
+      'error anywhere. Run exactly one instance (Cloud Run: --min-instances=1 ' +
+      '--max-instances=1, which cloudbuild.yaml applies on every deploy; managed PaaS: one ' +
+      'dedicated machine, NOT autoscale; Docker Compose: do not use --scale on the api service; ' +
+      `Azure Container Apps: min=max=1), and set ${INSTANCE_COUNT_ENV}=1 (it may be left ` +
+      'unset only off Cloud Run). Scaling out requires the async getStore() refactor first, ' +
+      'so reads go to Postgres rather than to a per-instance memory copy.',
   );
 }
 

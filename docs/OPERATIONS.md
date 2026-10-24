@@ -54,7 +54,8 @@ None of the deploy surfaces expresses an instance count the process can read —
 
 | Value | Effect |
 | --- | --- |
-| unset | Treated as `1`. Normal local development and the current deployments. |
+| unset, off Cloud Run | Treated as `1`. Local development and Docker Compose. |
+| unset, on Cloud Run (`K_SERVICE` set) | **Boot refused.** Cloud Run autoscales unless `max-instances` is pinned, and `gcloud run deploy --image` keeps whatever the live service has, so the default declares nothing there. |
 | `1` | Boots normally. |
 | anything else (`2`, `0`, `auto`, …) | **Boot refused** with an error naming the data-loss risk. A value that is not a positive integer is refused too: a guard that cannot read its own input has verified nothing. |
 
@@ -62,6 +63,7 @@ Enforced by `assertSingleInstance()` in `apps/api/src/platform/config.ts`, calle
 
 Per platform:
 
+- **Cloud Run** — `cloudbuild.yaml` deploys with `--min-instances=1 --max-instances=1` and sets `AZF_INSTANCE_COUNT=1` in the same command, on every deploy. A revision made any other way (console, a hand-run `gcloud run deploy`) inherits both from the one before it; if the variable is missing, the new revision fails to start and the previous one keeps serving. Raising `max-instances` by hand is the one change the guard cannot see. Min and max are per revision, so during a rollout the old and new revisions briefly run side by side; that overlap is inherent to Cloud Run and is not something the guard can see.
 - **Managed PaaS** — pin the deployment to a single reserved VM (one machine), never autoscale, and record that choice in whatever deployment manifest the host reads.
 - **Docker Compose** — `AZF_INSTANCE_COUNT=1` is set in `docker-compose.yml`. Do not use `docker compose up --scale api=N`.
 - **Azure Container Apps** — set min and max replicas both to 1.

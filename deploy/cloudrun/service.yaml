@@ -12,7 +12,9 @@
 # This file does not map a custom domain and does not read secret values.
 #
 # Single instance on purpose: the store hydrates once into memory. min and max
-# are both 1, and AZF_INSTANCE_COUNT=1 makes boot refuse anything else.
+# are both 1, and AZF_INSTANCE_COUNT=1 makes boot refuse anything else; on
+# Cloud Run boot also refuses it unset. cloudbuild.yaml re-applies all three
+# on every deploy, so the live service cannot drift off them.
 # CPU is always allocated so that one warm instance keeps its flush queue.
 apiVersion: serving.knative.dev/v1
 kind: Service

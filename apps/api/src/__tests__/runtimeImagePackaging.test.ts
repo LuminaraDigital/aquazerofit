@@ -108,6 +108,12 @@ describe('cloud run packaging', () => {
     expect(cloudbuild).toContain('_AR_REPO: api');
     expect(cloudbuild).toContain('_IMAGE: aquazerofit-api');
     expect(cloudbuild).toContain('${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE}:$COMMIT_SHA');
+    // --image alone keeps whatever scaling the live service has. The store is
+    // single-instance only, so every deploy pins it and declares it to the
+    // boot guard, which refuses an unset AZF_INSTANCE_COUNT on Cloud Run.
+    expect(cloudbuildCommands).toContain('--min-instances=1');
+    expect(cloudbuildCommands).toContain('--max-instances=1');
+    expect(cloudbuildCommands).toMatch(/--update-env-vars="[^"]*\bAZF_INSTANCE_COUNT=1\b/);
 
     const service = fs.readFileSync(path.join(repoRoot, 'deploy/cloudrun/service.yaml'), 'utf8');
     expect(service).toContain('gcloud run deploy aquazerofit-api --image');

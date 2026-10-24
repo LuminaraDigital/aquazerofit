@@ -164,7 +164,7 @@ balancer, point `API_ORIGIN` at that origin, then set ingress to
 
 ## Follow-ups, not part of this cutover
 
-- Stripe. The API reads `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET` (see `.env.example`). Leave those mounts, and any other live secret or volume, on the service. The deploy step updates the image only.
+- Stripe. The API reads `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET` (see `.env.example`). Leave those mounts, and any other live secret or volume, on the service. The deploy step changes only the image, the one-instance scaling pin, `APP_VERSION` and `AZF_INSTANCE_COUNT`.
 - Closing direct access to the run.app hostname. The API can now refuse it itself: `REQUIRE_ORIGIN_SECRET=true` 403s any request without the shared secret above, once both sides hold it and every provider webhook is on this domain (docs/OPERATIONS.md, "Closing the run.app bypass"). Do not raise `TRUST_PROXY` to paper over a shared Cloudflare egress address.
 - Firestore. The API is off. The store stays on Cloud SQL.
 - Meal-photo object storage. Cloud Run disk is ephemeral.

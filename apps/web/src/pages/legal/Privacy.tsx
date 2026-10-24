@@ -6,6 +6,8 @@
  * account deletion and the anonymised ledger/audit retention (me/service.ts),
  * and the Open Food Facts barcode fallback, whose disclosure here is a
  * REQUIRED pre-launch action recorded in docs/research/security-privacy-review.md.
+ * The recipients table lists each outbound integration in apps/api, apps/web
+ * and the Android build; adding one means adding its row and its country.
  *
  * Operator-specific facts come from ./operator and are marked in the page
  * until supplied. See that file before publishing.
@@ -29,6 +31,7 @@ const CLAUSES: Clause[] = [
   { id: 'ai', heading: 'AI processing' },
   { id: 'photos', heading: 'Meal photographs' },
   { id: 'third-parties', heading: 'Who else sees it' },
+  { id: 'overseas', heading: 'Data sent outside Australia' },
   { id: 'retention', heading: 'How long it is kept' },
   { id: 'rights', heading: 'Your controls and rights' },
   { id: 'security', heading: 'Security' },
@@ -80,7 +83,9 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
           <Fact name="privacyEmail" hint="privacy contact" />.
         </P>
         <P>
-          Data is stored and processed in <Fact name="hostingRegion" hint="hosting region" />.
+          Data is stored and processed in <Fact name="hostingRegion" hint="hosting region" />. It
+          reaches our servers through Cloudflare&apos;s global network. Sections 7 and 8 set out
+          who else receives it and where.
         </P>
       </Section>
 
@@ -125,8 +130,10 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
           default.
         </P>
         <Notice icon="info">
-          We set no advertising or third-party cookies and run no third-party analytics. The
-          referral values above are stored in your browser&apos;s local storage, under the key{' '}
+          We set no advertising or third-party cookies and run no third-party analytics on the web.
+          The Android app sends crash reports and usage analytics to Firebase only if you turn on
+          anonymised analytics. The referral values above are stored in your browser&apos;s local
+          storage, under the key{' '}
           <code className="rounded bg-surface-variant/60 px-1 py-0.5 text-[0.9em]">azf_attr_v1</code>
           , so a huddle invite still works after you sign up. Clearing site data removes it. Whether
           this deployment needs to ask consent before storing it depends on the law of{' '}
@@ -198,33 +205,85 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
       <Section id="third-parties" index={7} heading="Who else sees it">
         <Table
           caption="Third parties"
-          head={['Recipient', 'What reaches them']}
+          head={['Recipient', 'Why', 'What reaches them', 'Where processed']}
           rows={[
             [
-              <Fact key="ai" name="aiProviders" hint="configured AI providers" />,
-              'The feature-specific slice described above, when you use an AI feature.',
+              'Google Cloud',
+              'Runs our servers and database.',
+              'Everything stored in your account.',
+              <Fact key="host" name="hostingRegion" hint="hosting region" />,
             ],
             [
-              'Open Food Facts',
-              'When you scan a barcode that is not in our local mirror, that barcode is sent to Open Food Facts to look up the product. No account identifier or token is sent — but the request reveals to them that someone at your IP address scanned that product.',
+              'Cloudflare',
+              'Delivers this site, relays every request from the apps to our servers, and runs the Turnstile check on sign-up and password reset.',
+              'Your IP address and each request as it passes through. Turnstile also reads signals from your browser to tell a person from a script.',
+              'Cloudflare’s global network, usually the data centre nearest you.',
+            ],
+            [
+              <Fact key="ai" name="aiProviders" hint="configured AI providers" />,
+              'Meal-photo analysis, plans, recipes and coach replies.',
+              'The feature-specific slice described above, when you use an AI feature.',
+              'United States; Google Gemini runs on Google’s global infrastructure.',
+            ],
+            [
+              'Resend',
+              'Sends password-reset email.',
+              'Your email address and the message.',
+              'United States; sent from its Tokyo, Japan region.',
+            ],
+            [
+              'Stripe',
+              'Takes subscription payments on the web.',
+              'Your account identifier, and the email and card details you enter on Stripe’s checkout page. Card details never reach us.',
+              'United States.',
+            ],
+            [
+              'Google Play',
+              'Takes subscription payments in the Android app.',
+              'The purchase record and a one-way hash of your account identifier. Payment details stay with Google.',
+              'Google’s global infrastructure.',
+            ],
+            [
+              'Firebase (Google)',
+              'Crash reports and usage analytics from the Android app, only if you turn on anonymised analytics; web sign-in, where it is enabled.',
+              'App and installation identifiers, crash details, device model and in-app events; for sign-in, your email address.',
+              'Google’s global infrastructure.',
             ],
             [
               'Telegram',
-              'If you use the Telegram Mini App, Telegram supplies signed launch data identifying your Telegram account, and their own privacy terms cover your use of Telegram itself.',
+              'Signs you in to the Telegram Mini App, sends bot messages, and takes payments in Telegram Stars.',
+              'If you use the Telegram Mini App, Telegram supplies signed launch data identifying your Telegram account, and receives the bot messages and Stars invoices we send you. Their own privacy terms cover your use of Telegram itself.',
+              'Telegram’s own infrastructure, as its privacy policy describes.',
             ],
             [
-              'Hosting provider',
-              <>
-                Infrastructure in <Fact key="host" name="hostingRegion" hint="hosting region" />{' '}
-                that stores the data on our behalf.
-              </>,
+              'Open Food Facts',
+              'Looks up a barcode that is not in our local mirror.',
+              'The barcode. No account identifier or token is sent — but the request reveals to them that someone at your IP address scanned that product.',
+              'France.',
             ],
           ]}
         />
         <P>We do not sell personal data, and we do not share it with advertisers.</P>
       </Section>
 
-      <Section id="retention" index={8} heading="How long it is kept">
+      <Section id="overseas" index={8} heading="Data sent outside Australia">
+        <P>
+          Your account is stored in Australia, but some of the recipients above are not. Under
+          Australian Privacy Principle 8 of the Privacy Act 1988 (Cth), these are the countries your
+          personal information may be disclosed to:
+        </P>
+        <List
+          items={[
+            'United States: the AI providers, Stripe and Resend.',
+            'Japan: Resend sends our email from its Tokyo region.',
+            'France: Open Food Facts, for barcode lookups.',
+            'Cloudflare, Google (Firebase, Google Play and Gemini) and Telegram run infrastructure in many countries, so what they handle may be processed wherever they operate.',
+          ]}
+        />
+        <P>Each receives only what the table above says reaches it.</P>
+      </Section>
+
+      <Section id="retention" index={9} heading="How long it is kept">
         <Table
           caption="Retention periods"
           head={['Data', 'Kept for']}
@@ -254,22 +313,42 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
         />
       </Section>
 
-      <Section id="rights" index={9} heading="Your controls and rights">
+      <Section id="rights" index={10} heading="Your controls and rights">
         <P>Inside the app you can, at any time and without asking anyone:</P>
         <List
           items={[
             'Turn AI personalisation on or off.',
             'Review, confirm, reject or delete every fact the coach has remembered.',
             'Edit or delete individual logs.',
+            'Download a copy of your data from Settings → Export my data (JSON), on the web or in the Android app.',
             'Delete your account, which erases your data as set out above.',
           ]}
         />
         <P>
+          The export is a single JSON file holding your account record, consents, profile, logs,
+          plans, coach conversations and remembered facts, and your credit and audit records.
+        </P>
+        <P>
           Depending on where you live you may also have rights to access a copy of your data, to
           correct it, to restrict or object to processing, to portability, and to complain to a
-          supervisory authority. There is no automated export yet — a request to{' '}
-          <Fact name="privacyEmail" hint="privacy contact" /> is the route, and the response time we
-          commit to must be stated here before this notice is relied upon.
+          supervisory authority. For anything the app does not do for you, write to{' '}
+          <Fact name="privacyEmail" hint="privacy contact" />. We respond to access and correction
+          requests within 30 days.
+        </P>
+        <P>
+          To complain about how we have handled your personal information, write to{' '}
+          <Fact name="privacyEmail" hint="privacy contact" /> first; we respond within 30 days. If you
+          are not satisfied with our response, you can complain to the Office of the Australian
+          Information Commissioner (OAIC) at{' '}
+          <a
+            href="https://www.oaic.gov.au"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-primary hover:text-secondary"
+          >
+            oaic.gov.au
+          </a>
+          .
         </P>
         <Notice icon="delete" tone="coral">
           Deletion is real: your profile, logs, plans, conversations, remembered facts and any meal
@@ -278,7 +357,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
         </Notice>
       </Section>
 
-      <Section id="security" index={10} heading="Security">
+      <Section id="security" index={11} heading="Security">
         <P>
           Passwords are stored hashed with bcrypt. Sessions use short-lived access tokens with
           rotating refresh tokens. Requests are rate limited per account and per network, and
@@ -295,7 +374,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
         </P>
       </Section>
 
-      <Section id="children" index={11} heading="Age">
+      <Section id="children" index={12} heading="Age">
         <P>
           The service is not designed for children. The wellness profile accepts ages from{' '}
           {RANGES.age.min} upward, and accounts should not be created for anyone younger. Some
@@ -305,7 +384,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
         </P>
       </Section>
 
-      <Section id="changes" index={12} heading="Changes and contact">
+      <Section id="changes" index={13} heading="Changes and contact">
         <P>
           If this notice changes materially we will say so in the app before the change takes
           effect. The version in force is the one published here, effective{' '}

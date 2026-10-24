@@ -162,18 +162,21 @@ export function List({ items }: { items: React.ReactNode[] }) {
   );
 }
 
-/** Definition table for retention periods and similar. */
+/**
+ * Definition table for retention periods and similar. The first cell of each
+ * row is its header. Wider tables scroll inside the card at phone width.
+ */
 export function Table({
   caption,
   head,
   rows,
 }: {
   caption: string;
-  head: [string, string];
-  rows: Array<[React.ReactNode, React.ReactNode]>;
+  head: string[];
+  rows: React.ReactNode[][];
 }) {
   return (
-    <div className="lp-card overflow-hidden">
+    <div className="lp-card overflow-x-auto">
       <table className="w-full text-left text-sm" aria-label={caption}>
         <thead>
           <tr className="border-b border-white/8">
@@ -197,9 +200,14 @@ export function Table({
               >
                 {row[0]}
               </th>
-              <td className="px-5 py-3 align-top text-[13px] leading-relaxed text-on-surface-variant/75">
-                {row[1]}
-              </td>
+              {row.slice(1).map((cell, j) => (
+                <td
+                  key={j}
+                  className="px-5 py-3 align-top text-[13px] leading-relaxed text-on-surface-variant/75"
+                >
+                  {cell}
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>

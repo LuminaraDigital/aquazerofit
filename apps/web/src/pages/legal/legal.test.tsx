@@ -8,10 +8,12 @@
  *    possible failure mode for this file;
  *  - the retention periods quoted must match the constants the server enforces;
  *  - the disclosures the project's own privacy review made mandatory before
- *    launch (the Open Food Facts barcode transfer) must be present.
+ *    launch (the Open Food Facts barcode transfer) must be present;
+ *  - every recipient the code sends data to is named, with the country, as
+ *    the Australian Privacy Principles require.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import {
   DEFAULT_SUPPORT_EMAIL,
@@ -129,6 +131,71 @@ describe('privacy notice', () => {
       screen.getByText(new RegExp(`accepts ages from\\s+${RANGES.age.min}`, 'i')),
     ).toBeTruthy();
   });
+
+  it('names the hosting the API actually runs on', () => {
+    // deploy/cloudrun/service.yaml: Cloud Run and Cloud SQL in
+    // australia-southeast1. The live build still said Replit in the US.
+    renderAt('/privacy', <PrivacyPage />);
+
+    expect(screen.getAllByText(/Australia \(Google Cloud, Sydney\)/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Replit/)).toBeNull();
+  });
+
+  it('lists every outbound integration with what reaches it and where', () => {
+    // One row per integration the code calls out to. A provider wired into
+    // the API or the Android build without a row here is an undisclosed
+    // recipient.
+    renderAt('/privacy', <PrivacyPage />);
+    const table = screen.getByRole('table', { name: 'Third parties' });
+
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((th) => th.textContent),
+    ).toEqual(['Recipient', 'Why', 'What reaches them', 'Where processed']);
+    for (const recipient of [
+      'Google Cloud',
+      'Cloudflare',
+      OPERATOR.aiProviders?.join(', ') ?? '',
+      'Resend',
+      'Stripe',
+      'Google Play',
+      'Firebase (Google)',
+      'Telegram',
+      'Open Food Facts',
+    ]) {
+      const row = within(table).getByRole('rowheader', { name: recipient }).closest('tr');
+      expect(row?.querySelectorAll('td')).toHaveLength(3);
+    }
+  });
+
+  it('states the APP 8 overseas disclosure, naming the countries', () => {
+    const { container } = renderAt('/privacy', <PrivacyPage />);
+    const overseas = container.querySelector('section#overseas') as HTMLElement;
+
+    expect(within(overseas).getByText(/Australian Privacy Principle 8/)).toBeTruthy();
+    expect(within(overseas).getByText(/Privacy Act 1988/)).toBeTruthy();
+    for (const country of ['United States', 'Japan', 'France']) {
+      expect(within(overseas).getByText(new RegExp(`^${country}:`))).toBeTruthy();
+    }
+  });
+
+  it('gives the OAIC complaint path and the response time', () => {
+    renderAt('/privacy', <PrivacyPage />);
+
+    expect(screen.getByText(/Office of the Australian Information Commissioner/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'oaic.gov.au' }).getAttribute('href')).toBe(
+      'https://www.oaic.gov.au',
+    );
+    expect(screen.getAllByText(/within 30 days/).length).toBeGreaterThan(0);
+  });
+
+  it('points at the export that exists instead of denying there is one', () => {
+    renderAt('/privacy', <PrivacyPage />);
+
+    expect(screen.getByText(/Settings → Export my data \(JSON\)/)).toBeTruthy();
+    expect(screen.queryByText(/no automated export/i)).toBeNull();
+  });
 });
 
 /**
@@ -154,6 +221,7 @@ describe('Google Play privacy policy', () => {
     expect(screen.getByText(`${MEMORY_REJECTED_RETENTION_DAYS} days, then erased.`)).toBeTruthy();
     expect(screen.getByText(/24 hours after the analysis finishes/i)).toBeTruthy();
     expect(screen.getAllByText(/Open Food Facts/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Australian Privacy Principle 8/)).toBeTruthy();
     expect(screen.getAllByText(/LUMINARA DIGITAL PTY LTD/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/\[operator legal name\]/i)).toBeNull();
   });

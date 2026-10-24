@@ -79,7 +79,10 @@ export const OPERATOR: OperatorFacts = {
   legalName: 'LUMINARA DIGITAL PTY LTD',
   postalAddress: 'Melbourne, VIC 3000, Australia',
   jurisdiction: 'Victoria, Australia',
-  hostingRegion: 'United States (Replit Reserved VM)',
+  // Not from the live build: that said Replit in the United States, which the
+  // API left for Cloud Run and Cloud SQL in australia-southeast1
+  // (deploy/cloudrun/service.yaml).
+  hostingRegion: 'Australia (Google Cloud, Sydney)',
   privacyEmail: 'info@luminara.digital',
   // One mailbox. SUPPORT_EMAIL overrides it at build time; blank falls through
   // to the address already published for this operator.

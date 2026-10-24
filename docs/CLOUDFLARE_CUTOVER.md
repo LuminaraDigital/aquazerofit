@@ -117,8 +117,13 @@ postgres://azf:<password-already-in-the-secret>@/aquazerofit?host=/cloudsql/aqua
 The API treats that socket as a local transport. A public IP without TLS is
 refused. Do not authorize `0.0.0.0/0`.
 
-`cloudbuild.yaml` rebuilds the image and replaces `aquazerofit-api`. It does
-not touch DNS. The running service does not need a rebuild for this cutover.
+`cloudbuild.yaml` rebuilds the image and deploys it with
+`gcloud run deploy aquazerofit-api --image`. It does not apply
+`deploy/cloudrun/service.yaml`, and it does not touch DNS. A
+`gcloud run services replace` of that file would drop secret mounts that
+were added on the live service and are not listed there (the STRIPE_*
+secrets and the FIREBASE_ADMIN_JSON volume). The running service does not
+need a rebuild for this cutover.
 
 ## Staging
 
@@ -127,7 +132,7 @@ instance exists.
 
 ## Follow-ups, not part of this cutover
 
-- Stripe. The API reads `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET` (see `.env.example`); none is mounted on this service yet, so checkout stays off.
+- Stripe. The API reads `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET` (see `.env.example`). Leave those mounts, and any other live secret or volume, on the service. The deploy step updates the image only.
 - Orange-cloud in front of `run.app`, then `TRUST_PROXY=2`, then closing public ingress on the API hostname. Grey-cloud is not the public path. The Worker is.
 - Firestore. The API is off. The store stays on Cloud SQL.
 - Meal-photo object storage. Cloud Run disk is ephemeral.

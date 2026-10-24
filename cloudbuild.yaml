@@ -1,15 +1,25 @@
-# Build the monorepo image and replace the Cloud Run service.
+# Build the monorepo image and deploy that image to the existing Cloud Run
+# service.
 #
 # Operator command, from the repo root, after the IAM and Artifact Registry
 # steps in docs/CLOUDFLARE_CUTOVER.md:
 #   gcloud builds submit --project=aquazerofit --config=cloudbuild.yaml
 #
 # This config does not map aquazerofit.com and does not change Cloudflare DNS.
-# IMAGE_URI and APP_VERSION_SHA in deploy/cloudrun/service.yaml are placeholders
-# replaced below. The image tag is the commit SHA, not :latest.
+# The image tag is the commit SHA, not :latest.
+#
+# Do not switch this back to `gcloud run services replace` with
+# deploy/cloudrun/service.yaml. That file is not a full copy of the live
+# service. A replace drops mounts that exist only on the running revision,
+# including the STRIPE_* secrets and the FIREBASE_ADMIN_JSON volume.
+#
+# The live Artifact Registry repository is `api` and the image name is
+# `aquazerofit-api` (PROJECT/api/aquazerofit-api). The previous substitution
+# pushed PROJECT/aquazerofit/api, which is not the image the service runs.
 substitutions:
   _REGION: australia-southeast1
-  _AR_REPO: aquazerofit
+  _AR_REPO: api
+  _IMAGE: aquazerofit-api
 
 steps:
   - id: build
@@ -19,14 +29,14 @@ steps:
       - -f
       - apps/api/Dockerfile
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api:$COMMIT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE}:$COMMIT_SHA
       - .
 
   - id: push
     name: gcr.io/cloud-builders/docker
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api:$COMMIT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE}:$COMMIT_SHA
 
   - id: deploy
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -35,12 +45,12 @@ steps:
       - -c
       - |
         set -euo pipefail
-        image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api:$COMMIT_SHA"
-        sed \
-          -e "s|IMAGE_URI|$${image}|g" \
-          -e "s|APP_VERSION_SHA|$COMMIT_SHA|g" \
-          deploy/cloudrun/service.yaml > /workspace/service.rendered.yaml
-        gcloud run services replace /workspace/service.rendered.yaml \
+        image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE}:$COMMIT_SHA"
+        # --image keeps the current service spec (secrets, volumes, env,
+        # scaling). --update-env-vars changes only APP_VERSION.
+        gcloud run deploy aquazerofit-api \
+          --image="$${image}" \
+          --update-env-vars="APP_VERSION=$COMMIT_SHA" \
           --region="${_REGION}" \
           --project="$PROJECT_ID" \
           --quiet

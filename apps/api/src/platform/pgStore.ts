@@ -91,6 +91,21 @@ export const STARS_CHARGE_UNIQUE_INDEX_SQL = `CREATE UNIQUE INDEX IF NOT EXISTS 
     AND COALESCE(doc->>'telegramPaymentChargeId', '') <> '';`;
 
 /**
+ * One Stars subscription charge per Telegram charge id.
+ *
+ * A separate partial index, not an edit of documents_stars_charge_uidx.
+ * CREATE INDEX IF NOT EXISTS will not change an index that already exists,
+ * and rebuilding the purchase index to cover a second type would fail boot
+ * if historical purchase duplicates are already stored. This type has no
+ * historical rows, so the index is created on every boot.
+ */
+export const STARS_SUBSCRIPTION_CHARGE_UNIQUE_INDEX_SQL = `CREATE UNIQUE INDEX IF NOT EXISTS documents_stars_subscription_charge_uidx
+  ON documents ((doc->>'telegramPaymentChargeId'))
+  WHERE container = 'ledger'
+    AND doc->>'type' = 'starsSubscriptionPayment'
+    AND COALESCE(doc->>'telegramPaymentChargeId', '') <> '';`;
+
+/**
  * How many Stars charge ids are stored more than once.
  *
  * The inner query groups inside Postgres and projects a constant, so the only
@@ -346,6 +361,10 @@ export class PostgresStore extends MemoryBackedStore {
     } else {
       await this.exec.query(STARS_CHARGE_UNIQUE_INDEX_SQL);
     }
+    // Always. Skipping this when purchase duplicates exist would leave
+    // subscription charges without a unique constraint. The index predicate
+    // is the new type only, so those historical purchase rows do not block it.
+    await this.exec.query(STARS_SUBSCRIPTION_CHARGE_UNIQUE_INDEX_SQL);
     const { rows } = await this.exec.query('SELECT container, id, doc FROM documents');
 
     const byContainer = new Map<ContainerName, StoredDoc[]>();

@@ -13,18 +13,10 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import {
-  createUserWithEmailAndPassword,
-  onIdTokenChanged,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  type User as FirebaseUser,
-} from 'firebase/auth';
+import type { User as FirebaseUser } from 'firebase/auth';
 import type { AuthResponse, PublicUser } from '@aquazerofit/shared';
 import { api, tokenStore } from './api';
-import { getFirebaseAuth, isFirebaseAuthEnabled, mapFirebaseAuthError } from './firebase';
+import { isFirebaseAuthEnabled, loadFirebaseSdk, mapFirebaseAuthError } from './firebase';
 
 interface AuthContextValue {
   /** True until the first Firebase auth event (or immediately if disabled). */
@@ -62,34 +54,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [idToken, setIdToken] = useState<string | null>(null);
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
-    if (!auth) {
+    if (!firebaseEnabled) {
       setIsLoading(false);
       return;
     }
-    const unsub = onIdTokenChanged(auth, async (user) => {
-      try {
-        if (!user) {
-          setFirebaseUser(null);
-          setIdToken(null);
-          // Do not clear a legacy JWT session (Telegram cookie refresh may own it).
-          return;
-        }
-        const token = await user.getIdToken();
-        setFirebaseUser(user);
-        setIdToken(token);
-        tokenStore.set({ accessToken: token });
-      } finally {
+    let unsub = () => {};
+    let cancelled = false;
+    void loadFirebaseSdk().then((sdk) => {
+      if (cancelled) return;
+      if (!sdk.auth) {
         setIsLoading(false);
+        return;
       }
+      unsub = sdk.onIdTokenChanged(sdk.auth, (user) => {
+        void (async () => {
+          try {
+            if (!user) {
+              setFirebaseUser(null);
+              setIdToken(null);
+              // Do not clear a legacy JWT session (Telegram cookie refresh may own it).
+              return;
+            }
+            const token = await user.getIdToken();
+            setFirebaseUser(user);
+            setIdToken(token);
+            tokenStore.set({ accessToken: token });
+          } finally {
+            setIsLoading(false);
+          }
+        })();
+      });
     });
-    return () => unsub();
-  }, []);
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [firebaseEnabled]);
 
   const signInEmail = useCallback(async (email: string, password: string) => {
-    const auth = getFirebaseAuth();
-    if (!auth) throw new Error('Firebase Auth is not configured');
-    const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+    const sdk = await loadFirebaseSdk();
+    if (!sdk.auth) throw new Error('Firebase Auth is not configured');
+    const cred = await sdk.signInWithEmailAndPassword(sdk.auth, email.trim(), password);
     const token = await cred.user.getIdToken();
     tokenStore.set({ accessToken: token });
     setIdToken(token);
@@ -99,15 +104,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerEmail = useCallback(
     async (input: { email: string; password: string; displayName?: string }) => {
-      const auth = getFirebaseAuth();
-      if (!auth) throw new Error('Firebase Auth is not configured');
-      const cred = await createUserWithEmailAndPassword(
-        auth,
+      const sdk = await loadFirebaseSdk();
+      if (!sdk.auth) throw new Error('Firebase Auth is not configured');
+      const cred = await sdk.createUserWithEmailAndPassword(
+        sdk.auth,
         input.email.trim(),
         input.password,
       );
       if (input.displayName?.trim()) {
-        await updateProfile(cred.user, { displayName: input.displayName.trim() });
+        await sdk.updateProfile(cred.user, { displayName: input.displayName.trim() });
       }
       const token = await cred.user.getIdToken(true);
       tokenStore.set({ accessToken: token });
@@ -119,14 +124,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const resetPassword = useCallback(async (email: string) => {
-    const auth = getFirebaseAuth();
-    if (!auth) throw new Error('Firebase Auth is not configured');
-    await sendPasswordResetEmail(auth, email.trim());
+    const sdk = await loadFirebaseSdk();
+    if (!sdk.auth) throw new Error('Firebase Auth is not configured');
+    await sdk.sendPasswordResetEmail(sdk.auth, email.trim());
   }, []);
 
   const signOutFirebase = useCallback(async () => {
-    const auth = getFirebaseAuth();
-    if (auth) await signOut(auth);
+    const sdk = await loadFirebaseSdk();
+    if (sdk.auth) await sdk.signOut(sdk.auth);
     setFirebaseUser(null);
     setIdToken(null);
   }, []);

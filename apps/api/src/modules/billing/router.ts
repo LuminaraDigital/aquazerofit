@@ -43,6 +43,12 @@ import {
   syncCheckoutSession,
   type StripeEvent,
 } from './stripe';
+import {
+  STARS_SUBSCRIPTION_PERIOD_SECONDS,
+  createPremiumSubscriptionInvoice,
+  starsPremiumAvailable,
+  starsPremiumPrice,
+} from '../payments/starsSubscription';
 import type { User } from '@aquazerofit/shared';
 
 export const billingRouter = Router();
@@ -52,9 +58,16 @@ billingRouter.get(
   '/config',
   asyncHandler(async (_req, res) => {
     const price = await premiumPrice();
+    const starsPrice = starsPremiumPrice();
+    const starsOn = starsPremiumAvailable();
     res.json({
       play: { available: playBillingConfigured() },
       stripe: { available: price !== null, price },
+      stars: {
+        available: starsOn,
+        price: starsOn ? starsPrice : null,
+        periodSeconds: starsOn ? STARS_SUBSCRIPTION_PERIOD_SECONDS : null,
+      },
     });
   }),
 );
@@ -331,6 +344,25 @@ billingRouter.post(
       throw new AppError('CONFLICT', 'This account is already on premium.');
     }
     res.json({ url: await createCheckoutSession(userId) });
+  }),
+);
+
+/**
+ * Open a Stars subscription invoice for the Mini App.
+ *
+ * The session channel is minted by initData auth. A password or Firebase
+ * session is refused: Stars is the Mini App rail, and Stripe stays refused
+ * the other way around. The price and the 30-day period are server-side.
+ */
+billingRouter.post(
+  '/stars/subscription',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (req.user?.channel !== 'telegram') {
+      throw new AppError('FORBIDDEN', 'Stars checkout is only available in the Telegram Mini App.');
+    }
+    const result = await createPremiumSubscriptionInvoice(userIdOf(req));
+    res.json(result);
   }),
 );
 

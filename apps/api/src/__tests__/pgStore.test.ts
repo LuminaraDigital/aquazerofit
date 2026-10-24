@@ -18,6 +18,7 @@ import {
   CREATE_TABLE_SQL,
   STARS_CHARGE_DUPLICATE_COUNT_SQL,
   STARS_CHARGE_UNIQUE_INDEX_SQL,
+  STARS_SUBSCRIPTION_CHARGE_UNIQUE_INDEX_SQL,
   UPSERT_CHUNK_SIZE,
   starsChargeDuplicateCount,
   databaseSslOption,
@@ -107,7 +108,10 @@ describe('hydrate', () => {
     expect(exec.calls[2]!.text).toContain('CREATE UNIQUE INDEX IF NOT EXISTS documents_stars_charge_uidx');
     expect(exec.calls[2]!.text).toContain("doc->>'telegramPaymentChargeId'");
     expect(exec.calls[2]!.text).toContain("doc->>'type' = 'starsPurchase'");
-    expect(exec.calls[3]!.text).toBe('SELECT container, id, doc FROM documents');
+    expect(exec.calls[3]!.text).toBe(STARS_SUBSCRIPTION_CHARGE_UNIQUE_INDEX_SQL);
+    expect(exec.calls[3]!.text).toContain('documents_stars_subscription_charge_uidx');
+    expect(exec.calls[3]!.text).toContain("doc->>'type' = 'starsSubscriptionPayment'");
+    expect(exec.calls[4]!.text).toBe('SELECT container, id, doc FROM documents');
     expect(store.count('users')).toBe(1);
     expect(store.count('logs')).toBe(2);
     expect(store.byId('users', 'u1')).toEqual({ id: 'u1', email: 'a@b.c' });
@@ -129,7 +133,7 @@ describe('hydrate', () => {
     const store = newStore();
     await store.hydrate();
     await store.hydrate();
-    expect(exec.calls).toHaveLength(4);
+    expect(exec.calls).toHaveLength(5);
   });
 
   it('skips the charge unique index when duplicate charge ids are already stored', async () => {
@@ -170,6 +174,7 @@ describe('hydrate', () => {
     }
 
     expect(exec.calls.map((call) => call.text)).not.toContain(STARS_CHARGE_UNIQUE_INDEX_SQL);
+    expect(exec.calls.map((call) => call.text)).toContain(STARS_SUBSCRIPTION_CHARGE_UNIQUE_INDEX_SQL);
     expect(exec.calls.some((call) => call.text === 'SELECT container, id, doc FROM documents')).toBe(true);
     const skipped = lines.find((line) => line.includes('documents_stars_charge_uidx'));
     expect(skipped).toContain('2');

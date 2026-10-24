@@ -5,7 +5,7 @@
  * comes with premium". This is where that sentence lands, and the job here is
  * to be straight rather than to sell:
  *
- * 1. The user's actual position leads — their tier and the credit balance they
+ * 1. The user's actual position leads  -  their tier and the credit balance they
  *    can spend today. A real number someone can act on beats a value
  *    proposition they cannot check.
  * 2. What premium changes is rendered from `premiumLanes` and `costs`, not from
@@ -22,7 +22,9 @@
  * A premium account sees its position and what is switched on, not a sales
  * page it has already bought.
  */
+import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { Chip } from '@/components/ui/Chip';
@@ -32,25 +34,27 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import {
+  queryKeys,
   useBillingConfig,
   useEntitlements,
+  useStartStarsSubscription,
   useStartStripeCheckout,
   useStripeCheckoutSync,
   type BillingConfig,
   type Entitlements,
 } from '@/lib/queries';
-import { isTMA } from '@/lib/telegram';
+import { canPayWithStars, isTMA, openStarsInvoice } from '@/lib/telegram';
 
 /**
  * What each premium model lane means to a person, keyed by the lane id the API
- * reports. Unknown lanes still render — a lane the server has added and this
+ * reports. Unknown lanes still render  -  a lane the server has added and this
  * map has not is described generically rather than dropped, so the page can
  * never quietly under-report what a tier includes.
  */
 const PREMIUM_LANE_COPY: Record<string, { title: string; body: string }> = {
   insightBatch: {
     title: 'A coach-written weekly note',
-    body: 'On premium, the narrative at the top of your weekly summary is written by the coach. On free it is written from your own numbers by the app itself — you still get the summary, and every "what changed" line in it, every week.',
+    body: 'On premium, the narrative at the top of your weekly summary is written by the coach. On free it is written from your own numbers by the app itself. You still get the summary, and every "what changed" line in it, every week.',
   },
 };
 
@@ -83,7 +87,7 @@ function creditWord(n: number): string {
 
 /**
  * Position first. The balance is the ledger balance, which is what the user can
- * actually spend right now — the daily grant is what tops it up, so both
+ * actually spend right now  -  the daily grant is what tops it up, so both
  * numbers are stated rather than folded into an "X of Y" that would be wrong
  * for anyone carrying credits over.
  */
@@ -175,7 +179,7 @@ function CostsCard({ costs }: { costs: Entitlements['costs'] }) {
   );
 }
 
-/** What the premium lanes actually buy — one block per lane the API reports. */
+/** What the premium lanes actually buy  -  one block per lane the API reports. */
 function LaneList({ lanes, premium }: { lanes: string[]; premium: boolean }) {
   return (
     <div className="space-y-3">
@@ -209,7 +213,7 @@ function LaneList({ lanes, premium }: { lanes: string[]; premium: boolean }) {
 
 type StripePrice = NonNullable<NonNullable<BillingConfig['stripe']>['price']>;
 
-/** "A$9.99" from 999 minor units — the currency's own decimals, so ¥ prices read right too. */
+/** "A$9.99" from 999 minor units. The currency's own decimals, so yen prices read right too. */
 function formatAmount({ amount, currency }: StripePrice): string {
   const format = new Intl.NumberFormat(undefined, { style: 'currency', currency });
   return format.format(amount / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2));
@@ -254,6 +258,78 @@ function SubscribeCard({ price }: { price: StripePrice }) {
   );
 }
 
+type StarsOffer = { price: number; periodSeconds: number };
+
+function starsPeriodLabel(periodSeconds: number): string {
+  if (periodSeconds > 0 && periodSeconds % 86_400 === 0) {
+    const days = periodSeconds / 86_400;
+    return days === 1 ? '1 day' : `${days} days`;
+  }
+  return `${periodSeconds} seconds`;
+}
+
+/** Stars subscription inside the Mini App. The price and the period come from the API. */
+function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
+  const qc = useQueryClient();
+  const checkout = useStartStarsSubscription();
+  const [note, setNote] = useState<string | null>(null);
+  const period = starsPeriodLabel(offer.periodSeconds);
+
+  async function subscribe() {
+    setNote(null);
+    try {
+      const { invoiceLink } = await checkout.mutateAsync();
+      const status = await openStarsInvoice(invoiceLink);
+      if (status === 'paid') {
+        await qc.invalidateQueries({ queryKey: queryKeys.entitlements });
+        setNote('Payment received. Premium is on once Telegram confirms it.');
+      } else if (status === 'cancelled') {
+        setNote('Payment cancelled. Nothing was charged.');
+      } else if (status === 'pending') {
+        setNote('Telegram is still confirming the payment.');
+      } else {
+        setNote('The payment did not complete. Nothing was charged.');
+      }
+    } catch {
+      setNote(null);
+    }
+  }
+
+  return (
+    <section aria-labelledby="plan-stars">
+      <GlassCard className="p-card-padding space-y-3">
+        <h2
+          id="plan-stars"
+          className="font-heading font-semibold uppercase tracking-wide text-base text-on-surface"
+        >
+          Go premium
+        </h2>
+        <p className="flex items-baseline gap-2">
+          <span className="font-heading font-bold text-3xl tabular-nums text-primary">{offer.price}</span>
+          <span className="text-sm text-on-surface-variant">Stars / {period}</span>
+        </p>
+        <p className="text-sm leading-relaxed text-on-surface-variant">
+          Renews every {period} until support stops it. You pay with Telegram Stars. If a renewal
+          does not arrive, premium from this subscription is not extended.
+        </p>
+        <PrimaryButton loading={checkout.isPending} onClick={() => void subscribe()}>
+          Subscribe for {offer.price} Stars
+        </PrimaryButton>
+        {checkout.isError && (
+          <p role="alert" className="text-sm text-error">
+            We could not open the invoice. Nothing was charged. Try again in a moment.
+          </p>
+        )}
+        {note && (
+          <p role="status" className="text-sm leading-relaxed text-on-surface">
+            {note}
+          </p>
+        )}
+      </GlassCard>
+    </section>
+  );
+}
+
 /** Shown where Stripe sends the buyer back: cancelled, or paid and being confirmed. */
 function CheckoutReturn({ state, sessionId }: { state: string | null; sessionId: string | null }) {
   const sync = useStripeCheckoutSync(state === 'success' ? sessionId : null);
@@ -289,6 +365,17 @@ export default function Plan() {
   const billing = useBillingConfig();
   // Telegram requires its own Stars for digital goods inside a Mini App.
   const stripePrice = !isTMA() && billing.data?.stripe?.available ? billing.data.stripe.price : null;
+  const starsConfig = billing.data?.stars;
+  const starsOffer: StarsOffer | null =
+    isTMA() &&
+    canPayWithStars() &&
+    starsConfig?.available &&
+    typeof starsConfig.price === 'number' &&
+    starsConfig.price > 0 &&
+    typeof starsConfig.periodSeconds === 'number' &&
+    starsConfig.periodSeconds > 0
+      ? { price: starsConfig.price, periodSeconds: starsConfig.periodSeconds }
+      : null;
 
   if (isLoading) {
     return (
@@ -341,7 +428,7 @@ export default function Plan() {
           {lanes.length === 0 ? (
             <GlassCard className="p-card-padding">
               <p className="text-sm leading-relaxed text-on-surface-variant">
-                Nothing is held back from the free plan at the moment — every feature in the app is
+                Nothing is held back from the free plan at the moment. Every feature in the app is
                 available to you.
               </p>
             </GlassCard>
@@ -369,7 +456,8 @@ export default function Plan() {
           cannot flash up and then turn into a button.
         */}
         {!premium && stripePrice && <SubscribeCard price={stripePrice} />}
-        {!premium && !stripePrice && !billing.isLoading && (
+        {!premium && starsOffer && <StarsSubscribeCard offer={starsOffer} />}
+        {!premium && !stripePrice && !starsOffer && !billing.isLoading && (
           <section aria-labelledby="plan-availability">
             <GlassCard className="p-card-padding space-y-3 border-l-4 border-l-outline-variant">
               <div className="flex items-center gap-2">
@@ -401,7 +489,7 @@ export default function Plan() {
 
         {premium && (
           <p className="px-2 text-xs leading-relaxed text-on-surface-variant">
-            Nothing to do here — this page is just your current position. Your weekly note is
+            Nothing to do here. This page is just your current position. Your weekly note is
             written for you automatically.
           </p>
         )}

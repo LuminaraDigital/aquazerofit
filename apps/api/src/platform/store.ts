@@ -172,12 +172,17 @@ function userTypeKey(doc: StoredDoc): string | undefined {
   return indexKey(d.userId, d.type);
 }
 
-/** Stars purchases, one row per Telegram charge id. Unique. */
+/**
+ * Stars purchases and Stars subscription charges, one row per Telegram charge
+ * id. Unique. A charge id is one payment, so the two document types share the
+ * key. Refunds are excluded: they name the same charge and must not collide
+ * with the payment they reverse.
+ */
 export const LEDGER_BY_STARS_CHARGE = 'ledger.starsPurchase.telegramPaymentChargeId';
 
 function starsChargeKey(doc: StoredDoc): string | undefined {
   const d = doc as { type?: unknown; telegramPaymentChargeId?: unknown };
-  if (d.type !== 'starsPurchase') return undefined;
+  if (d.type !== 'starsPurchase' && d.type !== 'starsSubscriptionPayment') return undefined;
   if (typeof d.telegramPaymentChargeId !== 'string' || d.telegramPaymentChargeId.length === 0) {
     return undefined;
   }

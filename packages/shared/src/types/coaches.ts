@@ -109,6 +109,59 @@ export interface StarsRefund {
   createdAt: string;
 }
 
+/**
+ * Anchor for a Stars Premium subscription invoice.
+ *
+ * Kept after the first payment. Telegram reuses the same invoice payload on
+ * every renewal, and that payload is how a later charge finds the account.
+ */
+export interface StarsSubscription {
+  type: 'starsSubscription';
+  id: string;
+  userId: string;
+  /** Stars charged for each period, copied from config when the invoice was created. */
+  stars: number;
+  payload: string;
+  createdAt: string;
+}
+
+/**
+ * One settled Stars subscription charge. Idempotent on Telegram's charge id.
+ * A renewal is a new row with a new charge id and the same invoice payload.
+ */
+export interface StarsSubscriptionPayment {
+  type: 'starsSubscriptionPayment';
+  id: string;
+  userId: string;
+  stars: number;
+  telegramPaymentChargeId: string;
+  providerPaymentChargeId: string | null;
+  invoicePayload: string;
+  telegramUserId?: number | null;
+  /** ISO instant from Telegram's subscription_expiration_date. The period end. */
+  subscriptionExpirationDate: string;
+  isRecurring: boolean;
+  isFirstRecurring: boolean;
+  createdAt: string;
+}
+
+/**
+ * Append-only record that one subscription charge was refunded and the
+ * subscription was cancelled. The payment row stays.
+ */
+export interface StarsSubscriptionRefund {
+  type: 'starsSubscriptionRefund';
+  id: string;
+  userId: string;
+  stars: number;
+  telegramPaymentChargeId: string;
+  invoicePayload: string;
+  telegramUserId: number;
+  reason: string;
+  actorId: string;
+  createdAt: string;
+}
+
 /** Why a coach is or is not currently available to a user. */
 export type CoachLockReason = 'free' | 'level' | 'purchased' | 'locked';
 

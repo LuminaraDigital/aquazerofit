@@ -134,8 +134,20 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   resetStripePriceCache();
-  const user = getStore().byId<User>('users', userId);
-  if (user) getStore().upsert('users', { ...user, premiumUntil: null });
+  // premiumUntil is recomputed from the ledger, so a reset that only nulls
+  // the user field would leave an earlier invoice covering the next test.
+  const store = getStore();
+  for (const id of [userId, otherUserId]) {
+    if (!id) continue;
+    for (const grant of store.where<{ id: string }>(
+      'ledger',
+      (d) => (d as { type?: string }).type === 'entitlementGrant' && (d as { userId?: string }).userId === id,
+    )) {
+      store.delete('ledger', grant.id);
+    }
+    const user = store.byId<User>('users', id);
+    if (user?.premiumUntil) store.upsert('users', { ...user, premiumUntil: null });
+  }
 });
 
 afterAll(async () => {
@@ -231,13 +243,15 @@ describe('POST /billing/stripe/webhook', () => {
    * arrives after the user has already bought a new one must not take away the
    * month they just paid for.
    */
-  it('ignores the deletion of a subscription the account has since replaced', async () => {
+  it('removes a replaced subscription and keeps the period of the one that replaced it', async () => {
+    const end = inDaysS(30);
     await deliver(event('invoice.paid', invoice({ id: 'in_old', sub: 'sub_old', uid: userId, end: inDaysS(5) })));
-    await deliver(event('invoice.paid', invoice({ id: 'in_new', sub: 'sub_new', uid: userId, end: inDaysS(30) })));
+    await deliver(event('invoice.paid', invoice({ id: 'in_new', sub: 'sub_new', uid: userId, end })));
 
     await deliver(event('customer.subscription.deleted', subscription('sub_old', userId)));
 
     expect(effectiveTier(userDoc())).toBe('premium');
+    expect(userDoc().premiumUntil).toBe(new Date(end * 1000).toISOString());
   });
 
   it('ignores event types it does not act on', async () => {

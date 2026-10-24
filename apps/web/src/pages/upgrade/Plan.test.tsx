@@ -3,8 +3,8 @@
  * The plan page exists because the weekly-insight footnote had nowhere to send
  * a free-tier user. Two things about it are worth failing a build over.
  *
- * First, it must state the account's real position — the tier and the credit
- * balance — rather than a value proposition, so the numbers come from the API
+ * First, it must state the account's real position  -  the tier and the credit
+ * balance  -  rather than a value proposition, so the numbers come from the API
  * fixture and are asserted as rendered.
  *
  * Second, and the reason this file is emphatic about it: a purchase control
@@ -16,6 +16,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS, MAX_BANKED_CREDITS } from '@aquazerofit/shared';
 import type { BillingConfig, Entitlements } from '@/lib/queries';
@@ -24,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   useEntitlements: vi.fn(),
   useBillingConfig: vi.fn(),
   startCheckout: vi.fn(),
+  startStars: vi.fn(() => Promise.resolve({ invoiceLink: 'https://t.me/invoice/test', stars: 417 })),
   // The sync hook's state for the session in the URL; idle unless a case says otherwise.
   syncCheckout: vi.fn(
     (_sessionId: string | null): { isError: boolean; isSuccess: boolean; data?: { tier: string } } => ({
@@ -32,14 +34,28 @@ const mocks = vi.hoisted(() => ({
     }),
   ),
   isTMA: vi.fn(() => false),
+  canPayWithStars: vi.fn(() => false),
+  openStarsInvoice: vi.fn(
+    (): Promise<'paid' | 'cancelled' | 'failed' | 'pending'> => Promise.resolve('cancelled'),
+  ),
 }));
 vi.mock('@/lib/queries', () => ({
+  queryKeys: { entitlements: ['entitlements'] },
   useEntitlements: mocks.useEntitlements,
   useBillingConfig: mocks.useBillingConfig,
   useStartStripeCheckout: () => ({ mutate: mocks.startCheckout, isPending: false, isError: false }),
   useStripeCheckoutSync: mocks.syncCheckout,
+  useStartStarsSubscription: () => ({
+    mutateAsync: mocks.startStars,
+    isPending: false,
+    isError: false,
+  }),
 }));
-vi.mock('@/lib/telegram', () => ({ isTMA: mocks.isTMA }));
+vi.mock('@/lib/telegram', () => ({
+  isTMA: mocks.isTMA,
+  canPayWithStars: mocks.canPayWithStars,
+  openStarsInvoice: mocks.openStarsInvoice,
+}));
 
 import Plan from './Plan';
 
@@ -73,24 +89,30 @@ function renderWith(state: QueryState, billing: BillingConfig = NO_STRIPE, url =
     ...state,
   });
   mocks.useBillingConfig.mockReturnValue({ data: billing, isLoading: false });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={[url]}>
-      <Routes>
-        <Route path="/plan" element={<Plan />} />
-        <Route path="/progress" element={<p>progress</p>} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[url]}>
+        <Routes>
+          <Route path="/plan" element={<Plan />} />
+          <Route path="/progress" element={<p>progress</p>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mocks.isTMA.mockReturnValue(false);
+  mocks.canPayWithStars.mockReturnValue(false);
+  mocks.openStarsInvoice.mockResolvedValue('cancelled');
   mocks.syncCheckout.mockReset();
   mocks.syncCheckout.mockImplementation(() => ({ isError: false, isSuccess: false }));
 });
 
-describe('plan page — free tier', () => {
+describe('plan page  -  free tier', () => {
   it('leads with the account position: tier and the credits actually available', () => {
     renderWith({ data: FREE });
 
@@ -148,7 +170,7 @@ describe('plan page — free tier', () => {
     expect(screen.getByRole('heading', { name: /upgrading is not available here yet/i })).toBeTruthy();
     expect(screen.getByText(/you cannot buy premium from this screen yet/i)).toBeTruthy();
 
-    // No checkout affordance of any kind — not even a disabled one.
+    // No checkout affordance of any kind  -  not even a disabled one.
     for (const role of ['button', 'link'] as const) {
       expect(
         screen.queryByRole(role, { name: /upgrade|buy|subscribe|checkout|go premium|pay/i }),
@@ -159,7 +181,7 @@ describe('plan page — free tier', () => {
   });
 });
 
-describe('plan page — premium tier', () => {
+describe('plan page  -  premium tier', () => {
   it('shows the position and what is switched on, not a sales page', () => {
     renderWith({ data: PREMIUM });
 
@@ -178,6 +200,17 @@ describe('plan page — premium tier', () => {
     expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
   });
 
+  it('does not offer Stars to an account that is already premium', () => {
+    mocks.isTMA.mockReturnValue(true);
+    mocks.canPayWithStars.mockReturnValue(true);
+    renderWith(
+      { data: PREMIUM },
+      { stars: { available: true, price: 417, periodSeconds: 2_592_000 } },
+    );
+
+    expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
+  });
+
   it('still prices credits, because credits are spent on premium too', () => {
     renderWith({ data: PREMIUM });
 
@@ -186,7 +219,7 @@ describe('plan page — premium tier', () => {
   });
 });
 
-describe('plan page — non-content states', () => {
+describe('plan page  -  non-content states', () => {
   it('shows skeletons while the entitlements request is in flight', () => {
     const { container } = renderWith({ isLoading: true });
 
@@ -202,7 +235,7 @@ describe('plan page — non-content states', () => {
   });
 });
 
-describe('plan page — Stripe checkout', () => {
+describe('plan page  -  Stripe checkout', () => {
   it("offers Subscribe with Stripe's price on the button, and opens checkout when pressed", () => {
     renderWith({ data: FREE }, STRIPE);
 
@@ -240,6 +273,34 @@ describe('plan page — Stripe checkout', () => {
     renderWith({ data: FREE }, STRIPE, '/plan?checkout=success&session_id=cs_test_abc');
 
     expect(screen.getByRole('status').textContent).toMatch(/could not confirm this checkout yet/i);
+  });
+
+  it('opens a Stars invoice in the Mini App at the price the API sent', async () => {
+    mocks.isTMA.mockReturnValue(true);
+    mocks.canPayWithStars.mockReturnValue(true);
+    mocks.openStarsInvoice.mockResolvedValue('paid');
+    const stars: BillingConfig = {
+      stripe: { available: true, price: { amount: 999, currency: 'aud', interval: 'month' } },
+      stars: { available: true, price: 417, periodSeconds: 2_592_000 },
+    };
+    renderWith({ data: FREE }, stars);
+
+    expect(screen.queryByRole('button', { name: /9\.99/i })).toBeNull();
+    expect(screen.getAllByText(/30 days/i).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /subscribe for 417 stars/i }));
+
+    expect(await screen.findByText(/payment received/i)).toBeTruthy();
+    expect(mocks.startStars).toHaveBeenCalledTimes(1);
+    expect(mocks.openStarsInvoice).toHaveBeenCalledWith('https://t.me/invoice/test');
+  });
+
+  it('keeps the not-available card when Stars has no price, even inside Telegram', () => {
+    mocks.isTMA.mockReturnValue(true);
+    mocks.canPayWithStars.mockReturnValue(true);
+    renderWith({ data: FREE }, { stars: { available: false, price: null, periodSeconds: null } });
+
+    expect(screen.getByRole('heading', { name: /upgrading is not available here yet/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
   });
 
   it('says nothing was charged when the buyer backs out of checkout', () => {

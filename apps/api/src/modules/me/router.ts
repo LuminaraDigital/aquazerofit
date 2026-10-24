@@ -8,8 +8,8 @@ import {
   maxBankedCreditsFor,
   consentsSchema,
   profileSchema,
+  linkTelegramSchema,
   setCredentialsSchema,
-  telegramAuthSchema,
   updateIdentitySchema,
   type User,
 } from '@aquazerofit/shared';
@@ -103,9 +103,9 @@ meRouter.get('/targets', (req, res) => {
 });
 
 meRouter.post('/link-telegram', (req, res) => {
-  const { initData } = telegramAuthSchema.parse(req.body);
+  const { initData, confirm } = linkTelegramSchema.parse(req.body);
   const tgUser = validateTelegramInitData(initData);
-  const user = linkTelegram(userIdOf(req), tgUser.id, tgUser.username);
+  const user = linkTelegram(userIdOf(req), tgUser.id, tgUser.username, confirm === true);
   res.json({ user });
 });
 

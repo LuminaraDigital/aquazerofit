@@ -8,9 +8,20 @@
  *
  * Cookie scope: path=/api/v1/auth limits it to the auth endpoints; Secure
  * is set only when not dev/test/loopback so local http dev still works.
- * Split-origin hosting (web and API on different hostnames) would need
- * SameSite=None;Secure : SameSite=Lax is correct for the same-origin and
- * Vite-proxy deployments this build targets. See VITE_API_BASE_URL.
+ *
+ * SameSite stays Lax. A Mini App embedded in web.telegram.org is a
+ * third-party context, so the browser does not send this cookie on refresh
+ * from that iframe. The web client re-runs Telegram initData auth in that
+ * case (apps/web/src/lib/api.ts) instead of widening the cookie.
+ *
+ * SameSite=None; Secure was considered and rejected. Refresh and logout
+ * have no CSRF token: they trust the cookie. None would attach azf_rt to
+ * cross-site requests. CORS credentials:false stops a foreign page from
+ * reading the response, but it does not stop the browser from sending the
+ * cookie, so that page could still rotate the single-use token or revoke
+ * the family. Lax keeps that side effect on the cookie's own site.
+ * Split-origin hosting (VITE_API_BASE_URL on another hostname) is outside
+ * this design for the same reason.
  */
 import type { Request, Response } from 'express';
 import { config } from '../../platform/config';

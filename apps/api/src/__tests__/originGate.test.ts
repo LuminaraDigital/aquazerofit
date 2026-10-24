@@ -23,6 +23,7 @@ const KEYS = [
   'REQUIRE_ORIGIN_SECRET',
   'ORIGIN_SHARED_SECRET',
   'ORIGIN_SHARED_SECRET_PREVIOUS',
+  'CORS_ORIGINS',
 ] as const;
 const ORIGINAL = Object.fromEntries(KEYS.map((k) => [k, process.env[k]])) as Record<
   string,
@@ -113,6 +114,44 @@ describe('requireWorkerOrigin', () => {
     expect(health.body.status).toBe('ok');
     const ready = await request(app).get('/ready');
     expect(ready.status).toBe(200);
+  });
+
+  it('exempts only the exact probe paths, not near misses', async () => {
+    // Express would route several of these to the probe handlers (it matches
+    // case-insensitively and ignores a trailing slash), and a looser exemption
+    // check is how a gate grows a hole. Each must be refused.
+    enforce();
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const app = createApp();
+    const nearMisses = [
+      '/health/',
+      '/HEALTH',
+      '//health',
+      '/%68ealth',
+      '/health/../api/v1/me',
+      '/health;x',
+      '/ready/',
+    ];
+    for (const path of nearMisses) {
+      expect((await request(app).get(path)).status, path).toBe(403);
+    }
+    // A query string is not part of the path, so a probe that adds one still passes.
+    expect((await request(app).get('/ready?x=1')).status).toBe(200);
+  });
+
+  it('lets a CORS preflight carrying the secret through', async () => {
+    // Browsers preflight cross-origin API calls; through the Worker the
+    // preflight carries the secret like any other request.
+    enforce();
+    process.env.CORS_ORIGINS = 'https://aquazerofit.com';
+    const res = await request(createApp())
+      .options('/api/v1/auth/login')
+      .set('Origin', 'https://aquazerofit.com')
+      .set('Access-Control-Request-Method', 'POST')
+      .set(ORIGIN_SHARED_SECRET_HEADER, SECRET);
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(300);
+    expect(res.headers['access-control-allow-origin']).toBe('https://aquazerofit.com');
   });
 
   it('logs at most one security line a minute, carrying the suppressed count', async () => {

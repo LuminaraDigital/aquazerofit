@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { isTMA } from '@/lib/telegram';
+import { shouldUseStaticTelegramBackground } from '@/lib/telegramChrome';
 
 /**
- * Animated WebGL aurora shader — custom implementation in AquaZeroFit's
+ * Animated WebGL aurora shader. Custom implementation in AquaZeroFit's
  * aquatic palette (cyan/teal/green).
  *
  * Renders three fixed layers:
@@ -12,20 +14,104 @@ import { useEffect, useRef } from 'react';
  * The shader is a single full-screen triangle with banded light rays
  * that shift slowly. Performance: one draw call per frame, ~0% CPU when
  * tab is backgrounded (rAF pauses). Respects prefers-reduced-motion.
+ *
+ * Inside Telegram the shader is skipped on Android, on a light scheme (the
+ * shader is a dark ocean and would sit under light text), when deviceMemory
+ * or hardwareConcurrency is 4 or less, and when the user prefers reduced
+ * motion. Those cases paint a static CSS wash instead. Outside Telegram the
+ * only skip is reduced motion, and the canvas stack stays as it was.
  */
+function prefersReducedMotion(): boolean {
+  if (typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * Read the host object directly. Page tests replace the telegram module with
+ * a partial mock that only stubs isTMA, and a named import of telegramWebApp
+ * would throw while rendering the marketing shell.
+ */
+function liveWebApp() {
+  return typeof window === 'undefined' ? undefined : window.Telegram?.WebApp;
+}
+
+function telegramStaticBackground(): boolean {
+  const tg = liveWebApp();
+  return shouldUseStaticTelegramBackground({
+    inTelegram: isTMA(),
+    platform: tg?.platform,
+    colorScheme: tg?.colorScheme,
+    deviceMemory: navigator.deviceMemory,
+    hardwareConcurrency: navigator.hardwareConcurrency,
+    prefersReducedMotion: prefersReducedMotion(),
+  });
+}
+
+function supportsThemeEvents(): boolean {
+  const tg = liveWebApp();
+  if (!tg?.initData || typeof tg.isVersionAtLeast !== 'function') return false;
+  try {
+    return tg.isVersionAtLeast('6.1') === true;
+  } catch {
+    return false;
+  }
+}
+
 export function AppBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [staticBg, setStaticBg] = useState(telegramStaticBackground);
 
   useEffect(() => {
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (prefersReduced) return;
+    let cancelled = false;
+    let stopGl: (() => void) | undefined;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const gl = canvas.getContext('webgl');
-    if (!gl) return;
+    const apply = () => {
+      stopGl?.();
+      stopGl = undefined;
+      const reduced = prefersReducedMotion();
+      const telegramStatic = telegramStaticBackground();
+      if (cancelled) return;
+      setStaticBg(telegramStatic);
+      if (reduced || telegramStatic) return;
 
-    // Capture non-null refs for use inside callbacks
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      stopGl = startAurora(canvas);
+    };
+
+    apply();
+    const tg = liveWebApp();
+    const onTheme = () => apply();
+    if (supportsThemeEvents()) {
+      tg?.onEvent?.('themeChanged', onTheme);
+    }
+    return () => {
+      cancelled = true;
+      stopGl?.();
+      if (supportsThemeEvents()) tg?.offEvent?.('themeChanged', onTheme);
+    };
+  }, []);
+
+  return (
+    <>
+      {staticBg ? <div className="azf-bg-static" aria-hidden="true" /> : null}
+      <canvas
+        ref={canvasRef}
+        className="azf-bg-canvas"
+        aria-hidden="true"
+        style={staticBg ? { display: 'none' } : undefined}
+      />
+      <div className="azf-bg-hatch" aria-hidden="true" />
+      <div className="azf-bg-vignette" aria-hidden="true" />
+    </>
+  );
+}
+
+function startAurora(canvas: HTMLCanvasElement): (() => void) | undefined {
+  const gl = canvas.getContext('webgl');
+  if (!gl) return;
+
+  // Capture non-null refs for use inside callbacks
     const cv = canvas;
     const ctx = gl;
 
@@ -122,13 +208,4 @@ export function AppBackground() {
       cancelAnimationFrame(rafId);
       window.removeEventListener('resize', resize);
     };
-  }, []);
-
-  return (
-    <>
-      <canvas ref={canvasRef} className="azf-bg-canvas" aria-hidden="true" />
-      <div className="azf-bg-hatch" aria-hidden="true" />
-      <div className="azf-bg-vignette" aria-hidden="true" />
-    </>
-  );
 }

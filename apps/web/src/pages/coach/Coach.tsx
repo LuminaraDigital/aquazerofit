@@ -23,6 +23,7 @@ import { api, ApiError, streamChat } from '@/lib/api';
 import { asList } from '@/lib/envelopes';
 import { todayLocalDate } from '@/lib/format';
 import { useDraftPersistence } from '@/lib/useDraftPersistence';
+import { useTelegramUnsavedEdits } from '@/lib/useTelegramChrome';
 import { trackFirstValueMeal } from '@/lib/retention';
 import { queryKeys, useCoachRoster, type CoachCardData } from '@/lib/queries';
 import { AppHeader } from '@/components/ui/AppHeader';
@@ -214,6 +215,7 @@ export default function Coach() {
     surface: 'coach',
     onRestore: onRestoreComposer,
   });
+  useTelegramUnsavedEdits(input.trim().length > 0);
 
   // ---- session bootstrap ----
   const sessionsQuery = useQuery({

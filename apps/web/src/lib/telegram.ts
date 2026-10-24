@@ -3,6 +3,11 @@
  * The global is typed minimally here - we only touch the surface we need,
  * and every helper is a safe no-op outside of Telegram.
  */
+import {
+  installTelegramChrome,
+  syncTelegramChromeColors,
+  telegramSupports,
+} from './telegramChrome';
 
 interface TelegramHapticFeedback {
   impactOccurred(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'): void;
@@ -10,31 +15,79 @@ interface TelegramHapticFeedback {
   selectionChanged(): void;
 }
 
-interface TelegramWebApp {
+export interface TelegramInsets {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+interface TelegramBackButton {
+  show(): void;
+  hide(): void;
+  onClick(handler: () => void): void;
+  offClick(handler: () => void): void;
+}
+
+interface TelegramMainButton {
+  show(): void;
+  hide(): void;
+  enable?(): void;
+  disable?(): void;
+  setText?(text: string): void;
+  onClick(handler: () => void): void;
+  offClick(handler: () => void): void;
+  setParams?(params: {
+    text?: string;
+    color?: string;
+    text_color?: string;
+    is_active?: boolean;
+    is_visible?: boolean;
+  }): void;
+}
+
+export interface TelegramWebApp {
   initData: string;
   /**
    * Client-side parse of the same launch data. Unsigned by definition, so it
-   * is read only for things that are not security decisions — here, the
+   * is read only for things that are not security decisions. Here, the
    * attribution payload from the landing page's deep link. Anything that
    * grants access still goes through the server, which re-parses `initData`
    * and verifies its HMAC.
    */
   initDataUnsafe?: { start_param?: string };
+  version?: string;
+  platform?: string;
   colorScheme?: 'light' | 'dark';
   themeParams?: Record<string, string>;
+  viewportHeight?: number;
+  viewportStableHeight?: number;
+  safeAreaInset?: TelegramInsets;
+  contentSafeAreaInset?: TelegramInsets;
   ready(): void;
   expand(): void;
+  isVersionAtLeast?(version: string): boolean;
   HapticFeedback?: TelegramHapticFeedback;
-  /** Present from Bot API 6.1; older clients simply never fire theme updates. */
-  onEvent?(event: 'themeChanged', handler: () => void): void;
-  offEvent?(event: 'themeChanged', handler: () => void): void;
+  BackButton?: TelegramBackButton;
+  MainButton?: TelegramMainButton;
+  setHeaderColor?(color: string): void;
+  setBackgroundColor?(color: string): void;
+  disableVerticalSwipes?(): void;
+  enableVerticalSwipes?(): void;
+  enableClosingConfirmation?(): void;
+  disableClosingConfirmation?(): void;
+  /** Events are versioned individually. Callers gate with isVersionAtLeast. */
+  onEvent?(event: string, handler: (...args: unknown[]) => void): void;
+  offEvent?(event: string, handler: (...args: unknown[]) => void): void;
   /**
    * Stars checkout, Bot API 6.1+. Optional because an older Telegram client
-   * simply does not have it — which is a real case, not a theoretical one, and
+   * simply does not have it. That is a real case, not a theoretical one, and
    * is why `canPayWithStars()` exists rather than an unguarded call that
    * throws inside the purchase handler.
    */
   openInvoice?(url: string, callback?: (status: InvoiceStatus) => void): void;
+  openTelegramLink?(url: string): void;
+  openLink?(url: string): void;
 }
 
 /** Terminal states Telegram reports back from an invoice. */
@@ -50,6 +103,11 @@ function getWebApp(): TelegramWebApp | undefined {
   return typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
 }
 
+/** The live WebApp object, or undefined outside Telegram and in SSR. */
+export function telegramWebApp(): TelegramWebApp | undefined {
+  return getWebApp();
+}
+
 /** True only when actually launched inside Telegram (initData present). */
 export function isTMA(): boolean {
   return Boolean(getWebApp()?.initData);
@@ -62,7 +120,7 @@ export function getTelegramInitData(): string | null {
 }
 
 /**
- * The `startapp` payload from the deep link that launched this Mini App — the
+ * The `startapp` payload from the deep link that launched this Mini App. It is the
  * only channel by which anything survives the web → Telegram hop. Null outside
  * Telegram and for a launch that carried no payload.
  */
@@ -75,7 +133,7 @@ export function getTelegramStartParam(): string | null {
 // SDK loading
 //
 // The SDK used to be a blocking <script> in index.html, fetched from
-// telegram.org on every page load — including the landing page, whose entire
+// telegram.org on every page load, including the landing page, whose entire
 // job is to convert visitors who are *not* in Telegram yet. That put a
 // third-party, render-blocking request in front of the marketing site for
 // everyone, and made the page hang for precisely the audience least able to
@@ -113,7 +171,7 @@ export function looksLikeTelegramLaunch(): boolean {
   try {
     return Boolean(window.sessionStorage.getItem(TG_SESSION_KEY));
   } catch {
-    // Storage denied (private mode, third-party context) — not a launch signal.
+    // Storage denied (private mode, third-party context). That is not a launch signal.
     return false;
   }
 }
@@ -145,7 +203,7 @@ export function loadTelegramSdk(): Promise<boolean> {
 }
 
 /**
- * Bootstrap Telegram if — and only if — this is a Mini App launch. On the web
+ * Bootstrap Telegram if, and only if, this is a Mini App launch. On the web
  * this resolves immediately having touched no third-party origin at all.
  */
 export async function ensureTelegram(): Promise<boolean> {
@@ -168,24 +226,23 @@ export async function ensureTelegram(): Promise<boolean> {
 // The line drawn between "follows the host" and "stays AquaZeroFit":
 //
 //   BOUND    page background, the surface/container ramp, primary text,
-//            secondary/hint text, hairline outlines. These are chrome — the
+//            secondary/hint text, hairline outlines. These are chrome. The
 //            user picked them in their client and the app should sit inside
 //            it rather than punch a hole in it.
 //
 //   BRAND    aqua primary, mint secondary, coral/tertiary, the error ramp,
-//            the CTA gradient and every on-* pairing. These are the product's
-//            identity and, just as importantly, ~200 usages across the app
-//            assume this exact light-on-dark ramp. Repainting them from a
-//            chat client would make AquaZeroFit unrecognisable *and* break
-//            pairs like `bg-secondary text-on-secondary`.
+//            the CTA gradient and every on-* pairing. On a dark host these
+//            stay the shipped light-on-dark ramp: repainting them from a chat
+//            client would make AquaZeroFit unrecognisable and break pairs
+//            like `bg-secondary text-on-secondary`.
 //
-// Because the brand foregrounds are fixed and light, the bound surface is not
-// free to be anything: a white host background would leave #8aebff headings
-// at 1.3:1. So every candidate background is gated on keeping the fixed brand
-// foregrounds at WCAG AA, and a host theme that fails the gate (any light
-// Telegram theme) binds nothing at all and renders the shipped dark palette,
-// which is readable. That is a measured decision, not an assumption that the
-// host is dark — see resolveTelegramNeutrals below and its tests.
+// A light host is different. The shipped foregrounds are light (#8aebff on
+// white is about 1.3:1), so a light colorScheme cannot keep them. It binds
+// the host background and text, then darkens each brand foreground until it
+// clears WCAG AA on that background and flips the matching on-* ink so
+// buttons stay readable. An explicit dark colorScheme with a light background
+// keeps the shipped dark palette instead of painting light text on white.
+// See resolveTelegramAppearance below and its tests.
 // ---------------------------------------------------------------------------
 
 /** sRGB channel triplet, 0-255. */
@@ -195,9 +252,10 @@ export type Rgb = readonly [number, number, number];
 const AA_TEXT_CONTRAST = 4.5;
 
 /**
- * Brand foregrounds that are painted directly on the page surface and are
- * never rebound. The palest of these is what limits how light a bound host
- * background may be. Mirrors the --azf-* brand block in styles/index.css.
+ * Shipped brand foregrounds. On a dark host they stay as written. They are
+ * also the contrast floor for adopting a dark host background: if any of
+ * them would fall under AA, the background is not a dark theme. Mirrors the
+ * --azf-* brand block in styles/index.css.
  */
 const FIXED_BRAND_FOREGROUNDS: readonly Rgb[] = [
   [138, 235, 255], // primary
@@ -214,7 +272,7 @@ const FIXED_BRAND_FOREGROUNDS: readonly Rgb[] = [
  * background to the foreground. Taken from the shipped palette's own spacing
  * (#0e1416 -> #161d1e -> ... -> #343a3c) so a bound host keeps the same sense
  * of depth, and so the ramp runs the correct direction whatever the host's
- * polarity — it always steps *towards* the host's text colour.
+ * polarity. It always steps *towards* the host's text colour.
  */
 const CONTAINER_RAMP = {
   '--azf-surface-container-lowest': -0.025,
@@ -275,8 +333,7 @@ function channels(color: Rgb): string {
 
 /**
  * True when a candidate page background keeps every fixed brand foreground at
- * AA. This is the whole light/dark question, answered by measurement rather
- * than by reading colorScheme.
+ * AA. Dark hosts pass. Light hosts do not, and take the light-theme path.
  */
 export function keepsBrandLegible(background: Rgb): boolean {
   return FIXED_BRAND_FOREGROUNDS.every(
@@ -284,27 +341,78 @@ export function keepsBrandLegible(background: Rgb): boolean {
   );
 }
 
+/** Fallback page colour when a light client sends no bg_color. */
+const DEFAULT_LIGHT_BG: Rgb = [244, 248, 249];
+const DEFAULT_LIGHT_TEXT: Rgb = [23, 29, 31];
+
 /**
- * Map Telegram theme params onto the --azf-* neutrals.
- *
- * Returns an empty map — meaning "keep the shipped palette" — when the theme
- * is missing, unparseable, or light enough that binding it would drop the
- * fixed brand foregrounds below AA. Pure, so the contrast rules are testable
- * without a DOM.
+ * Shipped brand colours that light themes darken. Same hues, lower luminance,
+ * so headings and buttons stay AquaZeroFit and still clear AA on white.
  */
-export function resolveTelegramNeutrals(
+const LIGHT_BRAND: Readonly<Record<string, Rgb>> = {
+  '--azf-primary': [138, 235, 255],
+  '--azf-secondary': [69, 223, 164],
+  '--azf-tertiary': [255, 210, 213],
+  '--azf-error': [255, 180, 171],
+  '--azf-success': [69, 223, 164],
+  '--azf-warning': [255, 196, 90],
+  '--azf-info': [138, 235, 255],
+  '--azf-coral': [255, 178, 185],
+  '--azf-surface-tint': [47, 217, 244],
+  '--azf-primary-fixed-dim': [47, 217, 244],
+  '--azf-secondary-fixed-dim': [69, 223, 164],
+  '--azf-tertiary-fixed-dim': [255, 178, 185],
+};
+
+const ON_ROLE: Readonly<Record<string, string>> = {
+  '--azf-primary': '--azf-on-primary',
+  '--azf-secondary': '--azf-on-secondary',
+  '--azf-tertiary': '--azf-on-tertiary',
+  '--azf-error': '--azf-on-error',
+  '--azf-success': '--azf-on-success',
+  '--azf-warning': '--azf-on-warning',
+  '--azf-info': '--azf-on-info',
+};
+
+/** Every property the binding may write, so a failed rebind can clear cleanly. */
+export const TELEGRAM_APPEARANCE_PROPERTIES: readonly string[] = [
+  ...BOUND_PROPERTIES,
+  ...Object.keys(LIGHT_BRAND),
+  ...Object.values(ON_ROLE),
+  '--azf-cta-text',
+];
+
+export interface TelegramAppearance {
+  /** CSS custom properties. Empty means keep the shipped palette. */
+  vars: Record<string, string>;
+  scheme: 'light' | 'dark' | null;
+}
+
+function darkenUntil(color: Rgb, background: Rgb): Rgb {
+  for (let step = 0; step <= 24; step += 1) {
+    const candidate = mix(color, [0, 0, 0], step / 24);
+    if (contrastRatio(candidate, background) >= AA_TEXT_CONTRAST) return candidate;
+  }
+  return [0, 0, 0];
+}
+
+export function rgbToHex(color: Rgb): string {
+  return `#${color.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function inkForFills(fills: readonly Rgb[]): Rgb {
+  const white: Rgb = [255, 255, 255];
+  const black: Rgb = [0, 0, 0];
+  const worst = (ink: Rgb) => Math.min(...fills.map((fill) => contrastRatio(ink, fill)));
+  return worst(white) >= worst(black) ? white : black;
+}
+
+function neutralVars(
+  background: Rgb,
   theme: Record<string, string> | undefined,
+  anchor: Rgb,
+  text: Rgb | null,
 ): Record<string, string> {
-  const background = parseHexColor(theme?.['bg_color']);
-  if (!background || !keepsBrandLegible(background)) return {};
-
-  const text = parseHexColor(theme?.['text_color']);
-  const textIsReadable =
-    text !== null && contrastRatio(text, background) >= AA_TEXT_CONTRAST;
-  // The ramp needs a foreground anchor even if the host's own text colour is
-  // unusable. The background passed the gate, so it is dark: white is safe.
-  const anchor: Rgb = textIsReadable && text ? text : [255, 255, 255];
-
   const bound: Record<string, string> = {
     '--azf-surface': channels(background),
     '--azf-surface-dim': channels(background),
@@ -312,11 +420,12 @@ export function resolveTelegramNeutrals(
   for (const [property, t] of Object.entries(CONTAINER_RAMP)) {
     bound[property] = channels(mix(background, anchor, t));
   }
-  if (textIsReadable && text) bound['--azf-on-surface'] = channels(text);
-
+  if (text && contrastRatio(text, background) >= AA_TEXT_CONTRAST) {
+    bound['--azf-on-surface'] = channels(text);
+  }
   // Telegram's hint colour is routinely below AA against its own background
   // (#708499 on #17212b is 4.2:1). Rather than drop it or accept it, walk it
-  // towards the text colour until it passes — the host's intent survives, the
+  // towards the text colour until it passes. The host's intent survives, the
   // contrast floor holds.
   const hint = parseHexColor(theme?.['hint_color']);
   if (hint) {
@@ -329,6 +438,99 @@ export function resolveTelegramNeutrals(
     }
   }
   return bound;
+}
+
+/**
+ * Map Telegram theme params onto the token layer.
+ *
+ * Dark hosts bind neutrals only, and only while the shipped brand foregrounds
+ * stay at AA. Light hosts (colorScheme light, or a light bg_color when the
+ * scheme is unset) bind neutrals and a darkened brand ramp. An empty `vars`
+ * map means "keep the shipped palette". Pure, so the contrast rules are
+ * testable without a DOM.
+ */
+export function resolveTelegramAppearance(
+  theme: Record<string, string> | undefined,
+  colorScheme?: 'light' | 'dark',
+): TelegramAppearance {
+  const parsed = parseHexColor(theme?.['bg_color']);
+  const background = parsed ?? (colorScheme === 'light' ? DEFAULT_LIGHT_BG : null);
+  if (!background) return { vars: {}, scheme: null };
+
+  const brandOk = keepsBrandLegible(background);
+  const blackOk = contrastRatio([0, 0, 0], background) >= AA_TEXT_CONTRAST;
+  const wantLight = colorScheme === 'light' || (colorScheme !== 'dark' && !brandOk && blackOk);
+
+  if (wantLight && !brandOk && blackOk) {
+    const supplied = parseHexColor(theme?.['text_color']);
+    const text =
+      supplied && contrastRatio(supplied, background) >= AA_TEXT_CONTRAST
+        ? supplied
+        : colorScheme === 'light' && !parsed
+          ? DEFAULT_LIGHT_TEXT
+          : null;
+    const readableText = text && contrastRatio(text, background) >= AA_TEXT_CONTRAST ? text : null;
+    const anchor: Rgb = readableText ?? [0, 0, 0];
+    const vars = neutralVars(background, theme, anchor, readableText ?? anchor);
+    const fills: Rgb[] = [];
+    for (const [property, source] of Object.entries(LIGHT_BRAND)) {
+      const darkened = darkenUntil(source, background);
+      vars[property] = channels(darkened);
+      fills.push(darkened);
+      const onRole = ON_ROLE[property];
+      if (onRole) vars[onRole] = channels(inkForFills([darkened]));
+    }
+    const tint = darkenUntil(LIGHT_BRAND['--azf-surface-tint'] ?? [47, 217, 244], background);
+    const secondary = darkenUntil(LIGHT_BRAND['--azf-secondary'] ?? [69, 223, 164], background);
+    vars['--azf-cta-text'] = rgbToHex(inkForFills([tint, secondary]));
+    return { vars, scheme: 'light' };
+  }
+
+  if (!brandOk) return { vars: {}, scheme: null };
+
+  const text = parseHexColor(theme?.['text_color']);
+  const textIsReadable = text !== null && contrastRatio(text, background) >= AA_TEXT_CONTRAST;
+  const anchor: Rgb = textIsReadable && text ? text : [255, 255, 255];
+  return {
+    vars: neutralVars(background, theme, anchor, textIsReadable ? text : null),
+    scheme: 'dark',
+  };
+}
+
+/**
+ * Neutrals only, for callers that predate the light brand ramp.
+ * Prefer resolveTelegramAppearance for new code.
+ */
+export function resolveTelegramNeutrals(
+  theme: Record<string, string> | undefined,
+  colorScheme?: 'light' | 'dark',
+): Record<string, string> {
+  const { vars } = resolveTelegramAppearance(theme, colorScheme);
+  const neutrals: Record<string, string> = {};
+  for (const property of BOUND_PROPERTIES) {
+    const value = vars[property];
+    if (value) neutrals[property] = value;
+  }
+  return neutrals;
+}
+
+/**
+ * Colour passed to setHeaderColor / setBackgroundColor.
+ *
+ * Bot API 6.9+ accepts any #RRGGBB. Older 6.1 clients accept only the host
+ * bg_color (the keyword or that exact hex). When the painted surface is the
+ * host background, pass the hex on both. Otherwise fall back to the keyword
+ * until arbitrary hex is allowed, then pass the painted surface.
+ */
+export function telegramHostColor(
+  paintedHex: string,
+  themeBg: string | undefined,
+  arbitraryHex: boolean,
+): string {
+  const painted = paintedHex.toLowerCase();
+  if (arbitraryHex) return painted;
+  if (themeBg && parseHexColor(themeBg) && themeBg.toLowerCase() === painted) return painted;
+  return 'bg_color';
 }
 
 /**
@@ -353,16 +555,19 @@ export function applyTelegramTheme(): boolean {
     }
   }
 
-  const bound = resolveTelegramNeutrals(theme);
-  for (const property of BOUND_PROPERTIES) root.style.removeProperty(property);
-  if (Object.keys(bound).length === 0) {
+  root.classList.add('tg-active');
+  const appearance = resolveTelegramAppearance(theme, tg?.colorScheme);
+  for (const property of TELEGRAM_APPEARANCE_PROPERTIES) root.style.removeProperty(property);
+  if (appearance.scheme === null) {
     delete root.dataset['tgTheme'];
+    syncTelegramChromeColors();
     return false;
   }
-  for (const [property, value] of Object.entries(bound)) {
+  for (const [property, value] of Object.entries(appearance.vars)) {
     root.style.setProperty(property, value);
   }
-  root.dataset['tgTheme'] = tg?.colorScheme ?? 'dark';
+  root.dataset['tgTheme'] = appearance.scheme;
+  syncTelegramChromeColors();
   return true;
 }
 
@@ -380,12 +585,16 @@ export function initTelegram(): void {
     // Older clients may not implement both; never crash the app shell.
   }
   applyTelegramTheme();
+  installTelegramChrome();
   try {
     // Bot API 6.1+. Without this, switching theme in Telegram would leave the
     // app on the theme it launched with until the user reloaded it.
-    tg.onEvent?.('themeChanged', () => {
-      applyTelegramTheme();
-    });
+    // themeChanged itself arrived with isVersionAtLeast, so gate the subscribe.
+    if (typeof tg.isVersionAtLeast === 'function' && tg.isVersionAtLeast('6.1')) {
+      tg.onEvent?.('themeChanged', () => {
+        applyTelegramTheme();
+      });
+    }
   } catch {
     // Theme updates are an enhancement, never a reason to fail bootstrap.
   }
@@ -402,6 +611,8 @@ export type HapticType =
 
 /** Fire haptic feedback inside Telegram; silently does nothing elsewhere. */
 export function haptic(type: HapticType = 'light'): void {
+  // HapticFeedback arrived in Bot API 6.1, with isVersionAtLeast.
+  if (!telegramSupports('6.1')) return;
   const h = getWebApp()?.HapticFeedback;
   if (!h) return;
   try {
@@ -422,16 +633,14 @@ export function haptic(type: HapticType = 'light'): void {
  * inside TMA when available; falls back to window.open.
  */
 export function openTelegramLink(url: string): void {
-  const tg = getWebApp() as TelegramWebApp & {
-    openTelegramLink?: (u: string) => void;
-    openLink?: (u: string) => void;
-  } | undefined;
+  const tg = getWebApp();
   try {
-    if (tg?.openTelegramLink && url.startsWith('https://t.me/')) {
+    // openTelegramLink and openLink are Bot API 6.1+.
+    if (telegramSupports('6.1') && tg?.openTelegramLink && url.startsWith('https://t.me/')) {
       tg.openTelegramLink(url);
       return;
     }
-    if (tg?.openLink) {
+    if (telegramSupports('6.1') && tg?.openLink) {
       tg.openLink(url);
       return;
     }
@@ -447,13 +656,15 @@ export function openTelegramLink(url: string): void {
  * Two conditions, both required. `openInvoice` arrived in Bot API 6.1, so an
  * older Telegram build reaches this code with the method absent; and outside
  * Telegram entirely there is no invoice surface at all. The browser path is
- * not a degraded case to work around — it is the segment whose network blocks
+ * not a degraded case to work around. It is the segment whose network blocks
  * Telegram, and the honest thing to show them is "open this in Telegram to
  * buy", not a button that silently does nothing.
  */
 export function canPayWithStars(): boolean {
   const tg = getWebApp();
-  return Boolean(tg?.initData && typeof tg.openInvoice === 'function');
+  return Boolean(
+    tg?.initData && typeof tg.openInvoice === 'function' && telegramSupports('6.1'),
+  );
 }
 
 /**
@@ -469,7 +680,8 @@ export function openStarsInvoice(url: string): Promise<InvoiceStatus> {
   const openInvoice = tg?.openInvoice;
   // Bound to a local before the closure: `tg.openInvoice` is an optional
   // property, so narrowing it here does not survive into the Promise callback.
-  if (!openInvoice) return Promise.resolve('failed');
+  // openInvoice is Bot API 6.1+.
+  if (!telegramSupports('6.1') || !openInvoice) return Promise.resolve('failed');
   return new Promise((resolve) => {
     let settled = false;
     const finish = (status: InvoiceStatus) => {

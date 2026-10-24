@@ -1,5 +1,10 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import {
+  useTelegramBackButton,
+  useTelegramHostChrome,
+  useTelegramVerticalSwipes,
+} from './lib/useTelegramChrome';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { RequireAuth, RequireTargets, useProfileGate } from './components/layout/RequireAuth';
@@ -79,11 +84,20 @@ function LandingAlias() {
   return <Navigate to={{ pathname: '/', hash, search }} replace />;
 }
 
+function TelegramChrome() {
+  useTelegramHostChrome();
+  useTelegramBackButton();
+  useTelegramVerticalSwipes();
+  return null;
+}
+
 export default function App() {
   // Last-resort boundary for screens outside AppLayout (auth, settings,
   // capture flows) - AppLayout has its own so the bottom nav survives there.
   const { pathname } = useLocation();
   return (
+    <>
+    <TelegramChrome />
     <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={<RouteFallbackSkeleton />}>
         <Routes>
@@ -165,5 +179,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </ErrorBoundary>
+    </>
   );
 }

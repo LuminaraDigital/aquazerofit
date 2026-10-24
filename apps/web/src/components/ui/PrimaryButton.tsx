@@ -23,13 +23,13 @@ export function PrimaryButton({
       type={type}
       disabled={isDisabled}
       aria-busy={loading || undefined}
-      className={`cta-gradient w-full min-h-[52px] rounded-2xl font-heading font-semibold uppercase tracking-[0.04em] text-sm text-[#001f25] transition-all active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 px-6 ${className}`}
+      className={`cta-gradient azf-cta-text w-full min-h-[52px] rounded-2xl font-heading font-semibold uppercase tracking-[0.04em] text-sm transition-all active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 px-6 ${className}`}
       {...rest}
     >
       {loading && (
         <span
           aria-hidden="true"
-          className="w-4 h-4 rounded-full border-2 border-[#001f25]/30 border-t-[#001f25] animate-spin"
+          className="w-4 h-4 rounded-full border-2 border-current/30 border-t-current animate-spin"
         />
       )}
       {children}

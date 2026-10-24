@@ -169,6 +169,21 @@ These are unresolved, and the procedure above deliberately does not pretend othe
 3. **How long Telegram retries a refused update, and with what backoff.** The route's design assumes redelivery of non-2xx; the retry duration is not recorded anywhere here. If it is shorter than the rotation window, updates in that window are lost outright rather than delayed, and the `successful_payment` row of the cost table above becomes optimistic.
 4. **This procedure has not been executed against production.** Rehearse the first run against a staging bot with its own token and webhook URL before doing it live.
 
+## Stripe webhook events
+
+Each environment's endpoint (`<APP_PUBLIC_URL>/api/v1/billing/stripe/webhook`, API version `2025-11-17.clover`) must be subscribed to all six events below; Stripe sends nothing it was not asked for. To extend an existing endpoint, open it in the Stripe Dashboard (Workbench → Webhooks), edit its events and add the missing ones. The signing secret does not change.
+
+| Event | Effect | Log line to watch |
+| --- | --- | --- |
+| `invoice.paid` | Grants through the paid period. | `stripe_invoice_unmapped` |
+| `customer.subscription.deleted` | Ends that subscription's premium now. | |
+| `customer.subscription.updated` | Ends premium when status becomes `canceled`, `unpaid` or `incomplete_expired`. `cancel_at_period_end` changes nothing: the paid period stands. | |
+| `invoice.payment_failed` | Nothing revoked; Stripe retries. For dunning. | `stripe_invoice_payment_failed` |
+| `charge.refunded` | A full refund retires the period that payment bought. A partial refund only logs. | `stripe_charge_partially_refunded`, `stripe_charge_unmapped` |
+| `charge.dispute.created` | Retires the period the disputed payment bought. A dispute later won does not restore it; re-grant with `POST /api/v1/admin/users/:id/premium`. | `stripe_charge_unmapped` |
+
+`stripe_charge_unmapped` means a refund or dispute could not be traced to an account through Stripe's invoice payments, so nothing was revoked; check the charge in the Dashboard. `stripe_webhook_unsettled` means handling stopped on a final error, including Stripe being unreachable during that lookup; resend the event from the Dashboard once the cause is fixed.
+
 ## What is NOT here (deliberately)
 
 - No Prometheus pull format. `/metrics` is JSON because the target platforms scrape stdout and HTTP probes; the counters backing it are structured so a Prometheus exporter can be added later without code archaeology.

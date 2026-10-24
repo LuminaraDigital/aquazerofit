@@ -13,20 +13,26 @@
  * this module reads to find the account moved between versions:
  * `invoice.parent.subscription_details` from 2025-03-31.basil onwards.
  *
- * Two events drive the entitlement:
+ * What each event does to the entitlement:
  *
  *  - `invoice.paid` grants through the end of the period the invoice paid
  *    for. It fires for the first payment and for every renewal, so it is the
  *    one grant path; keyed on the invoice id, so redelivery settles once.
  *  - `customer.subscription.deleted` ends premium now. Cancelling "at period
  *    end" does not fire it until that end, so paid time is never taken away.
+ *  - `customer.subscription.updated` ends premium when the status becomes
+ *    canceled, unpaid or incomplete_expired, and ignores everything else,
+ *    cancel_at_period_end included.
+ *  - `charge.refunded` (in full) and `charge.dispute.created` retire the one
+ *    period that payment bought.
+ *  - `invoice.payment_failed` revokes nothing; it is logged for dunning.
  */
 import { createHmac } from 'node:crypto';
 import { AppError } from '../../platform/errors';
 import { config } from '../../platform/config';
 import { secureEquals } from '../../platform/auth';
 import { logEvent } from '../../platform/telemetry';
-import { grantPremium, revokePremium } from './entitlements';
+import { entitlementHistory, grantPremium, revokePremium } from './entitlements';
 import { fetchWithTimeout } from './play';
 
 const STRIPE_API = 'https://api.stripe.com/v1';
@@ -45,6 +51,10 @@ interface StripeInvoice {
     subscription_details?: { subscription?: string; metadata?: Record<string, string> | null } | null;
   } | null;
   lines?: { data?: { period?: { end?: number } }[] };
+  /** On a failed payment: collection attempts that have failed so far. */
+  attempt_count?: number;
+  /** Unix seconds of Stripe's next automatic retry; null once it has given up. */
+  next_payment_attempt?: number | null;
 }
 
 interface StripeSubscription {
@@ -53,6 +63,8 @@ interface StripeSubscription {
 }
 
 export interface StripeEvent {
+  /** Identical across redeliveries of one event: the replay key when nothing else is. */
+  id: string;
   type: string;
   data?: { object?: unknown };
 }
@@ -233,7 +245,7 @@ export function stripeSignatureValid(
   return signatures.some((signature) => secureEquals(signature, expected));
 }
 
-export function handleStripeEvent(event: StripeEvent): void {
+export async function handleStripeEvent(event: StripeEvent): Promise<void> {
   if (event.type === 'invoice.paid') {
     const invoice = event.data?.object as StripeInvoice;
     const userId = invoice.parent?.subscription_details?.metadata?.userId;
@@ -257,12 +269,190 @@ export function handleStripeEvent(event: StripeEvent): void {
      * its own end. Periods are not added together and a deleted subscription
      * does not wipe the others.
      */
-    revokePremium(
-      userId,
-      'stripe',
-      `stripe:deleted:${subscription.id}`,
-      'stripe:subscription_deleted',
-      subscription.id,
+    revokeOnce(userId, `stripe:deleted:${subscription.id}`, 'stripe:subscription_deleted', subscription.id);
+    return;
+  }
+
+  if (event.type === 'customer.subscription.updated') {
+    onSubscriptionUpdated(event);
+    return;
+  }
+
+  if (event.type === 'invoice.payment_failed') {
+    onPaymentFailed(event.data?.object as StripeInvoice);
+    return;
+  }
+
+  if (event.type === 'charge.refunded') {
+    const charge = event.data?.object as StripeCharge;
+    if (!charge.refunded) {
+      // Partial: the purchase stands. Logged for support, nothing revoked.
+      logEvent('stripe_charge_partially_refunded', {
+        charge: charge.id,
+        amountRefunded: charge.amount_refunded ?? null,
+      });
+      return;
+    }
+    await revokeForPayment(charge.id, charge.payment_intent, `stripe:refund:${charge.id}`, 'stripe:charge_refunded');
+    return;
+  }
+
+  if (event.type === 'charge.dispute.created') {
+    const dispute = event.data?.object as StripeDispute;
+    await revokeForPayment(
+      dispute.charge ?? dispute.id,
+      dispute.payment_intent,
+      `stripe:dispute:${dispute.id}`,
+      'stripe:charge_disputed',
     );
   }
+}
+
+/**
+ * revokePremium, once per key. revokePremium always appends, so without this
+ * a redelivered event writes a second revoke, and for a subscription that has
+ * recovered since, that second revoke sorts after the new grant and retires
+ * it. The key is the revoke's own externalId, looked up in the account's
+ * history; nothing in the ledger is ever rewritten.
+ */
+function revokeOnce(
+  userId: string,
+  externalId: string,
+  reason: string,
+  subscriptionId: string,
+  revokesExternalId?: string,
+): void {
+  if (entitlementHistory(userId).some((grant) => grant.externalId === externalId)) return;
+  revokePremium(userId, 'stripe', externalId, reason, subscriptionId, revokesExternalId);
+}
+
+interface StripeSubscriptionUpdate extends StripeSubscription {
+  status?: string;
+  cancel_at_period_end?: boolean;
+}
+
+/**
+ * Statuses in which Stripe has stopped collecting, and its own docs say to
+ * revoke access. `canceled` and `incomplete_expired` are terminal. `unpaid` is
+ * where a subscription lands once every retry has failed (when the account
+ * chooses unpaid over cancel), and it can still recover.
+ */
+const REVOKING_STATUSES = new Set(['canceled', 'unpaid', 'incomplete_expired']);
+
+/**
+ * `customer.subscription.updated` fires for every change to a subscription,
+ * and almost none of them matter here. Only a status that ends collection
+ * revokes. `cancel_at_period_end` is deliberately not one: the subscriber has
+ * paid through the period end, and `customer.subscription.deleted` arrives
+ * when it does. Revoking on the flag would take back days already paid for.
+ *
+ * The terminal statuses share the deletion's key, because one cancellation
+ * can be reported through both events and either order must settle once.
+ * `unpaid` is keyed on the event: a subscription can recover and lapse again,
+ * and every lapse must revoke, but a redelivery of an old lapse must not
+ * retire the period a later payment bought.
+ */
+function onSubscriptionUpdated(event: StripeEvent): void {
+  const subscription = event.data?.object as StripeSubscriptionUpdate;
+  const userId = subscription.metadata?.userId;
+  if (!userId || !subscription.status || !REVOKING_STATUSES.has(subscription.status)) return;
+  const key =
+    subscription.status === 'unpaid' ? `stripe:unpaid:${event.id}` : `stripe:deleted:${subscription.id}`;
+  revokeOnce(userId, key, `stripe:subscription_${subscription.status}`, subscription.id);
+}
+
+/**
+ * A renewal charge failed. Nothing is revoked: the period already paid for
+ * stands, Stripe retries on its own schedule, and premium already stops at the
+ * last paid period's end if no retry ever lands, because only a paid invoice
+ * grants. What ops and dunning need is to see it happen, and this line is all
+ * of that. It writes no state, so a redelivery only repeats the line.
+ */
+function onPaymentFailed(invoice: StripeInvoice): void {
+  const details = invoice.parent?.subscription_details;
+  logEvent('stripe_invoice_payment_failed', {
+    invoice: invoice.id,
+    subscription: details?.subscription ?? null,
+    userId: details?.metadata?.userId ?? null,
+    attempt: invoice.attempt_count ?? null,
+    nextAttemptAt: invoice.next_payment_attempt
+      ? new Date(invoice.next_payment_attempt * 1000).toISOString()
+      : null,
+  });
+}
+
+interface StripeCharge {
+  id: string;
+  payment_intent?: string | null;
+  /** True only once the whole amount is refunded; a partial refund leaves it false. */
+  refunded?: boolean;
+  amount_refunded?: number;
+}
+
+interface StripeDispute {
+  id: string;
+  charge?: string | null;
+  payment_intent?: string | null;
+}
+
+interface InvoicePaymentList {
+  data?: { invoice?: StripeInvoice | string | null }[];
+}
+
+/**
+ * The invoice a payment intent paid, and the account and subscription it
+ * names.
+ *
+ * At the pinned version neither a Charge nor a PaymentIntent carries its
+ * invoice: 2025-03-31.basil removed the field for InvoicePayment objects, and
+ * Stripe's changelog points at this list for the link. The invoice is expanded
+ * in the same call, and the account is read from exactly the field that
+ * granted the period - the subscription metadata Checkout stamped. A Checkout
+ * subscription's payment intent pays one invoice, so the first entry is it.
+ *
+ * Null for a payment that is not ours. A Stripe failure surfaces as the
+ * AppError stripeApi throws; the webhook route acknowledges that and logs
+ * stripe_webhook_unsettled with the event type, so it can be resent from the
+ * Dashboard rather than retried forever.
+ */
+async function paidInvoiceFor(
+  paymentIntent: string,
+): Promise<{ invoice: string; userId: string; subscription: string } | null> {
+  const query = new URLSearchParams({
+    'payment[type]': 'payment_intent',
+    'payment[payment_intent]': paymentIntent,
+    'expand[]': 'data.invoice',
+  });
+  const list = await stripeApi<InvoicePaymentList>(`/invoice_payments?${query}`);
+  const invoice = list.data?.[0]?.invoice;
+  if (!invoice || typeof invoice !== 'object') return null;
+  const details = invoice.parent?.subscription_details;
+  if (!details?.metadata?.userId || !details.subscription) return null;
+  return { invoice: invoice.id, userId: details.metadata.userId, subscription: details.subscription };
+}
+
+/**
+ * Take back the period one payment bought: a full refund, or a chargeback.
+ *
+ * Charge-scoped, like the Stars refund. `revokesExternalId` names the grant
+ * that invoice made, so a later renewal on the same subscription, and any
+ * other rail's period, stays. Keyed on the charge or the dispute, each of
+ * which happens to a payment once.
+ *
+ * A payment it cannot place is logged and acknowledged, never thrown: Stripe
+ * redelivers anything that is not a 2xx, and a payment that is not ours will
+ * not become ours on the next attempt.
+ */
+async function revokeForPayment(
+  chargeId: string,
+  paymentIntent: string | null | undefined,
+  externalId: string,
+  reason: string,
+): Promise<void> {
+  const paid = paymentIntent ? await paidInvoiceFor(paymentIntent) : null;
+  if (!paid) {
+    logEvent('stripe_charge_unmapped', { charge: chargeId, reason });
+    return;
+  }
+  revokeOnce(paid.userId, externalId, reason, paid.subscription, `stripe:${paid.invoice}`);
 }

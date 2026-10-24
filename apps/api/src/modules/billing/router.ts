@@ -405,7 +405,7 @@ billingRouter.post(
     }
     const event = JSON.parse(raw.toString('utf8')) as StripeEvent;
     try {
-      handleStripeEvent(event);
+      await handleStripeEvent(event);
     } catch (err) {
       if (!(err instanceof AppError)) throw err;
       logEvent('stripe_webhook_unsettled', { type: event.type, reason: err.message });

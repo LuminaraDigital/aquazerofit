@@ -27,6 +27,7 @@ import type {
   Exercise,
 } from '@aquazerofit/shared';
 import type { JsonStore } from '../platform/store';
+import { isUnownedEmailDomain, UNOWNED_EMAIL_DOMAIN } from '../platform/mailer';
 import { computeTargets } from '../modules/me/targets';
 import { buildPlan } from '../modules/plans/service';
 import { foodsSeed } from './seeds/foods';
@@ -38,12 +39,31 @@ const DEMO_USER_ID = 'usr-demo';
 const DEMO_EMAIL = 'demo@aquazero.fit';
 const DEMO_PASSWORD = 'AquaZeroDemo!2026';
 const ADMIN_USER_ID = 'usr-admin';
-const ADMIN_EMAIL = 'admin@aquazero.fit';
+/** Local development only. Production takes ADMIN_EMAIL; see adminEmailForSeed. */
+const DEV_ADMIN_EMAIL = 'admin@aquazero.fit';
 
 function adminPasswordForSeed(isProduction: boolean): string | undefined {
   const fromEnv = process.env.ADMIN_PASSWORD?.trim();
   if (isProduction) return fromEnv || undefined;
   return fromEnv || undefined; // No default — requires explicit ADMIN_PASSWORD in non-prod
+}
+
+/**
+ * The seeded admin's address, or a reason not to seed it.
+ *
+ * Production used to seed DEV_ADMIN_EMAIL, an address on aquazero.fit, which
+ * this project does not own. An account's recovery address must be one whose
+ * mail we actually receive, so production takes the address from ADMIN_EMAIL
+ * alone and refuses one on that domain.
+ */
+function adminEmailForSeed(isProduction: boolean): { email: string } | { refused: string } {
+  const fromEnv = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (!isProduction) return { email: fromEnv || DEV_ADMIN_EMAIL };
+  if (!fromEnv) return { refused: 'ADMIN_EMAIL is not set' };
+  if (isUnownedEmailDomain(fromEnv)) {
+    return { refused: `ADMIN_EMAIL is on ${UNOWNED_EMAIL_DOMAIN}, which nobody has registered` };
+  }
+  return { email: fromEnv };
 }
 
 async function bcryptHashAsync(password: string, rounds: number): Promise<string> {
@@ -415,21 +435,36 @@ export async function seedIfNeeded(store: JsonStore): Promise<void> {
   // Account seeding is gated: demo + admin only outside production and only
   // unless explicitly disabled via AZF_SEED_DEMO=false. In production the
   // demo account is never created; the admin account is created only when an
-  // operator provides ADMIN_PASSWORD (no well-known credentials in prod).
+  // operator provides ADMIN_PASSWORD and ADMIN_EMAIL (no well-known
+  // credentials or addresses in prod).
   const isProduction = process.env.NODE_ENV === 'production';
   const seedDemo = process.env.AZF_SEED_DEMO !== 'false' && !isProduction;
   let historyCounts: Record<string, number> = {};
   if (seedDemo) {
     await seedAccount(store, DEMO_USER_ID, DEMO_EMAIL, DEMO_PASSWORD, 'Alex Waters', 'user', 'premium', 15);
     const adminPassword = adminPasswordForSeed(false);
-    if (adminPassword) {
-      await seedAccount(store, ADMIN_USER_ID, ADMIN_EMAIL, adminPassword, 'AquaZero Admin', 'admin', 'premium', 30);
+    const admin = adminEmailForSeed(false);
+    if (adminPassword && 'email' in admin) {
+      await seedAccount(store, ADMIN_USER_ID, admin.email, adminPassword, 'AquaZero Admin', 'admin', 'premium', 30);
     }
     historyCounts = seedDemoHistory(store);
   } else if (isProduction) {
     const adminPassword = adminPasswordForSeed(true);
-    if (adminPassword) {
-      await seedAccount(store, ADMIN_USER_ID, ADMIN_EMAIL, adminPassword, 'AquaZero Admin', 'admin', 'premium', 30);
+    const admin = adminEmailForSeed(true);
+    if (adminPassword && 'refused' in admin) {
+      // eslint-disable-next-line no-console
+      console.warn(`[seed] admin account not created: ${admin.refused}`);
+    } else if (adminPassword && 'email' in admin) {
+      // seedAccount leaves an existing account alone, so an admin seeded at
+      // the old address keeps it. Say so rather than look fixed.
+      const existing = store.byId<User>('users', ADMIN_USER_ID);
+      if (existing && existing.email.toLowerCase() !== admin.email) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[seed] ${ADMIN_USER_ID} already exists with a different address; ADMIN_EMAIL does not change it. Update or delete that account.`,
+        );
+      }
+      await seedAccount(store, ADMIN_USER_ID, admin.email, adminPassword, 'AquaZero Admin', 'admin', 'premium', 30);
     }
   }
 

@@ -45,6 +45,10 @@ COPY tsconfig.base.json ./
 COPY prompts prompts
 COPY packages/shared packages/shared
 COPY apps/api apps/api
+# Packaging tests read these from the repo root. The runtime stage does not
+# copy them; it copies source explicitly below.
+COPY .gcloudignore cloudbuild.yaml ./
+COPY deploy/cloudrun/service.yaml deploy/cloudrun/service.yaml
 
 # Gate the image on a green API build before the slower web compile.
 RUN npm run typecheck --workspace packages/shared \
@@ -61,8 +65,12 @@ ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
     VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
 RUN npm run build --workspace apps/web
 
-# Create writable directories for runtime stage to copy
-RUN mkdir -p /repo/data /repo/apps/api/uploads
+# Writable runtime paths, plus the workspace node_modules directories.
+# npm omits a workspace node_modules when everything hoisted. Creating them
+# here lets the runtime COPY succeed either way, so a later nested dependency
+# is not dropped just because the directory was absent on a previous build.
+RUN mkdir -p /repo/data /repo/apps/api/uploads \
+  /repo/apps/api/node_modules /repo/packages/shared/node_modules
 
 # ---------- Stage 2: runtime ----------
 FROM gcr.io/distroless/nodejs20-debian12@sha256:aadeb54a6d25fa4f8c47160ca38cfdc2ff7a6227b5d41c8544f9cffb80a31823 AS runtime
@@ -80,10 +88,13 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/api/package.json apps/api/
 
-# Everything is hoisted to the root node_modules under npm workspaces, so a
-# single copy is correct and sufficient; per-workspace node_modules do not
-# exist in this install layout.
+# Hoisted packages live in the root node_modules. npm can also nest a
+# dependency under a workspace (this is what happened to zod 4.6.7). Copy
+# those trees too. The build stage creates the directories, so this does not
+# fail when a workspace currently hoists everything.
 COPY --from=build --chown=nonroot:nonroot /repo/node_modules /repo/node_modules
+COPY --from=build --chown=nonroot:nonroot /repo/apps/api/node_modules /repo/apps/api/node_modules
+COPY --from=build --chown=nonroot:nonroot /repo/packages/shared/node_modules /repo/packages/shared/node_modules
 
 # Copy source code. prompts/ is required at runtime: loadPrompt walks up to it
 # and a missing file fails soft to empty content, which ships a silent coach.
@@ -101,6 +112,11 @@ COPY --from=build --chown=nonroot:nonroot /repo/apps/web/dist /repo/apps/web/dis
 COPY --from=build --chown=nonroot:nonroot /repo/data /data
 COPY --from=build --chown=nonroot:nonroot /repo/apps/api/uploads /repo/apps/api/uploads
 ENV AZF_DATA_DIR=/data
+
+# Distroless has no shell, so this is exec form. It resolves the API entry
+# graph from this stage's tree and fails the build when a package is missing.
+# Importing index.ts itself would boot the server, so the script only resolves.
+RUN ["/nodejs/bin/node", "apps/api/scripts/runtimeImportSmoke.mjs"]
 
 # Distroless has nonroot:nonroot (UID 65532) built-in
 USER nonroot:nonroot

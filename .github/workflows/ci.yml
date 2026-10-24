@@ -8,9 +8,9 @@ on:
     branches: ['**']
   pull_request:
 
-# Every step below only reads the checkout and runs npm. Nothing creates a
-# release, pushes a commit, or comments on a PR, so the default token needs no
-# write scope.
+# verify only reads the checkout and runs npm. api-image builds
+# apps/api/Dockerfile and does not push it. Nothing creates a release, pushes
+# a commit, or comments on a PR, so the default token needs no write scope.
 permissions:
   contents: read
 
@@ -60,3 +60,16 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # The runtime image copies node_modules itself. `npm test` cannot see a
+  # package that the Dockerfile forgot to copy. The smoke step inside
+  # apps/api/Dockerfile resolves the API import graph from the runtime stage
+  # and fails this job when something like zod is missing. No registry push.
+  api-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Build API image (no push)
+        run: docker build -f apps/api/Dockerfile -t aquazerofit-api:ci .

@@ -1,10 +1,15 @@
 # Cloud Run API. The public hostname is the aquazerofit Worker, which proxies
 # /api and /uploads here. This service is already live as aquazerofit-api.
 #
+# cloudbuild.yaml does not apply this file. It deploys with
+# `gcloud run deploy aquazerofit-api --image`, which keeps the running
+# service's secrets, volumes, and env. Do not `gcloud run services replace`
+# this file onto the live service: it is not a full copy of that revision.
+# The live service mounts STRIPE_* secrets and a FIREBASE_ADMIN_JSON volume
+# that are absent here, and a replace would remove them.
+#
 # Do not apply this file by hand with the IMAGE_URI placeholder still in it.
-# cloudbuild.yaml substitutes the image and the version, then runs
-# `gcloud run services replace`. This file does not map a custom domain and
-# does not read secret values.
+# This file does not map a custom domain and does not read secret values.
 #
 # Single instance on purpose: the store hydrates once into memory. min and max
 # are both 1, and AZF_INSTANCE_COUNT=1 makes boot refuse anything else.

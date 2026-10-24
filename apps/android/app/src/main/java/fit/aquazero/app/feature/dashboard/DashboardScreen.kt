@@ -58,6 +58,7 @@ fun DashboardScreen(
     onOpenWorkout: (String?) -> Unit = {},
     onOpenProgress: () -> Unit = {},
     onOpenCoach: (String?) -> Unit = {},
+    onOpenFightRecord: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -102,6 +103,14 @@ fun DashboardScreen(
                 null
             },
             modifier = Modifier.fillMaxSize(),
+            seasonCard = {
+                SeasonCard(
+                    onOpenFightRecord = onOpenFightRecord,
+                    modifier = Modifier
+                        .padding(top = AzfSpacing.Gutter)
+                        .revealOnEnter(4),
+                )
+            },
         )
         CelebrationHost()
     }
@@ -113,7 +122,13 @@ fun DashboardScreen(
     )
 }
 
-/** Stateless dashboard body — everything previewable lives here. */
+/**
+ * Stateless dashboard body — everything previewable lives here.
+ *
+ * [seasonCard] is a slot rather than state because Fight Record owns its own
+ * ViewModel and flag: the dashboard reserves a place for it after the coach
+ * card and knows nothing else about it, and the previews stay free of Hilt.
+ */
 @Composable
 fun DashboardContent(
     state: DashboardUiState,
@@ -127,6 +142,7 @@ fun DashboardContent(
     onOpenCoach: (String?) -> Unit = {},
     onExplainTarget: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    seasonCard: @Composable () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -236,6 +252,8 @@ fun DashboardContent(
                     modifier = Modifier.revealOnEnter(4),
                 )
             }
+
+            seasonCard()
 
             Spacer(Modifier.height(AzfSpacing.Gutter))
 

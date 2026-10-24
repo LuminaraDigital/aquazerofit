@@ -109,8 +109,8 @@ export interface MockVisionCandidate {
 }
 
 export interface MockVisionContext {
-  seedKey: string;
-  candidates: MockVisionCandidate[];
+  seedKey?: string;
+  candidates?: MockVisionCandidate[];
   /** AI-04: Optional image data acknowledgment for dev parity.
    * Real providers receive image bytes; mock acknowledges the structure. */
   imageBase64?: string;
@@ -383,48 +383,69 @@ function chatReply(messages: MockMessage[], ctx: MockChatContext, coachId?: stri
 // Vision lane — identification only; calories are computed by CODE upstream
 // ---------------------------------------------------------------------------
 
-interface MockVisionPrediction {
-  foodId: string;
+interface MockVisionItem {
   name: string;
+  portion: string;
   estimatedGrams: number;
   confidence: number;
 }
 
-function visionIdentify(ctx: MockVisionContext): { predictions: MockVisionPrediction[] } {
-  const candidates = ctx.candidates;
-  if (candidates.length === 0) return { predictions: [] };
-  
-  // AI-04: Acknowledge image parameter for dev parity
-  // In real providers, image bytes are sent; here we log receipt and use seed for determinism
+/**
+ * Names the offline engine can hand to the catalog matcher. They are ordinary
+ * food words, not nutrition. The keyless product still gets a review list.
+ * A degraded fallback discards this list before the user sees it.
+ */
+const OFFLINE_VISION_ITEMS: MockVisionItem[] = [
+  { name: 'chicken breast', portion: 'one small fillet', estimatedGrams: 120, confidence: 0.8 },
+  { name: 'white rice', portion: 'one cup cooked', estimatedGrams: 158, confidence: 0.74 },
+  { name: 'broccoli', portion: 'one cup chopped', estimatedGrams: 91, confidence: 0.7 },
+  { name: 'egg', portion: 'one egg', estimatedGrams: 50, confidence: 0.77 },
+];
+
+function visionIdentify(ctx: MockVisionContext): { items: MockVisionItem[] } {
+  const fromCandidates: MockVisionItem[] = (ctx.candidates ?? [])
+    .filter((food) => typeof food.name === 'string' && food.name.length > 0)
+    .map((food) => ({
+      name: food.name,
+      portion: food.commonServings?.[0]?.label ?? 'one serving',
+      estimatedGrams:
+        food.commonServings?.[0]?.grams && food.commonServings[0].grams > 0
+          ? food.commonServings[0].grams
+          : 100,
+      confidence: 0.7,
+    }));
+  const pool = fromCandidates.length > 0 ? fromCandidates : OFFLINE_VISION_ITEMS;
+  if (pool.length === 0) return { items: [] };
+
+  // AI-04: Acknowledge image parameter for dev parity.
+  // Real providers receive image bytes. The mock only uses them to vary the seed.
   const hasImage = !!(ctx.imageBase64 || ctx.imageHash);
-  const seedInput = hasImage 
+  const seedInput = hasImage
     ? `${ctx.seedKey}|img:${ctx.imageHash ?? 'b64'}${ctx.imageBase64?.slice(0, 32) ?? ''}`
     : ctx.seedKey;
-  const seed = fnv1a(seedInput);
-  
-  const count = Math.min(candidates.length, 2 + (seed % 3)); // 2–4 foods
-  const predictions: MockVisionPrediction[] = [];
+  const seed = fnv1a(seedInput || 'meal');
+
+  const count = Math.min(pool.length, 2 + (seed % 3));
+  const items: MockVisionItem[] = [];
   const used = new Set<number>();
   for (let i = 0; i < count; i += 1) {
-    let idx = (seed >>> (i * 5)) % candidates.length;
+    let idx = (seed >>> (i * 5)) % pool.length;
     let guard = 0;
-    while (used.has(idx) && guard < candidates.length) {
-      idx = (idx + 7) % candidates.length;
+    while (used.has(idx) && guard < pool.length) {
+      idx = (idx + 7) % pool.length;
       guard += 1;
     }
     used.add(idx);
-    const food = candidates[idx] as MockVisionCandidate;
-    const serving = food.commonServings?.[0]?.grams;
-    const grams = serving && serving > 0 ? serving : 80 + ((seed >>> (i * 3)) % 23) * 10; // 80–300 g
-    const confidence = 0.55 + (((seed >>> (i * 4)) % 41) / 100); // 0.55–0.95
-    predictions.push({
-      foodId: food.id,
+    const food = pool[idx] as MockVisionItem;
+    const confidence = Math.min(0.95, food.confidence + (((seed >>> (i * 4)) % 11) / 100));
+    items.push({
       name: food.name,
-      estimatedGrams: Math.round(grams),
+      portion: food.portion,
+      estimatedGrams: Math.round(food.estimatedGrams),
       confidence: Math.round(confidence * 100) / 100,
     });
   }
-  return { predictions };
+  return { items };
 }
 
 // ---------------------------------------------------------------------------
@@ -746,7 +767,12 @@ export function mockComplete(task: ModelGroup, messages: MockMessage[], opts: Mo
       return { text };
     }
     case 'visionPrimary': {
-      const json = visionIdentify(context as unknown as MockVisionContext);
+      const ctx = context as unknown as MockVisionContext;
+      const userText = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
+      const json = visionIdentify({
+        ...ctx,
+        seedKey: ctx.seedKey || userText || 'meal',
+      });
       return { text: JSON.stringify(json), json };
     }
     case 'planStructured': {

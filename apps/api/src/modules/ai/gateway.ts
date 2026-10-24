@@ -53,7 +53,9 @@ export interface GatewayOptions {
   timeoutMs?: number;
   /**
    * Budget for the whole call including every fallback hop. Callers may only
-   * tighten it — OVERALL_DEADLINE_MS is the ceiling.
+   * tighten it. Chat and the other text lanes cap at CHAT_DEADLINE_MS.
+   * visionPrimary caps at the vision deadline (AI_VISION_DEADLINE_MS, default
+   * 20s) so a photo can outlive the 12s chat ceiling.
    */
   deadlineMs?: number;
   /** Grounding data for the deterministic mock engine. */
@@ -156,13 +158,15 @@ const PROVIDERS: ProviderDef[] = [
     name: 'groq',
     baseUrl: 'https://api.groq.com/openai/v1',
     keyEnv: 'GROQ_API_KEY',
-    // supportsVision intentionally absent: image requests to Groq returned 400
-    // in production (2026-08, then on text-only llama-3.3-70b-versatile).
-    // llama-4-scout accepts images, but enable this only after a live check.
-    // Groq stays in the chain for every text lane and for a text-only vision
-    // call (stored photo unreadable).
+    // Vision default is qwen/qwen3.8-27b, listed on
+    // https://console.groq.com/docs/vision (checked 2026-10-24) and on the
+    // supported-models page. meta-llama/llama-4-scout-17b-16e-instruct was
+    // shut down on 2026-07-17 and is not offered. meta-models/muse-spark-open
+    // also accepts images but only as a limited preview, so it is not the
+    // default. Override with GROQ_MODEL_VISIONPRIMARY.
+    supportsVision: true,
     models: {
-      visionPrimary: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      visionPrimary: 'qwen/qwen3.8-27b',
       chatFast: 'qwen/qwen3.8-27b',
       planStructured: 'qwen/qwen3.8-27b',
       safetyCheap: 'openai/gpt-oss-20b',
@@ -236,11 +240,39 @@ function modelFor(provider: ProviderDef, task: ModelGroup): string {
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 /**
- * Ceiling for the entire complete() call, every fallback hop included. The
- * per-provider timeout alone allowed ~100s across the five-provider chain,
- * which no request-bound caller can absorb.
+ * Ceiling for chat, plans, and every lane that is not a meal photo. Callers
+ * may only tighten it. A photo has its own ceiling so a vision hop can run
+ * past this without stretching the chat socket.
  */
-const OVERALL_DEADLINE_MS = 12_000;
+export const CHAT_DEADLINE_MS = 12_000;
+/** Vision ceiling when AI_VISION_DEADLINE_MS is unset. */
+export const DEFAULT_VISION_DEADLINE_MS = 20_000;
+export const VISION_DEADLINE_ENV = 'AI_VISION_DEADLINE_MS';
+const VISION_DEADLINE_MIN_MS = 1_000;
+const VISION_DEADLINE_MAX_MS = 60_000;
+/** Shorter than this and the attempt is not worth opening a socket. */
+const MIN_ATTEMPT_MS = 50;
+
+export function visionDeadlineMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env[VISION_DEADLINE_ENV]?.trim();
+  if (!raw) return DEFAULT_VISION_DEADLINE_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return DEFAULT_VISION_DEADLINE_MS;
+  return Math.min(VISION_DEADLINE_MAX_MS, Math.max(VISION_DEADLINE_MIN_MS, Math.floor(parsed)));
+}
+
+/** Chat stays at 12s. visionPrimary uses the configurable photo deadline. */
+export function deadlineCeilingMs(task: ModelGroup, env: NodeJS.ProcessEnv = process.env): number {
+  return task === 'visionPrimary' ? visionDeadlineMs(env) : CHAT_DEADLINE_MS;
+}
+
+/**
+ * Time held back for the next credentialed vision provider, so a Groq timeout
+ * still leaves NVIDIA a full attempt inside the photo deadline.
+ */
+export function visionHopBudgetMs(deadlineMs: number): number {
+  return Math.max(VISION_DEADLINE_MIN_MS, Math.floor(deadlineMs / 2));
+}
 /** Attempts after the first, per provider, for transient failures only. */
 const MAX_RETRIES_PER_PROVIDER = 2;
 const BACKOFF_BASE_MS = 200;
@@ -557,9 +589,10 @@ function classify(err: unknown): ProviderError {
  * fallback. Only truly unexpected internal failures surface, and callers wrap
  * those as AI_UNAVAILABLE (503) with a manual-path message.
  *
- * The whole chain shares one deadline, so a caller waits at most
- * OVERALL_DEADLINE_MS regardless of how many providers are configured. Check
- * `meta.degraded` before treating the text as a genuine model answer.
+ * The whole chain shares one deadline. Chat waits at most CHAT_DEADLINE_MS.
+ * A meal photo waits at most the vision deadline, which defaults higher so a
+ * second provider can still run. Check `meta.degraded` before treating the
+ * text as a genuine model answer.
  */
 export async function complete(
   task: ModelGroup,
@@ -576,9 +609,22 @@ export async function complete(
   const hasImages = !!opts.images?.length;
   const promptTokens = estimateTokens(providerMessages.map((m) => m.content).join('\n'));
 
-  // Callers may tighten the budget but never extend it past the ceiling.
-  const deadlineAt = Date.now() + Math.min(opts.deadlineMs ?? OVERALL_DEADLINE_MS, OVERALL_DEADLINE_MS);
+  // Callers may tighten the budget but never extend it past the lane ceiling.
+  const ceiling = deadlineCeilingMs(task);
+  const activeDeadline = Math.min(opts.deadlineMs ?? ceiling, ceiling);
+  const deadlineAt = Date.now() + activeDeadline;
   const remainingMs = (): number => deadlineAt - Date.now();
+  const reserveFor = (index: number): number => {
+    if (task !== 'visionPrimary') return 0;
+    for (let i = index + 1; i < PROVIDERS.length; i += 1) {
+      const next = PROVIDERS[i];
+      if (!next || !process.env[next.keyEnv]) continue;
+      if (hasImages && !next.supportsVision) continue;
+      if (circuitIsOpen(next.name)) continue;
+      return visionHopBudgetMs(activeDeadline);
+    }
+    return 0;
+  };
   // A credentialed provider that was tried (or skipped because its breaker is
   // open) is what separates "everything real failed" from "no keys are
   // configured, the offline engine is the intended answer".
@@ -599,7 +645,7 @@ export async function complete(
   const budgetStopped = budgetExhausted();
   if (budgetStopped) recordSuppressed();
 
-  outer: for (const provider of budgetStopped ? [] : PROVIDERS) {
+  outer: for (const [index, provider] of (budgetStopped ? [] : PROVIDERS).entries()) {
     const credentialed = !!process.env[provider.keyEnv];
     if (!credentialed && !provider.keyOptional) continue;
     // Counted before the breaker and vision checks: a provider skipped because
@@ -612,13 +658,15 @@ export async function complete(
     // (Ollama on localhost), not a configured dependency: one shot, no retries,
     // and it never marks the result degraded.
     const maxAttempts = credentialed ? 1 + MAX_RETRIES_PER_PROVIDER : 1;
+    const reserve = reserveFor(index);
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      const budget = Math.min(remainingMs(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-      if (budget <= 0) {
+      const room = remainingMs() - reserve;
+      if (room < MIN_ATTEMPT_MS) {
         deadlineExceeded = true;
         break outer;
       }
+      const budget = Math.min(room, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
       const started = Date.now();
       try {
         const { text, json, tokens, model } = await callProvider(
@@ -673,9 +721,9 @@ export async function complete(
         });
         if (!failure.retryable || attempt === maxAttempts) break;
         const wait = failure.retryAfterMs ?? backoffDelayMs(attempt);
-        // Sleeping past the deadline only delays the fallback the caller is
-        // going to get anyway — move on instead.
-        if (wait >= remainingMs()) break;
+        // Sleeping past the deadline, or into the slice reserved for the next
+        // vision provider, only delays the fallback. Move on instead.
+        if (wait + reserve >= remainingMs()) break;
         await sleep(wait);
       }
     }
@@ -777,7 +825,8 @@ export async function complete(
     const providerMessages = withContextMessage(messages, opts.context);
     const promptTokens = estimateTokens(providerMessages.map((m) => m.content).join('\n'));
 
-    const deadlineAt = Date.now() + Math.min(opts.deadlineMs ?? OVERALL_DEADLINE_MS, OVERALL_DEADLINE_MS);
+    const streamCeiling = deadlineCeilingMs(task);
+    const deadlineAt = Date.now() + Math.min(opts.deadlineMs ?? streamCeiling, streamCeiling);
     const remainingMs = (): number => deadlineAt - Date.now();
     let realProviderInPlay = false;
     let deadlineExceeded = false;

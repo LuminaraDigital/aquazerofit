@@ -2,7 +2,14 @@
  * Shared zod validation schemas (FE-11): the same schemas validate on the
  * client for inline feedback and on the server as the authoritative check.
  */
-import { z } from 'zod';
+import { config, z } from 'zod';
+
+// Zod 4 compiles schemas with `new Function` unless this is set. The Worker
+// CSP does not allow 'unsafe-eval', and the probe still reports a violation
+// when the exception is caught. The API runs in Node, where the JIT stays on.
+// This package's tsconfig has no DOM lib, so the check goes through globalThis.
+const browserGlobal = globalThis as { window?: unknown };
+if (browserGlobal.window !== undefined) config({ jitless: true });
 import {
   ALLERGENS,
   DIETARY_PREFERENCES,

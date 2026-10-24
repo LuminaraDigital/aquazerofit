@@ -14,6 +14,9 @@
   "vars": {
     "API_ORIGIN": "https://aquazerofit-api-592686987043.australia-southeast1.run.app"
   },
+  // ORIGIN_SHARED_SECRET is a Worker secret, not a var. Set it with
+  // `npx wrangler secret put ORIGIN_SHARED_SECRET` from this directory.
+  // The same value goes on the API as ORIGIN_SHARED_SECRET. Never commit it.
   "assets": {
     "directory": "../apps/web/dist",
     "binding": "ASSETS",

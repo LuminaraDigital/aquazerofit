@@ -136,15 +136,14 @@ function recordLoginFailure(emailKey: string, now: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Per-IP Telegram auto-provision cap (distinct from the global /auth rate lane).
+// Telegram auto-provision caps (distinct from the /auth rate lane).
 // Only NEW account creation is counted; returning users signing in again are
-// unaffected. Stale buckets are pruned lazily on each check.
+// unaffected. Limits live in config (per IP per minute, per subnet per day,
+// and an optional process-local daily ceiling that defaults to off).
+// Stale buckets are pruned lazily on each check.
 // ---------------------------------------------------------------------------
 
 const TG_NEW_ACCOUNT_WINDOW_MS = 60_000;
-const TG_NEW_ACCOUNT_LIMIT = 3;
-const TG_GLOBAL_DAILY_LIMIT = 100;
-const TG_SUBNET_DAILY_LIMIT = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const telegramNewAccountsByIp = new Map<string, number[]>();
@@ -190,30 +189,33 @@ function pruneTelegramNewAccounts(now: number): void {
 function assertTelegramNewAccountAllowed(ip: string | undefined, now: number): void {
   pruneTelegramNewAccounts(now);
   const key = ip?.trim() || 'unknown';
+  const perIpLimit = config.telegramSignupPerIpPerMinute;
+  const subnetLimit = config.telegramSignupSubnetDaily;
+  const globalLimit = config.telegramSignupGlobalDaily;
   const windowStart = now - TG_NEW_ACCOUNT_WINDOW_MS;
   const stamps = (telegramNewAccountsByIp.get(key) ?? []).filter((t) => t > windowStart);
-  if (stamps.length >= TG_NEW_ACCOUNT_LIMIT) {
+  if (stamps.length >= perIpLimit) {
     const oldest = stamps[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + TG_NEW_ACCOUNT_WINDOW_MS - now) / 1000));
     throw new AppError('RATE_LIMITED', 'Too many new Telegram accounts from this network. Please try again later.', {
       retryAfterSeconds,
     });
   }
-  
-  // Global daily cap
-  if (telegramNewAccountsGlobal.length >= TG_GLOBAL_DAILY_LIMIT) {
-    const oldest = telegramNewAccountsGlobal[0];
+
+  // Process-local daily ceiling. 0 disables it (the launch default).
+  if (globalLimit > 0 && telegramNewAccountsGlobal.length >= globalLimit) {
+    const oldest = telegramNewAccountsGlobal[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + DAY_MS - now) / 1000));
     throw new AppError('RATE_LIMITED', 'Global daily limit for new Telegram accounts reached. Please try again tomorrow.', {
       retryAfterSeconds,
     });
   }
-  
-  // Per-subnet daily cap
+
+  // Per-subnet daily cap.
   const subnet = subnetKey(key);
   const subnetStamps = telegramNewAccountsBySubnet.get(subnet) ?? [];
-  if (subnetStamps.length >= TG_SUBNET_DAILY_LIMIT) {
-    const oldest = subnetStamps[0];
+  if (subnetStamps.length >= subnetLimit) {
+    const oldest = subnetStamps[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + DAY_MS - now) / 1000));
     throw new AppError('RATE_LIMITED', 'Too many new Telegram accounts from this network region. Please try again tomorrow.', {
       retryAfterSeconds,

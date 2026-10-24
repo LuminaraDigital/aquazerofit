@@ -46,7 +46,7 @@ async function telegramSignIn(tgId: number): Promise<{ token: string; userId: st
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-// The per-IP auto-provision cap (3/min) is service-level, not middleware, so
+// The per-IP auto-provision cap is service-level, not middleware, so
 // the test-env rate-limiter bypass does not cover it. Reset it between cases.
 beforeEach(() => {
   resetTelegramNewAccountLimits();

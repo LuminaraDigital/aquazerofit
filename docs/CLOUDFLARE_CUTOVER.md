@@ -130,10 +130,42 @@ need a rebuild for this cutover.
 Do not point staging at instance `azf-pg` or database `aquazerofit`. Only one
 instance exists.
 
+## Client IP for rate limits
+
+The Worker adds `X-Origin-Shared-Secret` on every request it proxies. The value
+is the Worker secret `ORIGIN_SHARED_SECRET`. The API trusts `CF-Connecting-IP`
+for rate limiting only when that header matches the same env var on Cloud Run.
+A mismatch, or an unset secret, uses the socket address, so direct callers of
+the run.app URL share one bucket. The secret is never committed.
+
+Generate one value and set it on both sides:
+
+```bash
+openssl rand -hex 32
+```
+
+Worker, from `cloudflare/`:
+
+```bash
+npx wrangler secret put ORIGIN_SHARED_SECRET
+```
+
+API: set `ORIGIN_SHARED_SECRET` on Cloud Run service `aquazerofit-api` in
+`australia-southeast1`, as a plain env var or a Secret Manager mount. That is
+an operator action. Nothing in this repository applies it.
+
+Optional ingress restriction, after a request through the Worker is limited per
+real client. Do not set Cloud Run ingress to `internal` while `API_ORIGIN` is
+still the public run.app URL: the Worker fetches that URL, and internal ingress
+would drop it. To close direct access, put an external HTTPS load balancer in
+front of the service, allow only Cloudflare's published IP ranges on that
+balancer, point `API_ORIGIN` at that origin, then set ingress to
+`internal-and-cloud-load-balancing`.
+
 ## Follow-ups, not part of this cutover
 
 - Stripe. The API reads `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET` (see `.env.example`). Leave those mounts, and any other live secret or volume, on the service. The deploy step updates the image only.
-- Orange-cloud in front of `run.app`, then `TRUST_PROXY=2`, then closing public ingress on the API hostname. Grey-cloud is not the public path. The Worker is.
+- Closing direct access to the run.app hostname. The shared secret above is what makes per-client rate limits correct while ingress stays `all`. Do not raise `TRUST_PROXY` to paper over a shared Cloudflare egress address.
 - Firestore. The API is off. The store stays on Cloud SQL.
 - Meal-photo object storage. Cloud Run disk is ephemeral.
 - Firebase Auth on the web (build-args plus authorized domain).

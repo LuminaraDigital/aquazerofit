@@ -12,6 +12,25 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 /** apps/api/.data by default, regardless of process cwd. */
 const defaultDataDir = path.resolve(here, '..', '..', '.data');
 
+/** Positive integer, or `fallback` when the value is missing or not usable. */
+function readPositiveInt(raw: string | undefined, fallback: number): number {
+  if (!raw?.trim()) return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) return fallback;
+  return n;
+}
+
+/**
+ * Zero or a positive integer. Zero is a real setting (a cap that is off),
+ * so only a missing or unparseable value uses `fallback`.
+ */
+function readNonNegativeInt(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) return fallback;
+  return n;
+}
+
 /**
  * Environment variable declaring how many instances of this API will run.
  *
@@ -66,12 +85,12 @@ export const config = {
   /**
    * Number of proxy hops to trust for `req.ip` / X-Forwarded-For.
    *
-   * Behind an Azure ingress (Container Apps, App Service, Front Door) Express
-   * sees the proxy's socket address for every request unless this is set, which
-   * collapses every caller into a single rate-limit bucket - the per-IP auth
-   * lane then locks out the whole platform after 10 attempts/minute. Defaults
-   * to 1 in production (trust exactly the immediate hop, so clients cannot
-   * spoof X-Forwarded-For) and 0 in dev, where there is no proxy.
+   * Rate limiting does not use `req.ip`. It trusts CF-Connecting-IP only when
+   * the Worker shared secret matches, and otherwise uses the socket address
+   * (see platform/clientIp.ts). `req.ip` is still what audit logs and the
+   * rest of the request see. Defaults to 1 in production (trust exactly the
+   * immediate hop, so clients cannot spoof X-Forwarded-For) and 0 in dev,
+   * where there is no proxy.
    */
   get trustProxy(): number {
     const raw = process.env.TRUST_PROXY?.trim();
@@ -80,6 +99,69 @@ export const config = {
       if (Number.isInteger(n) && n >= 0) return n;
     }
     return isProduction() ? 1 : 0;
+  },
+
+  /**
+   * Shared secret the Cloudflare Worker sends as `X-Origin-Shared-Secret`
+   * on requests it proxies to Cloud Run.
+   *
+   * Empty unless ORIGIN_SHARED_SECRET is set. An empty value never matches,
+   * so CF-Connecting-IP is ignored and rate limits fall back to the socket
+   * address. The value is not a default and is never committed.
+   */
+  get originSharedSecret(): string {
+    return process.env.ORIGIN_SHARED_SECRET?.trim() ?? '';
+  },
+
+  /**
+   * Auth-lane requests per minute for one client IP.
+   *
+   * 60 is one request a second. A Mini App open is a couple of /auth calls,
+   * and on a mobile carrier many subscribers share one address, so the old
+   * 10/min cap locked real people out of a launch. 60 stays far under the
+   * 300/min default lane. Password guessing against one account is still
+   * stopped by the per-email lockout (5 failures, then 15 minutes).
+   *
+   * A missing or non-positive value keeps this default. Zero must not turn
+   * the lane off.
+   */
+  get authRateLimitPerMinute(): number {
+    return readPositiveInt(process.env.AUTH_RATE_LIMIT_PER_MINUTE, 60);
+  },
+
+  /**
+   * New Telegram accounts per client IP per minute.
+   *
+   * Returning sign-ins are not counted. 5 allows a household or a double-tap
+   * on one connection and still stops a script. The old value was 3.
+   */
+  get telegramSignupPerIpPerMinute(): number {
+    return readPositiveInt(process.env.TELEGRAM_SIGNUP_PER_IP_PER_MINUTE, 5);
+  },
+
+  /**
+   * New Telegram accounts per IPv4 /24 (or IPv6 /64) per rolling day.
+   *
+   * 5/day made a carrier NAT, which puts unrelated people in one /24, fail
+   * closed after a handful of sign-ups. 2000/day is still a ceiling on a
+   * hostile subnet (about one new account a minute, sustained, across the
+   * whole block) and leaves room for a launch on shared mobile address space.
+   */
+  get telegramSignupSubnetDaily(): number {
+    return readPositiveInt(process.env.TELEGRAM_SIGNUP_SUBNET_DAILY, 2000);
+  },
+
+  /**
+   * New Telegram accounts per process per rolling day.
+   *
+   * 0, the default, disables the ceiling. The old cap was 100/day, which a
+   * real launch exceeds, and the counter lives in this process, so it was
+   * never a true global limit once more than one instance is running. Set
+   * TELEGRAM_SIGNUP_GLOBAL_DAILY to a positive integer to turn a per-instance
+   * circuit breaker back on.
+   */
+  get telegramSignupGlobalDaily(): number {
+    return readNonNegativeInt(process.env.TELEGRAM_SIGNUP_GLOBAL_DAILY, 0);
   },
 
   /**

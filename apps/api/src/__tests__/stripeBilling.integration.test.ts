@@ -1,8 +1,8 @@
 /**
  * Stripe billing routes.
  *
- * Same three ways to give the product away as the Play rail — an unconfigured
- * deployment, a forged notification, a purchase claimed by the wrong account —
+ * Same three ways to give the product away as the Play rail: an unconfigured
+ * deployment, a forged notification, a purchase claimed by the wrong account,
  * plus one Stripe adds: the webhook signature covers the exact bytes Stripe
  * sent, so a body that was parsed and re-serialised before verification can
  * never verify. Every webhook case below is signed over the raw string it
@@ -29,6 +29,8 @@ const { effectiveTier, entitlementHistory, grantPremium } = await import(
   '../modules/billing/entitlements'
 );
 const { resetStripePriceCache } = await import('../modules/billing/stripe');
+const { signTelegramInitData } = await import('../modules/auth/telegram');
+const { resetTelegramNewAccountLimits } = await import('../modules/auth/service');
 
 const app = createApp();
 const base = '/api/v1';
@@ -281,6 +283,37 @@ describe('POST /billing/stripe/checkout', () => {
     expect(sent.get('success_url')).toBe(
       'https://staging.aquazerofit.test/plan?checkout=success&session_id={CHECKOUT_SESSION_ID}',
     );
+  });
+
+  it('refuses checkout for a Telegram session, including after refresh', async () => {
+    resetTelegramNewAccountLimits();
+    const initData = signTelegramInitData({
+      auth_date: String(Math.floor(Date.now() / 1000)),
+      query_id: 'AA-stripe-tg',
+      user: JSON.stringify({ id: 880001, first_name: 'StripeTg' }),
+    });
+    const tg = await request(app).post(`${base}/auth/telegram`).send({ initData });
+    expect(tg.status).toBe(200);
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const blocked = await request(app)
+      .post(`${base}/billing/stripe/checkout`)
+      .set({ Authorization: `Bearer ${tg.body.accessToken as string}` });
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.code).toBe('FORBIDDEN');
+    expect(blocked.body.message).toMatch(/not available in Telegram/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    const refreshed = await request(app)
+      .post(`${base}/auth/refresh`)
+      .send({ refreshToken: tg.body.refreshToken });
+    expect(refreshed.status).toBe(200);
+    const blockedAgain = await request(app)
+      .post(`${base}/billing/stripe/checkout`)
+      .set({ Authorization: `Bearer ${refreshed.body.accessToken as string}` });
+    expect(blockedAgain.status).toBe(403);
+    expect(blockedAgain.body.code).toBe('FORBIDDEN');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('refuses to sell premium to an account that already has it', async () => {

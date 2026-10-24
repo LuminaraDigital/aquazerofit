@@ -80,7 +80,26 @@ Refusals write at most one line a minute: `kind:"security"`, `event:"origin_secr
 
 Telegram, Stripe and Pub/Sub cannot add a custom header. Only the Worker adds it, so after step 5 a webhook registered on run.app is refused outright. Every step is an operator action; nothing in this repository applies them.
 
-1. **One value, one shell, both sides.**
+0. **See what is live before changing anything.** The secret may already be set: `docs/CLOUDFLARE_CUTOVER.md` used to allow either a plain env var or a Secret Manager mount. Worker secrets can be listed but never read back.
+   ```bash
+   gcloud run services describe aquazerofit-api --project=aquazerofit --region=australia-southeast1 --format=json \
+     | jq '.spec.template.spec.containers[0].env[] | select(.name=="ORIGIN_SHARED_SECRET")'
+   (cd cloudflare && npx wrangler secret list)
+   ```
+   - **A `value`** is a plain env var. Reuse it, skip step 1, and swap it for a mount in step 3:
+     ```bash
+     SECRET="$(gcloud run services describe aquazerofit-api --project=aquazerofit \
+       --region=australia-southeast1 --format=json \
+       | jq -r '.spec.template.spec.containers[0].env[] | select(.name=="ORIGIN_SHARED_SECRET") | .value')"
+     ```
+   - **A `valueFrom.secretKeyRef`** is already a mount. Reuse it and skip steps 1 and 3:
+     ```bash
+     SECRET="$(gcloud secrets versions access latest --secret=<secretKeyRef.name> --project=aquazerofit)"
+     ```
+   - **Nothing** means it is not set. Generate one in step 1.
+
+   Reusing the Cloud Run value means step 2 brings the Worker into line with it, whatever the Worker held before. A fresh value generated while Cloud Run still holds an old one would split the two sides, and every visitor would share one rate-limit bucket until they matched again. A reused value under 32 characters, or a `replace-with-...` placeholder, would stop step 5 from booting; finish steps 2 and 3 with it, then replace it with "Rotating `ORIGIN_SHARED_SECRET`" below before step 5.
+1. **Generate**, only if step 0 found nothing. Keep this shell for steps 2 and 3.
    ```bash
    SECRET="$(openssl rand -hex 32)"
    ```
@@ -88,13 +107,15 @@ Telegram, Stripe and Pub/Sub cannot add a custom header. Only the Worker adds it
    ```bash
    printf %s "$SECRET" | npx wrangler secret put ORIGIN_SHARED_SECRET
    ```
-3. **Cloud Run.** Create the Secret Manager secret and mount it, which rolls one revision. If the runtime service account (`azf-api`) is granted secrets one by one rather than project-wide, grant it `roles/secretmanager.secretAccessor` on this secret first.
+3. **Cloud Run.** Create the Secret Manager secret and mount it, which rolls one revision. If the runtime service account (`azf-api`) is granted secrets one by one rather than project-wide, grant it `roles/secretmanager.secretAccessor` on this secret first. When step 0 found a plain `value`, remove it in the same update: `--update-secrets` refuses a name that is already a plain env var, and the update then changes nothing.
    ```bash
    printf %s "$SECRET" | gcloud secrets create ORIGIN_SHARED_SECRET \
      --project=aquazerofit --replication-policy=automatic --data-file=-
    gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --remove-env-vars=ORIGIN_SHARED_SECRET \
      --update-secrets=ORIGIN_SHARED_SECRET=ORIGIN_SHARED_SECRET:latest
    ```
+   Leave out `--remove-env-vars` when there was no plain value. If gcloud still reports a type conflict, run the removal and the mount as two updates back to back. The gate is still off here, so the gap between them costs only per-client rate limits for a minute.
 4. **Every provider webhook must be on `https://aquazerofit.com`.** Check each one against the provider's own record. The repository only documents the Telegram URL as `https://<host>/...`, so the docs do not settle this.
 
    | Provider | Must be | Check |
@@ -123,16 +144,6 @@ Telegram, Stripe and Pub/Sub cannot add a custom header. Only the Worker adds it
    gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
      --update-env-vars=REQUIRE_ORIGIN_SECRET=false
    ```
-7. **Rotate the Stripe live secret key and the Resend API key.** Both are held only by the operator. The secret ids below assume each matches its env name; confirm with `gcloud run services describe aquazerofit-api --region=australia-southeast1`.
-   - Stripe, live mode: Developers, API keys, secret key, **Roll key**. Give the old key an expiry (an hour is enough) so the serving revision keeps working until the new one is up.
-   - Resend: create a new API key with sending access. Do not delete the old one yet.
-   ```bash
-   printf %s "$NEW_STRIPE_KEY" | gcloud secrets versions add STRIPE_SECRET_KEY --project=aquazerofit --data-file=-
-   printf %s "$NEW_RESEND_KEY" | gcloud secrets versions add RESEND_API_KEY --project=aquazerofit --data-file=-
-   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
-     --update-secrets=STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,RESEND_API_KEY=RESEND_API_KEY:latest
-   ```
-   `:latest` is read when an instance starts, so a new revision has to be serving before the new keys take effect; check with `gcloud run revisions list --service=aquazerofit-api --region=australia-southeast1`. Then confirm the plan page on `aquazerofit.com` shows the Stripe price and a password reset reaches an operator mailbox. After that, delete the old Resend key. The old Stripe key expires on its own.
 
 ### Rotating `ORIGIN_SHARED_SECRET`
 
@@ -140,10 +151,12 @@ The gate stays on. The two sides cannot change at the same instant, so Cloud Run
 
 1. **Cloud Run holds both.** Record the version serving now, add the new one, and mount new as current and old as previous in one update:
    ```bash
-   OLD="$(gcloud secrets versions describe latest --secret=ORIGIN_SHARED_SECRET      --project=aquazerofit --format='value(name.basename())')"
+   OLD="$(gcloud secrets versions describe latest --secret=ORIGIN_SHARED_SECRET \
+     --project=aquazerofit --format='value(name.basename())')"
    NEW="$(openssl rand -hex 32)"
    printf %s "$NEW" | gcloud secrets versions add ORIGIN_SHARED_SECRET --project=aquazerofit --data-file=-
-   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1      --update-secrets="ORIGIN_SHARED_SECRET=ORIGIN_SHARED_SECRET:latest,ORIGIN_SHARED_SECRET_PREVIOUS=ORIGIN_SHARED_SECRET:${OLD}"
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --update-secrets="ORIGIN_SHARED_SECRET=ORIGIN_SHARED_SECRET:latest,ORIGIN_SHARED_SECRET_PREVIOUS=ORIGIN_SHARED_SECRET:${OLD}"
    ```
    Wait until `gcloud run revisions list --service=aquazerofit-api --region=australia-southeast1` shows the new revision serving.
 2. **Worker**, from `cloudflare/`:
@@ -153,9 +166,26 @@ The gate stays on. The two sides cannot change at the same instant, so Cloud Run
 3. **Verify** that `https://aquazerofit.com/api/v1/auth/captcha` returns 200 and that the log query in step 6 above shows no new `secret_mismatch` line.
 4. **Drop the old value**, then disable its version. Disable it only once the removal is serving: a revision that mounts a disabled version fails to start.
    ```bash
-   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1      --remove-secrets=ORIGIN_SHARED_SECRET_PREVIOUS
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --remove-secrets=ORIGIN_SHARED_SECRET_PREVIOUS
    gcloud secrets versions disable "$OLD" --secret=ORIGIN_SHARED_SECRET --project=aquazerofit
    ```
+
+## Key rotation: Stripe and Resend
+
+Operator-only; nothing in this repository holds either key. The secret ids below assume each matches its env name; confirm with `gcloud run services describe aquazerofit-api --region=australia-southeast1`.
+
+1. **Stripe, live mode:** Developers, API keys, secret key, **Roll key**. Give the old key an expiry (an hour is enough) so the serving revision keeps working until the new one is up.
+2. **Resend:** create a new API key with sending access. Do not delete the old one yet.
+3. **New versions, one new revision.**
+   ```bash
+   printf %s "$NEW_STRIPE_KEY" | gcloud secrets versions add STRIPE_SECRET_KEY --project=aquazerofit --data-file=-
+   printf %s "$NEW_RESEND_KEY" | gcloud secrets versions add RESEND_API_KEY --project=aquazerofit --data-file=-
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --update-secrets=STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,RESEND_API_KEY=RESEND_API_KEY:latest
+   ```
+   `:latest` is read when an instance starts, so the new keys take effect only once a new revision is serving; check with `gcloud run revisions list --service=aquazerofit-api --region=australia-southeast1`.
+4. **Verify, then retire.** The plan page on `aquazerofit.com` shows the Stripe price, and a password reset reaches an operator mailbox. Then delete the old Resend key. The old Stripe key expires on its own.
 
 ## Rotating `TELEGRAM_WEBHOOK_SECRET`
 

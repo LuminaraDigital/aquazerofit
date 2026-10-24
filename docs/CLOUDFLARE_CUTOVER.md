@@ -151,8 +151,10 @@ npx wrangler secret put ORIGIN_SHARED_SECRET
 ```
 
 API: set `ORIGIN_SHARED_SECRET` on Cloud Run service `aquazerofit-api` in
-`australia-southeast1`, as a plain env var or a Secret Manager mount. That is
-an operator action. Nothing in this repository applies it.
+`australia-southeast1` as a Secret Manager mount, following docs/OPERATIONS.md
+("Closing the run.app bypass"); its step 0 handles a value already set as a
+plain env var. That is an operator action. Nothing in this repository applies
+it.
 
 Optional ingress restriction, after a request through the Worker is limited per
 real client. Do not set Cloud Run ingress to `internal` while `API_ORIGIN` is

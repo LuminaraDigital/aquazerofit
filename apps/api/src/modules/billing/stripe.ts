@@ -13,20 +13,30 @@
  * this module reads to find the account moved between versions:
  * `invoice.parent.subscription_details` from 2025-03-31.basil onwards.
  *
- * Two events drive the entitlement:
+ * What each event does to the entitlement:
  *
  *  - `invoice.paid` grants through the end of the period the invoice paid
  *    for. It fires for the first payment and for every renewal, so it is the
  *    one grant path; keyed on the invoice id, so redelivery settles once.
  *  - `customer.subscription.deleted` ends premium now. Cancelling "at period
  *    end" does not fire it until that end, so paid time is never taken away.
+ *  - `charge.refunded` (in full), and a chargeback reported by
+ *    `charge.dispute.created` or `charge.dispute.funds_withdrawn`, retire the
+ *    one period that payment bought. An inquiry does not.
+ *  - `invoice.payment_failed` revokes nothing; it is logged for dunning.
+ *
+ * `customer.subscription.updated` is deliberately not handled. Only a paid
+ * invoice grants, so a lapsed subscription's premium already ends with its
+ * last paid period, and Stripe sends `customer.subscription.deleted` whenever
+ * a subscription ends. A revoke on an update - delivered late, or retried -
+ * could only take back time a later payment bought.
  */
 import { createHmac } from 'node:crypto';
 import { AppError } from '../../platform/errors';
 import { config } from '../../platform/config';
 import { secureEquals } from '../../platform/auth';
 import { logEvent } from '../../platform/telemetry';
-import { grantPremium, revokePremium } from './entitlements';
+import { grantPremium, revokePremiumOnce } from './entitlements';
 import { fetchWithTimeout } from './play';
 
 const STRIPE_API = 'https://api.stripe.com/v1';
@@ -45,6 +55,10 @@ interface StripeInvoice {
     subscription_details?: { subscription?: string; metadata?: Record<string, string> | null } | null;
   } | null;
   lines?: { data?: { period?: { end?: number } }[] };
+  /** On a failed payment: collection attempts that have failed so far. */
+  attempt_count?: number;
+  /** Unix seconds of Stripe's next automatic retry; null once it has given up. */
+  next_payment_attempt?: number | null;
 }
 
 interface StripeSubscription {
@@ -233,7 +247,7 @@ export function stripeSignatureValid(
   return signatures.some((signature) => secureEquals(signature, expected));
 }
 
-export function handleStripeEvent(event: StripeEvent): void {
+export async function handleStripeEvent(event: StripeEvent): Promise<void> {
   if (event.type === 'invoice.paid') {
     const invoice = event.data?.object as StripeInvoice;
     const userId = invoice.parent?.subscription_details?.metadata?.userId;
@@ -257,12 +271,153 @@ export function handleStripeEvent(event: StripeEvent): void {
      * its own end. Periods are not added together and a deleted subscription
      * does not wipe the others.
      */
-    revokePremium(
+    revokePremiumOnce(
       userId,
       'stripe',
       `stripe:deleted:${subscription.id}`,
       'stripe:subscription_deleted',
       subscription.id,
     );
+    return;
   }
+
+  if (event.type === 'invoice.payment_failed') {
+    onPaymentFailed(event.data?.object as StripeInvoice);
+    return;
+  }
+
+  if (event.type === 'charge.refunded') {
+    const charge = event.data?.object as StripeCharge;
+    if (!charge.refunded) {
+      // Partial: the purchase stands. Logged for support, nothing revoked.
+      logEvent('stripe_charge_partially_refunded', {
+        charge: charge.id,
+        amountRefunded: charge.amount_refunded ?? null,
+      });
+      return;
+    }
+    await revokeForPayment(charge.id, charge.payment_intent, `stripe:refund:${charge.id}`, 'stripe:charge_refunded');
+    return;
+  }
+
+  /*
+   * A chargeback is reported by `created` and again by `funds_withdrawn` when
+   * Stripe takes the money; both share the dispute's key, so it settles once.
+   * An inquiry (status `warning_*`) is the issuer asking a question: no money
+   * has moved and most never escalate, so it revokes nothing. One that does
+   * escalate turns the same dispute into a chargeback and debits the account
+   * (Stripe's testing docs), which `funds_withdrawn` reports; the shared key
+   * settles it once whichever of the two events arrive.
+   */
+  if (event.type === 'charge.dispute.created' || event.type === 'charge.dispute.funds_withdrawn') {
+    const dispute = event.data?.object as StripeDispute;
+    if (dispute.status?.startsWith('warning_')) {
+      logEvent('stripe_dispute_inquiry', { dispute: dispute.id, status: dispute.status });
+      return;
+    }
+    await revokeForPayment(
+      dispute.charge ?? dispute.id,
+      dispute.payment_intent,
+      `stripe:dispute:${dispute.id}`,
+      'stripe:charge_disputed',
+    );
+  }
+}
+
+/**
+ * A renewal charge failed. Nothing is revoked: the period already paid for
+ * stands, Stripe retries on its own schedule, and premium already stops at the
+ * last paid period's end if no retry ever lands, because only a paid invoice
+ * grants. What ops and dunning need is to see it happen, and this line is all
+ * of that. It writes no state, so a redelivery only repeats the line.
+ */
+function onPaymentFailed(invoice: StripeInvoice): void {
+  const details = invoice.parent?.subscription_details;
+  logEvent('stripe_invoice_payment_failed', {
+    invoice: invoice.id,
+    subscription: details?.subscription ?? null,
+    userId: details?.metadata?.userId ?? null,
+    attempt: invoice.attempt_count ?? null,
+    nextAttemptAt: invoice.next_payment_attempt
+      ? new Date(invoice.next_payment_attempt * 1000).toISOString()
+      : null,
+  });
+}
+
+interface StripeCharge {
+  id: string;
+  payment_intent?: string | null;
+  /** True only once the whole amount is refunded; a partial refund leaves it false. */
+  refunded?: boolean;
+  amount_refunded?: number;
+}
+
+interface StripeDispute {
+  id: string;
+  charge?: string | null;
+  payment_intent?: string | null;
+  /** `warning_*` for an inquiry; anything else is a chargeback. */
+  status?: string;
+}
+
+interface InvoicePaymentList {
+  data?: { invoice?: StripeInvoice | string | null }[];
+}
+
+/**
+ * The invoice a payment intent paid, and the account and subscription it
+ * names.
+ *
+ * At the pinned version neither a Charge nor a PaymentIntent carries its
+ * invoice: 2025-03-31.basil removed the field for InvoicePayment objects, and
+ * Stripe's changelog points at this list for the link. The invoice is expanded
+ * in the same call, and the account is read from exactly the field that
+ * granted the period - the subscription metadata Checkout stamped. A Checkout
+ * subscription's payment intent pays one invoice, so the first entry is it.
+ *
+ * Null for a payment that is not ours. A Stripe outage surfaces as the
+ * PAYMENT_UNAVAILABLE stripeApi throws, which the webhook route answers with
+ * a 503 so Stripe redelivers. Nothing has been written by then, and the
+ * revoke is keyed on the charge or dispute, so the redelivery settles once.
+ */
+async function paidInvoiceFor(
+  paymentIntent: string,
+): Promise<{ invoice: string; userId: string; subscription: string } | null> {
+  const query = new URLSearchParams({
+    'payment[type]': 'payment_intent',
+    'payment[payment_intent]': paymentIntent,
+    'expand[]': 'data.invoice',
+  });
+  const list = await stripeApi<InvoicePaymentList>(`/invoice_payments?${query}`);
+  const invoice = list.data?.[0]?.invoice;
+  if (!invoice || typeof invoice !== 'object') return null;
+  const details = invoice.parent?.subscription_details;
+  if (!details?.metadata?.userId || !details.subscription) return null;
+  return { invoice: invoice.id, userId: details.metadata.userId, subscription: details.subscription };
+}
+
+/**
+ * Take back the period one payment bought: a full refund, or a chargeback.
+ *
+ * Charge-scoped, like the Stars refund. `revokesExternalId` names the grant
+ * that invoice made, so a later renewal on the same subscription, and any
+ * other rail's period, stays. Keyed on the charge or the dispute, each of
+ * which happens to a payment once.
+ *
+ * A payment it cannot place is logged and acknowledged, never thrown: Stripe
+ * redelivers anything that is not a 2xx, and a payment that is not ours will
+ * not become ours on the next attempt.
+ */
+async function revokeForPayment(
+  chargeId: string,
+  paymentIntent: string | null | undefined,
+  externalId: string,
+  reason: string,
+): Promise<void> {
+  const paid = paymentIntent ? await paidInvoiceFor(paymentIntent) : null;
+  if (!paid) {
+    logEvent('stripe_charge_unmapped', { charge: chargeId, reason });
+    return;
+  }
+  revokePremiumOnce(paid.userId, 'stripe', externalId, reason, paid.subscription, `stripe:${paid.invoice}`);
 }

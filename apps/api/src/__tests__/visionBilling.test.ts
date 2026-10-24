@@ -221,8 +221,9 @@ describe('vision confirm macro recalculation', () => {
       (d) => (d as { reservationId?: string }).reservationId === reservationId,
     );
     expect(settlement.some((d) => (d as { kind?: string }).kind === 'commit')).toBe(false);
-    // Internal metering state must not reach the client.
-    expect(res.body.job?.aiDegraded).toBeUndefined();
+    // The review flag stays so the client can say the result was a fallback.
+    // The reservation id is metering state and must not reach the client.
+    expect(res.body.job?.aiDegraded).toBe(true);
     expect(res.body.job?.reservationId).toBeUndefined();
   });
 

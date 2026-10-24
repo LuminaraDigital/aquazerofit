@@ -35,6 +35,7 @@ These thresholds assume the platform can query structured logs (Azure Log Analyt
 | AI guardrail spike | `aiCallsBlocked` delta > 10 in 15 min | Possible prompt-injection probing; review `kind:"ai"` blocked records. |
 | Refresh-theft events | log search for `Refresh token reuse detected` | Count > 0 is worth a look; > 5/hour for one user suggests credential stuffing. |
 | Latency | p95 `ms` on http lines > 2 s over 5 min | Investigate store/Postgres health and AI provider latency. |
+| No AI provider | boot line `name:"ai_provider_unconfigured"` | Production has no provider key (or `OLLAMA_BASE_URL`), so every AI answer is offline template text, flagged `degradedReason: "no_provider"` and never billed. Set at least one key (`.env.production.example`) and redeploy. |
 
 ## Scaling: this API runs on exactly one instance
 
@@ -285,6 +286,23 @@ These are unresolved, and the procedure above deliberately does not pretend othe
 2. **Whether the environment can change without replacing the process.** `config.telegramWebhookSecret` is a getter that re-reads `process.env` on every call, so the *process* needs no restart to see a new value. Whether the managed host or Azure Container Apps can apply an environment change in place, rather than by rolling a new revision, is not visible from this repository. If it can, the window shrinks to the time between two commands — but nobody has run it that way.
 3. **How long Telegram retries a refused update, and with what backoff.** The route's design assumes redelivery of non-2xx; the retry duration is not recorded anywhere here. If it is shorter than the rotation window, updates in that window are lost outright rather than delayed, and the `successful_payment` row of the cost table above becomes optimistic.
 4. **This procedure has not been executed against production.** Rehearse the first run against a staging bot with its own token and webhook URL before doing it live.
+
+## Stripe webhook events
+
+Each environment's endpoint (`<APP_PUBLIC_URL>/api/v1/billing/stripe/webhook`, API version `2025-11-17.clover`) must be subscribed to all six events below; Stripe sends nothing it was not asked for. To extend an existing endpoint, open it in the Stripe Dashboard (Workbench → Webhooks), edit its events and add the missing ones. The signing secret does not change.
+
+| Event | Effect | Log line to watch |
+| --- | --- | --- |
+| `invoice.paid` | Grants through the paid period. | `stripe_invoice_unmapped` |
+| `customer.subscription.deleted` | Ends that subscription's premium now. | |
+| `invoice.payment_failed` | Nothing revoked; Stripe retries. For dunning. | `stripe_invoice_payment_failed` |
+| `charge.refunded` | A full refund retires the period that payment bought. A partial refund only logs. | `stripe_charge_partially_refunded`, `stripe_charge_unmapped` |
+| `charge.dispute.created` | A chargeback retires the period the disputed payment bought. An inquiry (status `warning_*`) only logs. | `stripe_dispute_inquiry`, `stripe_charge_unmapped` |
+| `charge.dispute.funds_withdrawn` | Same revoke, settled once with `created`; this is the event that reports an inquiry escalating to a chargeback. A dispute later won does not restore premium; re-grant with `POST /api/v1/admin/users/:id/premium`. | `stripe_charge_unmapped` |
+
+`customer.subscription.updated` is deliberately not subscribed: only a paid invoice grants, so a lapsed subscription already ends with its last paid period, and Stripe sends `customer.subscription.deleted` whenever a subscription ends.
+
+`stripe_charge_unmapped` means a refund or dispute could not be traced to an account through Stripe's invoice payments, so nothing was revoked; check the charge in the Dashboard. `stripe_webhook_deferred` means Stripe was unreachable during that lookup: the delivery got a 503 and Stripe retries it for about three days, so it needs action only if it repeats. `stripe_webhook_unsettled` means handling stopped on a final error (the account no longer exists, or Stripe does not recognise the payment); resend the event from the Dashboard once the cause is fixed.
 
 ## What is NOT here (deliberately)
 

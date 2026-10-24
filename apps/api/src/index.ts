@@ -24,6 +24,7 @@ import { sweepIdempotencyRecords } from './modules/logs/service';
 import { recoverStuckVisionJobs, sweepVisionArtifacts } from './modules/vision/router';
 import { sweepGrowthEvents } from './modules/analytics/router';
 import { creditLedger } from './modules/ai/creditLedger';
+import { warnIfNoAiProviderConfigured } from './modules/ai/gateway';
 
 // Fail fast: never boot a production process on dev fallback secrets.
 assertProductionSecrets();
@@ -41,6 +42,10 @@ assertOriginSecretConfigured();
 // Advisory rather than fatal: an unprotected signup form is a real weakness,
 // but killing a deploy over incomplete Cloudflare onboarding is a worse one.
 warnIfBotProtectionUnconfigured();
+// Advisory too: with no provider key production still works and bills nothing
+// for the offline engine's answers, but no model is answering anyone, and
+// nothing else in the logs says so.
+warnIfNoAiProviderConfigured();
 
 // Build the store before anything reads it. Under the Postgres backing
 // (DATABASE_URL set by a managed host) hydration is async while getStore() stays

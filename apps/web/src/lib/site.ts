@@ -35,7 +35,7 @@ export interface SiteConfig {
  * somebody else's bot, so every one of them is overridable at build time.
  */
 export const SITE_DEFAULTS: SiteConfig = {
-  siteOrigin: 'https://aquazero.fit',
+  siteOrigin: 'https://aquazerofit.com',
   telegramBotUsername: 'AquaZeroFitBot',
   /**
    * The Mini App short name is what makes `t.me/<bot>/<app>` open the app

@@ -22,7 +22,7 @@ import { getStore } from '../../platform/store';
 import { setCredentials } from '../auth/service';
 import { validateTelegramInitData } from '../auth/telegram';
 import { memoryRouter } from '../memory/router';
-import { effectiveTier } from '../billing/entitlements';
+import { effectiveTier, entitlementHistory } from '../billing/entitlements';
 import {
   exportUserData,
   getConsents,
@@ -82,6 +82,9 @@ meRouter.get(
       maxBankedCredits: maxBankedCreditsFor(tier),
       costs: CREDIT_COSTS,
       premiumLanes: PREMIUM_LANES,
+      // Which rail the latest entitlement came from, so the plan page offers
+      // Stripe's billing portal only to the people Stripe is billing.
+      billingSource: entitlementHistory(userId)[0]?.source ?? null,
     });
   }),
 );
@@ -148,12 +151,15 @@ meRouter.patch('/', (req, res) => {
   res.json({ user: updateIdentity(userIdOf(req), input) });
 });
 
-meRouter.delete('/', (req, res) => {
-  const result = requestDeletion(userIdOf(req));
-  res.json({
-    ...result,
-    message: result.purged
-      ? 'Your account and data have been deleted.'
-      : 'Deletion requested. Your account will be removed after the grace period; call again to delete immediately.',
-  });
-});
+meRouter.delete(
+  '/',
+  asyncHandler(async (req, res) => {
+    const result = await requestDeletion(userIdOf(req));
+    res.json({
+      ...result,
+      message: result.purged
+        ? 'Your account and data have been deleted.'
+        : 'Deletion requested. Your account will be removed after the grace period; call again to delete immediately.',
+    });
+  }),
+);

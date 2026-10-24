@@ -24,6 +24,7 @@ import {
 } from './adaptive';
 import { removeUserFromChallenges } from '../challenges/service';
 import { effectiveTier } from '../billing/entitlements';
+import { cancelStripeSubscriptions } from '../billing/stripe';
 import { addDays } from '../../platform/dates';
 import type { TrendPoint } from '@aquazerofit/shared';
 import { mealLogsForDate, weightLogsInRange } from '../logs/service';
@@ -314,13 +315,15 @@ export function exportUserData(userId: string): Record<string, unknown> {
  * Two-step deletion (AQF-06 §6): the first call flags the account and starts
  * the grace period; a second call while flagged purges immediately.
  */
-export function requestDeletion(userId: string): { purged: boolean; deletionRequestedAt: string } {
+export async function requestDeletion(
+  userId: string,
+): Promise<{ purged: boolean; deletionRequestedAt: string }> {
   const store = getStore();
   const user = store.byId<User>('users', userId);
   if (!user) throw new AppError('NOT_FOUND', 'Account not found');
 
   if (user.deletionRequestedAt) {
-    purgeUser(userId);
+    await purgeUser(userId);
     return { purged: true, deletionRequestedAt: user.deletionRequestedAt };
   }
   const flaggedAt = new Date().toISOString();
@@ -370,7 +373,11 @@ function scrubGrowthIdentifiers<T extends { id: string }>(doc: T): T {
   return { ...doc, props, attribution } as T;
 }
 
-export function purgeUser(userId: string): void {
+export async function purgeUser(userId: string): Promise<void> {
+  // First, while the ledger still names the subscription: an erased account
+  // must not go on being billed. Logs rather than throws if Stripe is down.
+  await cancelStripeSubscriptions(userId);
+
   const store = getStore();
 
   // Meal photo files on disk belong to the user's vision jobs — remove them
@@ -423,7 +430,7 @@ export function purgeUser(userId: string): void {
  * (deletionRequestedAt + config.deletionGraceDays < now). Runs on boot and
  * every 6 hours (scheduled in index.ts). Returns the number of purged users.
  */
-export function sweepExpiredDeletions(now = new Date()): number {
+export async function sweepExpiredDeletions(now = new Date()): Promise<number> {
   const store = getStore();
   const cutoff = now.getTime() - config.deletionGraceDays * 24 * 3600 * 1000;
   const expired = store.where<User>(
@@ -434,7 +441,7 @@ export function sweepExpiredDeletions(now = new Date()): number {
       new Date((d as User).deletionRequestedAt!).getTime() < cutoff,
   );
   for (const user of expired) {
-    purgeUser(user.id);
+    await purgeUser(user.id);
     // Audit the sweep purge itself. The subject is already erased, so the
     // event is written anonymised with a hashed reference (re-identifiable
     // only with the original user id).

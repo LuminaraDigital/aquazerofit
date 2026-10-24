@@ -37,6 +37,7 @@ import {
 import { obfuscatedAccountIdFor, playBillingConfigured, verifyPurchase } from './play';
 import {
   createCheckoutSession,
+  createPortalSession,
   handleStripeEvent,
   premiumPrice,
   stripeSignatureValid,
@@ -340,6 +341,15 @@ billingRouter.post(
     await syncCheckoutSession(userId, sessionId);
     const user = getStore().byId<User>('users', userId);
     res.json({ tier: user ? effectiveTier(user) : 'free', premiumUntil: user?.premiumUntil ?? null });
+  }),
+);
+
+/** Stripe's hosted billing portal: card, invoices, and cancelling. 404 for a non-Stripe account. */
+billingRouter.post(
+  '/stripe/portal',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    res.json({ url: await createPortalSession(userIdOf(req)) });
   }),
 );
 

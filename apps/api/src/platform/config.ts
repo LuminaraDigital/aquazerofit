@@ -11,6 +11,25 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 /** apps/api/.data by default, regardless of process cwd. */
 const defaultDataDir = path.resolve(here, '..', '..', '.data');
 
+/** Positive integer, or `fallback` when the value is missing or not usable. */
+function readPositiveInt(raw: string | undefined, fallback: number): number {
+  if (!raw?.trim()) return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) return fallback;
+  return n;
+}
+
+/**
+ * Zero or a positive integer. Zero is a real setting (a cap that is off),
+ * so only a missing or unparseable value uses `fallback`.
+ */
+function readNonNegativeInt(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) return fallback;
+  return n;
+}
+
 /**
  * Environment variable declaring how many instances of this API will run.
  *
@@ -65,12 +84,12 @@ export const config = {
   /**
    * Number of proxy hops to trust for `req.ip` / X-Forwarded-For.
    *
-   * Behind an Azure ingress (Container Apps, App Service, Front Door) Express
-   * sees the proxy's socket address for every request unless this is set, which
-   * collapses every caller into a single rate-limit bucket — the per-IP auth
-   * lane then locks out the whole platform after 10 attempts/minute. Defaults
-   * to 1 in production (trust exactly the immediate hop, so clients cannot
-   * spoof X-Forwarded-For) and 0 in dev, where there is no proxy.
+   * Rate limiting does not use `req.ip`. It trusts CF-Connecting-IP only when
+   * the Worker shared secret matches, and otherwise uses the socket address
+   * (see platform/clientIp.ts). `req.ip` is still what audit logs and the
+   * rest of the request see. Defaults to 1 in production (trust exactly the
+   * immediate hop, so clients cannot spoof X-Forwarded-For) and 0 in dev,
+   * where there is no proxy.
    */
   get trustProxy(): number {
     const raw = process.env.TRUST_PROXY?.trim();
@@ -79,6 +98,69 @@ export const config = {
       if (Number.isInteger(n) && n >= 0) return n;
     }
     return isProduction() ? 1 : 0;
+  },
+
+  /**
+   * Shared secret the Cloudflare Worker sends as `X-Origin-Shared-Secret`
+   * on requests it proxies to Cloud Run.
+   *
+   * Empty unless ORIGIN_SHARED_SECRET is set. An empty value never matches,
+   * so CF-Connecting-IP is ignored and rate limits fall back to the socket
+   * address. The value is not a default and is never committed.
+   */
+  get originSharedSecret(): string {
+    return process.env.ORIGIN_SHARED_SECRET?.trim() ?? '';
+  },
+
+  /**
+   * Auth-lane requests per minute for one client IP.
+   *
+   * 60 is one request a second. A Mini App open is a couple of /auth calls,
+   * and on a mobile carrier many subscribers share one address, so the old
+   * 10/min cap locked real people out of a launch. 60 stays far under the
+   * 300/min default lane. Password guessing against one account is still
+   * stopped by the per-email lockout (5 failures, then 15 minutes).
+   *
+   * A missing or non-positive value keeps this default. Zero must not turn
+   * the lane off.
+   */
+  get authRateLimitPerMinute(): number {
+    return readPositiveInt(process.env.AUTH_RATE_LIMIT_PER_MINUTE, 60);
+  },
+
+  /**
+   * New Telegram accounts per client IP per minute.
+   *
+   * Returning sign-ins are not counted. 5 allows a household or a double-tap
+   * on one connection and still stops a script. The old value was 3.
+   */
+  get telegramSignupPerIpPerMinute(): number {
+    return readPositiveInt(process.env.TELEGRAM_SIGNUP_PER_IP_PER_MINUTE, 5);
+  },
+
+  /**
+   * New Telegram accounts per IPv4 /24 (or IPv6 /64) per rolling day.
+   *
+   * 5/day made a carrier NAT, which puts unrelated people in one /24, fail
+   * closed after a handful of sign-ups. 2000/day is still a ceiling on a
+   * hostile subnet (about one new account a minute, sustained, across the
+   * whole block) and leaves room for a launch on shared mobile address space.
+   */
+  get telegramSignupSubnetDaily(): number {
+    return readPositiveInt(process.env.TELEGRAM_SIGNUP_SUBNET_DAILY, 2000);
+  },
+
+  /**
+   * New Telegram accounts per process per rolling day.
+   *
+   * 0, the default, disables the ceiling. The old cap was 100/day, which a
+   * real launch exceeds, and the counter lives in this process, so it was
+   * never a true global limit once more than one instance is running. Set
+   * TELEGRAM_SIGNUP_GLOBAL_DAILY to a positive integer to turn a per-instance
+   * circuit breaker back on.
+   */
+  get telegramSignupGlobalDaily(): number {
+    return readNonNegativeInt(process.env.TELEGRAM_SIGNUP_GLOBAL_DAILY, 0);
   },
 
   /**
@@ -100,8 +182,8 @@ export const config = {
   /**
    * Where meal photographs are written while a vision job is in flight.
    *
-   * Defaults to apps/api/uploads. On a host whose filesystem is ephemeral —
-   * many managed hosts reset it on every deploy — point UPLOADS_DIR at a mounted
+   * Defaults to apps/api/uploads. On a host whose filesystem is ephemeral  - 
+   * many managed hosts reset it on every deploy - point UPLOADS_DIR at a mounted
    * persistent volume, or in-flight photos vanish on redeploy. The blast
    * radius is deliberately small (the sweep deletes them within 24 hours
    * anyway and a missing file is tolerated everywhere it is read), but a lost
@@ -150,7 +232,7 @@ export const config = {
    * Shared secret echoed by Telegram in `X-Telegram-Bot-Api-Secret-Token` on
    * every webhook delivery (set with the `secret_token` parameter of
    * setWebhook). The webhook URL is otherwise a public, unauthenticated
-   * endpoint that grants coach entitlements — without this, anyone who guesses
+   * endpoint that grants coach entitlements - without this, anyone who guesses
    * the path can mint a `successful_payment` and take the paid roster for
    * free. Empty means the webhook refuses every request rather than trusting
    * them all, which is the correct default for an endpoint that moves money.
@@ -169,7 +251,7 @@ export const config = {
   },
 
   /**
-   * Turnstile site key. Public by design — it is handed to any caller of
+   * Turnstile site key. Public by design - it is handed to any caller of
    * GET /auth/captcha.
    *
    * Served at runtime rather than baked into the web bundle as a VITE_ var on
@@ -186,8 +268,8 @@ export const config = {
    * True only when BOTH keys are present.
    *
    * Requiring both is what stops the worst configuration: a secret with no
-   * site key would have the server demand a token that the client — told
-   * `enabled: false` — never renders a widget to produce, locking every real
+   * site key would have the server demand a token that the client - told
+   * `enabled: false` - never renders a widget to produce, locking every real
    * person out of registration while looking correctly configured.
    */
   get botProtectionEnabled(): boolean {
@@ -200,7 +282,7 @@ export const config = {
    * `X-Client: android` and carrying no captcha token is let through.
    *
    * Read what that actually is before enabling it. `X-Client` is a header any
-   * caller can type, so this is not "trust the app" — it is a GLOBAL bypass of
+   * caller can type, so this is not "trust the app" - it is a GLOBAL bypass of
    * the registration and password-reset challenge, available to anyone who
    * sends four bytes. It exists for closed testing, where the tester count is
    * known and the alternative is no Android signup at all.
@@ -216,7 +298,7 @@ export const config = {
 
   /**
    * Play Integrity verification of the Android client's attestation token.
-   * Off until BOTH the flag and the package name are set — a verdict checked
+   * Off until BOTH the flag and the package name are set - a verdict checked
    * against the wrong package is not a check.
    */
   get playIntegrityEnabled(): boolean {
@@ -237,7 +319,7 @@ export const config = {
    * code between every request, which ends with the code taped to the monitor;
    * too long and the step-up stops being a step-up. Ten minutes covers a
    * realistic support task (list accounts, look one up, edit a record) in one
-   * prompt while staying inside the 15-minute access-token lifetime — the
+   * prompt while staying inside the 15-minute access-token lifetime - the
    * grant is bound to the presenting access token (see modules/mfa/service),
    * so it can never outlive that token anyway, and this only shortens it.
    *
@@ -292,7 +374,7 @@ export const config = {
 
   /**
    * Echo password-reset tokens in API responses and server logs. Requires
-   * isDev AND this flag — staging (NODE_ENV=production) must never leak tokens
+   * isDev AND this flag - staging (NODE_ENV=production) must never leak tokens
    * even when operators forget to unset dev conveniences.
    */
   get exposeDevTokens(): boolean {
@@ -311,7 +393,7 @@ export const config = {
    * `logs` container (see modules/logs/service.sweepIdempotencyRecords).
    *
    * Six hours by default, matching the other periodic sweeps in index.ts. The
-   * records carry a 24h TTL, so this is four passes per lifetime — frequent
+   * records carry a 24h TTL, so this is four passes per lifetime - frequent
    * enough that the backlog stays small, rare enough that the sweep's full
    * container scan is nowhere near a request path.
    *
@@ -327,7 +409,7 @@ export const config = {
    * setting it never chose had an opinion.
    *
    * Set it with headroom. `platform/aiBudget.ts` counts what providers report,
-   * and a call that dies mid-generation spends tokens nobody reports — so the
+   * and a call that dies mid-generation spends tokens nobody reports - so the
    * figure this compares against is a floor on real spend, not a meter.
    *
    * A negative or unparseable value falls back to "no ceiling" rather than
@@ -364,7 +446,7 @@ export const config = {
   /**
    * Stripe secret key. Test-mode (`sk_test_`) on staging, live on production,
    * never the same set on both. Absent, or without STRIPE_PRICE_ID, means no
-   * Stripe checkout is offered — same asymmetry as the Play credentials.
+   * Stripe checkout is offered - same asymmetry as the Play credentials.
    */
   get stripeSecretKey(): string {
     return process.env.STRIPE_SECRET_KEY?.trim() ?? '';
@@ -412,7 +494,7 @@ export const config = {
    * anything but 1.
    *
    * NaN means AZF_INSTANCE_COUNT was set to something that is not a positive
-   * integer. That is not treated as "probably one" — a guard that cannot read
+   * integer. That is not treated as "probably one" - a guard that cannot read
    * its own input has not verified anything, so it refuses.
    */
   get instanceCount(): number {
@@ -515,7 +597,7 @@ export function assertSingleInstance(): void {
     `Refusing to start: ${problem}. This API is single-instance only. Each instance ` +
       'hydrates its own in-memory copy of the store at boot and never re-reads, so a write ' +
       'on one instance is invisible to the others and the last flush silently overwrites ' +
-      "the other instances' version of the same document — health logs are lost with no " +
+      "the other instances' version of the same document - health logs are lost with no " +
       'error anywhere. Run exactly one instance (managed PaaS: one dedicated machine, NOT ' +
       'autoscale; Docker Compose: do not use --scale on the api service; Azure Container ' +
       'Apps: min=max=1), and unset ' +
@@ -585,9 +667,9 @@ export function assertProductionSecrets(): void {
   // Bot protection is on only when BOTH Turnstile keys are present (see
   // config.botProtectionEnabled), and assertHuman returns early and does
   // nothing when it is off. So a production deployment missing either key
-  // serves POST /auth/register and POST /auth/password-reset/request — the
+  // serves POST /auth/register and POST /auth/password-reset/request - the
   // account-creation surface, where one route mints accounts and AI credits
-  // and the other mails an address the caller chose — completely unchallenged,
+  // and the other mails an address the caller chose - completely unchallenged,
   // while every response and every log line looks exactly as it does when the
   // check is working. The only previous signal was one console.warn at boot,
   // which is to say none.
@@ -603,7 +685,7 @@ export function assertProductionSecrets(): void {
       `Refusing to start in production without: ${turnstileMissing.join(', ')}. Bot protection ` +
         'is enabled only when BOTH Turnstile keys are set, so registration and password-reset ' +
         'request go out with no challenge at all without them and nothing says so at request ' +
-        'time — a distributed signup flood stays under every per-IP rate limit. One key on its ' +
+        'time - a distributed signup flood stays under every per-IP rate limit. One key on its ' +
         'own leaves protection off exactly as if neither were set, which is the usual way this ' +
         'happens. Take both from the Cloudflare dashboard (Turnstile -> your site) and set them ' +
         'together.',
@@ -613,8 +695,8 @@ export function assertProductionSecrets(): void {
   // Admin MFA is built and mounted, but with MFA_REQUIRE_ADMIN off an
   // administrator who never enrolled a second factor is audited, logged and
   // then let through anyway (see modules/mfa/middleware). The admin router
-  // reads and edits every account on the platform — every user's email,
-  // health profile, food and weight history — so an unenrolled admin means
+  // reads and edits every account on the platform - every user's email,
+  // health profile, food and weight history - so an unenrolled admin means
   // one stolen password stands between an attacker and all of it, with the
   // audit trail recording the breach rather than preventing it. The off
   // default exists only to give an existing deployment one window to enrol;
@@ -624,7 +706,7 @@ export function assertProductionSecrets(): void {
     throw new Error(
       'MFA_REQUIRE_ADMIN must be set to true in production: without it an administrator with no ' +
         'second factor enrolled is only audited, not stopped, and the admin routes expose every ' +
-        'account on the platform. Have every admin enrol an authenticator first, then set it — ' +
+        'account on the platform. Have every admin enrol an authenticator first, then set it - ' +
         'flipping it with nobody enrolled locks you out of your own system.',
     );
   }
@@ -645,7 +727,7 @@ export function assertProductionSecrets(): void {
 
 // Startup guard: importing config in a production process without real secrets
 // must crash immediately (dev fallbacks are dev-only). This covers every
-// entrypoint — the API server, the seed script, the importers — not just
+// entrypoint - the API server, the seed script, the importers - not just
 // index.ts, which also calls it explicitly.
 //
 // Skipped under test: the suite exercises production combinations by mutating

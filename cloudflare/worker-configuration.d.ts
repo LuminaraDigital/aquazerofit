@@ -3,6 +3,11 @@
 interface __BaseEnv_Env {
 	ASSETS: Fetcher;
 	API_ORIGIN: "https://aquazerofit-api-592686987043.australia-southeast1.run.app";
+	/**
+	 * Worker secret (`npx wrangler secret put ORIGIN_SHARED_SECRET`).
+	 * Not a var, so `wrangler types` will not emit it. Kept here on purpose.
+	 */
+	ORIGIN_SHARED_SECRET?: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {

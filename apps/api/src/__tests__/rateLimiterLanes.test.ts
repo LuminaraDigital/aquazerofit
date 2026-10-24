@@ -2,8 +2,8 @@
  * Which lane each path lands in.
  *
  * This exists because the strict lane shipped as "/chat and the photo route"
- * — a list of the two model-calling surfaces that existed when it was written
- * — and then `POST /plans/generate` and `POST /workouts/:id/swap-exercise`
+ * - a list of the two model-calling surfaces that existed when it was written
+ * - and then `POST /plans/generate` and `POST /workouts/:id/swap-exercise`
  * were added, both of which call the AI gateway, and neither of which was
  * added here. They sat on the 300/min default lane, so a caller could drive
  * fifteen times more model calls per minute through them than through /chat.
@@ -14,6 +14,7 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
+import { config } from '../platform/config';
 import { rateLimiter, resetRateLimiter } from '../platform/rateLimiter';
 
 const STRICT_LIMIT = 20;
@@ -38,9 +39,9 @@ afterAll(() => {
   resetRateLimiter();
 });
 
-/** Minimal req/res pair — the limiter reads only path, headers and ip. */
+/** Minimal req/res pair. The limiter keys on the socket when no Worker secret is present. */
 function callOnce(path: string, ip: string): { passed: boolean; status?: number } {
-  const req = { path, headers: {}, ip } as unknown as Request;
+  const req = { path, headers: {}, ip, socket: { remoteAddress: ip } } as unknown as Request;
   let status: number | undefined;
   const res = {
     setHeader: () => undefined,
@@ -120,12 +121,13 @@ describe('rate limiter lanes', () => {
   });
 
   /*
-   * The auth lane is the tightest of all and is keyed per IP only, since the
-   * requests it sees are unauthenticated by nature. Included so a future edit
-   * to the lane-selection order cannot quietly demote credential guessing to
-   * a looser lane.
+   * The auth lane is keyed per IP only, since the requests it sees are
+   * unauthenticated by nature. Included so a future edit to the lane-selection
+   * order cannot quietly demote credential guessing to the default lane.
+   * The number itself comes from config.
    */
-  it('keeps the auth lane strictest', () => {
-    expect(callsUntilBlocked('/api/v1/auth/login', '4.4.4.4', 30)).toBe(11);
+  it('keeps credential guessing on the per-IP auth lane', () => {
+    const limit = config.authRateLimitPerMinute;
+    expect(callsUntilBlocked('/api/v1/auth/login', '4.4.4.4', limit + 5)).toBe(limit + 1);
   });
 });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { API_ORIGIN, canonicalRedirect, isProxiedPath, upstreamRequest } from './proxy.ts';
+import { API_ORIGIN, ORIGIN_SECRET_HEADER, canonicalRedirect, isProxiedPath, upstreamRequest } from './proxy.ts';
 
 test('proxies API, uploads, and probes, and leaves the SPA alone', () => {
   assert.equal(isProxiedPath('/api/v1/auth/login'), true);
@@ -36,5 +36,25 @@ test('targets Cloud Run and drops a spoofed forwarding header', () => {
   assert.equal(headers.get('x-forwarded-for'), '203.0.113.9');
   assert.equal(headers.get('cookie'), 'azf_rt=abc');
   assert.equal(headers.get('host'), null);
+  assert.equal(headers.get('cf-connecting-ip'), '203.0.113.9');
+  assert.equal(headers.get(ORIGIN_SECRET_HEADER), null);
   assert.equal(upstream.init.redirect, 'manual');
+});
+
+test('replaces a spoofed origin secret and omits the header when unset', () => {
+  const request = new Request('https://aquazerofit.com/api/v1/auth/telegram', {
+    method: 'POST',
+    headers: {
+      'cf-connecting-ip': '203.0.113.9',
+      'x-origin-shared-secret': 'spoofed',
+    },
+  });
+  const withSecret = upstreamRequest(request, API_ORIGIN, '  real-secret  ');
+  const headers = new Headers(withSecret.init.headers);
+  assert.equal(headers.get(ORIGIN_SECRET_HEADER), 'real-secret');
+  assert.equal(headers.get('cf-connecting-ip'), '203.0.113.9');
+  assert.equal(headers.get('x-forwarded-for'), '203.0.113.9');
+
+  const without = upstreamRequest(request, API_ORIGIN, '   ');
+  assert.equal(new Headers(without.init.headers).get(ORIGIN_SECRET_HEADER), null);
 });

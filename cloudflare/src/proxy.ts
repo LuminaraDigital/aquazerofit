@@ -29,6 +29,9 @@ export function canonicalRedirect(url: URL): string | null {
   return target.href;
 }
 
+/** Header the API checks before trusting CF-Connecting-IP. Not a secret by itself. */
+export const ORIGIN_SECRET_HEADER = 'x-origin-shared-secret';
+
 const STRIP_HEADERS = [
   'host',
   'cf-connecting-ip',
@@ -39,23 +42,32 @@ const STRIP_HEADERS = [
   'x-forwarded-host',
   'x-forwarded-proto',
   'x-real-ip',
+  ORIGIN_SECRET_HEADER,
 ];
 
 /**
  * Build the Cloud Run request. Host is left unset so fetch uses the run.app
- * hostname. A client-supplied X-Forwarded-For is dropped. When Cloudflare
- * provides CF-Connecting-IP, that single value is the forwarded client.
+ * hostname. Client-supplied forwarding headers are dropped, then replaced:
+ * CF-Connecting-IP and X-Forwarded-For are the edge's view of the client,
+ * and X-Origin-Shared-Secret is set only from the Worker secret. A caller
+ * who hits Cloud Run directly cannot borrow that header from this proxy.
  */
 export function upstreamRequest(
   request: Request,
   apiOrigin: string,
+  originSharedSecret?: string,
 ): { url: string; init: RequestInit } {
   const incoming = new URL(request.url);
   const target = new URL(incoming.pathname + incoming.search, apiOrigin);
+  const client = request.headers.get('cf-connecting-ip');
   const headers = new Headers(request.headers);
   for (const name of STRIP_HEADERS) headers.delete(name);
-  const client = request.headers.get('cf-connecting-ip');
-  if (client) headers.set('x-forwarded-for', client);
+  if (client) {
+    headers.set('cf-connecting-ip', client);
+    headers.set('x-forwarded-for', client);
+  }
+  const secret = originSharedSecret?.trim();
+  if (secret) headers.set(ORIGIN_SECRET_HEADER, secret);
   const init: RequestInit = {
     method: request.method,
     headers,

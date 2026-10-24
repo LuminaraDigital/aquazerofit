@@ -135,15 +135,14 @@ function recordLoginFailure(emailKey: string, now: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Per-IP Telegram auto-provision cap (distinct from the global /auth rate lane).
+// Telegram auto-provision caps (distinct from the /auth rate lane).
 // Only NEW account creation is counted; returning users signing in again are
-// unaffected. Stale buckets are pruned lazily on each check.
+// unaffected. Limits live in config (per IP per minute, per subnet per day,
+// and an optional process-local daily ceiling that defaults to off).
+// Stale buckets are pruned lazily on each check.
 // ---------------------------------------------------------------------------
 
 const TG_NEW_ACCOUNT_WINDOW_MS = 60_000;
-const TG_NEW_ACCOUNT_LIMIT = 3;
-const TG_GLOBAL_DAILY_LIMIT = 100;
-const TG_SUBNET_DAILY_LIMIT = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const telegramNewAccountsByIp = new Map<string, number[]>();
@@ -189,30 +188,33 @@ function pruneTelegramNewAccounts(now: number): void {
 function assertTelegramNewAccountAllowed(ip: string | undefined, now: number): void {
   pruneTelegramNewAccounts(now);
   const key = ip?.trim() || 'unknown';
+  const perIpLimit = config.telegramSignupPerIpPerMinute;
+  const subnetLimit = config.telegramSignupSubnetDaily;
+  const globalLimit = config.telegramSignupGlobalDaily;
   const windowStart = now - TG_NEW_ACCOUNT_WINDOW_MS;
   const stamps = (telegramNewAccountsByIp.get(key) ?? []).filter((t) => t > windowStart);
-  if (stamps.length >= TG_NEW_ACCOUNT_LIMIT) {
+  if (stamps.length >= perIpLimit) {
     const oldest = stamps[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + TG_NEW_ACCOUNT_WINDOW_MS - now) / 1000));
     throw new AppError('RATE_LIMITED', 'Too many new Telegram accounts from this network. Please try again later.', {
       retryAfterSeconds,
     });
   }
-  
-  // Global daily cap
-  if (telegramNewAccountsGlobal.length >= TG_GLOBAL_DAILY_LIMIT) {
-    const oldest = telegramNewAccountsGlobal[0];
+
+  // Process-local daily ceiling. 0 disables it (the launch default).
+  if (globalLimit > 0 && telegramNewAccountsGlobal.length >= globalLimit) {
+    const oldest = telegramNewAccountsGlobal[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + DAY_MS - now) / 1000));
     throw new AppError('RATE_LIMITED', 'Global daily limit for new Telegram accounts reached. Please try again tomorrow.', {
       retryAfterSeconds,
     });
   }
-  
-  // Per-subnet daily cap
+
+  // Per-subnet daily cap.
   const subnet = subnetKey(key);
   const subnetStamps = telegramNewAccountsBySubnet.get(subnet) ?? [];
-  if (subnetStamps.length >= TG_SUBNET_DAILY_LIMIT) {
-    const oldest = subnetStamps[0];
+  if (subnetStamps.length >= subnetLimit) {
+    const oldest = subnetStamps[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + DAY_MS - now) / 1000));
     throw new AppError('RATE_LIMITED', 'Too many new Telegram accounts from this network region. Please try again tomorrow.', {
       retryAfterSeconds,
@@ -253,12 +255,12 @@ export async function register(
     // No mail transport exists yet, so there is no verification link to send.
     // Dev auto-verifies for convenience; production records the truth (false)
     // rather than asserting a verification that never happened. Nothing gates
-    // on this flag today — when the transport lands, gate login here.
+    // on this flag today - when the transport lands, gate login here.
     emailVerified: config.isDev,
     role: 'user',
     tier: 'free',
     // The email prefix is derived, not submitted, so it never passes through
-    // registerSchema — which makes it the one way a refused name could still
+    // registerSchema - which makes it the one way a refused name could still
     // land on an account (someone@ signing up as the slur before the @).
     displayName: safeDisplayName(input.displayName?.trim() || input.email.split('@')[0]!),
     createdAt: now,
@@ -405,7 +407,7 @@ export function requestPasswordReset(email: string, ip?: string): { devToken?: s
   });
 
   // Dev convenience: also echo the token. Requires both NODE_ENV=development and
-  // exposeDevTokens — staging (NODE_ENV=production) must not leak credentials via logs or response
+  // exposeDevTokens - staging (NODE_ENV=production) must not leak credentials via logs or response
   // bodies even when operators forget to unset dev conveniences.
   const exposeToken = process.env.NODE_ENV === 'development' && config.exposeDevTokens;
   if (exposeToken) {
@@ -446,7 +448,7 @@ export async function confirmPasswordReset(token: string, newPassword: string, i
 /**
  * First-time credentials for a Telegram-provisioned account (AQF-09 §2.3):
  * replace the synthetic tg-…@ placeholder email with one the user owns and
- * create the credentials record that `login` requires. One-shot by design —
+ * create the credentials record that `login` requires. One-shot by design  - 
  * an account that already has a password changes it via the reset flow, which
  * proves control of the mailbox; this endpoint only proves a valid session.
  */

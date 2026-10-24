@@ -4,7 +4,7 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
-    "test": "node --experimental-strip-types --test src/proxy.test.ts",
+    "test": "node --experimental-strip-types --test src/*.test.ts",
     "types": "wrangler types",
     "deploy": "wrangler deploy",
     "dry-run": "wrangler deploy --dry-run"

@@ -1,5 +1,6 @@
 /// <reference path="../worker-configuration.d.ts" />
-import { canonicalRedirect, isProxiedPath, upstreamRequest } from './proxy';
+import { canonicalRedirect, isProxiedPath, upstreamRequest } from './proxy.ts';
+import { withSecurityHeaders } from './securityHeaders.ts';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -7,9 +8,9 @@ export default {
     const redirectTo = canonicalRedirect(url);
     if (redirectTo) return Response.redirect(redirectTo, 301);
     if (isProxiedPath(url.pathname)) {
-      const upstream = upstreamRequest(request, env.API_ORIGIN);
+      const upstream = upstreamRequest(request, env.API_ORIGIN, env.ORIGIN_SHARED_SECRET);
       return fetch(upstream.url, upstream.init);
     }
-    return env.ASSETS.fetch(request);
+    return withSecurityHeaders(await env.ASSETS.fetch(request));
   },
 };

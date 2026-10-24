@@ -3,7 +3,7 @@
  * surfaces.
  *
  *  - a Telegram-provisioned account has no credentials record, so before this
- *    flow existed it could never pass `login()` — POST /me/credentials is its
+ *    flow existed it could never pass `login()` - POST /me/credentials is its
  *    only path onto the web;
  *  - POST /me/link-telegram is the mirror: an email account, signed in inside
  *    the Mini App, attaches its Telegram identity so auto-login lands on the
@@ -46,7 +46,7 @@ async function telegramSignIn(tgId: number): Promise<{ token: string; userId: st
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-// The per-IP auto-provision cap (3/min) is service-level, not middleware, so
+// The per-IP auto-provision cap is service-level, not middleware, so
 // the test-env rate-limiter bypass does not cover it. Reset it between cases.
 beforeEach(() => {
   resetTelegramNewAccountLimits();

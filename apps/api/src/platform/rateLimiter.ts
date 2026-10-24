@@ -8,13 +8,12 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import type { ApiErrorBody } from '@aquazerofit/shared';
+import { clientIpForRateLimit } from './clientIp';
 import { config } from './config';
 
 const WINDOW_MS = 60_000;
 const DEFAULT_LIMIT = 300;
 const STRICT_LIMIT = 20;
-/** /auth lane: credential guessing surface — strictest lane, keyed per IP. */
-const AUTH_LIMIT = 10;
 /** Unauthenticated telemetry writes and invite peeks. */
 const ANON_LIMIT = 30;
 
@@ -39,8 +38,8 @@ export function pruneBuckets(now: number): void {
  * that identifies it.
  *
  * Narrow on purpose. The mounts these live under also carry high-frequency
- * non-AI traffic — `/workouts/:id/complete` fires per set during a live
- * session, `/progress/summary` backs the dashboard — and putting those on a
+ * non-AI traffic - `/workouts/:id/complete` fires per set during a live
+ * session, `/progress/summary` backs the dashboard - and putting those on a
  * 20/min lane would throttle ordinary logging to protect a model call they
  * never make. Matching `/plans` or `/workouts` wholesale is the tempting
  * version of this and it is wrong.
@@ -78,8 +77,8 @@ function isAnonymousWritePath(path: string): boolean {
   return path.includes('/analytics/events') || path.includes('/challenges/peek');
 }
 
-/** Best-effort subject extraction for limiter keying only — NOT authentication. */
-function subjectOf(req: Request): string {
+/** Best-effort subject extraction for limiter keying only. This is not authentication. */
+function subjectOf(req: Request, clientIp: string): string {
   const header = req.headers.authorization;
   if (header?.startsWith('Bearer ')) {
     const decoded = jwt.decode(header.slice(7));
@@ -87,7 +86,7 @@ function subjectOf(req: Request): string {
       return `u:${decoded.sub}`;
     }
   }
-  return `ip:${req.ip ?? 'unknown'}`;
+  return `ip:${clientIp}`;
 }
 
 function hit(key: string, limit: number, now: number): { allowed: boolean; retryAfterSec: number } {
@@ -112,26 +111,28 @@ export function rateLimiter(req: Request, res: Response, next: NextFunction): vo
   const auth = isAuthPath(req.path);
   const anon = !auth && isAnonymousWritePath(req.path);
   const strict = !auth && !anon && isStrictPath(req.path);
-  const limit = auth ? AUTH_LIMIT : anon ? ANON_LIMIT : strict ? STRICT_LIMIT : DEFAULT_LIMIT;
+  const limit = auth ? config.authRateLimitPerMinute : anon ? ANON_LIMIT : strict ? STRICT_LIMIT : DEFAULT_LIMIT;
   const lane = auth ? 'auth' : anon ? 'anon' : strict ? 'strict' : 'default';
 
   // Auth lane is per-IP only (requests are unauthenticated by nature);
   // other lanes: per user (or per IP when anonymous) AND per IP.
-  const ipKey = `${lane}:ip:${req.ip ?? 'unknown'}`;
+  // The address is CF-Connecting-IP when the Worker secret matches, else the socket.
+  const clientIp = clientIpForRateLimit(req);
+  const ipKey = `${lane}:ip:${clientIp}`;
 
   /*
    * Deduplicated, and that is a fix rather than a tidy-up.
    *
    * `subjectOf` falls back to `ip:<addr>` when there is no bearer token, so
    * for every unauthenticated request the subject key and the IP key were the
-   * SAME string — and the old code hit it twice. One request therefore
+   * SAME string - and the old code hit it twice. One request therefore
    * consumed two slots from one bucket, and every anonymous caller silently
    * got half the lane's stated limit: 15/min on the 30/min anon lane, 150/min
    * on the 300/min default. Stricter than advertised rather than looser, so
    * nothing broke loudly; it just meant the numbers at the top of this file
    * described behaviour the code did not have.
    */
-  const keys = auth ? [ipKey] : [...new Set([`${lane}:${subjectOf(req)}`, ipKey])];
+  const keys = auth ? [ipKey] : [...new Set([`${lane}:${subjectOf(req, clientIp)}`, ipKey])];
   const checks = keys.map((key) => hit(key, limit, now));
   const blocked = checks.find((c) => !c.allowed);
   if (blocked) {

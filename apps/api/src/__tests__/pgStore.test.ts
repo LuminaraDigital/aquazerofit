@@ -16,6 +16,7 @@ import {
   buildDelete,
   buildUpsert,
   CREATE_TABLE_SQL,
+  STARS_CHARGE_UNIQUE_INDEX_SQL,
   UPSERT_CHUNK_SIZE,
   databaseSslOption,
   isLoopbackConnectionString,
@@ -93,7 +94,11 @@ describe('hydrate', () => {
 
     expect(exec.calls[0]!.text).toBe(CREATE_TABLE_SQL);
     expect(exec.calls[0]!.text).toContain('CREATE TABLE IF NOT EXISTS documents');
-    expect(exec.calls[1]!.text).toBe('SELECT container, id, doc FROM documents');
+    expect(exec.calls[1]!.text).toBe(STARS_CHARGE_UNIQUE_INDEX_SQL);
+    expect(exec.calls[1]!.text).toContain('CREATE UNIQUE INDEX IF NOT EXISTS documents_stars_charge_uidx');
+    expect(exec.calls[1]!.text).toContain("doc->>'telegramPaymentChargeId'");
+    expect(exec.calls[1]!.text).toContain("doc->>'type' = 'starsPurchase'");
+    expect(exec.calls[2]!.text).toBe('SELECT container, id, doc FROM documents');
     expect(store.count('users')).toBe(1);
     expect(store.count('logs')).toBe(2);
     expect(store.byId('users', 'u1')).toEqual({ id: 'u1', email: 'a@b.c' });
@@ -115,7 +120,7 @@ describe('hydrate', () => {
     const store = newStore();
     await store.hydrate();
     await store.hydrate();
-    expect(exec.calls).toHaveLength(2);
+    expect(exec.calls).toHaveLength(3);
   });
 });
 

@@ -9,7 +9,7 @@
  *     accepted from the caller is an amount the caller sets to one.
  *  2. **Grants are idempotent on Telegram's charge id.** Telegram retries a
  *     webhook it believes failed, and a redelivered `successful_payment` must
- *     not create a second purchase record — the ledger is append-only, so a
+ *     not create a second purchase record - the ledger is append-only, so a
  *     duplicate is permanent.
  *  3. **The payload is a lookup key, not a claim.** It is minted here, stored
  *     here, and matched here. Nothing inside the string is trusted on the way
@@ -20,14 +20,26 @@ import {
   starsPriceOf,
   type CoachPersona,
   type StarsPurchase,
+  type StarsRefund,
   type User,
 } from '@aquazerofit/shared';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../../platform/errors';
-import { getStore, newId } from '../../platform/store';
+import {
+  DuplicateIndexError,
+  LEDGER_BY_STARS_CHARGE,
+  getStore,
+  indexKey,
+  newId,
+} from '../../platform/store';
 import { logEvent } from '../../platform/telemetry';
-import { grantPurchasedCoach, getCoachState } from '../coaches/service';
-import { botConfigured, createStarsInvoiceLink, sendBotMessage } from './telegramBot';
+import { grantPurchasedCoach, getCoachState, revokePurchasedCoach } from '../coaches/service';
+import {
+  botConfigured,
+  createStarsInvoiceLink,
+  refundStarPayment,
+  sendBotMessage,
+} from './telegramBot';
 
 /**
  * An invoice we created and are waiting to be paid. Held in `ledger` beside
@@ -64,7 +76,7 @@ function purchasableOrThrow(coachId: string): CoachPersona {
 /**
  * Mint an invoice link for a coach.
  *
- * Refuses when the user already has the coach — by purchase *or* by level.
+ * Refuses when the user already has the coach - by purchase *or* by level.
  * Selling someone something they have already earned is the single worst thing
  * this surface could do, and the level door moves underneath a user who is
  * still deciding, so the check has to happen at purchase time rather than only
@@ -112,7 +124,7 @@ export async function createCoachInvoice(
 
   const link = await createStarsInvoiceLink({
     title: `Coach ${coach.name.split(' ')[0]}`,
-    description: `${coach.ringName} — ${coach.domain}. Unlocks permanently on this account.`,
+    description: `${coach.ringName}: ${coach.domain}. Unlocks permanently on this account.`,
     payload,
     stars,
   });
@@ -143,12 +155,35 @@ export function findPendingInvoice(payload: string): PendingInvoice | undefined 
     .at(0);
 }
 
+/** The purchase row for a Telegram charge id, if one was already credited. */
+export function findStarsPurchase(chargeId: string): StarsPurchase | undefined {
+  return getStore()
+    .whereIndexed<StarsPurchase>(
+      'ledger',
+      LEDGER_BY_STARS_CHARGE,
+      indexKey(chargeId),
+      (d) => d.type === 'starsPurchase' && d.telegramPaymentChargeId === chargeId,
+    )
+    .at(0);
+}
+
+function findStarsRefund(chargeId: string): StarsRefund | undefined {
+  return getStore()
+    .where<StarsRefund>(
+      'ledger',
+      (d) => d.type === 'starsRefund' && d.telegramPaymentChargeId === chargeId,
+    )
+    .at(0);
+}
+
 export interface SuccessfulPayment {
   invoicePayload: string;
   totalAmount: number;
   currency: string;
   telegramPaymentChargeId: string;
   providerPaymentChargeId?: string;
+  /** Telegram user who paid. Stored so a later refund can call refundStarPayment. */
+  telegramUserId?: number;
 }
 
 export type PaymentOutcome =
@@ -161,26 +196,20 @@ export type PaymentOutcome =
  *
  * Returns rather than throws. This runs inside a webhook handler, and an
  * exception there produces a non-2xx that makes Telegram redeliver the same
- * update indefinitely — turning one bad payment into an infinite retry loop.
+ * update indefinitely - turning one bad payment into an infinite retry loop.
  */
 export function completePayment(payment: SuccessfulPayment): PaymentOutcome {
   const store = getStore();
 
   // Idempotency gate, checked first and against the charge id: it is the only
   // identifier Telegram guarantees stable across a redelivery.
-  const existing = store
-    .where<StarsPurchase>(
-      'ledger',
-      (d) =>
-        d.type === 'starsPurchase' &&
-        d.telegramPaymentChargeId === payment.telegramPaymentChargeId,
-    )
-    .at(0);
+  const existing = findStarsPurchase(payment.telegramPaymentChargeId);
   if (existing) return { status: 'duplicate', coachId: existing.coachId };
 
   const pending = findPendingInvoice(payment.invoicePayload);
   if (!pending) {
-    logEvent('stars_payment_unmatched', { payload: payment.invoicePayload });
+    // The invoice payload is a bearer correlation id. It is not logged.
+    logEvent('stars_payment_unmatched', { reason: 'no_matching_invoice' });
     return { status: 'rejected', reason: 'No matching invoice.' };
   }
 
@@ -208,9 +237,21 @@ export function completePayment(payment: SuccessfulPayment): PaymentOutcome {
     telegramPaymentChargeId: payment.telegramPaymentChargeId,
     providerPaymentChargeId: payment.providerPaymentChargeId ?? null,
     invoicePayload: payment.invoicePayload,
+    telegramUserId:
+      typeof payment.telegramUserId === 'number' && payment.telegramUserId > 0
+        ? payment.telegramUserId
+        : null,
     createdAt: new Date().toISOString(),
   };
-  store.upsert('ledger', record);
+  try {
+    store.upsert('ledger', record);
+  } catch (err) {
+    if (err instanceof DuplicateIndexError) {
+      const winner = findStarsPurchase(payment.telegramPaymentChargeId);
+      return { status: 'duplicate', coachId: winner?.coachId ?? pending.coachId };
+    }
+    throw err;
+  }
   grantPurchasedCoach(pending.userId, pending.coachId);
   store.delete('ledger', pending.id);
 
@@ -230,4 +271,120 @@ export function completePayment(payment: SuccessfulPayment): PaymentOutcome {
   }
 
   return { status: 'granted', coachId: pending.coachId, userId: pending.userId };
+}
+
+export type StarsRefundOutcome =
+  | { status: 'refunded'; coachId: string; userId: string; telegramPaymentChargeId: string }
+  | {
+      status: 'already_refunded';
+      coachId: string;
+      userId: string;
+      telegramPaymentChargeId: string;
+    };
+
+/**
+ * Telegram's description when refundStarPayment is repeated for a charge it
+ * has already returned. Treated as success: the money is back, so the local
+ * entitlement must still be revoked. A crash between the Telegram call and
+ * the ledger write is the ordinary way this happens.
+ */
+export function starsAlreadyRefunded(error: string): boolean {
+  return /CHARGE_ALREADY_REFUNDED/i.test(error) || /already refunded/i.test(error);
+}
+
+function refundFailureReason(error: string): string {
+  if (starsAlreadyRefunded(error)) return 'already_refunded';
+  if (/not configured/i.test(error)) return 'bot_not_configured';
+  if (/CHARGE_NOT_FOUND/i.test(error)) return 'charge_not_found';
+  if (/USER_ID_INVALID|user not found/i.test(error)) return 'user_invalid';
+  if (/timeout|aborted/i.test(error)) return 'timeout';
+  return 'rejected';
+}
+
+function payerTelegramId(
+  purchase: StarsPurchase,
+  user: User | undefined,
+  override: number | undefined,
+): number | undefined {
+  if (typeof purchase.telegramUserId === 'number' && purchase.telegramUserId > 0) {
+    return purchase.telegramUserId;
+  }
+  if (typeof user?.tgId === 'number' && user.tgId > 0) return user.tgId;
+  if (typeof override === 'number' && override > 0) return override;
+  return undefined;
+}
+
+/**
+ * Refund one Stars purchase and revoke the coach entitlement.
+ *
+ * Idempotent on the charge id. A second call finds the refund row, revokes
+ * again (a no-op if the coach is already gone) and does not call Telegram.
+ * The purchase row itself stays: the ledger is append-only, and the refund
+ * is a second document, not an edit of the charge.
+ *
+ * The body override is used only when neither the purchase nor the account
+ * has a Telegram user id. It cannot redirect a refund that already knows
+ * who paid.
+ */
+export async function refundStarsPurchase(input: {
+  telegramPaymentChargeId: string;
+  reason: string;
+  actorId: string;
+  telegramUserId?: number;
+}): Promise<StarsRefundOutcome> {
+  const purchase = findStarsPurchase(input.telegramPaymentChargeId);
+  if (!purchase) throw new AppError('NOT_FOUND', 'No Stars purchase matches that charge.');
+
+  const done = (
+    status: StarsRefundOutcome['status'],
+  ): StarsRefundOutcome => ({
+    status,
+    coachId: purchase.coachId,
+    userId: purchase.userId,
+    telegramPaymentChargeId: purchase.telegramPaymentChargeId,
+  });
+
+  if (findStarsRefund(purchase.telegramPaymentChargeId)) {
+    revokePurchasedCoach(purchase.userId, purchase.coachId);
+    return done('already_refunded');
+  }
+
+  const user = getStore().byId<User>('users', purchase.userId);
+  const telegramUserId = payerTelegramId(purchase, user, input.telegramUserId);
+  if (telegramUserId === undefined) {
+    throw new AppError(
+      'CONFLICT',
+      'This purchase has no Telegram user id, so the Stars refund cannot be sent.',
+    );
+  }
+
+  const result = await refundStarPayment(telegramUserId, purchase.telegramPaymentChargeId);
+  if (!result.ok && !starsAlreadyRefunded(result.error)) {
+    logEvent('stars_refund_failed', {
+      coachId: purchase.coachId,
+      reason: refundFailureReason(result.error),
+    });
+    throw new AppError('PAYMENT_UNAVAILABLE', 'Telegram did not refund this payment.');
+  }
+
+  const record: StarsRefund = {
+    type: 'starsRefund',
+    id: newId('sref'),
+    userId: purchase.userId,
+    coachId: purchase.coachId,
+    stars: purchase.stars,
+    telegramPaymentChargeId: purchase.telegramPaymentChargeId,
+    telegramUserId,
+    reason: input.reason,
+    actorId: input.actorId,
+    createdAt: new Date().toISOString(),
+  };
+  getStore().upsert('ledger', record);
+  revokePurchasedCoach(purchase.userId, purchase.coachId);
+  logEvent('stars_refund_completed', {
+    coachId: purchase.coachId,
+    stars: purchase.stars,
+    alreadyRefunded: !result.ok,
+  });
+  return done(result.ok ? 'refunded' : 'already_refunded');
 }

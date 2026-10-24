@@ -1,5 +1,5 @@
 /**
- * /support — help, contact routes and reporting channels.
+ * /support: help, contact routes and reporting channels.
  *
  * The crisis signpost leads the page deliberately. On a product that handles
  * eating and body weight, the person who most needs the support page is not
@@ -22,7 +22,7 @@ const ANSWERS: Answer[] = [
     question: 'My calorie target looks wrong',
     answer: (
       <>
-        Check the figures in your wellness profile first — height, weight, activity level and goal
+        Check the figures in your wellness profile first. Height, weight, activity level and goal
         all move the number. If your target looks higher than you expected, it may have been clamped
         to the calorie floor, in which case the app shows an advisory beside it. The{' '}
         <Link to="/features#targets" className="text-primary hover:text-secondary">
@@ -50,8 +50,8 @@ const ANSWERS: Answer[] = [
     question: 'A meal photo estimate was well off',
     answer: (
       <>
-        Expected, and the reason the result arrives as an editable proposal rather than a logged
-        entry — a photograph cannot weigh your dinner. Correct the portions before confirming. Good
+        Expected. A photograph cannot weigh your dinner, so the result arrives as an editable
+        proposal rather than a logged entry. Correct the portions before confirming. Good
         light and a top-down angle noticeably improve the estimate.
       </>
     ),
@@ -61,8 +61,8 @@ const ANSWERS: Answer[] = [
     answer: (
       <>
         You have likely spent the day&apos;s free allowance of {FREE_TIER_DAILY_CREDITS} credits; it
-        resets daily. Everything deterministic — targets, logging, hydration, the exercise library,
-        charts — keeps working regardless, and a provider outage has the same effect on AI features
+        resets daily. Everything deterministic (targets, logging, hydration, the exercise library,
+        charts) keeps working regardless, and a provider outage has the same effect on AI features
         while leaving the rest running.
       </>
     ),
@@ -154,6 +154,25 @@ export default function SupportPage() {
               </Reveal>
             ))}
           </div>
+        </section>
+
+        <section id="refunds" className="scroll-mt-24">
+          <Reveal>
+            <h2 className="font-heading text-3xl font-semibold leading-[1.1] text-on-surface sm:text-[38px]">
+              Refunds
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-on-surface-variant/75">
+              Coach purchases paid with Telegram Stars are one-time. They do not renew. To request a
+              refund, email <Fact name="supportEmail" hint="support contact" /> with the date of the
+              charge and the Telegram account you paid from. If a refund is approved, the Stars are
+              returned and the coach is removed from the account.
+            </p>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-on-surface-variant/75">
+              Premium billed by Google Play is cancelled in the Play Store. Premium billed by card is
+              cancelled by contacting support. Access continues until the end of the period already
+              paid.
+            </p>
+          </Reveal>
         </section>
 
         {/* Contact routes */}
@@ -256,7 +275,7 @@ export default function SupportPage() {
                 If something here is difficult to use with a screen reader, a keyboard, or at a
                 larger text size, that is a bug and we want to hear about it. Send it to{' '}
                 <Fact name="supportEmail" hint="support contact" /> and describe what you were
-                trying to do — it will be treated as a defect, not a request.
+                trying to do. It will be treated as a defect, not a request.
               </p>
             </div>
           </Reveal>

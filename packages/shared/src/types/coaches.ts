@@ -18,7 +18,7 @@
  */
 export interface CoachState {
   type: 'coachState';
-  /** Document id — equals the userId, so the record is a natural singleton. */
+  /** Document id - equals the userId, so the record is a natural singleton. */
   id: string;
   userId: string;
   activeCoachId: string;
@@ -26,14 +26,14 @@ export interface CoachState {
   baselineXp: number;
   /** Settled bond per coach id, excluding the open amount for the active one. */
   accrued: Record<string, number>;
-  /** Coach ids bought with Stars — permanent, and independent of level. */
+  /** Coach ids bought with Stars - permanent, and independent of level. */
   purchased: string[];
   /**
    * What the user has already been congratulated for. Reactions are one-shot:
    * a level-up the user has seen must not greet them again tomorrow, or the
    * coach reads as a broken toy rather than someone paying attention.
    * Acknowledged explicitly by the client after display, never by the read
-   * itself — an unacknowledged reaction is one the user did not actually see.
+   * itself - an unacknowledged reaction is one the user did not actually see.
    */
   seenLevel: number;
   seenRankId: string;
@@ -43,8 +43,8 @@ export interface CoachState {
    *
    * The acknowledgement used to re-derive this from live activity at ack time,
    * which meant it marked a *different* set seen than the one displayed: any
-   * achievement earned between the read and the acknowledgement — an offline
-   * outbox draining while the celebration overlay is up is the ordinary case —
+   * achievement earned between the read and the acknowledgement - an offline
+   * outbox draining while the celebration overlay is up is the ordinary case -
    * was recorded as delivered without ever being rendered, and the one that
    * genuinely was shown could be left unseen.
    *
@@ -76,12 +76,36 @@ export interface StarsPurchase {
   coachId: string;
   /** Price actually charged, in Stars (XTR). */
   stars: number;
-  /** Telegram's charge id — the idempotency key for payment replay. */
+  /** Telegram's charge id - the idempotency key for payment replay. */
   telegramPaymentChargeId: string;
   /** Provider-side id when Telegram supplies one. */
   providerPaymentChargeId: string | null;
   /** Our correlation id, echoed through the invoice payload. */
   invoicePayload: string;
+  /**
+   * Telegram user who paid. Optional because purchases recorded before this
+   * field existed have none; a refund then falls back to the linked account.
+   */
+  telegramUserId?: number | null;
+  createdAt: string;
+}
+
+/**
+ * Append-only record that a Stars purchase was refunded.
+ * The purchase row is left in place. Idempotent on the charge id.
+ */
+export interface StarsRefund {
+  type: 'starsRefund';
+  id: string;
+  userId: string;
+  coachId: string;
+  stars: number;
+  telegramPaymentChargeId: string;
+  /** Telegram user id passed to refundStarPayment. */
+  telegramUserId: number;
+  reason: string;
+  /** Admin account that requested the refund. */
+  actorId: string;
   createdAt: string;
 }
 
@@ -111,7 +135,7 @@ export interface CoachReaction {
   expression: 'neutral' | 'celebrate' | 'encourage';
 }
 
-/** GET /coaches — the character-select payload. */
+/** GET /coaches - the character-select payload. */
 export interface CoachRosterResponse {
   activeCoachId: string;
   experience: import('../gamification').ExperienceStatus;

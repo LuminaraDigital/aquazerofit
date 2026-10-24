@@ -67,6 +67,27 @@ export const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS documents (
 );`;
 
 /**
+ * One Stars purchase per Telegram charge id.
+ *
+ * The primary key is (container, id), and purchase ids are random, so two
+ * webhook deliveries that both passed the in-memory check could insert two
+ * rows and credit the coach twice. This partial unique index makes the second
+ * insert fail. NULL charge ids (invoices, credit transactions, refunds) are
+ * excluded, and Postgres treats those NULLs as distinct anyway.
+ *
+ * Created at hydrate, same as the table: there is no separate migration
+ * runner. IF NOT EXISTS keeps a restart a no-op. If historical duplicates
+ * already exist, this statement fails and the process refuses to boot rather
+ * than serving a ledger that can double-credit. Deduplicate those rows, then
+ * start again.
+ */
+export const STARS_CHARGE_UNIQUE_INDEX_SQL = `CREATE UNIQUE INDEX IF NOT EXISTS documents_stars_charge_uidx
+  ON documents ((doc->>'telegramPaymentChargeId'))
+  WHERE container = 'ledger'
+    AND doc->>'type' = 'starsPurchase'
+    AND COALESCE(doc->>'telegramPaymentChargeId', '') <> '';`;
+
+/**
  * Rows per INSERT. Postgres caps a statement at 65535 bind parameters and we
  * bind two per row, so the ceiling is ~32k; 500 keeps individual statements
  * small enough that one oversized document cannot blow up a whole batch.
@@ -278,6 +299,7 @@ export class PostgresStore extends MemoryBackedStore {
   async hydrate(): Promise<void> {
     if (this.hydrated) return;
     await this.exec.query(CREATE_TABLE_SQL);
+    await this.exec.query(STARS_CHARGE_UNIQUE_INDEX_SQL);
     const { rows } = await this.exec.query('SELECT container, id, doc FROM documents');
 
     const byContainer = new Map<ContainerName, StoredDoc[]>();

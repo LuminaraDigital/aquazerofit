@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfCard
@@ -37,7 +38,6 @@ import fit.aquazero.app.core.model.BeltTier
 import fit.aquazero.app.core.model.FightRecordSeasonProgressDto
 import fit.aquazero.app.core.model.FightRecordStatusDto
 import fit.aquazero.app.core.model.SeasonDto
-import fit.aquazero.app.core.ui.CardSkeleton
 
 /**
  * Season card on the dashboard (AZF-W3-05 US-01), a port of
@@ -48,10 +48,18 @@ import fit.aquazero.app.core.ui.CardSkeleton
  * bar fills toward the next belt rather than marking days missed. No weight,
  * calorie or body figure appears on this surface.
  *
- * Renders nothing at all when Fight Record is off for the account, so a dark
- * launch leaves the dashboard exactly as it was. The dashboard owns only the
- * slot and hands its spacing in through [modifier], so when the card is
- * absent, so is its gap; it imports nothing from this feature.
+ * Renders nothing at all until a snapshot says the feature is on: not while
+ * loading, not on a failed fetch, not when off. Most accounts are off during
+ * the rollout, and a skeleton that collapses, or a retry for a feature the
+ * account does not have, would make the dark launch visible; the web card
+ * renders nothing in the same states for the same reason. The dashboard owns
+ * only the slot and hands its spacing in through [modifier], so when the card
+ * is absent, so is its gap.
+ *
+ * Refreshes on every resume, so a season that rolled over while the app was
+ * in the background, or a feature switched on since, shows up on return; the
+ * ViewModel also refetches when the outbox empties, which is when a log made
+ * on the dashboard has reached the server and can count.
  *
  * Display-only on Android (R1a): no celebration sheet and no share here; the
  * Fight Record screen holds the one share action.
@@ -62,37 +70,20 @@ fun SeasonCard(
     modifier: Modifier = Modifier,
     viewModel: FightRecordViewModel = hiltViewModel(),
 ) {
+    LifecycleResumeEffect(viewModel) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    SeasonCardContent(
-        state = state,
-        onRetry = viewModel::refresh,
-        onOpenFightRecord = onOpenFightRecord,
-        modifier = modifier,
-    )
-}
-
-/** Stateless body, one branch per state, so each one previews on its own. */
-@Composable
-internal fun SeasonCardContent(
-    state: FightRecordUiState,
-    onRetry: () -> Unit,
-    onOpenFightRecord: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    when (state) {
-        FightRecordUiState.Loading -> CardSkeleton(height = 196.dp, modifier = modifier)
-        FightRecordUiState.Failed -> SeasonCardRetry(onRetry = onRetry, modifier = modifier)
-        FightRecordUiState.Off -> Unit
-        is FightRecordUiState.Ready -> SeasonCardBody(
-            record = state.record,
-            onOpenFightRecord = onOpenFightRecord,
-            modifier = modifier,
-        )
+    val record = (state as? FightRecordUiState.Ready)?.record
+    if (record != null) {
+        SeasonCardContent(record = record, onOpenFightRecord = onOpenFightRecord, modifier = modifier)
     }
 }
 
+/** Stateless body for a record that exists — the only state the card draws. */
 @Composable
-private fun SeasonCardBody(
+internal fun SeasonCardContent(
     record: FightRecordStatusDto,
     onOpenFightRecord: () -> Unit,
     modifier: Modifier = Modifier,
@@ -178,60 +169,29 @@ private fun NextBeltBar(fraction: Float) {
     )
 }
 
-/**
- * The small retry, shown only when there is no snapshot to fall back on. The
- * dashboard's own [ErrorState][fit.aquazero.app.core.designsystem.ErrorState]
- * is a full-width section; an optional card failing deserves one line.
- */
-@Composable
-private fun SeasonCardRetry(onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    AzfCard(modifier = modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(R.string.fight_record_card_error),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onRetry) {
-                Text(
-                    text = stringResource(R.string.action_retry),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-    }
-}
-
 @Preview(showBackground = true, backgroundColor = 0xFF0E1416)
 @Composable
 private fun SeasonCardPreview() {
     AzfTheme {
         Column(Modifier.padding(16.dp)) {
             SeasonCardContent(
-                state = FightRecordUiState.Ready(
-                    FightRecordStatusDto(
-                        current = FightRecordSeasonProgressDto(
-                            season = SeasonDto(
-                                id = "season-3",
-                                number = 3,
-                                name = "Second Wind",
-                                startsOn = "2027-03-01",
-                                endsOn = "2027-04-25",
-                            ),
-                            activeDays = 14,
-                            daysLeft = 23,
-                            tier = BeltTier.BLUE,
-                            next = BeltRungDto(tier = BeltTier.PURPLE, activeDays = 24),
+                record = FightRecordStatusDto(
+                    current = FightRecordSeasonProgressDto(
+                        season = SeasonDto(
+                            id = "season-3",
+                            number = 3,
+                            name = "Second Wind",
+                            startsOn = "2027-03-01",
+                            endsOn = "2027-04-25",
                         ),
+                        activeDays = 14,
+                        daysLeft = 23,
+                        tier = BeltTier.BLUE,
+                        next = BeltRungDto(tier = BeltTier.PURPLE, activeDays = 24),
                     ),
                 ),
-                onRetry = {},
                 onOpenFightRecord = {},
             )
-            Spacer(Modifier.height(16.dp))
-            SeasonCardContent(state = FightRecordUiState.Failed, onRetry = {}, onOpenFightRecord = {})
         }
     }
 }

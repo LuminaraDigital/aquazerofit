@@ -16,12 +16,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.SportsMartialArts
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.BuildConfig
 import fit.aquazero.app.R
@@ -43,7 +44,6 @@ import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
@@ -66,6 +66,9 @@ import fit.aquazero.app.core.model.SeasonDto
  * Display-only on Android (R1a): no celebration, no story share, no emoji
  * status and nothing sold. The one outward action is a plain-text share of the
  * current season's belt.
+ *
+ * Asks the server on every resume, because this is the page someone opens to
+ * see a belt they just earned.
  */
 @Composable
 fun FightRecordScreen(
@@ -73,6 +76,10 @@ fun FightRecordScreen(
     modifier: Modifier = Modifier,
     viewModel: FightRecordViewModel = hiltViewModel(),
 ) {
+    LifecycleResumeEffect(viewModel) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     FightRecordContent(
@@ -84,7 +91,14 @@ fun FightRecordScreen(
     )
 }
 
-/** Stateless body — everything previewable lives here. */
+/**
+ * Stateless body — everything previewable lives here.
+ *
+ * [FightRecordUiState.Off] leaves rather than explaining itself. The entry
+ * point only exists while the feature is on, so Off here means the server has
+ * just withdrawn it (kill switch or rollout pulled back), and any "coming
+ * soon" message would be untrue. The web page redirects home in the same case.
+ */
 @Composable
 internal fun FightRecordContent(
     state: FightRecordUiState,
@@ -93,6 +107,9 @@ internal fun FightRecordContent(
     onShare: (BeltTier, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    LaunchedEffect(state) {
+        if (state == FightRecordUiState.Off) onBack()
+    }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
@@ -127,15 +144,8 @@ internal fun FightRecordContent(
                         onRetry = onRetry,
                     )
                 }
-                // Reached only if the flag turns off while the page is open,
-                // or from a stale entry point: say so plainly, invent nothing.
-                FightRecordUiState.Off -> item {
-                    EmptyState(
-                        title = stringResource(R.string.fight_record_off_title),
-                        message = stringResource(R.string.fight_record_off_body),
-                        icon = Icons.Outlined.SportsMartialArts,
-                    )
-                }
+                // Leaving: see the LaunchedEffect above.
+                FightRecordUiState.Off -> Unit
                 is FightRecordUiState.Ready -> {
                     item {
                         Text(
@@ -391,13 +401,5 @@ private fun FightRecordPreview() {
             onRetry = {},
             onShare = { _, _ -> },
         )
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF0E1416)
-@Composable
-private fun FightRecordOffPreview() {
-    AzfTheme {
-        FightRecordContent(state = FightRecordUiState.Off, onBack = {}, onRetry = {}, onShare = { _, _ -> })
     }
 }

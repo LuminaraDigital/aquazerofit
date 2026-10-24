@@ -1301,7 +1301,6 @@
     <string name="fight_record_season_number">Season %1$d</string>
     <string name="fight_record_season_dates">%1$s to %2$s</string>
     <string name="fight_record_season_subtitle">%1$s · %2$s</string>
-    <string name="fight_record_card_error">We couldn\'t load your season.</string>
     <string name="fight_record_intro">A season is eight weeks. Any day you log a meal, water or a weigh-in, or finish a workout, is an active day. Belts count active days, so a quiet day never costs you anything, and every season starts fresh with your old belts kept here.</string>
     <string name="fight_record_season_named">Season %1$d · %2$s</string>
     <plurals name="fight_record_active_days">
@@ -1323,8 +1322,6 @@
         <item quantity="other">Your first belt is %1$d active days away.</item>
     </plurals>
     <string name="fight_record_error">We couldn\'t load your Fight Record.</string>
-    <string name="fight_record_off_title">Fight Record is on its way</string>
-    <string name="fight_record_off_body">Seasons and belts are coming to your account soon.</string>
 
     <!-- Readiness (Protect / Maintain / Progress) -->
     <string name="readiness_mode_protect">Protect</string>

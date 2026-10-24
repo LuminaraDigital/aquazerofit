@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.core.data.FightRecordRepository
+import fit.aquazero.app.core.data.OutboxRepository
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.FightRecordEnvelopeDto
 import fit.aquazero.app.core.model.FightRecordStatusDto
@@ -11,6 +12,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -38,10 +44,18 @@ sealed interface FightRecordUiState {
  * snapshot, so either refreshing updates both.
  *
  * Display-only: no acknowledgement, no emoji status, nothing written back.
+ *
+ * Fetches are driven from outside rather than from `init`: each surface calls
+ * [refresh] on every resume (first composition included), and the outbox
+ * draining to empty triggers one too. Draining is the moment that matters
+ * for a belt: a meal, water or weigh-in logged offline-first only becomes an
+ * active day once it reaches the server, so refetching on the log itself
+ * would ask too early and show the old count.
  */
 @HiltViewModel
 class FightRecordViewModel @Inject constructor(
     private val repository: FightRecordRepository,
+    outboxRepository: OutboxRepository,
 ) : ViewModel() {
 
     private val fetch = MutableStateFlow(Fetch.InFlight)
@@ -52,10 +66,17 @@ class FightRecordViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.Eagerly, FightRecordUiState.Loading)
 
     init {
-        refresh()
+        // drop(1): the count as it stands on subscribe is not a drain, and the
+        // resume refresh already covers opening.
+        outboxRepository.pendingCount
+            .distinctUntilChanged()
+            .drop(1)
+            .filter { it == 0 }
+            .onEach { refresh() }
+            .launchIn(viewModelScope)
     }
 
-    /** Ask the server again; also the retry affordance. */
+    /** Ask the server again: on resume, on drain, and from the retry affordance. */
     fun refresh() {
         fetch.value = Fetch.InFlight
         viewModelScope.launch {

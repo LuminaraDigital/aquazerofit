@@ -26,9 +26,10 @@ const savedAzfDataDir = process.env.AZF_DATA_DIR;
 const savedProviderEnv = saveProviderEnv();
 const dataDir = createIsolatedDataDir('azf-insight-');
 bindIsolatedDataDir(dataDir);
-// No provider keys: the gateway lands on the offline engine by design, which
-// keeps meta.degraded false and therefore bills normally (the keyless mock IS
-// the product). That is the path this suite asserts billing against.
+// No provider keys: outside production the gateway lands on the offline engine
+// by design, which keeps meta.degraded false and therefore bills normally (the
+// keyless mock IS the product). That is the path this suite asserts billing
+// against; production marks the same answer degraded and does not bill it.
 clearProviderEnv();
 
 const { createApp } = await import('../app');

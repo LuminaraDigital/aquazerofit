@@ -35,6 +35,7 @@ These thresholds assume the platform can query structured logs (Azure Log Analyt
 | AI guardrail spike | `aiCallsBlocked` delta > 10 in 15 min | Possible prompt-injection probing; review `kind:"ai"` blocked records. |
 | Refresh-theft events | log search for `Refresh token reuse detected` | Count > 0 is worth a look; > 5/hour for one user suggests credential stuffing. |
 | Latency | p95 `ms` on http lines > 2 s over 5 min | Investigate store/Postgres health and AI provider latency. |
+| No AI provider | boot line `name:"ai_provider_unconfigured"` | Production has no provider key (or `OLLAMA_BASE_URL`), so every AI answer is offline template text, flagged `degradedReason: "no_provider"` and never billed. Set at least one key (`.env.production.example`) and redeploy. |
 
 ## Scaling: this API runs on exactly one instance
 

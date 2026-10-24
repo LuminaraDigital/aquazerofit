@@ -206,6 +206,7 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | `APP_VERSION` | Build identity returned by `/health` and `/ready` |
 | `AZF_SEED_DEMO` | Set to `false` to skip demo/admin account seeding (accounts are never seeded in production) |
 | `ADMIN_PASSWORD` | Production-only: seeds the admin account with this password; without it no admin account is created |
+| `ADMIN_EMAIL` | Production: the admin account's address, required alongside `ADMIN_PASSWORD`. Use a mailbox you control: the seeder refuses any address on `aquazero.fit`, which this project does not own |
 | `EXPOSE_DEV_TOKENS` | Dev-only: echo password-reset tokens in API responses/logs when `true` (requires non-production `NODE_ENV`) |
 | `UPLOADS_DIR` | Where in-flight meal photographs are written (default `apps/api/uploads`). Point this at a persistent volume on hosts with an ephemeral filesystem, or a redeploy loses photos mid-analysis |
 | `ENABLE_LLM_SAFETY` | Override LLM second stage for input guardrails (`true`/`false`; defaults on when any AI provider key is set) |
@@ -267,6 +268,8 @@ The gateway tries providers in order and falls back to a deterministic mock engi
 | Variable | Provider | Notes |
 | --- | --- | --- |
 | `GROQ_API_KEY` | Groq | https://console.groq.com/keys |
+| `GROQ_MODEL_VISIONPRIMARY` | Groq | Meal-photo model. Default `qwen/qwen3.8-27b` ([vision docs](https://console.groq.com/docs/vision)) |
+| `AI_VISION_DEADLINE_MS` | Gateway | Meal-photo deadline in ms. Default `20000`. Chat stays at `12000` |
 | `GEMINI_API_KEY` | Google Gemini | https://aistudio.google.com/apikey |
 | `OPENAI_API_KEY` | OpenAI | https://platform.openai.com/api-keys |
 | `NVIDIA_API_KEY` | NVIDIA NIM | https://build.nvidia.com/ |

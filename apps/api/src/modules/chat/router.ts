@@ -398,8 +398,9 @@ chatRouter.post(
       };
       await upsertDoc('ai', assistantMessage);
       // Real providers failed and the gateway fell back to offline templates -
-      // do not charge. Keyless mock (no providers configured) keeps degraded
-      // false and bills normally per product rules.
+      // do not charge. The keyless mock (no providers configured) is degraded
+      // too in production ('no_provider'), so it is not charged there either;
+      // only in development and tests does it bill, where it IS the product.
       await settleReservation(reservationId, result.meta.degraded !== true);
 
       // Memory write-back (Phase 2): stage suggested facts from this turn.

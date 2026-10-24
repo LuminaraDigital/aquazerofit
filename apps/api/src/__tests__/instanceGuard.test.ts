@@ -8,9 +8,11 @@
  * no failed probe, just missing entries in someone's food diary.
  *
  * assertSingleInstance() turns that from a comment into a refusal. These tests
- * pin the three properties that matter: it fires when more than one instance
- * is declared, it does NOT fire for the default or for a plain `1`, and it
- * refuses a value it cannot read rather than assuming the safe case.
+ * pin the four properties that matter: it fires when more than one instance
+ * is declared, it does NOT fire for the default or for a plain `1`, it
+ * refuses a value it cannot read rather than assuming the safe case, and on
+ * Cloud Run (K_SERVICE set) the default is not accepted, because there the
+ * scaling lives in the service spec and an unset variable declares nothing.
  *
  * config.* are getters, so each access re-reads process.env. The guard
  * short-circuits under test, so every case that must throw clears the test
@@ -19,7 +21,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { INSTANCE_COUNT_ENV, assertSingleInstance, config } from '../platform/config';
 
-const KEYS = [INSTANCE_COUNT_ENV, 'NODE_ENV', 'VITEST'] as const;
+const KEYS = [INSTANCE_COUNT_ENV, 'NODE_ENV', 'VITEST', 'K_SERVICE'] as const;
 const ORIGINAL = Object.fromEntries(KEYS.map((k) => [k, process.env[k]])) as Record<
   string,
   string | undefined
@@ -73,6 +75,36 @@ describe('assertSingleInstance', () => {
   it('permits the default (unset) — normal local dev must never see this', () => {
     asServingProcess(() => {
       delete process.env[INSTANCE_COUNT_ENV];
+      delete process.env.K_SERVICE;
+      expect(() => assertSingleInstance()).not.toThrow();
+    });
+  });
+
+  it('refuses the default on Cloud Run, where only an explicit 1 is a declaration', () => {
+    // Cloud Run autoscales unless max-instances is pinned, and a deploy with
+    // --image keeps whatever the live service has, so unset proves nothing.
+    for (const raw of [undefined, '', '   ']) {
+      const message = asServingProcess(() => {
+        process.env.K_SERVICE = 'aquazerofit-api';
+        if (raw === undefined) delete process.env[INSTANCE_COUNT_ENV];
+        else process.env[INSTANCE_COUNT_ENV] = raw;
+        try {
+          assertSingleInstance();
+          return '';
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+      });
+      expect(message).toContain('Refusing to start');
+      expect(message).toContain(`${INSTANCE_COUNT_ENV} is unset on Cloud Run`);
+      expect(message).toContain('--max-instances=1');
+    }
+  });
+
+  it('permits an explicit 1 on Cloud Run (cloudbuild.yaml sets it on every deploy)', () => {
+    asServingProcess(() => {
+      process.env.K_SERVICE = 'aquazerofit-api';
+      process.env[INSTANCE_COUNT_ENV] = '1';
       expect(() => assertSingleInstance()).not.toThrow();
     });
   });

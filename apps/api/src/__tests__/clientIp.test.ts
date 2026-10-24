@@ -16,6 +16,7 @@ import { rateLimiter, resetRateLimiter } from '../platform/rateLimiter';
 import { config } from '../platform/config';
 
 const ORIGINAL_SECRET = process.env.ORIGIN_SHARED_SECRET;
+const ORIGINAL_PREVIOUS = process.env.ORIGIN_SHARED_SECRET_PREVIOUS;
 const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
 const ORIGINAL_VITEST = process.env.VITEST;
 const ORIGINAL_FORCE = process.env.AZF_RATE_LIMIT_FORCE;
@@ -56,6 +57,8 @@ function callLimiter(req: Request): boolean {
 afterEach(() => {
   if (ORIGINAL_SECRET === undefined) delete process.env.ORIGIN_SHARED_SECRET;
   else process.env.ORIGIN_SHARED_SECRET = ORIGINAL_SECRET;
+  if (ORIGINAL_PREVIOUS === undefined) delete process.env.ORIGIN_SHARED_SECRET_PREVIOUS;
+  else process.env.ORIGIN_SHARED_SECRET_PREVIOUS = ORIGINAL_PREVIOUS;
   if (ORIGINAL_NODE_ENV === undefined) delete process.env.NODE_ENV;
   else process.env.NODE_ENV = ORIGINAL_NODE_ENV;
   if (ORIGINAL_VITEST === undefined) delete process.env.VITEST;
@@ -99,6 +102,19 @@ describe('clientIpForRateLimit', () => {
         fakeReq({ socket: '10.0.0.9', cf: '198.51.100.20', secret: 'worker-secret' }),
       ),
     ).toBe('10.0.0.9');
+  });
+
+  it('trusts CF-Connecting-IP behind the previous secret during a rotation', () => {
+    // Otherwise every visitor collapses into one bucket for as long as the
+    // Worker still sends the old value.
+    process.env.ORIGIN_SHARED_SECRET = 'new-secret';
+    process.env.ORIGIN_SHARED_SECRET_PREVIOUS = 'old-secret';
+    expect(
+      clientIpForRateLimit(fakeReq({ socket: '10.0.0.8', cf: '198.51.100.20', secret: 'old-secret' })),
+    ).toBe('198.51.100.20');
+    expect(
+      clientIpForRateLimit(fakeReq({ socket: '10.0.0.8', cf: '198.51.100.20', secret: 'other' })),
+    ).toBe('10.0.0.8');
   });
 
   it('ignores a CF-Connecting-IP that is not a single address', () => {

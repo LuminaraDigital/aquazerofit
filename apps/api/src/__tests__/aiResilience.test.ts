@@ -8,7 +8,18 @@
  * as concrete request counts.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { complete, resetProviderCircuits, type GatewayMessage } from '../modules/ai/gateway';
+import {
+  complete,
+  offlineVerdict,
+  resetProviderCircuits,
+  stream,
+  warnIfNoAiProviderConfigured,
+  type GatewayMessage,
+} from '../modules/ai/gateway';
+import { config } from '../platform/config';
+
+/** Production as the gateway sees it, without the boot guards NODE_ENV would arm. */
+const asProduction = () => vi.spyOn(config, 'isProduction', 'get').mockReturnValue(true);
 
 const PROVIDER_ENV = [
   'GROQ_API_KEY',
@@ -303,7 +314,7 @@ describe('max_tokens ceiling', () => {
 });
 
 describe('degraded flag', () => {
-  it('is FALSE on the designed keyless path — the mock IS the product offline', async () => {
+  it('is FALSE on the designed keyless path outside production — the mock IS the product offline', async () => {
     // No provider keys at all. The key-optional local Ollama probe still runs
     // and fails; that is not a degradation, it is the offline configuration.
     stubFetch(() => Promise.reject(new Error('offline')));
@@ -349,5 +360,189 @@ describe('degraded flag', () => {
     expect(keyless.meta.degraded).toBe(false);
     // Same input, byte-identical mock output regardless of why we landed there.
     expect(failed.text).toBe(keyless.text);
+  });
+});
+
+/*
+ * Production with no provider configured at all. The offline engine still
+ * answers, because no AI outage may take a core journey down, but the paid
+ * lanes bill whatever is not flagged degraded. Before this, a production
+ * deployment with no keys sold template text as AI output at full price.
+ * Development, the test suite and the eval runner keep the keyless path
+ * undegraded: there the offline engine is the intended product.
+ */
+describe('offlineVerdict', () => {
+  const none = { realProviderInPlay: false, budgetStopped: false, deadlineExceeded: false };
+
+  it('is undegraded on the keyless path outside production', () => {
+    expect(offlineVerdict({ ...none, isProduction: false })).toEqual({ degraded: false });
+  });
+
+  it('is no_provider on the keyless path in production', () => {
+    expect(offlineVerdict({ ...none, isProduction: true })).toEqual({ degraded: true, degradedReason: 'no_provider' });
+  });
+
+  it('names the real cause whenever a configured provider was in play', () => {
+    for (const isProduction of [false, true]) {
+      expect(offlineVerdict({ ...none, realProviderInPlay: true, isProduction }).degradedReason).toBe('provider_failure');
+      expect(
+        offlineVerdict({ ...none, realProviderInPlay: true, deadlineExceeded: true, isProduction }).degradedReason,
+      ).toBe('deadline_exceeded');
+    }
+  });
+
+  it('puts the budget first, because no provider was asked at all', () => {
+    expect(
+      offlineVerdict({ realProviderInPlay: true, budgetStopped: true, deadlineExceeded: true, isProduction: true }),
+    ).toEqual({ degraded: true, degradedReason: 'budget_exhausted' });
+  });
+});
+
+describe('degraded flag in production with no provider configured', () => {
+  beforeEach(() => {
+    asProduction();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('marks the offline answer degraded with reason no_provider', async () => {
+    stubFetch(() => Promise.reject(new Error('offline')));
+
+    const result = await complete('chatFast', MESSAGES, {});
+
+    expect(result.meta.provider).toBe('mock');
+    expect(result.meta.degraded).toBe(true);
+    expect(result.meta.degradedReason).toBe('no_provider');
+  });
+
+  it('marks the streaming lane the same way, since chat bills through it', async () => {
+    stubFetch(() => Promise.reject(new Error('offline')));
+
+    const iterator = stream('chatFast', MESSAGES, {});
+    let step = await iterator.next();
+    while (!step.done) step = await iterator.next();
+
+    expect(step.value.meta.provider).toBe('mock');
+    expect(step.value.meta.degraded).toBe(true);
+    expect(step.value.meta.degradedReason).toBe('no_provider');
+  });
+
+  it('serves text byte-identical to the keyless development path', async () => {
+    const context = { nutrition: { kcalTarget: 1900, kcalConsumed: 1450, kcalRemaining: 450 } };
+    stubFetch(() => Promise.reject(new Error('offline')));
+
+    const production = await complete('chatFast', MESSAGES, { context });
+    vi.restoreAllMocks();
+    const development = await complete('chatFast', MESSAGES, { context });
+
+    expect(development.meta.degraded).toBe(false);
+    expect(development.meta.degradedReason).toBeUndefined();
+    expect(production.text).toBe(development.text);
+  });
+
+  it('still reports the real cause when a configured provider failed', async () => {
+    process.env.GROQ_API_KEY = 'test-key';
+    stubFetch(() => response(503, {}));
+
+    const result = await complete('chatFast', MESSAGES, {});
+
+    expect(result.meta.degradedReason).toBe('provider_failure');
+  });
+
+  /*
+   * A self-hosted Ollama named by OLLAMA_BASE_URL is a configured dependency
+   * even with no key: when it fails, the cause is a provider failure, and the
+   * retry budget applies to it like any other configured provider.
+   */
+  it('treats a keyless Ollama with a configured base URL as a real provider', async () => {
+    process.env.OLLAMA_BASE_URL = 'http://ollama.internal:11434/v1';
+    const { calls } = stubFetch(() => response(503, {}));
+
+    const result = await complete('chatFast', MESSAGES, {});
+
+    expect(result.meta.degradedReason).toBe('provider_failure');
+    expect(calls.filter((c) => c.url.startsWith('http://ollama.internal'))).toHaveLength(3);
+  });
+});
+
+/*
+ * The meal-photo lane holds half its deadline back for the next configured
+ * vision provider. A self-hosted Ollama counts as configured there too, or a
+ * hung Groq would spend the whole photo budget and Ollama would never be
+ * asked.
+ */
+describe('vision hop reserve', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('holds a hop back for a self-hosted Ollama named by its base URL', async () => {
+    vi.useFakeTimers();
+    process.env.GROQ_API_KEY = 'groq-key';
+    process.env.OLLAMA_BASE_URL = 'http://ollama.internal:11434/v1';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init: { signal: AbortSignal }) =>
+        String(url).includes('groq.com')
+          ? new Promise((_resolve, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted'))))
+          : Promise.resolve(response(200, okBody('{"items":[]}'))),
+      ),
+    );
+    const image = `data:image/jpeg;base64,${Buffer.from('fake-jpeg-bytes').toString('base64')}`;
+
+    const pending = complete('visionPrimary', MESSAGES, { json: true, images: [image], timeoutMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(20_000);
+    const result = await pending;
+
+    expect(result.meta.provider).toBe('ollama');
+    expect(result.meta.degraded).toBe(false);
+  });
+});
+
+describe('boot warning for a production deployment with no AI provider', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('emits one structured line naming the condition', () => {
+    asProduction();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    warnIfNoAiProviderConfigured();
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    const line = JSON.parse(String(warn.mock.calls[0]![0])) as Record<string, unknown>;
+    expect(line.kind).toBe('event');
+    expect(line.name).toBe('ai_provider_unconfigured');
+  });
+
+  it('stays silent for a self-hosted Ollama named by its base URL', () => {
+    asProduction();
+    process.env.OLLAMA_BASE_URL = 'http://ollama.internal:11434/v1';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    warnIfNoAiProviderConfigured();
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('stays silent when any provider key is configured', () => {
+    asProduction();
+    process.env.GEMINI_API_KEY = 'test-key';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    warnIfNoAiProviderConfigured();
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('stays silent outside production, where keyless is the designed setup', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    warnIfNoAiProviderConfigured();
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });

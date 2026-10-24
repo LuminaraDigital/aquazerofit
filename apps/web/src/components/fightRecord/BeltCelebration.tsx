@@ -18,7 +18,7 @@
  * a sheet rendered in place would sit inside the card, under the bottom nav
  * and the capture button, instead of over the screen.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { COACHES, renderReaction, type BeltAwardView, type FightRecordStatus } from '@aquazerofit/shared';
 import { BottomSheet } from '@/pages/training/BottomSheet';
@@ -49,18 +49,26 @@ export function BeltShareSheet({
   onClose: () => void;
 }) {
   const me = useMe();
+  // Memoised on the award: ShareMoment re-renders the card, and counts a
+  // share_opened, whenever `payload` changes identity, and the parent
+  // re-renders as the acknowledgement settles. A fresh object per render drew
+  // the card three times and tripled the share-rate figure the rollout gates on.
+  const payload = useMemo(() => (award ? beltSharePayload(award) : null), [award]);
+  const story = useMemo(
+    () =>
+      award && adult
+        ? { mediaUrl: storyMediaUrl(award.tier), caption: beltStoryCaption(award) }
+        : null,
+    [award, adult],
+  );
   return createPortal(
     <ShareMoment
       open={award !== null}
       onClose={onClose}
-      payload={award ? beltSharePayload(award) : null}
+      payload={payload}
       userId={me.data?.id ?? null}
       invitePath="/welcome"
-      story={
-        award && adult
-          ? { mediaUrl: storyMediaUrl(award.tier), caption: beltStoryCaption(award) }
-          : null
-      }
+      story={story}
     />,
     document.body,
   );
@@ -83,7 +91,12 @@ export function BeltCelebration({ record }: { record: FightRecordStatus }) {
       ? renderReaction(coach.reactions.achievement, { name: beltName(award.tier) })
       : `${beltName(award.tier)}, earned.`
     : '';
+  // Only for a belt from the season in progress: the status shows this
+  // season's belt, so offering it on a retroactive older one would promise a
+  // status that nothing would set.
   const offerStatus =
+    award !== null &&
+    award.seasonNumber === record.current.season.number &&
     record.adult &&
     record.emojiStatus.available &&
     !record.emojiStatus.enabled &&

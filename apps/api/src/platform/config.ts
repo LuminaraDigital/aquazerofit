@@ -607,12 +607,14 @@ export const config = {
 
   /**
    * Share of users inside the Fight Record rollout, 0 to 100, bucketed by a
-   * stable hash of the user id so raising it only ever adds people. Unset or
-   * unparseable means 100: the master switch alone decides, which is the safe
-   * reading of a typo in a value that can only widen exposure when it is high.
+   * stable hash of the user id so raising it only ever adds people. Unset
+   * means 100, so the master switch alone decides. Set but unparseable ("10%",
+   * "12.5") means 0: a typo in a rollout control must fail toward fewer
+   * people, never toward everyone.
    */
   get fightRecordRolloutPercent(): number {
-    return Math.min(100, readNonNegativeInt(process.env.FIGHT_RECORD_ROLLOUT_PERCENT, 100));
+    const raw = process.env.FIGHT_RECORD_ROLLOUT_PERCENT;
+    return Math.min(100, readNonNegativeInt(raw, raw?.trim() ? 0 : 100));
   },
 
   /**

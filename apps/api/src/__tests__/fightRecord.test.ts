@@ -21,10 +21,8 @@ import {
   SEASON_ONE_STARTS_ON,
   activeDaysBySeason,
   daysLeftIn,
-  nextRungFor,
   seasonByNumber,
   seasonFor,
-  tierForActiveDays,
   type MealLog,
   type WeightLog,
 } from '@aquazerofit/shared';
@@ -139,13 +137,14 @@ describe('season calendar', () => {
 
 describe('belt ladder', () => {
   it('awards each tier exactly at its threshold and not one day before', () => {
-    expect(tierForActiveDays(0)).toBeNull();
     for (const rung of BELT_LADDER) {
-      expect(tierForActiveDays(rung.activeDays)).toBe(rung.tier);
-      expect(tierForActiveDays(rung.activeDays - 1)).not.toBe(rung.tier);
+      const below = `fr-rung-${rung.tier}-below`;
+      const at = `fr-rung-${rung.tier}-at`;
+      seedMeals(below, Array.from({ length: rung.activeDays - 1 }, (_, i) => day(i)));
+      seedMeals(at, Array.from({ length: rung.activeDays }, (_, i) => day(i)));
+      expect(service.readFightRecord(below, day(55)).current.tier).not.toBe(rung.tier);
+      expect(service.readFightRecord(at, day(55)).current.tier).toBe(rung.tier);
     }
-    expect(nextRungFor(0)).toEqual(BELT_LADDER[0]);
-    expect(nextRungFor(48)).toBeNull();
   });
 });
 
@@ -210,6 +209,11 @@ describe('rollout and gating', () => {
     expect(service.fightRecordEnabledFor('anyone')).toBe(true);
     process.env.FIGHT_RECORD_ROLLOUT_PERCENT = '0';
     expect(service.fightRecordEnabledFor('anyone')).toBe(false);
+    // A typo in a rollout control fails toward nobody, not everybody.
+    for (const typo of ['10%', '12.5', 'all']) {
+      process.env.FIGHT_RECORD_ROLLOUT_PERCENT = typo;
+      expect(service.fightRecordEnabledFor('anyone')).toBe(false);
+    }
 
     const bucket = service.rolloutBucket('usr-123');
     expect(bucket).toBe(service.rolloutBucket('usr-123'));
@@ -290,6 +294,21 @@ describe('celebration', () => {
 
     service.acknowledgeBelt('fr-d', status.celebrate!.id);
     expect(service.readFightRecord('fr-d', today).celebrate).toBeNull();
+  });
+
+  it('a log backfilled into a finished season does not bring its celebration back', () => {
+    seedMeals('fr-f', [
+      ...Array.from({ length: 3 }, (_, i) => day(i)),
+      ...Array.from({ length: 3 }, (_, i) => day(SEASON_LENGTH_DAYS + i)),
+    ]);
+    const today = day(SEASON_LENGTH_DAYS + 10);
+    service.acknowledgeBelt('fr-f', service.readFightRecord('fr-f', today).celebrate!.id);
+
+    // Twelve season-1 days logged after the fact: a season-1 blue is now earned.
+    seedMeals('fr-f', Array.from({ length: 12 }, (_, i) => day(i)));
+    const after = service.readFightRecord('fr-f', today);
+    expect(after.belts.find((b) => b.seasonNumber === 1)?.tier).toBe('blue');
+    expect(after.celebrate).toBeNull();
   });
 
   it('acknowledging a lower belt leaves a higher one to celebrate', () => {
@@ -419,5 +438,37 @@ describe('emoji status', () => {
     await vi.waitFor(() =>
       expect(service.readFightRecord('fr-follow', day(13)).emojiStatus.enabled).toBe(false),
     );
+    // A grant that ends inside Telegram still ends in the audit trail.
+    expect(audits('fr-follow')).toContain('fightRecord.emojiStatus.withdrawn');
+  });
+
+  it('a withdrawal made while a sync is in flight wins: the status comes back down', async () => {
+    adultTelegramUser('fr-race', 780);
+    seedMeals('fr-race', Array.from({ length: 3 }, (_, i) => day(i)));
+    await service.setEmojiStatusPreference('fr-race', true, day(4));
+    seedMeals('fr-race', Array.from({ length: 12 }, (_, i) => day(i)));
+
+    // Hold the read's Telegram call open until the withdrawal has been stored.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: { body: string }) => {
+        calls.push({ method: url.split('/').pop()!, body: JSON.parse(init.body) });
+        if (calls.length === 2) await held;
+        return { json: async () => ({ ok: true, result: true }) };
+      }),
+    );
+    service.readFightRecord('fr-race', day(13));
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    await service.setEmojiStatusPreference('fr-race', false, day(13));
+    release();
+
+    // The sync lands after the withdrawal, so it takes its own status down.
+    await vi.waitFor(() => expect(calls).toHaveLength(4));
+    expect(calls[1]!.body.emoji_status_custom_emoji_id).toBe('e-blue');
+    expect(calls[3]!.body.emoji_status_custom_emoji_id).toBe('');
+    const state = getStore().byId<{ id: string; emojiStatus: unknown }>('logs', 'fight-record-fr-race');
+    expect(state?.emojiStatus).toEqual({ enabled: false });
   });
 });

@@ -7,8 +7,9 @@
  *
  * Every route sits behind the rollout check, and off means off. The read
  * answers `{ fightRecord: null }` rather than 404 so a client hides the
- * surface without logging a released-later feature as a fault, and none of
- * the routes writes anything for a user outside the rollout.
+ * surface without logging a released-later feature as a fault, and nothing is
+ * written for a user outside the rollout, with one deliberate exception:
+ * withdrawing emoji-status consent, which must be as easy as granting it.
  */
 import { Router } from 'express';
 import { ackBeltSchema, emojiStatusPreferenceSchema } from '@aquazerofit/shared';
@@ -52,7 +53,9 @@ fightRecordRouter.put(
   asyncHandler(async (req, res) => {
     const { enabled } = emojiStatusPreferenceSchema.parse(req.body);
     const userId = userIdOf(req);
-    if (!fightRecordEnabledFor(userId)) {
+    // Withdrawal is never gated: a user dropped from the rollout, or caught by
+    // the kill switch, must still be able to take their belt off their profile.
+    if (enabled && !fightRecordEnabledFor(userId)) {
       throw new AppError('FORBIDDEN', 'Fight Record is not available for this account.');
     }
     res.json({ emojiStatus: await setEmojiStatusPreference(userId, enabled, todayFor(req)) });

@@ -119,20 +119,6 @@ export function daysLeftIn(season: Season, today: string): number {
   return Math.max(0, dayNumber(season.endsOn) - from + 1);
 }
 
-/** Highest belt `activeDays` has earned, or null below the first rung. */
-export function tierForActiveDays(activeDays: number): BeltTier | null {
-  let tier: BeltTier | null = null;
-  for (const rung of BELT_LADDER) {
-    if (activeDays >= rung.activeDays) tier = rung.tier;
-  }
-  return tier;
-}
-
-/** The rung above `activeDays`, or null once black is held. */
-export function nextRungFor(activeDays: number): BeltRung | null {
-  return BELT_LADDER.find((rung) => activeDays < rung.activeDays) ?? null;
-}
-
 /** Ladder position, for comparing tiers. -1 for "no belt". */
 export function tierRank(tier: BeltTier | null): number {
   return tier === null ? -1 : BELT_TIERS.indexOf(tier);

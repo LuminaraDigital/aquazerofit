@@ -6,46 +6,24 @@
  * and the meter shows progress toward the next belt rather than days missed.
  * No weight, calorie or body figure appears on this surface.
  *
- * Renders nothing when Fight Record is off for the account, so a dark launch
- * leaves the dashboard exactly as it was. Also hosts the celebration, which
- * is why every new belt is announced on the next dashboard visit.
+ * Renders only once there is a season to show. While the request is in
+ * flight, when it fails, and when Fight Record is off for the account it
+ * renders nothing at all, so a dark launch leaves the dashboard exactly as it
+ * was: no skeleton that collapses, no error card about a feature the user
+ * does not have. The /fight-record page carries the loading and error states.
+ * Also hosts the celebration, which is why every new belt is announced on the
+ * next dashboard visit.
  */
 import { useNavigate } from 'react-router-dom';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { ErrorState } from '@/components/ui/ErrorState';
 import { formatDate } from '@/lib/format';
 import { beltName, nextBeltCopy, useFightRecord } from '@/lib/fightRecord';
 import { BeltBadge } from './BeltBadge';
 import { BeltCelebration } from './BeltCelebration';
 
-export function SeasonCard({ className = '' }: { className?: string }) {
+export function SeasonCard() {
   const navigate = useNavigate();
-  const query = useFightRecord();
-
-  if (query.isPending) {
-    return (
-      <GlassCard className={`p-5 ${className}`}>
-        <div aria-busy="true" aria-label="Season loading" className="space-y-3">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-10 w-56" />
-          <Skeleton className="h-2 w-full" />
-        </div>
-      </GlassCard>
-    );
-  }
-
-  if (query.isError) {
-    return (
-      <ErrorState
-        surface="season"
-        message="We couldn't load your season."
-        retry={() => void query.refetch()}
-      />
-    );
-  }
-
-  const record = query.data;
+  const record = useFightRecord().data;
   if (!record) return null;
 
   const { season, activeDays, daysLeft, tier, next } = record.current;
@@ -53,7 +31,7 @@ export function SeasonCard({ className = '' }: { className?: string }) {
 
   return (
     <>
-      <GlassCard className={`p-5 ${className}`}>
+      <GlassCard className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="heading-display font-heading text-2xl text-on-surface">

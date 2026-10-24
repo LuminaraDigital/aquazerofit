@@ -50,6 +50,9 @@ function seedActiveDays(count: number): void {
   }
 }
 
+/** Telegram is the only thing this file reaches over fetch; record and accept every call. */
+const telegramCalls: Record<string, unknown>[] = [];
+
 const beltDocs = () =>
   getStore().where<{ id: string; type?: string; userId?: string }>(
     'logs',
@@ -57,6 +60,13 @@ const beltDocs = () =>
   );
 
 beforeAll(async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: { body: string }) => {
+      telegramCalls.push(JSON.parse(init.body) as Record<string, unknown>);
+      return { json: async () => ({ ok: true, result: true }) };
+    }),
+  );
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(`${TODAY}T10:00:00.000Z`));
   const res = await request(app)
@@ -74,6 +84,9 @@ afterEach(() => {
 
 afterAll(async () => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
+  delete process.env.TELEGRAM_BOT_TOKEN;
+  delete process.env.TELEGRAM_BELT_EMOJI_IDS;
   await getStore().flush();
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
@@ -100,6 +113,13 @@ describe('/fight-record', () => {
       .send({ enabled: true });
     expect(put.status).toBe(403);
     expect(put.body.code).toBe('FORBIDDEN');
+
+    // Withdrawing is never gated, even for a user outside the rollout.
+    const off = await request(app)
+      .put(`${base}/fight-record/emoji-status`)
+      .set(auth())
+      .send({ enabled: false });
+    expect(off.status).toBe(200);
   });
 
   it('serves the read model in its envelope, with no identifiers or health figures', async () => {
@@ -140,33 +160,35 @@ describe('/fight-record', () => {
     expect(after.body.fightRecord.celebrate).toBeNull();
   });
 
-  it('refuses the emoji status to an account with no profile and to a minor', async () => {
+  it('decides the emoji status on age alone once Telegram is configured', async () => {
     process.env.FIGHT_RECORD_ENABLED = 'true';
-    const none = await request(app)
-      .put(`${base}/fight-record/emoji-status`)
-      .set(auth())
-      .send({ enabled: true });
-    expect(none.status).toBe(403);
-
-    getStore().upsert('profiles', {
-      id: `profile-${userId}`,
-      type: 'wellnessProfile',
-      userId,
-      age: 16,
+    process.env.TELEGRAM_BOT_TOKEN = '123456:fight-record-integration';
+    process.env.TELEGRAM_BELT_EMOJI_IDS = JSON.stringify({
+      white: 'e-white',
+      blue: 'e-blue',
+      purple: 'e-purple',
+      brown: 'e-brown',
+      black: 'e-black',
     });
-    const minor = await request(app)
-      .put(`${base}/fight-record/emoji-status`)
-      .set(auth())
-      .send({ enabled: true });
+    const user = getStore().byId<{ id: string; tgId?: number }>('users', userId)!;
+    getStore().upsert('users', { ...user, tgId: 424242 });
+    const put = (enabled: boolean) =>
+      request(app).put(`${base}/fight-record/emoji-status`).set(auth()).send({ enabled });
+
+    expect((await put(true)).status).toBe(403); // no profile: not known to be an adult
+
+    const profile = { id: `profile-${userId}`, type: 'wellnessProfile', userId };
+    getStore().upsert('profiles', { ...profile, age: 16 });
+    const minor = await put(true);
     expect(minor.status).toBe(403);
     expect(minor.body.code).toBe('FORBIDDEN');
+    expect(telegramCalls).toHaveLength(0);
 
-    const off = await request(app)
-      .put(`${base}/fight-record/emoji-status`)
-      .set(auth())
-      .send({ enabled: false });
-    expect(off.status).toBe(200);
-    expect(off.body).toEqual({ emojiStatus: { available: false, enabled: false } });
+    getStore().upsert('profiles', { ...profile, age: 30 });
+    const adult = await put(true);
+    expect(adult.status).toBe(200);
+    expect(adult.body).toEqual({ emojiStatus: { available: true, enabled: true } });
+    expect(telegramCalls.at(-1)).toMatchObject({ user_id: 424242, emoji_status_custom_emoji_id: 'e-white' });
   });
 
   it('exports both document types and erases them with the account', async () => {
@@ -177,7 +199,13 @@ describe('/fight-record', () => {
     expect(types).toContain('fightRecordState');
 
     expect((await request(app).delete(`${base}/me`).set(auth())).body.purged).toBe(false);
+    const before = telegramCalls.length;
     expect((await request(app).delete(`${base}/me`).set(auth())).body.purged).toBe(true);
+    // Erasure takes the belt off the Telegram profile before the data goes.
+    expect(telegramCalls.slice(before)).toContainEqual({
+      user_id: 424242,
+      emoji_status_custom_emoji_id: '',
+    });
     expect(beltDocs()).toHaveLength(0);
     expect(
       getStore().where<{ id: string; type?: string; userId?: string }>(

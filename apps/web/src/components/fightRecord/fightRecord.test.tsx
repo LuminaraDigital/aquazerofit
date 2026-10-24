@@ -14,7 +14,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { BELT_LADDER, type BeltAwardView, type FightRecordStatus } from '@aquazerofit/shared';
 
 const mocks = vi.hoisted(() => ({
@@ -114,15 +114,16 @@ describe('SeasonCard', () => {
     expect(container.textContent ?? '').not.toMatch(/kcal|kg\b|calorie/i);
   });
 
-  it('shows a skeleton while loading and a retry on error', async () => {
+  it('renders nothing while loading or after an error, so a dark launch shows no trace', async () => {
     mocks.api.mockImplementation(() => new Promise(() => {}));
-    renderWithClient(<SeasonCard />);
-    expect(screen.getByLabelText('Season loading')).toBeTruthy();
+    const pending = renderWithClient(<SeasonCard />);
+    expect(pending.container.innerHTML).toBe('');
     cleanup();
 
     mocks.api.mockRejectedValue(new Error('down'));
-    renderWithClient(<SeasonCard />);
-    expect(await screen.findByText("We couldn't load your season.")).toBeTruthy();
+    const failed = renderWithClient(<SeasonCard />);
+    await waitFor(() => expect(mocks.api).toHaveBeenCalled());
+    expect(failed.container.innerHTML).toBe('');
   });
 });
 
@@ -140,6 +141,14 @@ describe('BeltCelebration', () => {
       }),
     );
     await waitFor(() => expect(screen.queryByText('Not now')).toBeNull());
+  });
+
+  it('does not offer the Telegram status for a belt from an earlier season', async () => {
+    mocks.canManageEmojiStatus.mockReturnValue(true);
+    serve(recordWith({ celebrate: { ...BLUE, id: 's2-blue', seasonNumber: 2 } }));
+    renderWithClient(<SeasonCard />);
+    await screen.findByRole('dialog');
+    expect(screen.queryByText('Show on my Telegram profile')).toBeNull();
   });
 
   it('offers the Telegram status only to an adult on a client that supports it', async () => {
@@ -181,10 +190,31 @@ describe('Fight Record page', () => {
     expect(container.textContent ?? '').not.toMatch(BANNED);
   });
 
-  it('explains an unopened feature rather than erroring', async () => {
-    serve(null);
+  it('shows a skeleton while loading and a retry on error', async () => {
+    mocks.api.mockImplementation(() => new Promise(() => {}));
     renderWithClient(<FightRecordPage />);
-    expect(await screen.findByText('Fight Record is on its way')).toBeTruthy();
+    expect(screen.getByLabelText('Fight Record loading')).toBeTruthy();
+    cleanup();
+
+    mocks.api.mockRejectedValue(new Error('down'));
+    renderWithClient(<FightRecordPage />);
+    expect(await screen.findByText("We couldn't load your Fight Record.")).toBeTruthy();
+  });
+
+  it('sends an account the feature is off for back home', async () => {
+    serve(null);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/fight-record']}>
+          <Routes>
+            <Route path="/fight-record" element={<FightRecordPage />} />
+            <Route path="/" element={<p>Home</p>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('Home')).toBeTruthy();
   });
 
   it('keeps an enabled Telegram status switchable off outside the Mini App', async () => {
@@ -192,6 +222,9 @@ describe('Fight Record page', () => {
     renderWithClient(<FightRecordPage />);
     const toggle = await screen.findByRole('switch');
     expect(toggle.getAttribute('aria-checked')).toBe('true');
+    expect(document.getElementById(toggle.getAttribute('aria-describedby')!)?.textContent).toMatch(
+      /clears when the season ends/,
+    );
     fireEvent.click(toggle);
     await waitFor(() =>
       expect(mocks.api).toHaveBeenCalledWith('/fight-record/emoji-status', {

@@ -1,5 +1,5 @@
 /**
- * Per-user Fight Record state: which belts have been celebrated, and the
+ * Per-user Fight Record state: how far celebrations have been seen, and the
  * emoji-status preference (AZF-W3-05 §4.4).
  *
  * One document in `logs` with a top-level `userId`, deliberately: the export
@@ -14,27 +14,44 @@
 import type { BeltTier } from '@aquazerofit/shared';
 import { getStore } from '../../platform/store';
 
+/** A belt's position in acknowledgement order: season first, then tier. */
+export interface BeltMark {
+  seasonNumber: number;
+  tier: BeltTier;
+}
+
+/**
+ * Off, or on with the consent it was granted under. A union rather than a
+ * flag beside nullable fields, so "off but still remembering a status it set"
+ * is a state the type cannot hold.
+ */
+export type EmojiStatusPreference =
+  | { enabled: false }
+  | {
+      enabled: true;
+      /** The consent copy the user agreed to, so a later rewording is traceable. */
+      consentTextVersion: string;
+      /**
+       * What Telegram last accepted. A read only calls out to Telegram when
+       * the belt it would send differs from this, so an ordinary dashboard
+       * load costs nothing.
+       */
+      lastSet: { seasonId: string; tier: BeltTier } | null;
+    };
+
 export interface FightRecordState {
   id: string;
   type: 'fightRecordState';
   userId: string;
   /**
-   * Awards whose celebration has been shown and closed. Bounded by the awards
-   * themselves (at most five a season), so it cannot grow without limit.
+   * The highest belt whose celebration has been shown and closed. Everything
+   * at or below it counts as seen, which is what one acknowledgement means:
+   * a returning user shown their newest belt is not then walked through older
+   * ones, and a log backfilled into a finished season cannot resurrect a
+   * celebration for it.
    */
-  celebratedAwardIds: string[];
-  emojiStatus: {
-    enabled: boolean;
-    /** The consent copy the user agreed to, so a later rewording is traceable. */
-    consentTextVersion: string | null;
-    /**
-     * What Telegram last accepted. A read only calls out to Telegram when the
-     * belt it would send differs from this, so an ordinary dashboard load
-     * costs nothing.
-     */
-    lastSet: { seasonId: string; tier: BeltTier } | null;
-    updatedAt: string | null;
-  };
+  celebratedThrough: BeltMark | null;
+  emojiStatus: EmojiStatusPreference;
   updatedAt: string;
 }
 
@@ -49,8 +66,8 @@ export function getFightRecordState(userId: string): FightRecordState {
     id: fightRecordStateId(userId),
     type: 'fightRecordState',
     userId,
-    celebratedAwardIds: [],
-    emojiStatus: { enabled: false, consentTextVersion: null, lastSet: null, updatedAt: null },
+    celebratedThrough: null,
+    emojiStatus: { enabled: false },
     updatedAt: new Date().toISOString(),
   };
 }

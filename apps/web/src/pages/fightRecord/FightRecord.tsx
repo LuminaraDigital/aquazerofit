@@ -10,15 +10,15 @@
  * The Telegram profile switch appears only where it can work: in the Mini App,
  * on Bot API 8.0+, for an adult on a deployment with the belt emoji set. It
  * asks Telegram for permission first and stores nothing if the user declines.
+ * A user the feature is off for is sent home rather than shown a teaser.
  */
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { tierRank, type BeltAwardView, type FightRecordStatus } from '@aquazerofit/shared';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { AppBackground } from '@/components/layout/AppBackground';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
@@ -60,18 +60,10 @@ export default function FightRecordPage() {
           ) : query.data ? (
             <Record record={query.data} />
           ) : (
-            <div className="mt-10">
-              <EmptyState
-                icon="sports_martial_arts"
-                title="Fight Record is on its way"
-                body="Seasons and belts are coming to your account soon."
-                action={
-                  <Link to="/" className="font-semibold text-primary underline-offset-2 hover:underline">
-                    Back to today
-                  </Link>
-                }
-              />
-            </div>
+            // Off for this account: there is nothing to see here, and saying
+            // "coming soon" to everyone outside a 10% bucket for weeks would
+            // advertise a feature they cannot have.
+            <Navigate to="/" replace />
           )}
         </div>
         <BottomNav />
@@ -213,7 +205,10 @@ function TelegramStatusSetting({ record }: { record: FightRecordStatus }) {
           <h2 id="tg-status-label" className="font-heading text-lg font-semibold text-on-surface">
             Show my belt on Telegram
           </h2>
-          <p className="mt-1 text-sm leading-relaxed text-on-surface-variant text-pretty">
+          <p
+            id="tg-status-help"
+            className="mt-1 text-sm leading-relaxed text-on-surface-variant text-pretty"
+          >
             Everyone you chat with sees your belt emoji next to your name. It changes when you earn
             a new belt and clears when the season ends. Turn it off any time.
           </p>
@@ -223,6 +218,7 @@ function TelegramStatusSetting({ record }: { record: FightRecordStatus }) {
           role="switch"
           aria-checked={enabled}
           aria-labelledby="tg-status-label"
+          aria-describedby="tg-status-help"
           disabled={setEmojiStatus.isPending}
           onClick={() => void toggle()}
           className={`relative mt-1 h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60 ${

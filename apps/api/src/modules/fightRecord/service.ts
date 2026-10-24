@@ -43,14 +43,13 @@ import { getStore, indexKey, LOGS_BY_USER_TYPE } from '../../platform/store';
 import { logEvent } from '../../platform/telemetry';
 import { activeDatesOf, loadActivity } from '../progress/service';
 import { auditDataAccess, getProfile, type ProfileDoc } from '../me/service';
-import { getFightRecordState, saveFightRecordState } from './state';
+import { getFightRecordState, saveFightRecordState, type BeltMark } from './state';
 import {
   EMOJI_STATUS_CONSENT_VERSION,
   clearEmojiStatus,
-  emojiStatusAvailable,
+  emojiStatusTarget,
   isAccessRevoked,
   sendEmojiStatus,
-  syncEmojiStatus,
 } from './emojiStatus';
 
 /** An awarded belt. Immutable once written; erased only with the account. */
@@ -204,6 +203,13 @@ function viewOf(award: BeltAward): BeltAwardView {
 
 // ----- read model -----
 
+/** Acknowledgement order: season first, then tier. Anything above the mark is unseen. */
+function isAbove(award: BeltMark, mark: BeltMark | null): boolean {
+  if (!mark) return true;
+  if (award.seasonNumber !== mark.seasonNumber) return award.seasonNumber > mark.seasonNumber;
+  return tierRank(award.tier) > tierRank(mark.tier);
+}
+
 export function readFightRecord(
   userId: string,
   today: string,
@@ -211,24 +217,23 @@ export function readFightRecord(
 ): FightRecordStatus {
   const { season, activeDays, awards, tier } = standingOf(userId, today, now);
   const state = getFightRecordState(userId);
-  const celebrated = new Set(state.celebratedAwardIds);
-  const celebrate = bestPerSeason(awards.filter((award) => !celebrated.has(award.id)))[0];
+  const shelf = bestPerSeason(awards);
+  // Only the top of the shelf can be news: anything below it was either
+  // acknowledged with it or is older than something already acknowledged.
+  const top = shelf[0];
+  const celebrate = top && isAbove(top, state.celebratedThrough) ? top : null;
 
   const user = getStore().byId<User>('users', userId);
   const adult = isAdult(getProfile(userId));
-  const emojiStatus: EmojiStatusSetting = {
-    available: emojiStatusAvailable(user, adult),
-    enabled: false,
-  };
-  emojiStatus.enabled = emojiStatus.available && state.emojiStatus.enabled;
-
-  const lastSet = state.emojiStatus.lastSet;
+  const target = emojiStatusTarget(user, adult);
+  const preference = state.emojiStatus;
   if (
-    emojiStatus.enabled &&
+    target !== null &&
+    preference.enabled &&
     tier !== null &&
-    (lastSet?.seasonId !== season.id || lastSet.tier !== tier)
+    (preference.lastSet?.seasonId !== season.id || preference.lastSet.tier !== tier)
   ) {
-    void syncEmojiStatus(userId, user!.tgId!, season, tier);
+    void syncEmojiStatus(userId, target, season, tier);
   }
 
   return {
@@ -243,48 +248,87 @@ export function readFightRecord(
       next: BELT_LADDER[tierRank(tier) + 1] ?? null,
     },
     ladder: BELT_LADDER,
-    belts: bestPerSeason(awards).map(viewOf),
+    belts: shelf.map(viewOf),
     celebrate: celebrate ? viewOf(celebrate) : null,
     adult,
-    emojiStatus,
+    emojiStatus: { available: target !== null, enabled: target !== null && preference.enabled },
   };
 }
 
 /**
- * Mark a displayed celebration seen. Also marks every lower belt from the same
- * season and everything from earlier seasons: a returning user who has just
- * been shown their newest belt must not then be walked through a queue of
- * stale ones. `viewId` is the client-facing id (beltViewId); one that matches
- * none of the caller's awards was never displayed to them, so it is ignored
- * rather than reported.
+ * Mark a displayed celebration seen by raising the high-water mark to it.
+ * `viewId` is the client-facing id (beltViewId); one that matches none of the
+ * caller's awards was never displayed to them, so it is ignored rather than
+ * reported, and acknowledging a belt at or below the mark changes nothing.
  */
 export function acknowledgeBelt(userId: string, viewId: string): void {
-  const awards = awardsOf(userId);
-  const shown = awards.find((award) => beltViewId(award.seasonNumber, award.tier) === viewId);
+  const shown = awardsOf(userId).find(
+    (award) => beltViewId(award.seasonNumber, award.tier) === viewId,
+  );
   if (!shown) return;
-
   const state = getFightRecordState(userId);
-  const celebrated = new Set(state.celebratedAwardIds);
-  const before = celebrated.size;
-  for (const award of awards) {
-    const subsumed =
-      award.seasonNumber < shown.seasonNumber ||
-      (award.seasonNumber === shown.seasonNumber && tierRank(award.tier) <= tierRank(shown.tier));
-    if (subsumed) celebrated.add(award.id);
-  }
-  if (celebrated.size === before) return;
-  saveFightRecordState({ ...state, celebratedAwardIds: [...celebrated] });
+  if (!isAbove(shown, state.celebratedThrough)) return;
+  saveFightRecordState({
+    ...state,
+    celebratedThrough: { seasonNumber: shown.seasonNumber, tier: shown.tier },
+  });
 }
 
-// ----- emoji status preference -----
+// ----- emoji status -----
+
+/**
+ * Bring the Telegram status up to date after a read found a new belt, and
+ * record the outcome. Called without awaiting: the dashboard never waits on
+ * Telegram. State is re-read after the network call because the user may have
+ * changed the setting while it was in flight:
+ *
+ *  - withdrawn meanwhile: whatever Telegram just applied comes straight back
+ *    down, so a withdrawal always wins the race;
+ *  - refused as a permission problem: the user revoked access inside Telegram
+ *    without telling us, so the preference turns off (and is audited as a
+ *    withdrawal) rather than retrying the same refusal on every read;
+ *  - any other failure: left on, to be retried by the next read.
+ */
+async function syncEmojiStatus(
+  userId: string,
+  tgId: number,
+  season: Season,
+  tier: BeltTier,
+): Promise<void> {
+  const result = await sendEmojiStatus(tgId, season, tier);
+  const state = getFightRecordState(userId);
+  const preference = state.emojiStatus;
+  if (!preference.enabled) {
+    if (result.ok) await clearEmojiStatus(tgId);
+    return;
+  }
+  if (result.ok) {
+    saveFightRecordState({
+      ...state,
+      emojiStatus: { ...preference, lastSet: { seasonId: season.id, tier } },
+    });
+    logEvent('fight_record_emoji_status_set', { tier });
+    return;
+  }
+  const revoked = isAccessRevoked(result.error);
+  if (revoked) {
+    saveFightRecordState({ ...state, emojiStatus: { enabled: false } });
+    auditDataAccess(userId, 'fightRecord.emojiStatus.withdrawn', {
+      consentTextVersion: preference.consentTextVersion,
+      by: 'telegram',
+    });
+  }
+  logEvent('fight_record_emoji_status_failed', { tier, revoked });
+}
 
 /**
  * Opt in or out of the belt as Telegram emoji status.
  *
  * Opting in happens after Telegram's own permission prompt in the Mini App.
- * When a belt is already held it is sent straight away, and the preference is
- * stored only if Telegram accepts: a refusal stores nothing and answers
- * CONFLICT, so the toggle never shows "on" for a status nobody can see.
+ * When a belt is already held this season it is sent straight away, and the
+ * preference is stored only if Telegram accepts: a refusal stores nothing and
+ * answers CONFLICT, so the toggle never shows "on" for a status nobody can
+ * see. Opting out always works, whatever else has changed since the grant.
  * Grants and withdrawals are written to the append-only audit trail with the
  * consent copy version.
  */
@@ -295,30 +339,28 @@ export async function setEmojiStatusPreference(
   now: Date = new Date(),
 ): Promise<EmojiStatusSetting> {
   const user = getStore().byId<User>('users', userId);
-  const available = emojiStatusAvailable(user, isAdult(getProfile(userId)));
+  const target = emojiStatusTarget(user, isAdult(getProfile(userId)));
   const state = getFightRecordState(userId);
 
   if (!enabled) {
     if (state.emojiStatus.enabled) {
-      saveFightRecordState({
-        ...state,
-        emojiStatus: { ...state.emojiStatus, enabled: false, lastSet: null, updatedAt: now.toISOString() },
-      });
+      saveFightRecordState({ ...state, emojiStatus: { enabled: false } });
       auditDataAccess(userId, 'fightRecord.emojiStatus.withdrawn', {
         consentTextVersion: state.emojiStatus.consentTextVersion,
+        by: 'user',
       });
       if (typeof user?.tgId === 'number') void clearEmojiStatus(user.tgId);
     }
-    return { available, enabled: false };
+    return { available: target !== null, enabled: false };
   }
 
-  if (!available || typeof user?.tgId !== 'number') {
+  if (target === null) {
     throw new AppError('FORBIDDEN', 'The belt emoji status is not available for this account.');
   }
 
   const { season, tier } = standingOf(userId, today, now);
   if (tier !== null) {
-    const result = await sendEmojiStatus(user.tgId, season, tier);
+    const result = await sendEmojiStatus(target, season, tier);
     if (!result.ok) {
       logEvent('fight_record_emoji_status_failed', { tier, revoked: isAccessRevoked(result.error) });
       throw new AppError(
@@ -330,14 +372,12 @@ export async function setEmojiStatusPreference(
   }
 
   // Re-read: the Telegram call above may have spanned another write.
-  const latest = getFightRecordState(userId);
   saveFightRecordState({
-    ...latest,
+    ...getFightRecordState(userId),
     emojiStatus: {
       enabled: true,
       consentTextVersion: EMOJI_STATUS_CONSENT_VERSION,
       lastSet: tier === null ? null : { seasonId: season.id, tier },
-      updatedAt: now.toISOString(),
     },
   });
   auditDataAccess(userId, 'fightRecord.emojiStatus.granted', {

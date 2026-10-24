@@ -256,16 +256,32 @@ class AzfDatabaseDaoTest {
     @Test
     fun replaceSeriesIsAtomicPerSeries() = runTest {
         val dao = db.progressDao()
-        dao.upsertSummary(ProgressSummaryEntity(userId = "u1", docJson = "{}"))
+        dao.upsertSummary(ProgressSummaryEntity(userId = ProgressSummaryEntity.PROGRESS_SUMMARY_KEY, docJson = "{}"))
         dao.replaceSeries("weight", listOf(trend("weight", "2026-01-01", 82.0)))
         dao.replaceSeries("kcal", listOf(trend("kcal", "2026-01-01", 2100.0)))
         dao.replaceSeries("weight", listOf(trend("weight", "2026-01-02", 81.5)))
 
-        assertNotNull(dao.summary().first())
+        assertNotNull(dao.snapshot(ProgressSummaryEntity.PROGRESS_SUMMARY_KEY).first())
         // Replacing one series must not touch a neighbouring one; the unique
         // (series, date) index is what makes the clear-then-insert safe.
         assertEquals(listOf("2026-01-02"), dao.series("weight").first().map { it.date })
         assertEquals(listOf("2026-01-01"), dao.series("kcal").first().map { it.date })
+    }
+
+    @Test
+    fun keyedProgressSnapshotsAreNeverReadForEachOther() = runTest {
+        val dao = db.progressDao()
+        // Fight Record first: under the old unfiltered `LIMIT 1` it was the
+        // row the progress summary read would have returned.
+        dao.upsertSummary(ProgressSummaryEntity(userId = ProgressSummaryEntity.FIGHT_RECORD_KEY, docJson = "fr"))
+        assertNull(dao.snapshot(ProgressSummaryEntity.PROGRESS_SUMMARY_KEY).first())
+
+        dao.upsertSummary(ProgressSummaryEntity(userId = ProgressSummaryEntity.PROGRESS_SUMMARY_KEY, docJson = "ps"))
+        assertEquals("ps", dao.snapshot(ProgressSummaryEntity.PROGRESS_SUMMARY_KEY).first()!!.docJson)
+        assertEquals("fr", dao.snapshot(ProgressSummaryEntity.FIGHT_RECORD_KEY).first()!!.docJson)
+
+        dao.clearSummary()
+        assertNull(dao.snapshot(ProgressSummaryEntity.FIGHT_RECORD_KEY).first())
     }
 
     @Test

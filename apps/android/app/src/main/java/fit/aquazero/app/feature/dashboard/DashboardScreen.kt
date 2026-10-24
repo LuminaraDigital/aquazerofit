@@ -50,6 +50,11 @@ import fit.aquazero.app.core.ui.rememberToastSink
  * mobile-specific choices called out in the sub-composables:
  * one-tap optimistic hydration, the Akin mascot in the greeting, and a
  * camera FAB that opens photo meal logging.
+ *
+ * [seasonCard] is a slot the app shell fills with Fight Record's card, so
+ * this feature reserves a place after the coach card and imports nothing
+ * from that one. It receives the dashboard's spacing as a modifier, so a card
+ * that renders nothing leaves no gap behind.
  */
 @Composable
 fun DashboardScreen(
@@ -58,6 +63,7 @@ fun DashboardScreen(
     onOpenWorkout: (String?) -> Unit = {},
     onOpenProgress: () -> Unit = {},
     onOpenCoach: (String?) -> Unit = {},
+    seasonCard: @Composable (Modifier) -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -102,6 +108,7 @@ fun DashboardScreen(
                 null
             },
             modifier = Modifier.fillMaxSize(),
+            seasonCard = seasonCard,
         )
         CelebrationHost()
     }
@@ -127,6 +134,7 @@ fun DashboardContent(
     onOpenCoach: (String?) -> Unit = {},
     onExplainTarget: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    seasonCard: @Composable (Modifier) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -236,6 +244,12 @@ fun DashboardContent(
                     modifier = Modifier.revealOnEnter(4),
                 )
             }
+
+            seasonCard(
+                Modifier
+                    .padding(top = AzfSpacing.Gutter)
+                    .revealOnEnter(4),
+            )
 
             Spacer(Modifier.height(AzfSpacing.Gutter))
 

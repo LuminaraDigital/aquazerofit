@@ -26,7 +26,8 @@ class ProgressRepository @Inject constructor(
 ) {
 
     /** Cached, decoded progress summary (null until first refresh). */
-    fun summary(): Flow<ProgressSummaryDto?> = progressDao.summary().map { it?.decode() }
+    fun summary(): Flow<ProgressSummaryDto?> =
+        progressDao.snapshot(ProgressSummaryEntity.PROGRESS_SUMMARY_KEY).map { it?.decode() }
 
     /** Cached trend series (`weight`, `kcal`, `proteinG`, `carbsG`, `fatG`). */
     fun series(series: String): Flow<List<TrendPointEntity>> = progressDao.series(series)
@@ -37,7 +38,7 @@ class ProgressRepository @Inject constructor(
             is ApiResult.Success -> {
                 progressDao.upsertSummary(
                     ProgressSummaryEntity(
-                        userId = "me",
+                        userId = ProgressSummaryEntity.PROGRESS_SUMMARY_KEY,
                         docJson = AzfJson.encodeToString(ProgressSummaryDto.serializer(), result.data),
                         cachedAt = System.currentTimeMillis(),
                     ),

@@ -85,6 +85,12 @@ sealed interface TabKey : NavKey
 /** Buddy challenges. [joinCode] pre-fills the join field from a deep link. */
 @Serializable data class ChallengesKey(val joinCode: String? = null) : NavKey
 
+/**
+ * Fight Record: season, belt ladder and shelf (AZF-W3-05). Full-screen, as on
+ * the web, where `/fight-record` renders outside the tabbed layout.
+ */
+@Serializable data object FightRecordKey : NavKey
+
 /** Settings root. */
 @Serializable data object SettingsKey : NavKey
 

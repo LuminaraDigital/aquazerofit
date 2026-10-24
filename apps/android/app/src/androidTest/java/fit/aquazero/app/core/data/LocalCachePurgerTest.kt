@@ -7,6 +7,7 @@ import fit.aquazero.app.core.database.OutboxEntity
 import fit.aquazero.app.core.database.OutboxEntityTypes
 import fit.aquazero.app.core.database.OutboxOpTypes
 import fit.aquazero.app.core.database.OutboxState
+import fit.aquazero.app.core.database.ProgressSummaryEntity
 import fit.aquazero.app.core.database.SyncState
 import fit.aquazero.app.core.database.UserEntity
 import fit.aquazero.app.core.database.createInMemoryDatabase
@@ -72,6 +73,9 @@ class LocalCachePurgerTest {
             ),
         )
         db.catalogDao().upsertCoaches(listOf(CoachEntity(coachId = "akin", unlocked = true)))
+        db.progressDao().upsertSummary(
+            ProgressSummaryEntity(userId = ProgressSummaryEntity.FIGHT_RECORD_KEY, docJson = "{}"),
+        )
 
         purger.purgeOnUserLogout()
 
@@ -82,6 +86,8 @@ class LocalCachePurgerTest {
         assertEquals(0L, db.catalogDao().foodById("f1")!!.lastUsedAt)
         assertEquals(0, db.catalogDao().foodById("f1")!!.useCount)
         assertTrue(db.catalogDao().coaches().first().isEmpty())
+        // The next account must not open on the previous one's belts.
+        assertNull(db.progressDao().snapshot(ProgressSummaryEntity.FIGHT_RECORD_KEY).first())
     }
 
     @Test

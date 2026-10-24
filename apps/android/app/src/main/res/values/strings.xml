@@ -1273,6 +1273,53 @@
     <string name="challenges_share_code">Share invite</string>
     <string name="challenges_share_text">Join my AquaZeroFit huddle:\n%1$s\nCode: %2$s</string>
 
+    <!-- Fight Record: seasons and Consistency Belts (AZF-W3-05). Every string
+         here keeps the copy rules of §2.7, enforced by FightRecordCopyTest:
+         belts count active days, nothing can be taken away, and days left is
+         a plain sentence, never a countdown. The share text carries the belt
+         and season only: no count of days and no health figure. -->
+    <string name="fight_record_title">Fight Record</string>
+    <string name="fight_record_belt_white">White Belt</string>
+    <string name="fight_record_belt_blue">Blue Belt</string>
+    <string name="fight_record_belt_purple">Purple Belt</string>
+    <string name="fight_record_belt_brown">Brown Belt</string>
+    <string name="fight_record_belt_black">Black Belt</string>
+    <string name="fight_record_belt_new">New belt</string>
+    <string name="fight_record_no_belt">No belt yet</string>
+    <plurals name="fight_record_next_belt">
+        <item quantity="one">%1$d active day to your %2$s.</item>
+        <item quantity="other">%1$d active days to your %2$s.</item>
+    </plurals>
+    <string name="fight_record_top_of_ladder">Black Belt: the top of the ladder this season.</string>
+    <plurals name="fight_record_days_left">
+        <item quantity="one">%1$d day left in the season</item>
+        <item quantity="other">%1$d days left in the season</item>
+    </plurals>
+    <string name="fight_record_season_number">Season %1$d</string>
+    <string name="fight_record_season_dates">%1$s to %2$s</string>
+    <string name="fight_record_season_subtitle">%1$s · %2$s</string>
+    <string name="fight_record_intro">A season is eight weeks. Any day you log a meal, water or a weigh-in, or finish a workout, is an active day. Belts count active days, so a quiet day never costs you anything, and every season starts fresh with your old belts kept here.</string>
+    <string name="fight_record_season_named">Season %1$d · %2$s</string>
+    <plurals name="fight_record_active_days">
+        <item quantity="one">%1$d active day this season</item>
+        <item quantity="other">%1$d active days this season</item>
+    </plurals>
+    <string name="fight_record_share">Share my belt</string>
+    <string name="fight_record_share_text">%1$s, Season %2$d on AquaZeroFit.\n%3$s</string>
+    <string name="fight_record_ladder_heading">The ladder</string>
+    <plurals name="fight_record_rung_days">
+        <item quantity="one">%1$d active day</item>
+        <item quantity="other">%1$d active days</item>
+    </plurals>
+    <string name="fight_record_rung_held">Held</string>
+    <string name="fight_record_rung_ahead">Not yet held</string>
+    <string name="fight_record_shelf_heading">Your belts</string>
+    <plurals name="fight_record_shelf_empty">
+        <item quantity="one">Your first belt is %1$d active day away.</item>
+        <item quantity="other">Your first belt is %1$d active days away.</item>
+    </plurals>
+    <string name="fight_record_error">We couldn\'t load your Fight Record.</string>
+
     <!-- Readiness (Protect / Maintain / Progress) -->
     <string name="readiness_mode_protect">Protect</string>
     <string name="readiness_mode_maintain">Maintain</string>

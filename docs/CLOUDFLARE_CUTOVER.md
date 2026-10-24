@@ -151,8 +151,10 @@ npx wrangler secret put ORIGIN_SHARED_SECRET
 ```
 
 API: set `ORIGIN_SHARED_SECRET` on Cloud Run service `aquazerofit-api` in
-`australia-southeast1`, as a plain env var or a Secret Manager mount. That is
-an operator action. Nothing in this repository applies it.
+`australia-southeast1` as a Secret Manager mount, following docs/OPERATIONS.md
+("Closing the run.app bypass"); its step 0 handles a value already set as a
+plain env var. That is an operator action. Nothing in this repository applies
+it.
 
 Optional ingress restriction, after a request through the Worker is limited per
 real client. Do not set Cloud Run ingress to `internal` while `API_ORIGIN` is
@@ -164,8 +166,8 @@ balancer, point `API_ORIGIN` at that origin, then set ingress to
 
 ## Follow-ups, not part of this cutover
 
-- Stripe. The API reads `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET` (see `.env.example`). Leave those mounts, and any other live secret or volume, on the service. The deploy step updates the image only.
-- Closing direct access to the run.app hostname. The shared secret above is what makes per-client rate limits correct while ingress stays `all`. Do not raise `TRUST_PROXY` to paper over a shared Cloudflare egress address.
+- Stripe. The API reads `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET` (see `.env.example`). Leave those mounts, and any other live secret or volume, on the service. The deploy step changes only the image, the one-instance scaling pin, `APP_VERSION` and `AZF_INSTANCE_COUNT`.
+- Closing direct access to the run.app hostname. The API can now refuse it itself: `REQUIRE_ORIGIN_SECRET=true` 403s any request without the shared secret above, once both sides hold it and every provider webhook is on this domain (docs/OPERATIONS.md, "Closing the run.app bypass"). Do not raise `TRUST_PROXY` to paper over a shared Cloudflare egress address.
 - Firestore. The API is off. The store stays on Cloud SQL.
 - Meal-photo object storage. Cloud Run disk is ephemeral.
 - Firebase Auth on the web (build-args plus authorized domain).

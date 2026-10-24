@@ -10,7 +10,7 @@ This document defines the production observability surface of the AquaZeroFit AP
 | `GET /ready` | none | Readiness. Store hydrated AND (Postgres-backed) pool answers `SELECT 1`. Returns 503 with `NOT_READY` while unfit for traffic. |
 | `GET /metrics` | none | In-process counters as JSON: `requestsTotal`, `responsesByClass` (2xx/3xx/4xx/5xx), `aiCallsTotal`, `aiCallsBlocked`, `startedAt`. No user data. |
 
-All three are registered before the rate limiter so platform probes cannot be throttled into a restart loop.
+All three are registered before the rate limiter so platform probes cannot be throttled into a restart loop. With `REQUIRE_ORIGIN_SECRET=true` (below), `/health` and `/ready` stay open but `/metrics` needs the Worker's secret like every other path, and the Worker does not proxy it, so a poller on the run.app URL gets 403.
 
 ## Structured logs (stdout)
 
@@ -35,6 +35,7 @@ These thresholds assume the platform can query structured logs (Azure Log Analyt
 | AI guardrail spike | `aiCallsBlocked` delta > 10 in 15 min | Possible prompt-injection probing; review `kind:"ai"` blocked records. |
 | Refresh-theft events | log search for `Refresh token reuse detected` | Count > 0 is worth a look; > 5/hour for one user suggests credential stuffing. |
 | Latency | p95 `ms` on http lines > 2 s over 5 min | Investigate store/Postgres health and AI provider latency. |
+| No AI provider | boot line `name:"ai_provider_unconfigured"` | Production has no provider key (or `OLLAMA_BASE_URL`), so every AI answer is offline template text, flagged `degradedReason: "no_provider"` and never billed. Set at least one key (`.env.production.example`) and redeploy. |
 
 ## Scaling: this API runs on exactly one instance
 
@@ -54,7 +55,8 @@ None of the deploy surfaces expresses an instance count the process can read —
 
 | Value | Effect |
 | --- | --- |
-| unset | Treated as `1`. Normal local development and the current deployments. |
+| unset, off Cloud Run | Treated as `1`. Local development and Docker Compose. |
+| unset, on Cloud Run (`K_SERVICE` set) | **Boot refused.** Cloud Run autoscales unless `max-instances` is pinned, and `gcloud run deploy --image` keeps whatever the live service has, so the default declares nothing there. |
 | `1` | Boots normally. |
 | anything else (`2`, `0`, `auto`, …) | **Boot refused** with an error naming the data-loss risk. A value that is not a positive integer is refused too: a guard that cannot read its own input has verified nothing. |
 
@@ -62,6 +64,7 @@ Enforced by `assertSingleInstance()` in `apps/api/src/platform/config.ts`, calle
 
 Per platform:
 
+- **Cloud Run** — `cloudbuild.yaml` deploys with `--min-instances=1 --max-instances=1` and sets `AZF_INSTANCE_COUNT=1` in the same command, on every deploy. A revision made any other way (console, a hand-run `gcloud run deploy`) inherits both from the one before it; if the variable is missing, the new revision fails to start and the previous one keeps serving. Raising `max-instances` by hand is the one change the guard cannot see. Min and max are per revision, so during a rollout the old and new revisions briefly run side by side; that overlap is inherent to Cloud Run and is not something the guard can see.
 - **Managed PaaS** — pin the deployment to a single reserved VM (one machine), never autoscale, and record that choice in whatever deployment manifest the host reads.
 - **Docker Compose** — `AZF_INSTANCE_COUNT=1` is set in `docker-compose.yml`. Do not use `docker compose up --scale api=N`.
 - **Azure Container Apps** — set min and max replicas both to 1.
@@ -69,6 +72,121 @@ Per platform:
 ### Lifting the restriction
 
 Raising `AZF_INSTANCE_COUNT` does not make the deployment scalable; it makes the data loss permitted. The prerequisite is the **async `getStore()` refactor**, which routes reads through to Postgres instead of a per-instance memory copy. It is tracked as its own piece of work because it touches roughly 77 call sites. Until it lands, one instance is the only correct configuration, and the per-process rate limiter and login lockout noted in `PRODUCTION_READINESS.md` are a second, independent reason not to scale out.
+
+## Closing the run.app bypass (`REQUIRE_ORIGIN_SECRET`)
+
+Cloud Run ingress is `all` and cannot be limited to the Worker, so `https://aquazerofit-api-592686987043.australia-southeast1.run.app` answers anyone and skips the edge. With `REQUIRE_ORIGIN_SECRET=true` the API refuses, with `403 {"code":"FORBIDDEN"}`, every request whose `X-Origin-Shared-Secret` does not match `ORIGIN_SHARED_SECRET`. `/health` and `/ready` are exempt for Cloud Run's probes. The switch is off by default, and boot is refused if it is on while `ORIGIN_SHARED_SECRET` is empty, still a `replace-with-...` placeholder, or under 32 characters (`requireWorkerOrigin` in `apps/api/src/platform/clientIp.ts`, `assertOriginSecretConfigured` in `platform/config.ts`).
+
+Refusals write at most one line a minute: `kind:"security"`, `event:"origin_secret_rejected"`, `refusedSinceLastLog`, and the `reason` and `path` of the request that tripped it. `secret_missing` is a direct caller. `secret_mismatch` on real traffic means the Worker and Cloud Run hold different values.
+
+Telegram, Stripe and Pub/Sub cannot add a custom header. Only the Worker adds it, so after step 5 a webhook registered on run.app is refused outright. Every step is an operator action; nothing in this repository applies them.
+
+0. **See what is live before changing anything.** The secret may already be set: `docs/CLOUDFLARE_CUTOVER.md` used to allow either a plain env var or a Secret Manager mount. Worker secrets can be listed but never read back.
+   ```bash
+   gcloud run services describe aquazerofit-api --project=aquazerofit --region=australia-southeast1 --format=json \
+     | jq '.spec.template.spec.containers[0].env[] | select(.name=="ORIGIN_SHARED_SECRET")'
+   (cd cloudflare && npx wrangler secret list)
+   ```
+   - **A `value`** is a plain env var. Reuse it, skip step 1, and swap it for a mount in step 3:
+     ```bash
+     SECRET="$(gcloud run services describe aquazerofit-api --project=aquazerofit \
+       --region=australia-southeast1 --format=json \
+       | jq -r '.spec.template.spec.containers[0].env[] | select(.name=="ORIGIN_SHARED_SECRET") | .value')"
+     ```
+   - **A `valueFrom.secretKeyRef`** is already a mount. Reuse it and skip steps 1 and 3:
+     ```bash
+     SECRET="$(gcloud secrets versions access latest --secret=<secretKeyRef.name> --project=aquazerofit)"
+     ```
+   - **Nothing** means it is not set. Generate one in step 1.
+
+   Reusing the Cloud Run value means step 2 brings the Worker into line with it, whatever the Worker held before. A fresh value generated while Cloud Run still holds an old one would split the two sides, and every visitor would share one rate-limit bucket until they matched again. A reused value under 32 characters, or a `replace-with-...` placeholder, would stop step 5 from booting; finish steps 2 and 3 with it, then replace it with "Rotating `ORIGIN_SHARED_SECRET`" below before step 5.
+1. **Generate**, only if step 0 found nothing. Keep this shell for steps 2 and 3.
+   ```bash
+   SECRET="$(openssl rand -hex 32)"
+   ```
+2. **Worker**, from `cloudflare/`:
+   ```bash
+   printf %s "$SECRET" | npx wrangler secret put ORIGIN_SHARED_SECRET
+   ```
+3. **Cloud Run.** Create the Secret Manager secret and mount it, which rolls one revision. If the runtime service account (`azf-api`) is granted secrets one by one rather than project-wide, grant it `roles/secretmanager.secretAccessor` on this secret first. When step 0 found a plain `value`, remove it in the same update: `--update-secrets` refuses a name that is already a plain env var, and the update then changes nothing.
+   ```bash
+   printf %s "$SECRET" | gcloud secrets create ORIGIN_SHARED_SECRET \
+     --project=aquazerofit --replication-policy=automatic --data-file=-
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --remove-env-vars=ORIGIN_SHARED_SECRET \
+     --update-secrets=ORIGIN_SHARED_SECRET=ORIGIN_SHARED_SECRET:latest
+   ```
+   Leave out `--remove-env-vars` when there was no plain value. If gcloud still reports a type conflict, run the removal and the mount as two updates back to back. The gate is still off here, so the gap between them costs only per-client rate limits for a minute.
+4. **Every provider webhook must be on `https://aquazerofit.com`.** Check each one against the provider's own record. The repository only documents the Telegram URL as `https://<host>/...`, so the docs do not settle this.
+
+   | Provider | Must be | Check |
+   | --- | --- | --- |
+   | Telegram | `https://aquazerofit.com/api/v1/telegram/webhook` | `curl -s "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"`, field `url` |
+   | Stripe (live and test) | `https://aquazerofit.com/api/v1/billing/stripe/webhook` | Dashboard, Developers, Webhooks: endpoint URL |
+   | Play RTDN | `https://aquazerofit.com/api/v1/billing/play/webhook` | `gcloud pubsub subscriptions list --format='table(name,pushConfig.pushEndpoint)'` in the RTDN topic's project |
+
+   To move Telegram, re-run the full `setWebhook` command under "Rotating `TELEGRAM_WEBHOOK_SECRET`" with the new URL. Leaving out `secret_token` clears it, and the route then refuses everything. To move Stripe, edit the endpoint URL; the signing secret does not change. To move Pub/Sub, run `gcloud pubsub subscriptions modify-push-config` and keep any `?secret=` query. Uptime checks or schedulers on run.app need the same treatment. Anything you missed will show up in `origin_secret_rejected` lines after step 5.
+5. **Flip the switch.** `cloudbuild.yaml` updates only the variables it names, so the setting survives later deploys.
+   ```bash
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --update-env-vars=REQUIRE_ORIGIN_SECRET=true
+   ```
+6. **Verify.**
+   ```bash
+   RUN=https://aquazerofit-api-592686987043.australia-southeast1.run.app
+   curl -s -o /dev/null -w '%{http_code}\n' "$RUN/api/v1/auth/captcha"                 # 403
+   curl -s -o /dev/null -w '%{http_code}\n' "$RUN/health"                              # 200
+   curl -s -o /dev/null -w '%{http_code}\n' https://aquazerofit.com/api/v1/auth/captcha # 200
+   gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="aquazerofit-api" AND jsonPayload.event="origin_secret_rejected"' \
+     --project=aquazerofit --freshness=1h
+   ```
+   A 403 through `aquazerofit.com`, a `secret_mismatch` line, or a line whose `path` is a webhook means roll back now, then fix the cause:
+   ```bash
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --update-env-vars=REQUIRE_ORIGIN_SECRET=false
+   ```
+
+### Rotating `ORIGIN_SHARED_SECRET`
+
+The gate stays on. The two sides cannot change at the same instant, so Cloud Run accepts the old value as `ORIGIN_SHARED_SECRET_PREVIOUS` beside the new one while the Worker is switched, and no request is refused at any point. Turning the gate off instead would reopen run.app exactly when a leak made the rotation urgent. While the previous value is set it still opens the origin, so finish step 4 as soon as step 3 is clean. It is held to the same boot rules as the current value. This assumes the Secret Manager mount from step 3 above.
+
+1. **Cloud Run holds both.** Record the version serving now, add the new one, and mount new as current and old as previous in one update:
+   ```bash
+   OLD="$(gcloud secrets versions describe latest --secret=ORIGIN_SHARED_SECRET \
+     --project=aquazerofit --format='value(name.basename())')"
+   NEW="$(openssl rand -hex 32)"
+   printf %s "$NEW" | gcloud secrets versions add ORIGIN_SHARED_SECRET --project=aquazerofit --data-file=-
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --update-secrets="ORIGIN_SHARED_SECRET=ORIGIN_SHARED_SECRET:latest,ORIGIN_SHARED_SECRET_PREVIOUS=ORIGIN_SHARED_SECRET:${OLD}"
+   ```
+   Wait until `gcloud run revisions list --service=aquazerofit-api --region=australia-southeast1` shows the new revision serving.
+2. **Worker**, from `cloudflare/`:
+   ```bash
+   printf %s "$NEW" | npx wrangler secret put ORIGIN_SHARED_SECRET
+   ```
+3. **Verify** that `https://aquazerofit.com/api/v1/auth/captcha` returns 200 and that the log query in step 6 above shows no new `secret_mismatch` line.
+4. **Drop the old value**, then disable its version. Disable it only once the removal is serving: a revision that mounts a disabled version fails to start.
+   ```bash
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --remove-secrets=ORIGIN_SHARED_SECRET_PREVIOUS
+   gcloud secrets versions disable "$OLD" --secret=ORIGIN_SHARED_SECRET --project=aquazerofit
+   ```
+
+## Key rotation: Stripe and Resend
+
+Operator-only; nothing in this repository holds either key. The secret ids below assume each matches its env name; confirm with `gcloud run services describe aquazerofit-api --region=australia-southeast1`.
+
+1. **Stripe, live mode:** Developers, API keys, secret key, **Roll key**. Give the old key an expiry (an hour is enough) so the serving revision keeps working until the new one is up.
+2. **Resend:** create a new API key with sending access. Do not delete the old one yet.
+3. **New versions, one new revision.**
+   ```bash
+   printf %s "$NEW_STRIPE_KEY" | gcloud secrets versions add STRIPE_SECRET_KEY --project=aquazerofit --data-file=-
+   printf %s "$NEW_RESEND_KEY" | gcloud secrets versions add RESEND_API_KEY --project=aquazerofit --data-file=-
+   gcloud run services update aquazerofit-api --project=aquazerofit --region=australia-southeast1 \
+     --update-secrets=STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,RESEND_API_KEY=RESEND_API_KEY:latest
+   ```
+   `:latest` is read when an instance starts, so the new keys take effect only once a new revision is serving; check with `gcloud run revisions list --service=aquazerofit-api --region=australia-southeast1`.
+4. **Verify, then retire.** The plan page on `aquazerofit.com` shows the Stripe price, and a password reset reaches an operator mailbox. Then delete the old Resend key. The old Stripe key expires on its own.
 
 ## Rotating `TELEGRAM_WEBHOOK_SECRET`
 
@@ -168,6 +286,23 @@ These are unresolved, and the procedure above deliberately does not pretend othe
 2. **Whether the environment can change without replacing the process.** `config.telegramWebhookSecret` is a getter that re-reads `process.env` on every call, so the *process* needs no restart to see a new value. Whether the managed host or Azure Container Apps can apply an environment change in place, rather than by rolling a new revision, is not visible from this repository. If it can, the window shrinks to the time between two commands — but nobody has run it that way.
 3. **How long Telegram retries a refused update, and with what backoff.** The route's design assumes redelivery of non-2xx; the retry duration is not recorded anywhere here. If it is shorter than the rotation window, updates in that window are lost outright rather than delayed, and the `successful_payment` row of the cost table above becomes optimistic.
 4. **This procedure has not been executed against production.** Rehearse the first run against a staging bot with its own token and webhook URL before doing it live.
+
+## Stripe webhook events
+
+Each environment's endpoint (`<APP_PUBLIC_URL>/api/v1/billing/stripe/webhook`, API version `2025-11-17.clover`) must be subscribed to all six events below; Stripe sends nothing it was not asked for. To extend an existing endpoint, open it in the Stripe Dashboard (Workbench → Webhooks), edit its events and add the missing ones. The signing secret does not change.
+
+| Event | Effect | Log line to watch |
+| --- | --- | --- |
+| `invoice.paid` | Grants through the paid period. | `stripe_invoice_unmapped` |
+| `customer.subscription.deleted` | Ends that subscription's premium now. | |
+| `invoice.payment_failed` | Nothing revoked; Stripe retries. For dunning. | `stripe_invoice_payment_failed` |
+| `charge.refunded` | A full refund retires the period that payment bought. A partial refund only logs. | `stripe_charge_partially_refunded`, `stripe_charge_unmapped` |
+| `charge.dispute.created` | A chargeback retires the period the disputed payment bought. An inquiry (status `warning_*`) only logs. | `stripe_dispute_inquiry`, `stripe_charge_unmapped` |
+| `charge.dispute.funds_withdrawn` | Same revoke, settled once with `created`; this is the event that reports an inquiry escalating to a chargeback. A dispute later won does not restore premium; re-grant with `POST /api/v1/admin/users/:id/premium`. | `stripe_charge_unmapped` |
+
+`customer.subscription.updated` is deliberately not subscribed: only a paid invoice grants, so a lapsed subscription already ends with its last paid period, and Stripe sends `customer.subscription.deleted` whenever a subscription ends.
+
+`stripe_charge_unmapped` means a refund or dispute could not be traced to an account through Stripe's invoice payments, so nothing was revoked; check the charge in the Dashboard. `stripe_webhook_deferred` means Stripe was unreachable during that lookup: the delivery got a 503 and Stripe retries it for about three days, so it needs action only if it repeats. `stripe_webhook_unsettled` means handling stopped on a final error (the account no longer exists, or Stripe does not recognise the payment); resend the event from the Dashboard once the cause is fixed.
 
 ## What is NOT here (deliberately)
 

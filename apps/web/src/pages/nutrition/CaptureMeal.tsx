@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { MealType } from '@aquazerofit/shared';
 import { MEAL_PHOTO_MAX_BYTES } from '@aquazerofit/shared';
 import { api } from '@/lib/api';
 import { compressPhoto } from '@/lib/compressPhoto';
 import { Chip } from '@/components/ui/Chip';
 import { useToast } from '@/components/ui/Toast';
+import { AiDegradedNotice, readAiDegradedFlag } from './AiDegradedNotice';
 import { MEAL_LABEL, MEAL_TYPES, mealTypeForNow, todayLocalDate } from '../dashboard/lib';
 import { useTelegramMainAction, useTelegramUnsavedEdits } from '@/lib/useTelegramChrome';
 
@@ -26,7 +27,10 @@ function Corner({ className }: { className: string }) {
 
 export default function CaptureMeal() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { show } = useToast();
+  const routedDegraded = Boolean((location.state as { aiDegraded?: boolean } | null)?.aiDegraded);
+  const showDegradedNotice = routedDegraded || readAiDegradedFlag();
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -176,6 +180,12 @@ export default function CaptureMeal() {
           </div>
           <div className="w-10 h-10" aria-hidden="true" />
         </header>
+
+        {showDegradedNotice && (
+          <div className="px-container-margin pt-3">
+            <AiDegradedNotice />
+          </div>
+        )}
 
         {/* Guidance copy */}
         <div className="flex-grow flex items-center justify-center pointer-events-none px-container-margin">

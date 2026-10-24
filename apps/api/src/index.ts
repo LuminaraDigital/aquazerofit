@@ -135,7 +135,7 @@ async function runVisionRecovery(): Promise<void> {
   }
 }
 
-runDeletionSweep();
+void runDeletionSweep();
 runGrowthEventSweep();
 runReservationSweep();
 // Prune on boot as well as on the interval: a process that restarts more often

@@ -26,6 +26,7 @@ import {
 import { removeUserFromChallenges } from '../challenges/service';
 import { clearEmojiStatusOnErasure } from '../fightRecord/emojiStatus';
 import { effectiveTier } from '../billing/entitlements';
+import { cancelStripeSubscriptions } from '../billing/stripe';
 import { addDays } from '../../platform/dates';
 import type { TrendPoint } from '@aquazerofit/shared';
 import { mealLogsForDate, weightLogsInRange } from '../logs/service';
@@ -375,6 +376,10 @@ function scrubGrowthIdentifiers<T extends { id: string }>(doc: T): T {
 }
 
 export async function purgeUser(userId: string): Promise<void> {
+  // First, while the ledger still names the subscription: an erased account
+  // must not go on being billed. Logs rather than throws if Stripe is down.
+  await cancelStripeSubscriptions(userId);
+
   const store = getStore();
 
   // Firebase first, then local data. removeFirebaseIdentity revokes refresh

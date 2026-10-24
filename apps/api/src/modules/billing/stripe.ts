@@ -3,12 +3,13 @@
  *
  * Same posture as the Play rail next door: Stripe is the only authority on
  * what was paid. The browser never reports a payment, a period or an amount;
- * it can only ask us to open a Checkout Session, and later ask us to look one
- * up. Anything that grants premium reads it from Stripe  -  a signed webhook
+ * it can only ask us to open a Checkout Session or the billing portal, and
+ * later ask us to look a Checkout Session up. Anything that grants premium
+ * reads it from Stripe  -  a signed webhook
  * delivery, or our own authenticated API call.
  *
  * NO NEW DEPENDENCY, for the reason `play.ts` gives: the SDK would be a large
- * tree for three HTTP calls and one HMAC. Requests pin `Stripe-Version`, and
+ * tree for a handful of HTTP calls and one HMAC. Requests pin `Stripe-Version`, and
  * the webhook endpoint must be created at the same version, because the field
  * this module reads to find the account moved between versions:
  * `invoice.parent.subscription_details` from 2025-03-31.basil onwards.
@@ -77,6 +78,9 @@ interface StripeInvoice {
 
 interface StripeSubscription {
   id: string;
+  status?: string;
+  /** The customer's id; we never expand it. */
+  customer?: string | null;
   metadata?: Record<string, string> | null;
 }
 
@@ -103,14 +107,14 @@ export function stripeConfigured(): boolean {
   return config.stripeSecretKey !== '' && config.stripePriceId !== '';
 }
 
-async function stripeApi<T>(path: string, form?: URLSearchParams): Promise<T> {
+async function stripeApi<T>(path: string, form?: URLSearchParams, method = form ? 'POST' : 'GET'): Promise<T> {
   if (!stripeConfigured()) {
     throw new AppError('PAYMENT_UNAVAILABLE', 'Stripe is not configured on this server.');
   }
   let res: Response;
   try {
     res = await fetchWithTimeout(`${STRIPE_API}${path}`, {
-      method: form ? 'POST' : 'GET',
+      method,
       headers: {
         Authorization: `Bearer ${config.stripeSecretKey}`,
         'Stripe-Version': STRIPE_API_VERSION,
@@ -282,6 +286,71 @@ export async function syncCheckoutSession(userId: string, sessionId: string): Pr
   }
   if (session.status === 'complete' && session.invoice && typeof session.invoice === 'object') {
     grantFromInvoice(userId, session.invoice);
+  }
+}
+
+/** The account's Stripe subscriptions, newest first, as its entitlement ledger names them. */
+function stripeSubscriptionIds(userId: string): string[] {
+  const refs = entitlementHistory(userId)
+    .filter((grant) => grant.source === 'stripe' && grant.providerRef)
+    .map((grant) => grant.providerRef!);
+  return [...new Set(refs)];
+}
+
+const subscriptionPath = (id: string) => `/subscriptions/${encodeURIComponent(id)}`;
+
+/**
+ * Open Stripe's hosted billing portal, where a subscriber changes their card,
+ * reads invoices and cancels. We store no customer id: the latest Stripe
+ * subscription on the ledger names one, and Stripe is asked which.
+ *
+ * Needs the portal configured once in the Stripe dashboard; until it is,
+ * Stripe refuses the session and this answers PAYMENT_UNAVAILABLE.
+ */
+export async function createPortalSession(userId: string): Promise<string> {
+  const [subscriptionId] = stripeSubscriptionIds(userId);
+  if (!subscriptionId) {
+    throw new AppError('NOT_FOUND', 'This account has no Stripe subscription.');
+  }
+  const { customer } = await stripeApi<StripeSubscription>(subscriptionPath(subscriptionId));
+  if (!customer) {
+    throw new AppError('PAYMENT_UNAVAILABLE', 'Stripe returned no customer for this subscription.');
+  }
+  const session = await stripeApi<{ url?: string | null }>(
+    '/billing_portal/sessions',
+    new URLSearchParams({ customer, return_url: `${config.appPublicUrl}/plan` }),
+  );
+  if (!session.url) {
+    throw new AppError('PAYMENT_UNAVAILABLE', 'Stripe returned no billing portal.');
+  }
+  return session.url;
+}
+
+/** Statuses Stripe will never bill again; cancelling one is an error, not a no-op. */
+const ENDED_STATUSES = new Set(['canceled', 'incomplete_expired']);
+
+/**
+ * Cancel, immediately, every Stripe subscription an account being erased still
+ * has. Called before the purge, which anonymises the ledger these ids are read
+ * from.
+ *
+ * Never throws. Erasure is the user's right and does not wait on Stripe, so a
+ * failure is logged with the subscription id — the one thing an operator needs
+ * to finish the cancellation by hand once the account is gone.
+ */
+export async function cancelStripeSubscriptions(userId: string): Promise<void> {
+  for (const id of stripeSubscriptionIds(userId)) {
+    try {
+      const { status } = await stripeApi<StripeSubscription>(subscriptionPath(id));
+      if (status && ENDED_STATUSES.has(status)) continue;
+      await stripeApi(subscriptionPath(id), undefined, 'DELETE');
+      logEvent('stripe_subscription_cancelled', { subscription: id, reason: 'account_deleted' });
+    } catch (err) {
+      logEvent('stripe_cancel_failed', {
+        subscription: id,
+        reason: err instanceof Error ? err.message : 'unknown',
+      });
+    }
   }
 }
 

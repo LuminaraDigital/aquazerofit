@@ -43,6 +43,14 @@ class FightRecordCopyTest {
         assertTrue("banned copy: $offenders", offenders.isEmpty())
     }
 
+    /** Without inflections, the test above would guard one spelling of each word. */
+    @Test
+    fun `the banned pattern catches inflections, not innocent neighbours`() {
+        listOf("No streaks here", "resets each season", "losing nothing", "it broke", "expiring soon", "hurried")
+            .forEach { assertTrue(it, BANNED.containsMatchIn(it)) }
+        listOf("close the sheet", "a quiet day", "one season").forEach { assertFalse(it, BANNED.containsMatchIn(it)) }
+    }
+
     @Test
     fun `the share text carries a belt and a season, never a count of days`() {
         val share = strings.getValue("fight_record_share_text")
@@ -58,9 +66,13 @@ class FightRecordCopyTest {
 
         val PLACEHOLDER = Regex("%\\d\\$[a-z]")
 
-        /** §2.7, whole words, any case. */
+        /**
+         * §2.7, by stem rather than whole word, any case. "break" as a stem
+         * would also catch "breakfast"; no Fight Record string mentions a
+         * meal, and one that did would be off-topic anyway.
+         */
         val BANNED = Regex(
-            "\\b(lost|lose|broken|break|reset|streak|hurry|only|last chance|expires)\\b",
+            "\\b(lost|los(e|es|ing)|broke\\w*|break\\w*|reset\\w*|streak\\w*|hurr\\w*|only|last chance|expir\\w*)\\b",
             RegexOption.IGNORE_CASE,
         )
     }

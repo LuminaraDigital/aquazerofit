@@ -174,6 +174,27 @@ export async function refundStarPayment(
 }
 
 /**
+ * Set, change or clear a user's emoji status (Bot API 8.0).
+ *
+ * Only works for a user who granted access from the Mini App with
+ * `requestEmojiStatusAccess`; Telegram answers anyone else with an error,
+ * which is how a revoked grant is discovered. An empty `customEmojiId`
+ * removes the status. `expiresAt` is unix seconds; the status then clears
+ * itself, so nothing on our side has to remember to take it down.
+ */
+export async function setUserEmojiStatus(
+  telegramUserId: number,
+  customEmojiId: string,
+  expiresAt?: number,
+): Promise<BotResult<boolean>> {
+  return callBot<boolean>('setUserEmojiStatus', {
+    user_id: telegramUserId,
+    emoji_status_custom_emoji_id: customEmojiId,
+    ...(expiresAt !== undefined ? { emoji_status_expiration_date: expiresAt } : {}),
+  });
+}
+
+/**
  * Stop a Stars subscription from renewing.
  *
  * refundStarPayment returns the Stars for one charge and does not cancel the

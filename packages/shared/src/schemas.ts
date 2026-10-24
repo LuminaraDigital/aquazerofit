@@ -469,3 +469,20 @@ export const diaryExportPayloadSchema = z.object({
   exportedAt: z.string().datetime({ offset: true }).optional(),
 });
 export type DiaryExportPayloadInput = z.infer<typeof diaryExportPayloadSchema>;
+
+// ---------- Fight Record (AZF-W3-05 §4.3) ----------
+
+/**
+ * The award the client actually displayed. Bounded so a junk body cannot be
+ * used to make the server scan with an arbitrarily long key; an id that does
+ * not belong to the caller is a silent no-op, not an error.
+ */
+export const ackBeltSchema = z.object({
+  awardId: z.string().min(1).max(40),
+});
+export type AckBeltInput = z.infer<typeof ackBeltSchema>;
+
+export const emojiStatusPreferenceSchema = z.object({
+  enabled: z.boolean(),
+});
+export type EmojiStatusPreferenceInput = z.infer<typeof emojiStatusPreferenceSchema>;

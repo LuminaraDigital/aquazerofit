@@ -63,7 +63,7 @@ class DeepLinkStore @Inject constructor() {
         // Compared case-insensitively: scheme and host are case-insensitive per
         // RFC 3986, and `URI` preserves whatever case the sender used. Reading
         // `host` rather than splitting the string is deliberate — it is what
-        // makes `https://app.aquazero.fit@evil.example/challenges` resolve to
+        // makes `https://aquazerofit.com@evil.example/challenges` resolve to
         // the host `evil.example` and be refused, instead of matching on a
         // userinfo field that merely looks like the real origin.
         if (!SCHEME.equals(uri.scheme, ignoreCase = true)) return null
@@ -105,7 +105,7 @@ class DeepLinkStore @Inject constructor() {
          * or verified links stop arriving.
          */
         private const val SCHEME = "https"
-        private const val HOST = "app.aquazero.fit"
+        private const val HOST = "aquazerofit.com"
 
         /** Public invite URL for buddy huddles (App Link + web fallback). */
         fun joinChallengeUrl(code: String): String {

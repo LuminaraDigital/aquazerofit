@@ -192,7 +192,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="app.aquazero.fit"
+                    android:host="aquazerofit.com"
                     android:pathPrefix="/challenges" />
             </intent-filter>
         </activity>

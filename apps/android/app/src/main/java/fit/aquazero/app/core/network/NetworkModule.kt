@@ -12,7 +12,6 @@ import fit.aquazero.app.core.network.api.ChallengesApi
 import fit.aquazero.app.core.network.api.ChatApi
 import fit.aquazero.app.core.network.api.CoachesApi
 import fit.aquazero.app.core.network.api.ExercisesApi
-import fit.aquazero.app.core.network.api.FightRecordApi
 import fit.aquazero.app.core.network.api.FoodsApi
 import fit.aquazero.app.core.network.api.LogsApi
 import fit.aquazero.app.core.network.api.MeApi
@@ -231,11 +230,6 @@ object NetworkModule {
     @Singleton
     fun challengesApi(@Named("api") retrofit: Retrofit): ChallengesApi =
         retrofit.create(ChallengesApi::class.java)
-
-    @Provides
-    @Singleton
-    fun fightRecordApi(@Named("api") retrofit: Retrofit): FightRecordApi =
-        retrofit.create(FightRecordApi::class.java)
 
     @Provides
     @Singleton

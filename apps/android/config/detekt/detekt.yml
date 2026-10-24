@@ -27,7 +27,7 @@ complexity:
   TooManyFunctions:
     # Raised to today's worst case in each bucket, no higher:
     #   file 20 (NutritionSections.kt), class 29 (WorkoutSessionViewModel),
-    #   interface 21 (CatalogDao), object 24 (NetworkModule, all @Provides).
+    #   interface 21 (CatalogDao), object 23 (NetworkModule, all @Provides).
     #
     # CatalogDao moved 20 -> 21 for `thumbnailsFor`, which the library list
     # needs to draw exercise images. It is now carrying foods, recipes,
@@ -40,16 +40,10 @@ complexity:
     # already owns the rest timer, so extracting them would put one concern in
     # two places. The next function it grows should move the live-notification
     # mirroring into its own collaborator rather than move this again.
-    #
-    # NetworkModule moved 23 -> 24 for `fightRecordApi`, a one-line @Provides
-    # beside every other Retrofit service. The next API it gains should move
-    # the per-service providers into a module of their own (as
-    # Phase6NetworkModule already does for its lane) rather than move this
-    # again; the clients and Retrofit instances are what this object is for.
     allowedFunctionsPerFile: 20
     allowedFunctionsPerClass: 29
     allowedFunctionsPerInterface: 21
-    allowedFunctionsPerObject: 24
+    allowedFunctionsPerObject: 23
 
 naming:
   FunctionNaming:

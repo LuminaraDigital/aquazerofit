@@ -88,6 +88,10 @@ export interface TelegramWebApp {
   openInvoice?(url: string, callback?: (status: InvoiceStatus) => void): void;
   openTelegramLink?(url: string): void;
   openLink?(url: string): void;
+  /** Bot API 7.8+. `mediaUrl` must be a public HTTPS URL, not a blob. */
+  shareToStory?(mediaUrl: string, params?: { text?: string }): void;
+  /** Bot API 8.0+. The callback receives whether access was granted. */
+  requestEmojiStatusAccess?(callback?: (allowed: boolean) => void): void;
 }
 
 /** Terminal states Telegram reports back from an invoice. */
@@ -719,5 +723,57 @@ export function openStarsInvoice(url: string): Promise<InvoiceStatus> {
       clearTimeout(timer);
       finish(status);
     });
+  });
+}
+
+/**
+ * Caption limit for a story posted by a non-Premium account. Premium allows
+ * 2048, but the caption is built before we could know which the user has, so
+ * it is cut to the limit everyone can post.
+ */
+const STORY_CAPTION_MAX = 200;
+
+/** Can this client open Telegram's story editor? Bot API 7.8+, in Telegram. */
+export function canShareToStory(): boolean {
+  return telegramSupports('7.8') && typeof getWebApp()?.shareToStory === 'function';
+}
+
+/**
+ * Open the story editor with `mediaUrl` and a caption. Returns false when the
+ * client cannot, so the caller can leave the button out rather than offer one
+ * that does nothing. The media must be a public HTTPS URL: Telegram fetches
+ * it itself, so a canvas blob from this page is not something it can see.
+ */
+export function shareToStory(mediaUrl: string, caption: string): boolean {
+  const tg = getWebApp();
+  if (!canShareToStory() || !tg?.shareToStory) return false;
+  try {
+    tg.shareToStory(mediaUrl, { text: caption.slice(0, STORY_CAPTION_MAX) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Can this client ask for emoji-status access? Bot API 8.0+, in Telegram. */
+export function canManageEmojiStatus(): boolean {
+  return telegramSupports('8.0') && typeof getWebApp()?.requestEmojiStatusAccess === 'function';
+}
+
+/**
+ * Show Telegram's own permission prompt for managing the user's emoji status.
+ * Resolves with the user's answer; resolves false when the client cannot ask,
+ * so "not supported" and "declined" share the one branch that stores nothing.
+ */
+export function requestEmojiStatusAccess(): Promise<boolean> {
+  const tg = getWebApp();
+  const request = tg?.requestEmojiStatusAccess;
+  if (!canManageEmojiStatus() || !request) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    try {
+      request.call(tg, (allowed) => resolve(allowed === true));
+    } catch {
+      resolve(false);
+    }
   });
 }

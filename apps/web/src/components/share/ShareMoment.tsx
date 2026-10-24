@@ -19,7 +19,7 @@ import {
 import { buildShareUrl, getAttribution, inviteRefFromUserId } from '@/lib/attribution';
 import { joinChallengeUrl } from '@/lib/challenges';
 import { trackGrowth } from '@/lib/growth';
-import { haptic, openTelegramLink } from '@/lib/telegram';
+import { canShareToStory, haptic, openTelegramLink, shareToStory } from '@/lib/telegram';
 
 export interface ShareMomentProps {
   open: boolean;
@@ -29,6 +29,13 @@ export interface ShareMomentProps {
   invitePath?: string;
   userId?: string | null;
   challengeCode?: string | null;
+  /**
+   * Offer "Share to story" with this public HTTPS art and caption; the invite
+   * link is appended. Shown only where the client supports stories (Bot API
+   * 7.8), and callers pass it only for adults: a story is public to everyone
+   * the user knows.
+   */
+  story?: { mediaUrl: string; caption: string } | null;
 }
 
 export function ShareMoment({
@@ -38,6 +45,7 @@ export function ShareMoment({
   invitePath = '/welcome',
   userId = null,
   challengeCode = null,
+  story = null,
 }: ShareMomentProps) {
   const toast = useToast();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -122,6 +130,16 @@ export function ShareMoment({
     void trackGrowth('share_telegram', { kind: payload.kind });
   };
 
+  const onStory = () => {
+    if (!payload || !story) return;
+    if (!shareToStory(story.mediaUrl, `${story.caption} ${shareUrl()}`)) {
+      toast.error('Stories are not available in this version of Telegram');
+      return;
+    }
+    haptic('medium');
+    void trackGrowth('share_telegram', { kind: payload.kind, channel: 'story' });
+  };
+
   const onCopy = async () => {
     if (!payload) return;
     try {
@@ -182,6 +200,11 @@ export function ShareMoment({
           <SecondaryButton onClick={onTelegram} disabled={busy}>
             Share on Telegram
           </SecondaryButton>
+          {story && canShareToStory() && (
+            <SecondaryButton onClick={onStory} disabled={busy}>
+              Share to story
+            </SecondaryButton>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <SecondaryButton onClick={() => void onCopy()} disabled={busy}>
               Copy link

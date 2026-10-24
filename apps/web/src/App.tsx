@@ -54,6 +54,7 @@ const LogWeight = lazy(() => import('./pages/progress/LogWeight'));
 const Coach = lazy(() => import('./pages/coach/Coach'));
 const CoachSelect = lazy(() => import('./pages/coach/CoachSelect'));
 const Challenges = lazy(() => import('./pages/challenges/Challenges'));
+const FightRecord = lazy(() => import('./pages/fightRecord/FightRecord'));
 
 const PlanPage = lazy(() => import('./pages/upgrade/Plan'));
 
@@ -164,6 +165,7 @@ export default function App() {
           <Route path="/workouts/:id" element={<WorkoutDetail />} />
           <Route path="/progress/log-weight" element={<LogWeight />} />
           <Route path="/challenges" element={<Challenges />} />
+          <Route path="/fight-record" element={<FightRecord />} />
           {/* Character select renders its own header and nav, like /settings. */}
           <Route path="/coach/select" element={<CoachSelect />} />
           {/* Renders its own header and nav, so it sits outside AppLayout -

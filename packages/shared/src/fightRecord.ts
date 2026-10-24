@@ -39,7 +39,7 @@ export const SEASON_LENGTH_DAYS = 56;
  * embed the season number, so moving the anchor would re-label belts people
  * already hold. Dates before it fall into season 1 and count for nothing.
  */
-export const SEASON_ONE_STARTS_ON = '2026-10-26';
+export const SEASON_ONE_STARTS_ON = '2026-10-19';
 
 /**
  * Rotating season names. Fighter-camp vocabulary rather than weather: half the

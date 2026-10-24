@@ -248,7 +248,7 @@ retry) and populated. Days left is plain text, never a ring or a timer.
 
 ```
 SEASON_LENGTH_DAYS  = 56                      // 8 weeks
-SEASON_ONE_STARTS_ON = '2026-11-02'           // a Monday; see launch checklist
+SEASON_ONE_STARTS_ON = '2026-10-19'           // a Monday; reset to the launch Monday
 index(d)   = max(0, floor((d - SEASON_ONE_STARTS_ON) / 56))
 startsOn   = SEASON_ONE_STARTS_ON + 56 * index
 endsOn     = startsOn + 55

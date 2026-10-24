@@ -8,7 +8,7 @@ import { AKIN_POSES, AQUA_CHARACTER } from '@aquazerofit/shared';
  * `consistency` replaced the old `streak` kind: a shared card must never be
  * able to announce a lost run. Nothing in the app produces `streak` any more.
  */
-export type ShareKind = 'meal' | 'workout' | 'consistency' | 'challenge';
+export type ShareKind = 'meal' | 'workout' | 'consistency' | 'challenge' | 'belt';
 
 export interface ShareCardPayload {
   kind: ShareKind;
@@ -16,6 +16,8 @@ export interface ShareCardPayload {
   subline: string;
   stats: { label: string; value: string }[];
   catchphrase?: string;
+  /** A Fight Record belt drawn across the card under the character. */
+  belt?: { colour: string; bar: string };
 }
 
 /**
@@ -108,10 +110,15 @@ export async function renderShareCard(payload: ShareCardPayload): Promise<Blob> 
     }
   }
 
-  ctx.fillStyle = 'rgba(138, 235, 255, 0.9)';
-  ctx.font = '600 28px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(AQUA_CHARACTER.name.toUpperCase(), W / 2, 640);
+  // A belt takes the name plate's place: its knot and tails occupy that band.
+  if (payload.belt) {
+    drawBelt(ctx, payload.belt);
+  } else {
+    ctx.fillStyle = 'rgba(138, 235, 255, 0.9)';
+    ctx.font = '600 28px system-ui, sans-serif';
+    ctx.fillText(AQUA_CHARACTER.name.toUpperCase(), W / 2, 640);
+  }
 
   ctx.fillStyle = '#f2fbff';
   ctx.font = '700 58px system-ui, sans-serif';
@@ -159,6 +166,43 @@ export async function renderShareCard(payload: ShareCardPayload): Promise<Blob> 
       else reject(new Error('PNG encode failed'));
     }, 'image/png');
   });
+}
+
+/**
+ * A belt across the card, knotted in the middle, with the rank bar near the
+ * right end. Outlined so a white belt holds its edge against the pale glow and
+ * a black one against the dark panel.
+ */
+function drawBelt(ctx: CanvasRenderingContext2D, belt: { colour: string; bar: string }): void {
+  // Sits across the figure's shins; the tails end above the headline's cap
+  // height (the headline baseline is 710 at 58 px).
+  const y = 556;
+  const h = 28;
+  ctx.save();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(242, 251, 255, 0.55)';
+  ctx.fillStyle = belt.colour;
+  roundRect(ctx, 150, y, W - 300, h, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = belt.bar;
+  ctx.fillRect(W - 300, y + 3, 60, h - 6);
+  // Tails, then the knot over them.
+  ctx.fillStyle = belt.colour;
+  for (const dir of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(W / 2 + dir * 10, y + h);
+    ctx.lineTo(W / 2 + dir * 46, y + h + 52);
+    ctx.lineTo(W / 2 + dir * 22, y + h + 58);
+    ctx.lineTo(W / 2 - dir * 8, y + h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  roundRect(ctx, W / 2 - 30, y - 10, 60, h + 20, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }
 
 function wrapText(

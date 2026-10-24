@@ -1,13 +1,16 @@
 /**
- * Firebase client bootstrap for web Auth and Analytics.
+ * Firebase client bootstrap for web Auth.
  *
  * The SDK is loaded with a dynamic import the first time auth is actually
  * enabled. Test runs and deployments without VITE_FIREBASE_API_KEY never
  * download it. When those keys are unset, Auth stays disabled and the UI
  * falls back to the legacy /auth/login path.
+ *
+ * Firebase Analytics is deliberately not loaded. The privacy notice says the
+ * web runs no third-party analytics, and nothing on the web gates it behind
+ * the anonymisedAnalytics consent.
  */
 import type { FirebaseApp, FirebaseOptions } from 'firebase/app';
-import type { Analytics } from 'firebase/analytics';
 import type { Auth, User as FirebaseUser } from 'firebase/auth';
 
 export const firebaseConfig: FirebaseOptions = {
@@ -41,7 +44,6 @@ function readConfig(): FirebaseOptions | null {
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
-let analyticsPromise: Promise<Analytics | null> | null = null;
 let loading: Promise<FirebaseSdk> | null = null;
 
 export interface FirebaseSdk {
@@ -106,10 +108,9 @@ export function getFirebaseAuth(): Auth | null {
 export function loadFirebaseSdk(): Promise<FirebaseSdk> {
   if (!isFirebaseAuthEnabled()) return Promise.resolve(emptySdk());
   loading ??= (async () => {
-    const [{ initializeApp, getApps, getApp }, authMod, analyticsMod] = await Promise.all([
+    const [{ initializeApp, getApps, getApp }, authMod] = await Promise.all([
       import('firebase/app'),
       import('firebase/auth'),
-      import('firebase/analytics'),
     ]);
     if (getApps().length > 0) app = getApp();
     else {
@@ -118,14 +119,6 @@ export function loadFirebaseSdk(): Promise<FirebaseSdk> {
       app = initializeApp(options);
     }
     auth = authMod.getAuth(app);
-    if (typeof window !== 'undefined') {
-      const current = app;
-      analyticsPromise = analyticsMod
-        .isSupported()
-        .then((supported) => (supported && current ? analyticsMod.getAnalytics(current) : null))
-        .catch(() => null);
-      void analyticsPromise;
-    }
     return {
       app,
       auth,
@@ -138,11 +131,6 @@ export function loadFirebaseSdk(): Promise<FirebaseSdk> {
     };
   })();
   return loading;
-}
-
-export function getFirebaseAnalytics(): Promise<Analytics | null> {
-  if (!isFirebaseAuthEnabled()) return Promise.resolve(null);
-  return loadFirebaseSdk().then(() => analyticsPromise ?? Promise.resolve(null));
 }
 
 /** Map Firebase Auth error codes to user-facing copy (no internal detail). */

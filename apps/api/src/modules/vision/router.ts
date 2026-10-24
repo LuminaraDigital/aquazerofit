@@ -23,8 +23,9 @@ import {
   MEAL_PHOTO_MAX_BYTES,
   MEAL_PHOTO_MIME,
 } from '@aquazerofit/shared';
-import type { Food, MealLog, MealType, VisionJob, VisionPrediction } from '@aquazerofit/shared';
+import type { Food, MealLog, MealType, VisionJob } from '@aquazerofit/shared';
 import { complete } from '../ai/gateway';
+import { predictionsForVisionResult } from './recognition';
 import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { post as postGuardrail } from '../ai/guardrails';
 import { loadPrompt } from '../ai/prompts';
@@ -46,8 +47,8 @@ visionRouter.use(requireAuth);
 type StoredImageVariant = { path: string; mime: string };
 
 // Jobs carry a private reservation reference that is never returned to clients.
-// `aiDegraded` is recorded when the job is processed but consumed later, at
-// confirm time, because that is where this lane settles its reservation.
+// `aiDegraded` is returned with the job: the review screen has to say when
+// recognition fell back. Confirm still reads it when settling the reservation.
 // `imageVariants` is the record of what was actually written to disk.
 type StoredVisionJob = VisionJob & {
   reservationId?: string;
@@ -350,30 +351,14 @@ function nutritionFromFood(food: Food, grams: number, nameOverride?: string) {
   };
 }
 
-/** Cap catalog size sent to the vision model; full list blows prompt budgets. */
-const MAX_VISION_CANDIDATES = 150;
-
-function visionCandidates(foods: Food[]): { id: string; name: string; commonServings?: Food['commonServings'] }[] {
-  return foods
-    .slice()
-    .sort((a, b) => {
-      const aHas = a.commonServings?.length ? 1 : 0;
-      const bHas = b.commonServings?.length ? 1 : 0;
-      if (bHas !== aHas) return bHas - aHas;
-      return a.id.localeCompare(b.id);
-    })
-    .slice(0, MAX_VISION_CANDIDATES)
-    .map((f) => ({ id: f.id, name: f.name, commonServings: f.commonServings }));
-}
-
 function publicJob(job: StoredVisionJob): Omit<VisionJob, 'imagePath'> {
-  // reservationId and aiDegraded are internal metering state; imagePath and
-  // imageVariants are server filesystem locations and must never reach the
-  // client. The image is reached only through the ownership-checked route.
+  // reservationId is internal metering state. imagePath and imageVariants are
+  // server filesystem locations and must never reach the client. The image is
+  // reached only through the ownership-checked route. aiDegraded stays: the
+  // review screen has to say when recognition fell back.
   const {
     reservationId: _hidden,
     imagePath: _path,
-    aiDegraded: _degraded,
     imageVariants: _variants,
     ...rest
   } = job;
@@ -396,10 +381,10 @@ async function processJob(jobId: string): Promise<void> {
     const foods = await whereDocs<Food>('content', (d: any) => d?.type === 'food');
     const seedKey = path.basename(job.imagePath);
     
-    // The stored JPEG is what the model must actually analyse; the mock seeds
-    // on its hash instead (AI-04 dev parity). A missing file (sweeper race,
-    // disk fault) degrades to the text-only prompt rather than failing the job
-    // — the mock still grounds on the candidate catalog either way.
+    // The stored JPEG is what the model must actually analyse. The mock seeds
+    // on the filename (and this hash, when the file is readable) so two photos
+    // do not collapse to one offline answer. A missing file falls through to
+    // the text prompt. The catalog is not sent: matching happens in code.
     let imageHash: string | undefined;
     let images: string[] | undefined;
     if (existsSync(job.imagePath)) {
@@ -410,9 +395,7 @@ async function processJob(jobId: string): Promise<void> {
       console.warn('[vision] stored photo unreadable, falling back to text-only prompt', jobId);
     }
 
-    // Real providers need P-01 itself — the output schema, the grounding rule
-    // and the examples. Without it they saw only the context block and
-    // answered with schema-mismatched or empty predictions.
+    // P-01 names the output schema. It does not embed the food catalog.
     const result = await complete(
       'visionPrimary',
       [
@@ -422,8 +405,10 @@ async function processJob(jobId: string): Promise<void> {
       {
         json: true,
         promptId: 'P-01',
+        temperature: 0.2,
+        maxTokens: 600,
         images,
-        context: { seedKey, candidates: visionCandidates(foods), imageHash },
+        context: { seedKey, imageHash },
       },
     );
 
@@ -434,29 +419,9 @@ async function processJob(jobId: string): Promise<void> {
       }
     }
 
-    const raw = (result.json ?? {}) as { predictions?: { foodId?: string; name?: string; estimatedGrams?: number; confidence?: number }[] };
-    const predictions: VisionPrediction[] = [];
-    for (const p of raw.predictions ?? []) {
-      // Deterministic nutrition: the model identifies, CODE calculates.
-      const food = p.foodId ? foods.find((f) => f.id === p.foodId) : undefined;
-      if (!food) continue; // never trust free-text identifications we cannot ground
-      const grams = Math.min(2000, Math.max(10, Math.round(p.estimatedGrams ?? 100)));
-      const grounded = nutritionFromFood(food, grams);
-      predictions.push({
-        name: grounded.name,
-        foodId: grounded.foodId,
-        estimatedGrams: grams,
-        confidence: Math.min(0.99, Math.max(0.05, p.confidence ?? 0.5)),
-        kcal: grounded.kcal,
-        proteinG: grounded.proteinG,
-        carbsG: grounded.carbsG,
-        fatG: grounded.fatG,
-      });
-    }
-
-    if (predictions.length === 0) {
-      throw new Error('no groundable predictions');
-    }
+    // Degraded output is an empty editable list. A real answer is matched
+    // against the catalog. Unmatched names stay, with no invented macros.
+    const predictions = predictionsForVisionResult(result.meta.degraded === true, result.json, foods);
 
     job.status = 'succeeded';
     job.predictions = predictions;

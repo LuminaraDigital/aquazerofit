@@ -86,7 +86,8 @@ spec:
             # /ready exempt). Off until the runbook in docs/OPERATIONS.md
             # ("Closing the run.app bypass") has been followed: the secret on
             # both sides and every provider webhook on aquazerofit.com. On with
-            # an empty ORIGIN_SHARED_SECRET, boot is refused.
+            # an empty, placeholder or sub-32-character ORIGIN_SHARED_SECRET,
+            # boot is refused.
             - name: REQUIRE_ORIGIN_SECRET
               value: "false"
             - name: MFA_REQUIRE_ADMIN

@@ -24,7 +24,9 @@ const ORIGINAL = Object.fromEntries(KEYS.map((k) => [k, process.env[k]])) as Rec
   string,
   string | undefined
 >;
-const SECRET = 'worker-secret';
+// Shaped like the documented recipe (`openssl rand -hex 32`): the boot guard
+// refuses anything shorter than 32 characters.
+const SECRET = 'a'.repeat(64);
 
 // /ready reads the store, so it needs a data directory of its own.
 const dataDir = createIsolatedDataDir('azf-origin-gate-');
@@ -130,6 +132,41 @@ describe('assertOriginSecretConfigured', () => {
     expect(() => assertOriginSecretConfigured()).toThrow(/Refusing to start.*ORIGIN_SHARED_SECRET/);
     process.env.ORIGIN_SHARED_SECRET = '   ';
     expect(() => assertOriginSecretConfigured()).toThrow(/ORIGIN_SHARED_SECRET is empty/);
+  });
+
+  it('refuses the public placeholder and anything shorter than 32 characters', () => {
+    // .env.production.example is in a public repository, so its placeholder
+    // admits anyone who has read it.
+    process.env.REQUIRE_ORIGIN_SECRET = 'true';
+    const weak = [
+      'replace-with-production-only-origin-secret',
+      `Replace-With-${'x'.repeat(40)}`,
+      'x'.repeat(31),
+    ];
+    for (const value of weak) {
+      process.env.ORIGIN_SHARED_SECRET = value;
+      expect(() => assertOriginSecretConfigured()).toThrow(/Refusing to start: ORIGIN_SHARED_SECRET/);
+    }
+    // The message names the problem without echoing the value it refused.
+    process.env.ORIGIN_SHARED_SECRET = 'x'.repeat(31);
+    let message = '';
+    try {
+      assertOriginSecretConfigured();
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).toContain('31 characters');
+    expect(message).not.toContain('x'.repeat(31));
+    process.env.ORIGIN_SHARED_SECRET = 'x'.repeat(32);
+    expect(() => assertOriginSecretConfigured()).not.toThrow();
+  });
+
+  it('does not judge the secret while the gate is off', () => {
+    // Off, the secret only steers rate-limit buckets; a deploy must not fail
+    // over it before the operator has chosen to turn the gate on.
+    delete process.env.REQUIRE_ORIGIN_SECRET;
+    process.env.ORIGIN_SHARED_SECRET = 'replace-with-production-only-origin-secret';
+    expect(() => assertOriginSecretConfigured()).not.toThrow();
   });
 
   it('boots with the gate on and a secret set, or with the gate off', () => {

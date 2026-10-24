@@ -717,8 +717,15 @@ export function assertSingleInstance(): void {
 }
 
 /**
+ * Shortest origin secret the gate will run on. A floor, not a strength
+ * measure: the documented recipe (`openssl rand -hex 32`) gives 64 hex
+ * characters, so anything under half that was not made that way.
+ */
+const MIN_ORIGIN_SECRET_LENGTH = 32;
+
+/**
  * Origin-gate guard: refuse to boot with REQUIRE_ORIGIN_SECRET on and no
- * ORIGIN_SHARED_SECRET to compare against.
+ * usable ORIGIN_SHARED_SECRET to compare against.
  *
  * An empty secret never matches (originSecretMatches in platform/clientIp.ts),
  * so the gate would refuse every request - the whole site and every webhook -
@@ -726,16 +733,45 @@ export function assertSingleInstance(): void {
  * platform would read that revision as healthy and send it all the traffic.
  * A failed deploy keeps the previous revision serving instead.
  *
- * Not skipped under test, unlike assertSingleInstance: it reads two getters
- * and only index.ts calls it, so the suite can exercise it directly.
+ * A guessable secret is the opposite failure and just as quiet: the gate
+ * looks closed and admits anyone who has the value. The `replace-with-...`
+ * placeholder in .env.production.example is in a public repository, so it is
+ * refused outright, as is anything shorter than MIN_ORIGIN_SECRET_LENGTH.
+ * Neither message echoes the value.
+ *
+ * Off, nothing is judged. The secret then only steers rate-limit buckets, and
+ * a deploy must not fail over it before the operator has chosen the gate.
+ *
+ * Not skipped under test, unlike assertSingleInstance: it reads getters and
+ * only index.ts calls it, so the suite can exercise it directly.
  */
 export function assertOriginSecretConfigured(): void {
-  if (!config.requireOriginSecret || config.originSharedSecret) return;
+  if (!config.requireOriginSecret) return;
+  const secret = config.originSharedSecret;
+  if (!secret) {
+    throw new Error(
+      'Refusing to start: REQUIRE_ORIGIN_SECRET is on but ORIGIN_SHARED_SECRET is empty, so every ' +
+        'request except /health and /ready would be refused with 403 while the probes stayed green. ' +
+        'Set ORIGIN_SHARED_SECRET to the value the Worker holds (`npx wrangler secret put ' +
+        'ORIGIN_SHARED_SECRET` in cloudflare/), or unset REQUIRE_ORIGIN_SECRET.',
+    );
+  }
+  assertUnguessableOriginSecret('ORIGIN_SHARED_SECRET', secret);
+}
+
+function assertUnguessableOriginSecret(name: string, value: string): void {
+  let problem: string;
+  if (value.toLowerCase().startsWith('replace-with')) {
+    problem = 'is the placeholder from .env.production.example, which anyone can read';
+  } else if (value.length < MIN_ORIGIN_SECRET_LENGTH) {
+    problem = `is ${value.length} characters, under the ${MIN_ORIGIN_SECRET_LENGTH}-character floor`;
+  } else {
+    return;
+  }
   throw new Error(
-    'Refusing to start: REQUIRE_ORIGIN_SECRET is on but ORIGIN_SHARED_SECRET is empty, so every ' +
-      'request except /health and /ready would be refused with 403 while the probes stayed green. ' +
-      'Set ORIGIN_SHARED_SECRET to the value the Worker holds (`npx wrangler secret put ' +
-      'ORIGIN_SHARED_SECRET` in cloudflare/), or unset REQUIRE_ORIGIN_SECRET.',
+    `Refusing to start: ${name} ${problem}, so REQUIRE_ORIGIN_SECRET would admit anyone ` +
+      'who has it. Generate one with `openssl rand -hex 32` and set it on the Worker and on ' +
+      'Cloud Run (docs/OPERATIONS.md, "Closing the run.app bypass").',
   );
 }
 

@@ -3,10 +3,20 @@
  * Kept separate from platform/auth.ts to avoid a circular import with the
  * JWT/refresh module that requireAuth lives in.
  *
- * Linking an existing account by email requires email_verified === true,
- * administrators included. An unverified token that names an existing email
- * throws AUTH_EMAIL_UNVERIFIED ("Verify your email first") and does not
- * write firebaseUid, role, or emailVerified on that account.
+ * Linking an existing account by email requires both sides to be verified:
+ * the token's email_verified === true, and the existing account's
+ * emailVerified === true. Administrators included. Either miss throws
+ * AUTH_EMAIL_UNVERIFIED and does not write firebaseUid, role, or
+ * emailVerified on that account.
+ *
+ * The account-side check is what stops a Telegram session from claiming
+ * someone else's address through POST /me/credentials and then catching
+ * their later Google sign-in. setCredentials stores that address unverified
+ * on purpose. There is no email-verification token flow in this codebase
+ * (password reset is a different proof and is not reused). Until one exists,
+ * an unverified stored address cannot be used for linking. Register still
+ * returns CONFLICT while that row holds the address, so the address can be
+ * reserved. That reservation is the remaining gap, not a takeover.
  *
  * A token that matches no existing account still provisions a new local
  * user. That is the current product rule: there is nobody to take over, the
@@ -54,8 +64,9 @@ function findUserByFirebaseUid(uid: string): User | undefined {
 
 /**
  * Resolve or create the local User for a Firebase identity.
- * Links by email only when email_verified is true. Otherwise provisions a
- * new user, or refuses when that email is already taken.
+ * Links by email only when the token and the existing account both have a
+ * verified email. Otherwise provisions a new user, or refuses when that
+ * email is already taken.
  * Credentials stay in Firebase Auth. No password hash is written here.
  */
 export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string): User {
@@ -81,19 +92,28 @@ export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string):
     const byEmail = findUserByEmail(email);
     if (byEmail) {
       // Unverified must not link, including when byEmail.role is admin.
-      // Refuse before any write so a retry after verification is clean.
-      if (identity.emailVerified !== true) {
+      // That covers an unverified token and an existing account whose stored
+      // email was never proved (POST /me/credentials). Refuse before any
+      // write so a retry after verification is clean.
+      const tokenUnverified = identity.emailVerified !== true;
+      const accountUnverified = byEmail.emailVerified !== true;
+      if (tokenUnverified || accountUnverified) {
         auditAuthEvent(
           byEmail.id,
           'firebase.link.rejected',
           {
-            reason: 'email_unverified',
+            reason: tokenUnverified ? 'email_unverified' : 'account_email_unverified',
             emailHash: hashIdentifier(email),
             firebaseUidHash: hashIdentifier(identity.uid),
           },
           ip,
         );
-        throw new AppError('AUTH_EMAIL_UNVERIFIED', 'Verify your email first');
+        throw new AppError(
+          'AUTH_EMAIL_UNVERIFIED',
+          tokenUnverified
+            ? 'Verify your email first'
+            : 'This email is not verified on the existing account',
+        );
       }
       let user: User = { ...byEmail, firebaseUid: identity.uid, emailVerified: true };
       if (user.deletionRequestedAt) {

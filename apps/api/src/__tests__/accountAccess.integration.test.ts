@@ -3,7 +3,7 @@
  * surfaces.
  *
  *  - a Telegram-provisioned account has no credentials record, so before this
- *    flow existed it could never pass `login()` - POST /me/credentials is its
+ *    flow existed it could never pass `login()`. POST /me/credentials is its
  *    only path onto the web;
  *  - POST /me/link-telegram is the mirror: an email account, signed in inside
  *    the Mini App, attaches its Telegram identity so auto-login lands on the
@@ -98,6 +98,9 @@ describe('telegram-provisioned account → web credentials', () => {
     expect(set.body.user.email).toBe('tess3@example.com'); // normalised
     expect(set.body.user.hasPassword).toBe(true);
     expect(set.body.user.telegramLinked).toBe(true);
+    // The address is unproved. Dev must not auto-verify it: that flag is what
+    // a later Firebase sign-in uses to decide whether it may link.
+    expect(set.body.user.emailVerified).toBe(false);
 
     const login = await request(app)
       .post(`${base}/auth/login`)
@@ -171,5 +174,62 @@ describe('email account → telegram link (mirror direction)', () => {
       .set(auth(other.body.accessToken as string))
       .send({ initData: initDataFor(920001, 'Linker') });
     expect(conflict.status).toBe(409);
+  });
+
+  it('requires confirmation before replacing an existing Telegram link', async () => {
+    const reg = await request(app)
+      .post(`${base}/auth/register`)
+      .send({ email: 'relink@example.com', password: 'CorrectHorse9Battery' });
+    expect(reg.status).toBe(201);
+    const token = reg.body.accessToken as string;
+
+    const first = await request(app)
+      .post(`${base}/me/link-telegram`)
+      .set(auth(token))
+      .send({ initData: initDataFor(930001, 'First') });
+    expect(first.status).toBe(200);
+
+    // Same identity again is not a replacement.
+    const again = await request(app)
+      .post(`${base}/me/link-telegram`)
+      .set(auth(token))
+      .send({ initData: initDataFor(930001, 'First') });
+    expect(again.status).toBe(200);
+
+    const replace = await request(app)
+      .post(`${base}/me/link-telegram`)
+      .set(auth(token))
+      .send({ initData: initDataFor(930002, 'Second') });
+    expect(replace.status).toBe(409);
+    expect(replace.body.code).toBe('CONFLICT');
+
+    const still = await request(app).post(`${base}/auth/telegram`).send({ initData: initDataFor(930001, 'First') });
+    expect(still.status).toBe(200);
+    expect(still.body.user.id).toBe(reg.body.user.id);
+
+    const confirmed = await request(app)
+      .post(`${base}/me/link-telegram`)
+      .set(auth(token))
+      .send({ initData: initDataFor(930002, 'Second'), confirm: true });
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.body.user.telegramLinked).toBe(true);
+
+    const moved = await request(app).post(`${base}/auth/telegram`).send({ initData: initDataFor(930002, 'Second') });
+    expect(moved.status).toBe(200);
+    expect(moved.body.user.id).toBe(reg.body.user.id);
+
+    const released = await request(app)
+      .post(`${base}/auth/telegram`)
+      .send({ initData: initDataFor(930001, 'First') });
+    expect(released.status).toBe(200);
+    expect(released.body.user.id).not.toBe(reg.body.user.id);
+  });
+
+  it('rejects oversized launch data on the HTTP schema', async () => {
+    const res = await request(app)
+      .post(`${base}/auth/telegram`)
+      .send({ initData: 'x'.repeat(5000) });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_FAILED');
   });
 });

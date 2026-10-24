@@ -11,6 +11,13 @@ Tagged releases are `v1.0.0`, `v1.1.0`, `v1.2.0` and `v1.3.0`. Anything after
 
 ## [Unreleased]
 
+### Security
+
+- Firebase sign-in no longer links onto an account whose email is unverified. `POST /me/credentials` keeps a new address unverified in every environment. There is still no mailbox-proof flow, so that address can be reserved but cannot be taken over.
+- Telegram launch data rejects a future `auth_date` (30 seconds of clock skew), payloads over 4 KB, and a user object that does not match the expected shape.
+- Telegram Web re-authenticates with initData when the SameSite=Lax refresh cookie is not sent. SameSite=None is not used.
+- Replacing an existing Telegram link requires confirmation. Stripe checkout is refused for a Telegram session.
+
 ### Added
 
 - Staging promotion path (`feature` to `staging` to `main`), with disjoint

@@ -24,6 +24,8 @@ vi.mock('../platform/firebaseAdmin', () => ({
 const { createApp } = await import('../app');
 const { getStore } = await import('../platform/store');
 const { ensureUserFromFirebase } = await import('../modules/auth/firebaseUsers');
+const { signTelegramInitData } = await import('../modules/auth/telegram');
+const { resetTelegramNewAccountLimits } = await import('../modules/auth/service');
 const app = createApp();
 const base = '/api/v1';
 
@@ -382,6 +384,105 @@ describe('Firebase email linking requires a verified email', () => {
       if (previous === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = previous;
     }
+  });
+
+  it('does not link a verified Google sign-in onto an email a Telegram account claimed', async () => {
+    resetTelegramNewAccountLimits();
+    const initData = signTelegramInitData({
+      auth_date: String(Math.floor(Date.now() / 1000)),
+      query_id: 'AA-takeover',
+      user: JSON.stringify({ id: 770001, first_name: 'Squatter' }),
+    });
+    const tg = await request(app).post(`${base}/auth/telegram`).send({ initData });
+    expect(tg.status).toBe(200);
+    const attackerId = tg.body.user.id as string;
+
+    const set = await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', `Bearer ${tg.body.accessToken}`)
+      .send({ email: 'Victim.Takeover@example.com', password: 'CorrectHorse9Battery' });
+    expect(set.status).toBe(200);
+    expect(set.body.user.email).toBe('victim.takeover@example.com');
+    expect(set.body.user.emailVerified).toBe(false);
+
+    verifyFirebaseIdToken.mockResolvedValueOnce({
+      uid: 'fb-victim-google',
+      email: 'victim.takeover@example.com',
+      emailVerified: true,
+      name: 'Victim',
+    });
+    const session = await request(app)
+      .post(`${base}/auth/firebase/session`)
+      .set('Authorization', 'Bearer victim-google-token')
+      .send({});
+    expect(session.status).toBe(403);
+    expect(session.body.code).toBe('AUTH_EMAIL_UNVERIFIED');
+    expect(session.body.message).toBe('This email is not verified on the existing account');
+
+    const stored = getStore().byId<{
+      id: string;
+      email: string;
+      emailVerified: boolean;
+      firebaseUid?: string;
+      tgId?: number;
+      role: string;
+    }>('users', attackerId);
+    expect(stored?.firebaseUid).toBeUndefined();
+    expect(stored?.emailVerified).toBe(false);
+    expect(stored?.email).toBe('victim.takeover@example.com');
+    expect(stored?.tgId).toBe(770001);
+    expect(stored?.role).toBe('user');
+
+    const linked = getStore().where<{ id: string; firebaseUid?: string }>('users', (d) => {
+      return d.firebaseUid === 'fb-victim-google';
+    });
+    expect(linked).toHaveLength(0);
+
+    const rejected = getStore().where<{ id: string; userId?: string; action?: string; detail?: { reason?: string } }>(
+      'audit',
+      (d) => d.userId === attackerId && d.action === 'firebase.link.rejected',
+    );
+    expect(rejected.some((event) => event.detail?.reason === 'account_email_unverified')).toBe(true);
+    expect(JSON.stringify(rejected)).not.toContain('victim.takeover@example.com');
+    expect(JSON.stringify(rejected)).not.toContain('fb-victim-google');
+
+    verifyFirebaseIdToken.mockResolvedValueOnce({
+      uid: 'fb-victim-google',
+      email: 'victim.takeover@example.com',
+      emailVerified: true,
+      name: 'Victim',
+    });
+    const me = await request(app).get(`${base}/me`).set('Authorization', 'Bearer victim-google-token');
+    expect(me.status).toBe(403);
+    expect(me.body.code).toBe('AUTH_EMAIL_UNVERIFIED');
+    expect(getStore().byId<{ id: string; firebaseUid?: string }>('users', attackerId)?.firebaseUid).toBeUndefined();
+  });
+
+  it('refuses to link when the stored email is unverified, even if the token is verified', () => {
+    getStore().upsert('users', {
+      id: 'usr_unverified_stored',
+      email: 'unverified.stored@example.com',
+      emailVerified: false,
+      role: 'user',
+      tier: 'free',
+      displayName: 'Unverified',
+      createdAt: new Date().toISOString(),
+      deletionRequestedAt: null,
+    });
+    expect(() =>
+      ensureUserFromFirebase({
+        uid: 'fb-should-not-link',
+        email: 'unverified.stored@example.com',
+        emailVerified: true,
+        name: 'Verified Token',
+      }),
+    ).toThrowError(/not verified on the existing account/);
+    const stored = getStore().byId<{ id: string; firebaseUid?: string; emailVerified: boolean }>(
+      'users',
+      'usr_unverified_stored',
+    );
+    expect(stored?.firebaseUid).toBeUndefined();
+    expect(stored?.emailVerified).toBe(false);
   });
 
   it('marks a brand-new unverified identity verified outside production, same as password registration', () => {

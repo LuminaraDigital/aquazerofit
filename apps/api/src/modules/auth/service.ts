@@ -15,6 +15,7 @@ import {
   secureEquals,
   sha256Hex,
   signAccess,
+  type SessionChannel,
 } from '../../platform/auth';
 import { credentialsId, toPublicUser, type CredentialsDoc } from '../me/service';
 import { validateTelegramInitData, type TelegramUser } from './telegram';
@@ -82,10 +83,10 @@ export function findUserByEmail(email: string): User | undefined {
   );
 }
 
-function tokensFor(user: User): AuthResponse {
-  const { token } = issueRefresh(user.id);
+function tokensFor(user: User, channel?: SessionChannel): AuthResponse {
+  const { token } = issueRefresh(user.id, undefined, channel);
   return {
-    accessToken: signAccess(user),
+    accessToken: signAccess(user, channel),
     refreshToken: token,
     user: toPublicUser(user),
   };
@@ -305,15 +306,15 @@ export async function login(input: { email: string; password: string }, ip?: str
 
 export function refresh(refreshToken: string, ip?: string): Promise<AuthResponse> {
   return (async () => {
-    const { token, userId } = await rotateRefresh(refreshToken);
-    const user = getStore().byId<User>('users', userId);
+    const rotated = await rotateRefresh(refreshToken);
+    const user = getStore().byId<User>('users', rotated.userId);
     if (!user || !isUserDoc(user)) {
       throw new AppError('AUTH_INVALID', 'Account no longer exists');
     }
     auditAuthEvent(user.id, 'token.refresh', undefined, ip);
     return {
-      accessToken: signAccess(user),
-      refreshToken: token,
+      accessToken: signAccess(user, rotated.channel),
+      refreshToken: rotated.token,
       user: toPublicUser(user),
     };
   })();
@@ -355,7 +356,7 @@ export function telegramAuth(initData: string, ip?: string): AuthResponse {
   } else {
     auditAuthEvent(user.id, 'login.telegram', { tgIdHash: hashIdentifier(tgUser.id) }, ip);
   }
-  return tokensFor(user);
+  return tokensFor(user, 'telegram');
 }
 
 // ---------------------------------------------------------------------------
@@ -448,7 +449,7 @@ export async function confirmPasswordReset(token: string, newPassword: string, i
 /**
  * First-time credentials for a Telegram-provisioned account (AQF-09 §2.3):
  * replace the synthetic tg-…@ placeholder email with one the user owns and
- * create the credentials record that `login` requires. One-shot by design  - 
+ * create the credentials record that `login` requires. One-shot by design -
  * an account that already has a password changes it via the reset flow, which
  * proves control of the mailbox; this endpoint only proves a valid session.
  */
@@ -474,12 +475,22 @@ export async function setCredentials(
     throw new AppError('CONFLICT', 'An account already exists for this email address');
   }
 
+  const emailChanged = email !== user.email.trim().toLowerCase();
   const updated: User = {
     ...user,
     email,
-    // Same stance as register(): dev auto-verifies for convenience; production
-    // records the truth until a verification transport exists.
-    emailVerified: config.isDev,
+    // A new address is unproved. This codebase has a password-reset token,
+    // not an email-verification token, and the reset flow must not be reused
+    // to flip this flag (it changes the password and revokes every session).
+    // Leave a changed address unverified in every environment, including dev,
+    // so a later verified Firebase sign-in cannot attach to this account.
+    // Password login does not read the flag and still works. An unchanged
+    // address keeps whatever proof it already had.
+    //
+    // What is left: a mailbox-proof flow that sets emailVerified only after
+    // the address is confirmed, and a way to release an unverified claim.
+    // Until then, register returns CONFLICT while this row holds the address.
+    emailVerified: emailChanged ? false : user.emailVerified,
   };
   store.upsert('users', updated);
   store.upsert('users', {

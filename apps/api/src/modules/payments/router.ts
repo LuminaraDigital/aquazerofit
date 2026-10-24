@@ -1,5 +1,5 @@
 /**
- * /telegram/webhook — the only unauthenticated route in this product that can
+ * /telegram/webhook - the only unauthenticated route in this product that can
  * grant an entitlement.
  *
  * Everything about its shape follows from that sentence:
@@ -7,7 +7,7 @@
  *  - **It authenticates by shared secret, and fails closed.** Telegram echoes
  *    `secret_token` from setWebhook in a header on every delivery. If the
  *    secret is unset, the route rejects everything rather than trusting
- *    everything — an unconfigured webhook that accepts updates is a free
+ *    everything - an unconfigured webhook that accepts updates is a free
  *    coach roster for anyone who finds the URL.
  *  - **It always answers 200.** Telegram redelivers any non-2xx, so returning
  *    500 on a malformed update creates an infinite retry loop against a
@@ -28,8 +28,9 @@ import { coachById, starsPriceOf } from '@aquazerofit/shared';
 import { config } from '../../platform/config';
 import { secureEquals } from '../../platform/auth';
 import { logEvent } from '../../platform/telemetry';
-import { answerPreCheckoutQuery } from './telegramBot';
+import { answerPreCheckoutQuery, sendBotMessage } from './telegramBot';
 import { completePayment, findPendingInvoice } from './stars';
+import { botCommand, paysupportMessage, supportEmail } from './paysupport';
 
 export const telegramWebhookRouter = Router();
 
@@ -42,6 +43,8 @@ interface TelegramUpdate {
     invoice_payload: string;
   };
   message?: {
+    text?: string;
+    chat?: { id?: number };
     successful_payment?: {
       currency: string;
       total_amount: number;
@@ -113,7 +116,21 @@ telegramWebhookRouter.post('/webhook', (req, res) => {
     return;
   }
 
-  // Anything else (plain messages, edits) is acknowledged and ignored — the
+  // /paysupport is the one command this bot answers. Telegram requires a bot
+  // that sells digital goods to tell the buyer where payment help lives, and
+  // to say that Telegram's own support cannot refund the purchase.
+  if (botCommand(update.message?.text) === 'paysupport') {
+    const chatId = update.message?.chat?.id;
+    if (typeof chatId === 'number') {
+      void sendBotMessage(chatId, paysupportMessage(supportEmail(), config.appPublicUrl));
+    } else {
+      logEvent('paysupport_without_chat', {});
+    }
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  // Anything else (plain messages, edits) is acknowledged and ignored. The
   // bot is a payment and notification channel, not a conversational surface.
   res.status(200).json({ ok: true });
 });

@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { API_ORIGIN, canonicalRedirect, isProxiedPath, upstreamRequest } from './proxy.ts';
+import {
+  API_ORIGIN,
+  canonicalLegalPath,
+  canonicalRedirect,
+  isProxiedPath,
+  legalRedirectTarget,
+  upstreamRequest,
+} from './proxy.ts';
 
 test('proxies API, uploads, and probes, and leaves the SPA alone', () => {
   assert.equal(isProxiedPath('/api/v1/auth/login'), true);
@@ -12,6 +19,35 @@ test('proxies API, uploads, and probes, and leaves the SPA alone', () => {
   assert.equal(isProxiedPath('/nutrition'), false);
   assert.equal(isProxiedPath('/.well-known/assetlinks.json'), false);
   assert.equal(isProxiedPath('/assets/index.js'), false);
+});
+
+test('follows a trailing-slash redirect only for the legal pages', () => {
+  assert.equal(canonicalLegalPath('/terms'), '/terms');
+  assert.equal(canonicalLegalPath('/terms/'), '/terms');
+  assert.equal(canonicalLegalPath('/privacy'), '/privacy');
+  assert.equal(canonicalLegalPath('/refund/'), '/refund');
+  assert.equal(canonicalLegalPath('/features'), null);
+
+  const followed = legalRedirectTarget(
+    'https://aquazerofit.com/terms',
+    307,
+    'https://aquazerofit.com/terms/',
+  );
+  assert.equal(followed, 'https://aquazerofit.com/terms/');
+
+  assert.equal(
+    legalRedirectTarget('https://aquazerofit.com/features', 307, '/features/'),
+    null,
+  );
+  assert.equal(
+    legalRedirectTarget('https://aquazerofit.com/terms', 307, 'https://evil.example/terms/'),
+    null,
+  );
+  assert.equal(legalRedirectTarget('https://aquazerofit.com/terms', 301, '/terms/'), null);
+  assert.equal(
+    legalRedirectTarget('https://aquazerofit.com/terms/', 200, null),
+    null,
+  );
 });
 
 test('redirects www to the apex and leaves the apex alone', () => {

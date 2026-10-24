@@ -4,8 +4,8 @@
  * WHY THIS FILE EXISTS
  * --------------------
  * A privacy notice and terms of use are binding statements made by whoever
- * operates the service. Everything derivable from the source — what the
- * software collects, how long it keeps it, what it deletes — is written into
+ * operates the service. Everything derivable from the source (what the
+ * software collects, how long it keeps it, what it deletes) is written into
  * the pages directly and is accurate. Everything that depends on *who is
  * running it* (legal entity, governing law, contact address, which AI
  * providers are configured in that deployment) cannot be derived from code and
@@ -23,6 +23,8 @@
  *     scaffolding is drafting support, not legal advice.
  *  3. Set REVIEW_STATUS to 'published'.
  */
+
+import { resolveSupportEmail } from '@aquazerofit/shared';
 
 export interface OperatorFacts {
   /** Legal entity that operates the service, e.g. "AquaZero Pty Ltd". */
@@ -63,11 +65,11 @@ export interface OperatorFacts {
 }
 
 // Read verbatim out of the operator chunk of the build currently serving
-// https://aquazerofit.com — the deployment that has been publishing these
+// https://aquazerofit.com, the deployment that has been publishing these
 // documents since the stated effective date. Not invented here, and not
 // present in any commit: the live site and this repository had drifted, so a
 // build from main rendered every value below as a visible "[operator legal
-// name]" placeholder under a "Draft — not yet in force" banner.
+// name]" placeholder under a "Draft: not yet in force" banner.
 //
 // That matters because https://aquazerofit.com/privacy is the privacy policy
 // URL submitted to Google Play. Shipping the placeholder version would turn a
@@ -79,12 +81,14 @@ export const OPERATOR: OperatorFacts = {
   jurisdiction: 'Victoria, Australia',
   hostingRegion: 'United States (Replit Reserved VM)',
   privacyEmail: 'info@luminara.digital',
-  supportEmail: 'info@luminara.digital',
+  // One mailbox. SUPPORT_EMAIL overrides it at build time; blank falls through
+  // to the address already published for this operator.
+  supportEmail: resolveSupportEmail(import.meta.env.SUPPORT_EMAIL),
   supportResponseTime: 'within 3 business days',
   aiProviders: ['Groq', 'Google Gemini', 'Nvidia NIM', 'OpenAI'],
   // The one field the live build has no counterpart for. It asserts a date on
   // which someone actually read the providers' terms and confirmed what they
-  // do with prompt data — a claim only the operator can make, so it stays null
+  // do with prompt data. A claim only the operator can make, so it stays null
   // until they make it. isPublished() below therefore still returns false.
   aiProvidersVerifiedOn: null,
   effectiveDate: '4 August 2026',
@@ -137,7 +141,7 @@ export function DraftNotice() {
         <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
           draft
         </span>
-        Draft — not yet in force
+        Draft: not yet in force
       </p>
       <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
         This document is a working draft. The passages describing what the software does are

@@ -700,6 +700,13 @@ function isProduction(): boolean {
  * command that pins min and max instances to 1, so the declaration and the
  * scaling travel together.
  *
+ * That is a declaration check, not a measurement, and its reach is narrow.
+ * The process cannot read max-instances, so a service raised by hand in the
+ * console boots with the variable still at 1. And since cloudbuild.yaml sets
+ * the variable on every deploy, what it mostly catches is a revision made some
+ * other way on a service that never had it. It stays because that case is
+ * exactly a fresh service sitting on Cloud Run's default ceiling of 100.
+ *
  * Skipped under test (the suite runs many workers in one repo and never boots
  * a serving process) and, off Cloud Run, satisfied silently by the default of
  * 1, so ordinary local development never sees it.
@@ -707,18 +714,28 @@ function isProduction(): boolean {
 export function assertSingleInstance(): void {
   if (config.isTest) return;
   const raw = process.env[INSTANCE_COUNT_ENV]?.trim() ?? '';
-  const undeclaredOnCloudRun = raw === '' && Boolean(process.env.K_SERVICE?.trim());
+  if (raw === '' && process.env.K_SERVICE?.trim()) {
+    throw singleInstanceRefusal(
+      `${INSTANCE_COUNT_ENV} is unset on Cloud Run, which autoscales unless max-instances is ` +
+        'pinned, so the default of 1 declares nothing',
+    );
+  }
   const declared = config.instanceCount;
-  if (declared === 1 && !undeclaredOnCloudRun) return;
+  if (Number.isNaN(declared)) {
+    throw singleInstanceRefusal(
+      `${INSTANCE_COUNT_ENV} is set to ${JSON.stringify(raw)}, which is not a positive integer`,
+    );
+  }
+  if (declared > 1) {
+    throw singleInstanceRefusal(
+      `${INSTANCE_COUNT_ENV}=${declared} declares ${declared} concurrent instances`,
+    );
+  }
+}
 
-  const problem = undeclaredOnCloudRun
-    ? `${INSTANCE_COUNT_ENV} is unset on Cloud Run, which autoscales unless max-instances is ` +
-      'pinned, so the default of 1 declares nothing'
-    : Number.isNaN(declared)
-      ? `${INSTANCE_COUNT_ENV} is set to ${JSON.stringify(raw)}, which is not a positive integer`
-      : `${INSTANCE_COUNT_ENV}=${declared} declares ${declared} concurrent instances`;
-
-  throw new Error(
+/** The refusal every branch above throws: the problem, then why, then what to run instead. */
+function singleInstanceRefusal(problem: string): Error {
+  return new Error(
     `Refusing to start: ${problem}. This API is single-instance only. Each instance ` +
       'hydrates its own in-memory copy of the store at boot and never re-reads, so a write ' +
       'on one instance is invisible to the others and the last flush silently overwrites ' +

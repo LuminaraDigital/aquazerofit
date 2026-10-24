@@ -399,7 +399,7 @@ Release builds bake these into `apps/android/app/build.gradle.kts`:
 | `MEDIA_BASE_URL` | `https://aquazerofit.com` |
 | `WEB_BASE_URL` | `https://aquazerofit.com` |
 
-Change all three together if your API lives on a different host (for example `https://api.aquazerofit.com`), then cut a new version tag and rebuild.
+All three, and the App Link host in the manifest, come from `publicOrigin` near the top of that file. Change the origin there (give `API_BASE_URL` its own value only if the API moves to a different host, for example `https://api.aquazerofit.com`), then cut a new version tag and rebuild.
 
 Debug builds point `API_BASE_URL` and `MEDIA_BASE_URL` at `http://10.0.2.2:4000` (emulator loopback to a local API on port **4000**) but deliberately keep `WEB_BASE_URL` on `https://aquazerofit.com`, so the legal pages, support and captcha bridge resolve without a local web server running. Do not "correct" that to loopback.
 

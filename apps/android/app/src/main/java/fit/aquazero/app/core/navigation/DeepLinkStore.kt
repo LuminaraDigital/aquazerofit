@@ -1,6 +1,7 @@
 package fit.aquazero.app.core.navigation
 
 import android.content.Intent
+import fit.aquazero.app.BuildConfig
 import fit.aquazero.app.core.data.ChallengesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -97,15 +98,14 @@ class DeepLinkStore @Inject constructor() {
         /**
          * The only origin a challenge invite may arrive from.
          *
-         * These two must stay in step with the App Link `<data>` element in
-         * AndroidManifest.xml. They are duplicated rather than shared because
-         * manifest placeholders are not substituted into arbitrary attributes
-         * and a build-time constant cannot be read from XML — so if the host
-         * ever moves, both this pair and the manifest filter change together,
-         * or verified links stop arriving.
+         * HOST is read from WEB_BASE_URL, and the App Link `<data>` element in
+         * AndroidManifest.xml gets the same host through the `appLinkHost`
+         * manifest placeholder. Both come from `publicOrigin` in
+         * app/build.gradle.kts, so the host this app accepts and the host
+         * Android verifies links for cannot drift apart.
          */
         private const val SCHEME = "https"
-        private const val HOST = "aquazerofit.com"
+        private val HOST: String = java.net.URI(BuildConfig.WEB_BASE_URL).host
 
         /** Public invite URL for buddy huddles (App Link + web fallback). */
         fun joinChallengeUrl(code: String): String {

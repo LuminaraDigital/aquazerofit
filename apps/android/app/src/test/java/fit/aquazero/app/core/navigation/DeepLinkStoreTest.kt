@@ -1,7 +1,9 @@
 package fit.aquazero.app.core.navigation
 
+import fit.aquazero.app.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DeepLinkStoreTest {
@@ -70,6 +72,13 @@ class DeepLinkStoreTest {
         // are the same two constants, so this pins them together.
         val url = DeepLinkStore.joinChallengeUrl("aqua1234")
         assertEquals(PendingDeepLink.JoinChallenge("AQUA1234"), store.parseJoinChallengeUri(url))
+    }
+
+    @Test
+    fun joinChallengeUrl_usesTheWebOrigin() {
+        // The host comes from WEB_BASE_URL, the same value the manifest's App
+        // Link placeholder is built from, so an invite never names another host.
+        assertTrue(DeepLinkStore.joinChallengeUrl("AQUA1234").startsWith("${BuildConfig.WEB_BASE_URL}/"))
     }
 
     @Test

@@ -166,6 +166,70 @@ html[data-tg-theme] .azf-bg-canvas {
   opacity: 0.3;
 }
 
+/* Static stand-in for the aurora when WebGL is gated inside Telegram
+   (Android, light scheme, low memory, low core count, reduced motion).
+   The class is never applied outside a Mini App. */
+.azf-bg-static {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 70% at 15% -10%, rgba(47, 217, 244, 0.22), transparent 55%),
+    radial-gradient(90% 50% at 100% 0%, rgba(69, 223, 164, 0.14), transparent 48%),
+    rgb(var(--azf-surface));
+}
+
+html[data-tg-theme='light'] .azf-bg-static {
+  background:
+    radial-gradient(120% 70% at 15% -10%, rgba(15, 111, 130, 0.18), transparent 55%),
+    radial-gradient(90% 50% at 100% 0%, rgba(4, 120, 87, 0.12), transparent 48%),
+    rgb(var(--azf-surface));
+}
+
+/* CTA label. Defaults to the shipped ink (#001f25). A light Mini App theme
+   sets --azf-cta-text so the same buttons stay readable on the darkened ramp. */
+.azf-cta-text {
+  color: var(--azf-cta-text, #001f25);
+}
+
+/* Mini App viewport and safe areas. The variables exist only under
+   html.tg-active, which lib/telegram.ts sets when initData is present.
+   Outside Telegram these rules do not match. */
+html.tg-active {
+  --azf-header-safe-top: calc(
+    var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)
+  );
+  --azf-header-safe-right: calc(
+    var(--tg-safe-area-inset-right, 0px) + var(--tg-content-safe-area-inset-right, 0px)
+  );
+  --azf-header-safe-left: calc(
+    var(--tg-safe-area-inset-left, 0px) + var(--tg-content-safe-area-inset-left, 0px)
+  );
+  --azf-nav-safe-bottom: calc(
+    var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px)
+  );
+  --azf-nav-safe-right: calc(
+    var(--tg-safe-area-inset-right, 0px) + var(--tg-content-safe-area-inset-right, 0px)
+  );
+  --azf-nav-safe-left: calc(
+    var(--tg-safe-area-inset-left, 0px) + var(--tg-content-safe-area-inset-left, 0px)
+  );
+  --azf-viewport-height: var(--tg-viewport-stable-height, 100dvh);
+}
+
+html.tg-active,
+html.tg-active body,
+html.tg-active #root {
+  min-height: var(--azf-viewport-height);
+}
+
+html.tg-active .min-h-screen {
+  min-height: var(--azf-viewport-height);
+}
+
 /* App content sits above all background layers */
 .azf-content {
   position: relative;
@@ -252,6 +316,10 @@ html[data-tg-theme] .azf-bg-canvas {
 
   .safe-bottom {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
+  }
+
+  html.tg-active .safe-bottom {
+    padding-bottom: calc(var(--azf-nav-safe-bottom, env(safe-area-inset-bottom, 0px)) + 5.5rem);
   }
 
   /* ---- Deep-link target highlight ----
@@ -636,4 +704,70 @@ html[data-tg-theme] .azf-bg-canvas {
       background: rgb(var(--azf-surface-container-high) / 0.7);
     }
   }
+}
+
+/* Light Mini App surfaces.
+   The glass cards are tuned for a dark ocean: translucent fills, a 7% white
+   edge, and brand inks at partial alpha. On a white host those same rules
+   drop body text and the macro fills under WCAG AA. These overrides apply
+   only while a light Telegram theme is bound. Dark hosts and the browser
+   keep the glass system above. */
+html[data-tg-theme='light'] .card-hero,
+html[data-tg-theme='light'] .glass-card,
+html[data-tg-theme='light'] .card-compact {
+  background: #ffffff;
+  background-image: none;
+  border: 1px solid rgb(var(--azf-outline));
+  box-shadow:
+    0 1px 2px rgb(23 29 31 / 0.08),
+    0 14px 32px -18px rgb(23 29 31 / 0.38);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-tg-theme='light'] .glass-blur {
+  background: rgb(var(--azf-surface));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-tg-theme='light'] {
+  --azf-ring-aqua: rgb(var(--azf-primary));
+  --azf-ring-green: rgb(var(--azf-secondary));
+  --azf-ring-coral: rgb(var(--azf-tertiary-container));
+  --azf-ring-navy: rgb(var(--azf-primary));
+  --azf-ring-track: rgb(var(--azf-outline));
+  --azf-coach-ink: rgb(var(--azf-primary));
+  --azf-coach-chip: rgb(var(--azf-primary) / 0.12);
+}
+
+/* Partial-alpha text utilities are how the dark theme quiets inactive labels.
+   On either bound host the 60% mix falls under 4.5:1. Restore the full token,
+   which the theme binder already lifts to AA. The browser target is untouched. */
+html[data-tg-theme] .text-on-surface-variant\/40,
+html[data-tg-theme] .text-on-surface-variant\/60,
+html[data-tg-theme] .text-on-surface-variant\/75 {
+  color: rgb(var(--azf-on-surface-variant));
+}
+
+html[data-tg-theme='light'] .text-primary\/60,
+html[data-tg-theme='light'] .text-primary\/70,
+html[data-tg-theme='light'] .text-primary\/80,
+html[data-tg-theme='light'] .text-primary\/90 {
+  color: rgb(var(--azf-primary));
+}
+
+html[data-tg-theme='light'] .text-secondary\/60,
+html[data-tg-theme='light'] .text-secondary\/80 {
+  color: rgb(var(--azf-secondary));
+}
+
+html[data-tg-theme='light'] [role='progressbar'] {
+  background-color: rgb(var(--azf-outline-variant));
+}
+
+/* Macro percentages dim the whole glyph with opacity. 75% of the hint colour
+   on a light pill is about 3:1. Full opacity keeps the AA hint token. */
+html[data-tg-theme='light'] .tabular-nums.opacity-75 {
+  opacity: 1;
 }

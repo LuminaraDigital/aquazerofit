@@ -1,7 +1,7 @@
 /**
- * Log Weight — pixel reference: log_your_weight (bottom-sheet styled page).
+ * Log Weight. Pixel reference: log_your_weight (bottom-sheet styled page).
  * Big numeric input with kg/lb toggle honouring profile unitPreference
- * (display conversion only — always submits canonical kg), date (max today),
+ * (display conversion only, always submits canonical kg), date (max today),
  * optional note with quick chips, recent entries with delta badges, and
  * POST /weight-logs with an Idempotency-Key.
  */
@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
+import { useTelegramMainAction, useTelegramUnsavedEdits } from '@/lib/useTelegramChrome';
 
 type Unit = 'kg' | 'lb';
 
@@ -86,7 +87,7 @@ export default function LogWeight() {
    *
    * Safe to show in full, which the meal path is not: the weight is the number
    * the user just typed rather than one the server derives. What the server
-   * *does* derive from it — the recomputed daily targets — is left to the
+   * *does* derive from it, the recomputed daily targets, is left to the
    * ['targets'] invalidation and is never guessed here.
    */
   const weightPatch = optimisticPatch<
@@ -109,7 +110,7 @@ export default function LogWeight() {
         res.advisory ??
         (res.clamped && res.clampReason
           ? `Saved. ${res.clampReason}`
-          : 'Weight saved — your daily targets have been recomputed.');
+          : 'Weight saved. Your daily targets have been recomputed.');
       toast.success(hint);
       idemKeyRef.current = crypto.randomUUID();
       navigate('/progress');
@@ -146,6 +147,13 @@ export default function LogWeight() {
       localDate: date,
     });
   };
+
+  const nativeSave = useTelegramMainAction({
+    text: mutation.isPending ? 'Saving' : 'Save entry',
+    onClick: submit,
+    enabled: !mutation.isPending,
+  });
+  useTelegramUnsavedEdits(value.trim() !== '' || note.trim() !== '');
 
   return (
     <div className="mx-auto w-full max-w-md px-5 pb-10">
@@ -284,12 +292,14 @@ export default function LogWeight() {
           </div>
         </div>
 
+        {!nativeSave && (
         <PrimaryButton disabled={mutation.isPending} onClick={submit}>
           {mutation.isPending ? 'Saving…' : 'Save Entry'}
           <span className="material-symbols-outlined" aria-hidden="true">
             arrow_forward
           </span>
         </PrimaryButton>
+        )}
       </section>
 
       {/* ---- recent entries ---- */}

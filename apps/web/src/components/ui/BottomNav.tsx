@@ -22,7 +22,11 @@ export function BottomNav() {
     >
       <div
         className="mx-auto max-w-md flex justify-around items-stretch glass-blur border-t border-outline-variant/30"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{
+          paddingBottom: 'var(--azf-nav-safe-bottom, env(safe-area-inset-bottom, 0px))',
+          paddingLeft: 'var(--azf-nav-safe-left, 0px)',
+          paddingRight: 'var(--azf-nav-safe-right, 0px)',
+        }}
       >
         {ITEMS.map((item) => (
           <NavLink

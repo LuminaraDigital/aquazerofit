@@ -42,3 +42,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface Navigator {
+  /** Chromium only. Gigabytes of approximate RAM. Absent on other engines. */
+  deviceMemory?: number;
+}

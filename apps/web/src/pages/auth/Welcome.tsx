@@ -9,6 +9,7 @@ import { useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { tokenStore } from '../../lib/api';
 import { getTelegramInitData, haptic, isTMA } from '../../lib/telegram';
+import { useTelegramMainAction } from '../../lib/useTelegramChrome';
 import { useAuthActions } from '../../lib/queries';
 import { useTelegramAutoLogin } from '../../lib/useTelegramAutoLogin';
 import { AuthGateSkeleton } from '../../components/ui/Skeleton';
@@ -48,6 +49,15 @@ function WelcomeInner() {
   const [tgLoading, setTgLoading] = useState(false);
 
   const autoLoginPending = useTelegramAutoLogin();
+  const nativeContinue = useTelegramMainAction(
+    isTMA() && !autoLoginPending
+      ? {
+          text: 'Continue',
+          onClick: () => void onTelegram(),
+          enabled: !tgLoading,
+        }
+      : null,
+  );
   if (autoLoginPending) return <AuthGateSkeleton />;
 
   function onScroll() {
@@ -79,7 +89,10 @@ function WelcomeInner() {
       {/* Background atmosphere - WebGL aurora + hatch + vignette */}
       <AppBackground />
 
-      <main className="relative z-10 flex-1 flex flex-col max-w-md w-full mx-auto px-container-margin pt-10 pb-8">
+      <main
+        className="relative z-10 flex-1 flex flex-col max-w-md w-full mx-auto px-container-margin pb-8"
+        style={{ paddingTop: 'calc(2.5rem + var(--azf-header-safe-top, 0px))' }}
+      >
         {/* Brand header */}
         <div className="flex justify-center mb-section-gap reveal">
           <div className="flex items-center gap-2">
@@ -174,7 +187,7 @@ function WelcomeInner() {
           <SecondaryButton onClick={() => navigate('/sign-in')}>
             I already have an account
           </SecondaryButton>
-          {isTMA() && (
+          {isTMA() && !nativeContinue && (
             <SecondaryButton onClick={() => void onTelegram()} loading={tgLoading}>
               <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
                 send

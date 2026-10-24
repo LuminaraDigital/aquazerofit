@@ -8,12 +8,13 @@ import { compressPhoto } from '@/lib/compressPhoto';
 import { Chip } from '@/components/ui/Chip';
 import { useToast } from '@/components/ui/Toast';
 import { MEAL_LABEL, MEAL_TYPES, mealTypeForNow, todayLocalDate } from '../dashboard/lib';
+import { useTelegramMainAction, useTelegramUnsavedEdits } from '@/lib/useTelegramChrome';
 
 const ACCEPT = 'image/jpeg,image/png,image/heic';
 
 function isAcceptedFile(file: File): boolean {
   if (['image/jpeg', 'image/png', 'image/heic'].includes(file.type)) return true;
-  // Some platforms report an empty MIME for HEIC — fall back to the extension.
+  // Some platforms report an empty MIME for HEIC. Fall back to the extension.
   if (!file.type) return /\.(heic|jpe?g|png)$/i.test(file.name);
   return false;
 }
@@ -57,8 +58,22 @@ export default function CaptureMeal() {
         show('Upload succeeded but no analysis job was returned');
       }
     },
-    onError: () => show('Upload failed — check your connection and try again'),
+    onError: () => show('Upload failed. Check your connection and try again'),
   });
+
+  const nativePrimary = useTelegramMainAction(
+    file
+      ? {
+          text: upload.isPending ? 'Uploading' : 'Analyze meal',
+          onClick: () => upload.mutate(file),
+          enabled: !upload.isPending,
+        }
+      : {
+          text: 'Take photo',
+          onClick: () => cameraInputRef.current?.click(),
+        },
+  );
+  useTelegramUnsavedEdits(file !== null && !upload.isSuccess);
 
   const onFileChosen = async (chosen: File | undefined) => {
     setError(null);
@@ -137,7 +152,10 @@ export default function CaptureMeal() {
       {/* UI overlay */}
       <div className="relative z-10 h-full flex flex-col max-w-md mx-auto">
         {/* Header */}
-        <header className="bg-surface/40 backdrop-blur-md px-container-margin py-4 flex justify-between items-center border-b border-outline-variant/30">
+        <header
+          className="bg-surface/40 backdrop-blur-md px-container-margin py-4 flex justify-between items-center border-b border-outline-variant/30"
+          style={{ paddingTop: 'calc(1rem + var(--azf-header-safe-top, 0px))' }}
+        >
           <button
             type="button"
             aria-label="Close meal capture"
@@ -167,7 +185,7 @@ export default function CaptureMeal() {
                 <span className="material-symbols-outlined text-primary" aria-hidden="true">
                   center_focus_weak
                 </span>
-                {file ? 'Looks good — pick a meal type and analyze' : 'Frame your whole meal in the brackets'}
+                {file ? 'Looks good. Pick a meal type and analyze' : 'Frame your whole meal in the brackets'}
               </p>
               {!file && (
                 <p className="text-on-surface-variant text-xs mt-1">
@@ -227,6 +245,7 @@ export default function CaptureMeal() {
               </span>
             </button>
 
+            {!nativePrimary && (
             <button
               type="button"
               onClick={() => cameraInputRef.current?.click()}
@@ -235,6 +254,7 @@ export default function CaptureMeal() {
             >
               <div className="w-[72px] h-[72px] rounded-full border-2 border-background" aria-hidden="true" />
             </button>
+            )}
 
             <button
               type="button"
@@ -257,7 +277,7 @@ export default function CaptureMeal() {
           </div>
 
           {/* Analyze CTA */}
-          {file && (
+          {file && !nativePrimary && (
             <button
               type="button"
               onClick={() => upload.mutate(file)}

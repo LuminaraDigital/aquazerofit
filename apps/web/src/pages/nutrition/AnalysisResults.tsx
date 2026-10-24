@@ -16,6 +16,7 @@ import { useMe } from '@/lib/queries';
 import { FoodSearchSheet } from './FoodSearchSheet';
 import { GramsStepper } from './GramsStepper';
 import { fmtInt, round1, todayLocalDate } from '../dashboard/lib';
+import { useTelegramMainAction, useTelegramUnsavedEdits } from '@/lib/useTelegramChrome';
 
 /** Review item: keeps per-gram ratios so edits recompute deterministically in code. */
 interface ReviewItem {
@@ -141,6 +142,18 @@ export default function AnalysisResults() {
     },
     onError: () => show('Could not save the meal - please try again'),
   });
+
+  const readyToLog = job?.status === 'succeeded';
+  const nativeLog = useTelegramMainAction(
+    readyToLog
+      ? {
+          text: confirm.isPending ? 'Saving' : 'Log meal',
+          onClick: () => confirm.mutate(),
+          enabled: !confirm.isPending && computed.length > 0,
+        }
+      : null,
+  );
+  useTelegramUnsavedEdits(Boolean(readyToLog));
 
   const scanning = !job || job.status === 'queued' || job.status === 'processing';
 
@@ -326,6 +339,7 @@ export default function AnalysisResults() {
                 These are AI estimates - please check the items and portions before saving. Nothing
                 is added to your log until you confirm.
               </p>
+              {!(nativeLog && job.status === 'succeeded') && (
               <button
                 type="button"
                 onClick={() => confirm.mutate()}
@@ -343,6 +357,7 @@ export default function AnalysisResults() {
                   arrow_forward
                 </span>
               </button>
+              )}
             </section>
           </>
         )}

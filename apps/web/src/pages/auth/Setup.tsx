@@ -25,6 +25,7 @@ import {
   formatMl,
 } from '../../lib/format';
 import { haptic } from '../../lib/telegram';
+import { useTelegramMainAction, useTelegramUnsavedEdits } from '../../lib/useTelegramChrome';
 import { useTargets, useUpdateConsents, useUpdateProfile } from '../../lib/queries';
 import { useDraftPersistence } from '../../lib/useDraftPersistence';
 import {
@@ -238,6 +239,18 @@ export default function Setup() {
     }
   }
 
+  const saving = updateProfile.isPending || updateConsents.isPending;
+  const nativeSubmit = useTelegramMainAction(
+    phase === 'form'
+      ? {
+          text: 'Show my targets',
+          onClick: () => void submit(),
+          enabled: !saving,
+        }
+      : null,
+  );
+  useTelegramUnsavedEdits(phase === 'form' && isDirtyDraft(state));
+
   if (phase === 'reveal') {
     return <TargetsReveal onDone={() => navigate(next, { replace: true })} />;
   }
@@ -438,12 +451,14 @@ export default function Setup() {
       </div>
 
       <div className="mt-8 space-y-3">
-        <PrimaryButton
-          onClick={() => void submit()}
-          loading={updateProfile.isPending || updateConsents.isPending}
-        >
-          Show my targets
-        </PrimaryButton>
+        {!nativeSubmit && (
+          <PrimaryButton
+            onClick={() => void submit()}
+            loading={updateProfile.isPending || updateConsents.isPending}
+          >
+            Show my targets
+          </PrimaryButton>
+        )}
         <SecondaryButton
           onClick={() => {
             if (isFirstSetup) trackOnboardingSkipped('setup_not_now');
@@ -492,6 +507,9 @@ function ConsentCheckbox({
  */
 function TargetsReveal({ onDone }: { onDone: () => void }) {
   const { data: targets, isLoading } = useTargets();
+  const nativeContinue = useTelegramMainAction(
+    !isLoading && targets ? { text: 'Continue', onClick: onDone } : null,
+  );
 
   if (isLoading || !targets) return <SetupTargetsSkeleton />;
 
@@ -592,9 +610,11 @@ function TargetsReveal({ onDone }: { onDone: () => void }) {
         Settings - add them whenever you like and the plans and meal ideas will follow.
       </p>
 
-      <div className="mt-auto">
-        <PrimaryButton onClick={onDone}>Continue</PrimaryButton>
-      </div>
+      {!nativeContinue && (
+        <div className="mt-auto">
+          <PrimaryButton onClick={onDone}>Continue</PrimaryButton>
+        </div>
+      )}
     </div>
   );
 }

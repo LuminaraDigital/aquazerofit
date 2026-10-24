@@ -18,6 +18,7 @@ import {
   revokePremium,
 } from '../billing/entitlements';
 import { refundStarsPurchase } from '../payments/stars';
+import { refundStarsSubscription } from '../payments/starsSubscription';
 
 export const adminRouter = Router();
 /**
@@ -244,15 +245,24 @@ adminRouter.post(
   '/payments/stars/refund',
   asyncHandler(async (req, res) => {
     const input = starsRefundSchema.parse(req.body ?? {});
-    const outcome = await refundStarsPurchase({
+    const refundInput = {
       telegramPaymentChargeId: input.telegramPaymentChargeId,
       reason: input.reason,
       actorId: req.user!.id,
       telegramUserId: input.telegramUserId,
-    });
+    };
+    let outcome: { userId: string; status: string; coachId?: string };
+    try {
+      outcome = await refundStarsPurchase(refundInput);
+    } catch (err) {
+      // A charge is either a coach purchase or a subscription payment.
+      // The subscription path runs only when the coach ledger has no row.
+      if (!(err instanceof AppError) || err.code !== 'NOT_FOUND') throw err;
+      outcome = await refundStarsSubscription(refundInput);
+    }
     auditDataAccess(req.user!.id, 'admin.stars.refund', {
       userId: outcome.userId,
-      coachId: outcome.coachId,
+      coachId: outcome.coachId ?? null,
       status: outcome.status,
       reason: input.reason,
     });

@@ -162,16 +162,33 @@ export default function TermsPage() {
             refund page
           </Link>
           . Premium runs through the end of the period on the last paid invoice. It ends when Stripe
-          reports that subscription deleted, if that subscription is still the one on the account. A
-          deletion for a subscription a later purchase has replaced leaves the later period in place.
+          reports that subscription deleted. That subscription's periods then stop counting. A
+          period from another Stripe subscription, from Stars, or from Play stays until its own end.
         </P>
         <P>
           Inside the Telegram Mini App, digital goods are sold in Telegram Stars. The Mini App does
           not open Stripe checkout. A locked coach can be bought for the Stars price shown for that
           coach before you pay. The price comes from the roster, not from the request. The purchase
-          unlocks that coach on your account. There is no renewal. The same coach also unlocks when
-          you reach the level the roster requires, and the purchase is refused if you already have
-          that coach.
+          unlocks that coach on your account. Coach purchases do not renew. The same coach also
+          unlocks when you reach the level the roster requires, and the purchase is refused if you
+          already have that coach.
+        </P>
+        <P>
+          Premium inside the Mini App, when a Stars price is configured for this deployment, is a
+          Telegram Stars subscription. The billing period is 30 days (2592000 seconds). The plan
+          page shows the Stars price before you pay, which is why these terms do not copy a price.
+          Each successful payment, including a renewal, keeps that subscription's premium until the
+          expiration Telegram reports for that payment. If a renewal payment does not arrive, that
+          subscription is not extended. The app has no button that cancels this subscription.
+        </P>
+        <P>
+          A support refund of a Stars charge returns the Stars for that charge and stops further
+          renewals of that subscription. It does not end a Stripe or Play period that is still in
+          the future.
+        </P>
+        <P>
+          When more than one of Stripe, Stars and Play has a paid period on the account, premium
+          lasts until the latest of those periods. The periods are not added together.
         </P>
         <P>
           On Android, when Google Play billing is configured, premium is a Play subscription. The

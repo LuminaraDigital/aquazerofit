@@ -58,6 +58,56 @@ describe('Stars charge unique index', () => {
     expect(store.where('ledger', (d) => (d as { type?: string }).type === 'starsPurchase')).toHaveLength(1);
   });
 
+  it('rejects a second subscription charge with the same charge id', () => {
+    const store = newStore();
+    const payment = {
+      id: 'sspay-1',
+      type: 'starsSubscriptionPayment' as const,
+      userId: 'usr-1',
+      stars: 100,
+      telegramPaymentChargeId: 'charge-sub',
+      providerPaymentChargeId: null,
+      invoicePayload: 'premium.one',
+      subscriptionExpirationDate: new Date().toISOString(),
+      isRecurring: false,
+      isFirstRecurring: true,
+      createdAt: new Date().toISOString(),
+    };
+    store.upsert('ledger', payment);
+    expect(() => store.upsert('ledger', { ...payment, id: 'sspay-2' })).toThrow(DuplicateIndexError);
+    expect(store.byId('ledger', 'sspay-2')).toBeUndefined();
+  });
+
+  it('does not let a subscription refund occupy the charge id', () => {
+    const store = newStore();
+    store.upsert('ledger', {
+      id: 'ssref-1',
+      type: 'starsSubscriptionRefund',
+      userId: 'usr-1',
+      stars: 100,
+      telegramPaymentChargeId: 'charge-sub',
+      invoicePayload: 'premium.one',
+      telegramUserId: 42,
+      reason: 'support',
+      actorId: 'admin',
+      createdAt: new Date().toISOString(),
+    });
+    store.upsert('ledger', {
+      id: 'sspay-1',
+      type: 'starsSubscriptionPayment',
+      userId: 'usr-1',
+      stars: 100,
+      telegramPaymentChargeId: 'charge-sub',
+      providerPaymentChargeId: null,
+      invoicePayload: 'premium.one',
+      subscriptionExpirationDate: new Date().toISOString(),
+      isRecurring: false,
+      isFirstRecurring: true,
+      createdAt: new Date().toISOString(),
+    });
+    expect(store.indexedIds('ledger', LEDGER_BY_STARS_CHARGE, indexKey('charge-sub'))).toEqual(['sspay-1']);
+  });
+
   it('does not treat an invoice or a refund as a purchase', () => {
     const store = newStore();
     store.upsert('ledger', {

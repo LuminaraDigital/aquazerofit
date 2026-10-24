@@ -200,9 +200,9 @@ export const MARKETING_ROUTES: readonly MarketingRoute[] = [
     path: '/refund',
     title: 'Refunds | AquaZeroFit',
     description:
-      'How to ask AquaZeroFit for a refund of web premium billed by Stripe, or a coach bought with Telegram Stars. Email the support address or send /paysupport.',
+      'How to ask AquaZeroFit for a refund of web premium billed by Stripe, Mini App premium billed with Telegram Stars, or a coach bought with Telegram Stars. Email the support address or send /paysupport.',
     summary:
-      'How to ask for a refund from AquaZeroFit, operated by Luminara Digital Pty Ltd. Web premium is a Stripe subscription: Stripe bills it again each period, and premium lasts until the end of the period already paid. Inside the Telegram Mini App, coaches are digital goods sold in Telegram Stars. Email info@luminara.digital, or send /paysupport to the bot, and include the account that paid and what you bought. The request itself does not refund the payment.',
+      'How to ask for a refund from AquaZeroFit, operated by Luminara Digital Pty Ltd. Web premium is a Stripe subscription: Stripe bills it again each period, and that subscription lasts until the end of the period already paid. Inside the Telegram Mini App, coaches are one-time Telegram Stars purchases. Premium in the Mini App, when a Stars price is configured, is a 30 day Stars subscription: each payment lasts until the expiration Telegram reports, and it is not extended when a renewal does not arrive. A support refund of a Stars charge returns that charge and stops further renewals. Overlapping paid periods last until the latest end, and are not added together. Email info@luminara.digital, or send /paysupport to the bot, and include the account that paid and what you bought. The request itself does not refund the payment.',
     priority: 0.3,
   },
   {

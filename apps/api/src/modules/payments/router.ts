@@ -40,6 +40,11 @@ import { logEvent } from '../../platform/telemetry';
 import { commandName, replyForCommand } from './commands';
 import { answerPreCheckoutQuery, sendBotMessage } from './telegramBot';
 import { completePayment, findPendingInvoice } from './stars';
+import {
+  PREMIUM_PAYLOAD_PREFIX,
+  completeSubscriptionPayment,
+  premiumCheckoutAccepts,
+} from './starsSubscription';
 
 export const telegramWebhookRouter = Router();
 
@@ -84,6 +89,12 @@ const telegramUpdateSchema = z.object({
           invoice_payload: z.string().max(1024),
           telegram_payment_charge_id: z.string().min(1).max(256),
           provider_payment_charge_id: z.string().max(256).optional(),
+          // Present on Stars subscription charges. Absent on coach purchases.
+          // A missing expiration is handled in completeSubscriptionPayment:
+          // the schema stays optional so a coach payment still parses.
+          subscription_expiration_date: z.number().int().optional(),
+          is_recurring: z.boolean().optional(),
+          is_first_recurring: z.boolean().optional(),
         })
         .optional(),
     })
@@ -120,6 +131,23 @@ function answerFailureReason(error: string): string {
 }
 
 async function handlePreCheckout(query: NonNullable<TelegramUpdate['pre_checkout_query']>): Promise<void> {
+  if (query.invoice_payload.startsWith(PREMIUM_PAYLOAD_PREFIX)) {
+    const priceOk = premiumCheckoutAccepts(query);
+    const answered = await answerPreCheckoutQuery(
+      query.id,
+      priceOk,
+      priceOk ? undefined : 'This subscription is no longer available.',
+    );
+    if (!answered.ok) {
+      logEvent('stars_precheckout_answer_failed', {
+        accepted: priceOk,
+        reason: answerFailureReason(answered.error),
+      });
+    }
+    if (!priceOk) logEvent('stars_precheckout_declined', { reason: 'unavailable' });
+    return;
+  }
+
   const pending = findPendingInvoice(query.invoice_payload);
   const coach = pending ? coachById(pending.coachId) : undefined;
   const priceOk =
@@ -193,16 +221,33 @@ telegramWebhookRouter.post(
 
       const payment = update.message?.successful_payment;
       if (payment) {
-        const outcome = completePayment({
-          invoicePayload: payment.invoice_payload,
-          totalAmount: payment.total_amount,
-          currency: payment.currency,
-          telegramPaymentChargeId: payment.telegram_payment_charge_id,
-          providerPaymentChargeId: payment.provider_payment_charge_id,
-          telegramUserId: update.message?.from?.id,
-        });
-        if (outcome.status === 'rejected') {
-          logEvent('stars_payment_rejected', { reason: outcome.reason });
+        if (payment.invoice_payload.startsWith(PREMIUM_PAYLOAD_PREFIX)) {
+          const outcome = completeSubscriptionPayment({
+            invoicePayload: payment.invoice_payload,
+            totalAmount: payment.total_amount,
+            currency: payment.currency,
+            telegramPaymentChargeId: payment.telegram_payment_charge_id,
+            providerPaymentChargeId: payment.provider_payment_charge_id,
+            telegramUserId: update.message?.from?.id,
+            subscriptionExpirationDate: payment.subscription_expiration_date,
+            isRecurring: payment.is_recurring,
+            isFirstRecurring: payment.is_first_recurring,
+          });
+          if (outcome.status === 'rejected') {
+            logEvent('stars_subscription_payment_rejected', { reason: outcome.reason });
+          }
+        } else {
+          const outcome = completePayment({
+            invoicePayload: payment.invoice_payload,
+            totalAmount: payment.total_amount,
+            currency: payment.currency,
+            telegramPaymentChargeId: payment.telegram_payment_charge_id,
+            providerPaymentChargeId: payment.provider_payment_charge_id,
+            telegramUserId: update.message?.from?.id,
+          });
+          if (outcome.status === 'rejected') {
+            logEvent('stars_payment_rejected', { reason: outcome.reason });
+          }
         }
         res.status(200).json({ ok: true });
         return;

@@ -243,6 +243,22 @@ export const config = {
   },
 
   /**
+   * Whole Stars charged for one 30-day Premium period inside the Mini App.
+   *
+   * There is no default. Unset, empty, zero, or anything that is not a
+   * positive safe integer means the plan page stays on "not available" and
+   * the invoice route does not call Telegram. Telegram rejects a price it
+   * will not sell; this process does not invent a cap or a fallback amount.
+   */
+  get telegramStarsPremiumPrice(): number | null {
+    const raw = process.env.TELEGRAM_STARS_PREMIUM_PRICE?.trim() ?? '';
+    if (!/^[1-9]\d*$/.test(raw)) return null;
+    const price = Number(raw);
+    if (!Number.isSafeInteger(price) || price <= 0) return null;
+    return price;
+  },
+
+  /**
    * Cloudflare Turnstile secret, used server-side to verify a solved token.
    * Unset disables the check entirely, which is what dev, the test suite and
    * the keyless offline demo need.

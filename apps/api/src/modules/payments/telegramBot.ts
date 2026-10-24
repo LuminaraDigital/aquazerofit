@@ -70,6 +70,11 @@ export interface InvoiceRequest {
   /** Whole Stars. XTR has no minor unit, so this is not cents. */
   stars: number;
   photoUrl?: string;
+  /**
+   * Present only for a subscription invoice. Telegram requires exactly
+   * 2592000 (30 days) for Stars. Omitted for one-time coach purchases.
+   */
+  subscriptionPeriod?: number;
 }
 
 /**
@@ -87,6 +92,7 @@ export async function createStarsInvoiceLink(req: InvoiceRequest): Promise<BotRe
     currency: STARS_CURRENCY,
     prices: [{ label: req.title.slice(0, 32), amount: req.stars }],
     ...(req.photoUrl ? { photo_url: req.photoUrl } : {}),
+    ...(req.subscriptionPeriod !== undefined ? { subscription_period: req.subscriptionPeriod } : {}),
   });
 }
 
@@ -164,5 +170,24 @@ export async function refundStarPayment(
   return callBot<boolean>('refundStarPayment', {
     user_id: telegramUserId,
     telegram_payment_charge_id: telegramPaymentChargeId,
+  });
+}
+
+/**
+ * Stop a Stars subscription from renewing.
+ *
+ * refundStarPayment returns the Stars for one charge and does not cancel the
+ * subscription. is_canceled true tells Telegram not to send the next renewal.
+ * It does not shorten the period Telegram already reported.
+ */
+export async function editUserStarSubscription(
+  telegramUserId: number,
+  telegramPaymentChargeId: string,
+  isCanceled: boolean,
+): Promise<BotResult<boolean>> {
+  return callBot<boolean>('editUserStarSubscription', {
+    user_id: telegramUserId,
+    telegram_payment_charge_id: telegramPaymentChargeId,
+    is_canceled: isCanceled,
   });
 }

@@ -36,7 +36,7 @@ export default function RefundPage() {
         <List
           items={[
             'The account that paid (the email on the AquaZeroFit account, or the Telegram account you paid from).',
-            'What you bought: web premium, or a named coach.',
+            'What you bought: web premium, a Mini App premium subscription, or a named coach.',
             'When you paid, if you know it.',
           ]}
         />
@@ -61,10 +61,10 @@ export default function RefundPage() {
         </P>
         <P>
           The app has no button that cancels a Stripe subscription. Ask by the email or the
-          /paysupport command above. Premium runs through the end of the period on the last paid
-          invoice. It ends when Stripe reports that subscription deleted, if that subscription is
-          still the one on the account. A deletion for a subscription a later purchase has replaced
-          leaves the later period in place.
+          /paysupport command above. When Stripe reports that subscription deleted, that
+          subscription's periods stop counting. A period from another purchase that is still in the
+          future stays. Periods from different purchases are not added together: premium lasts
+          until the latest one.
         </P>
         <P>
           The{' '}
@@ -79,13 +79,23 @@ export default function RefundPage() {
         <P>
           Inside the Telegram Mini App, digital goods are sold in Telegram Stars. The Mini App
           does not open Stripe checkout. A locked coach can be bought for the Stars price shown
-          for that coach. The purchase unlocks that coach on your account. There is no renewal.
+          for that coach. The purchase unlocks that coach on your account. Coach purchases do not
+          renew.
         </P>
         <P>
           The same coach also unlocks when you reach the level the roster requires, and the app
           refuses the purchase if you already have that coach.
         </P>
+        <P>
+          Premium in the Mini App, when a Stars price is configured, is a subscription with a 30
+          day period (2592000 seconds). The plan page shows the price. Each payment, including a
+          renewal, lasts until the expiration Telegram reports for that payment. If a renewal does
+          not arrive, that subscription is not extended. The app has no cancel button. A support
+          refund returns the Stars for that charge and stops further renewals. It does not remove
+          a Stripe or Play period that is still running.
+        </P>
         <P>A Stars refund is done by support on request.</P>
+        <P>That covers a coach purchase or a premium subscription charge.</P>
       </Section>
 
       <Section id="play" index={4} heading="Google Play">

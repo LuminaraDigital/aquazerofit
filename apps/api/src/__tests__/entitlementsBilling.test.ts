@@ -70,7 +70,7 @@ describe('effectiveTier', () => {
 
   /*
    * The case the whole design exists for. A cancelled or lapsed subscription
-   * must stop being premium on its own, with no scheduled job in the loop —
+   * must stop being premium on its own, with no scheduled job in the loop  - 
    * a job is a thing that can fail to run, and the failure mode is silent
    * unlimited access.
    */
@@ -102,7 +102,7 @@ describe('grantPremium', () => {
 
   /*
    * Every billing provider retries a notification it believes failed. Without
-   * this the user's period grows by a month on each redelivery — free
+   * this the user's period grows by a month on each redelivery  -  free
    * subscription time, granted by an infrastructure detail.
    */
   it('is idempotent on the provider reference, so a redelivery grants nothing extra', () => {
@@ -167,10 +167,65 @@ describe('revokePremium', () => {
     expect(userDoc(id).premiumUntil).toBeNull();
   });
 
-  it('leaves a comped account alone — its premium was never a payment', () => {
+  it('leaves a comped account alone  -  its premium was never a payment', () => {
     const id = newUser({ tier: 'premium' });
     revokePremium(id, 'admin', 'rev-1', 'testing');
     expect(effectiveTier(userDoc(id))).toBe('premium');
+  });
+
+  it('folds Stripe and Stars to the later end, and a revoke of one leaves the other', () => {
+    const id = newUser();
+    const starsUntil = inDays(40);
+    const stripeUntil = inDays(10);
+    grantPremium({
+      userId: id,
+      source: 'stars',
+      externalId: 'stars:c1',
+      providerRef: 'premium.a',
+      premiumUntil: starsUntil,
+    });
+    grantPremium({
+      userId: id,
+      source: 'stripe',
+      externalId: 'stripe:in_1',
+      providerRef: 'sub_1',
+      premiumUntil: stripeUntil,
+    });
+
+    // Latest end, not the sum of the two periods.
+    expect(Date.parse(userDoc(id).premiumUntil!)).toBe(Date.parse(starsUntil));
+    expect(Date.parse(userDoc(id).premiumUntil!)).toBeLessThan(Date.now() + 41 * 86_400_000);
+
+    revokePremium(id, 'stripe', 'stripe:deleted:sub_1', 'stripe:subscription_deleted', 'sub_1');
+    expect(Date.parse(userDoc(id).premiumUntil!)).toBe(Date.parse(starsUntil));
+    expect(effectiveTier(userDoc(id))).toBe('premium');
+
+    revokePremium(id, 'stars', 'stars:refund:c1', 'refund', 'premium.a', 'stars:c1');
+    expect(userDoc(id).premiumUntil).toBeNull();
+    expect(effectiveTier(userDoc(id))).toBe('free');
+  });
+
+  it('lets a later payment on the same provider reference count after a revoke', () => {
+    const id = newUser();
+    grantPremium({
+      userId: id,
+      source: 'play',
+      externalId: 'play:tok:1',
+      providerRef: 'tok',
+      premiumUntil: inDays(10),
+    });
+    revokePremium(id, 'play', 'rtdn:tok:13', 'rtdn:13', 'tok');
+    expect(userDoc(id).premiumUntil).toBeNull();
+
+    const restarted = inDays(20);
+    grantPremium({
+      userId: id,
+      source: 'play',
+      externalId: 'play:tok:2',
+      providerRef: 'tok',
+      premiumUntil: restarted,
+    });
+    expect(Date.parse(userDoc(id).premiumUntil!)).toBe(Date.parse(restarted));
   });
 
   it('keeps the overwritten period in history, which is what support reads', () => {

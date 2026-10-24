@@ -1,12 +1,14 @@
 /**
- * Firebase client bootstrap for web Auth & Analytics.
- * When VITE_FIREBASE_API_KEY + VITE_FIREBASE_APP_ID are unset, Auth stays
- * disabled and the UI falls back to the legacy /auth/login API path so the
- * offline demo and vitest suite keep working without credentials.
+ * Firebase client bootstrap for web Auth and Analytics.
+ *
+ * The SDK is loaded with a dynamic import the first time auth is actually
+ * enabled. Test runs and deployments without VITE_FIREBASE_API_KEY never
+ * download it. When those keys are unset, Auth stays disabled and the UI
+ * falls back to the legacy /auth/login path.
  */
-import { initializeApp, getApps, getApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
-import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics';
+import type { FirebaseApp, FirebaseOptions } from 'firebase/app';
+import type { Analytics } from 'firebase/analytics';
+import type { Auth, User as FirebaseUser } from 'firebase/auth';
 
 export const firebaseConfig: FirebaseOptions = {
   apiKey: 'AIzaSyCA04-nC_Rple5xoGAOzwm1jRlyOCSUnLA',
@@ -40,6 +42,46 @@ function readConfig(): FirebaseOptions | null {
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let analyticsPromise: Promise<Analytics | null> | null = null;
+let loading: Promise<FirebaseSdk> | null = null;
+
+export interface FirebaseSdk {
+  app: FirebaseApp | null;
+  auth: Auth | null;
+  onIdTokenChanged: (
+    auth: Auth,
+    next: (user: FirebaseUser | null) => void,
+  ) => () => void;
+  signInWithEmailAndPassword: (
+    auth: Auth,
+    email: string,
+    password: string,
+  ) => Promise<{ user: FirebaseUser }>;
+  createUserWithEmailAndPassword: (
+    auth: Auth,
+    email: string,
+    password: string,
+  ) => Promise<{ user: FirebaseUser }>;
+  sendPasswordResetEmail: (auth: Auth, email: string) => Promise<void>;
+  signOut: (auth: Auth) => Promise<void>;
+  updateProfile: (user: FirebaseUser, profile: { displayName?: string }) => Promise<void>;
+}
+
+const emptySdk = (): FirebaseSdk => ({
+  app: null,
+  auth: null,
+  onIdTokenChanged: () => () => {},
+  signInWithEmailAndPassword: async () => {
+    throw new Error('Firebase Auth is not configured');
+  },
+  createUserWithEmailAndPassword: async () => {
+    throw new Error('Firebase Auth is not configured');
+  },
+  sendPasswordResetEmail: async () => {
+    throw new Error('Firebase Auth is not configured');
+  },
+  signOut: async () => {},
+  updateProfile: async () => {},
+});
 
 export function isFirebaseAuthEnabled(): boolean {
   // Unit tests stay on the legacy /auth path unless they opt into Firebase mocks.
@@ -47,50 +89,60 @@ export function isFirebaseAuthEnabled(): boolean {
   return readConfig() !== null;
 }
 
+/** The app instance, once loadFirebaseSdk has resolved. Null before that. */
 export function getFirebaseApp(): FirebaseApp | null {
-  if (app) return app;
-  if (getApps().length > 0) {
-    app = getApp();
-    return app;
-  }
-  const config = readConfig();
-  if (!config) return null;
-  app = initializeApp(config);
   return app;
 }
 
+/** The auth instance, once loadFirebaseSdk has resolved. Null before that. */
 export function getFirebaseAuth(): Auth | null {
-  if (!isFirebaseAuthEnabled()) return null;
-  if (auth) return auth;
-  const currentApp = getFirebaseApp();
-  if (!currentApp) return null;
-  auth = getAuth(currentApp);
   return auth;
 }
 
-export function getFirebaseAnalytics(): Promise<Analytics | null> {
-  if (analyticsPromise) return analyticsPromise;
-  if (typeof window === 'undefined') {
-    analyticsPromise = Promise.resolve(null);
-    return analyticsPromise;
-  }
-  const currentApp = getFirebaseApp();
-  if (!currentApp) {
-    analyticsPromise = Promise.resolve(null);
-    return analyticsPromise;
-  }
-  analyticsPromise = isSupported()
-    .then((supported) => (supported ? getAnalytics(currentApp) : null))
-    .catch(() => null);
-  return analyticsPromise;
+/**
+ * Load the Firebase SDK. Resolves to a null auth when Firebase is disabled,
+ * without importing the packages.
+ */
+export function loadFirebaseSdk(): Promise<FirebaseSdk> {
+  if (!isFirebaseAuthEnabled()) return Promise.resolve(emptySdk());
+  loading ??= (async () => {
+    const [{ initializeApp, getApps, getApp }, authMod, analyticsMod] = await Promise.all([
+      import('firebase/app'),
+      import('firebase/auth'),
+      import('firebase/analytics'),
+    ]);
+    if (getApps().length > 0) app = getApp();
+    else {
+      const options = readConfig();
+      if (!options) return emptySdk();
+      app = initializeApp(options);
+    }
+    auth = authMod.getAuth(app);
+    if (typeof window !== 'undefined') {
+      const current = app;
+      analyticsPromise = analyticsMod
+        .isSupported()
+        .then((supported) => (supported && current ? analyticsMod.getAnalytics(current) : null))
+        .catch(() => null);
+      void analyticsPromise;
+    }
+    return {
+      app,
+      auth,
+      onIdTokenChanged: authMod.onIdTokenChanged,
+      signInWithEmailAndPassword: authMod.signInWithEmailAndPassword,
+      createUserWithEmailAndPassword: authMod.createUserWithEmailAndPassword,
+      sendPasswordResetEmail: authMod.sendPasswordResetEmail,
+      signOut: authMod.signOut,
+      updateProfile: authMod.updateProfile,
+    };
+  })();
+  return loading;
 }
 
-// Auto-initialize analytics in real browser runtime (avoid running during test runs)
-if (
-  typeof window !== 'undefined' &&
-  (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')
-) {
-  void getFirebaseAnalytics();
+export function getFirebaseAnalytics(): Promise<Analytics | null> {
+  if (!isFirebaseAuthEnabled()) return Promise.resolve(null);
+  return loadFirebaseSdk().then(() => analyticsPromise ?? Promise.resolve(null));
 }
 
 /** Map Firebase Auth error codes to user-facing copy (no internal detail). */

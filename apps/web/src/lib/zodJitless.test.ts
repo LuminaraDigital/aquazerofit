@@ -12,6 +12,6 @@ describe('zod jitless', () => {
     const firstSchema = src.indexOf('export const localDateSchema');
     expect(jitless).toBeGreaterThan(0);
     expect(firstSchema).toBeGreaterThan(jitless);
-    expect(src).toContain("typeof window !== 'undefined'");
+    expect(src).toContain('browserGlobal.window !== undefined');
   });
 });

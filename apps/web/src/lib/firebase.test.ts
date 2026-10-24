@@ -1,7 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   firebaseConfig,
-  getFirebaseAnalytics,
   getFirebaseApp,
   isFirebaseAuthEnabled,
   mapFirebaseAuthError,
@@ -23,9 +22,47 @@ describe('Firebase Web SDK Configuration and Helpers', () => {
     expect(typeof enabled).toBe('boolean');
   });
 
-  it('provides getFirebaseAnalytics without throwing in test environment', async () => {
-    const analytics = await getFirebaseAnalytics();
-    expect(analytics === null || typeof analytics === 'object').toBe(true);
+  it('never starts Firebase Analytics, even with web sign-in configured', async () => {
+    // The privacy notice says the web runs no third-party analytics, and the
+    // anonymisedAnalytics consent gates nothing here. Loading the SDK for
+    // sign-in must not also set Google Analytics cookies on every page.
+    vi.resetModules();
+    vi.stubEnv('MODE', 'development');
+    vi.stubEnv('VITE_FIREBASE_API_KEY', 'test-key');
+    vi.stubEnv('VITE_FIREBASE_APP_ID', 'test-app');
+    // Analytics only ever started where window exists; this file runs in node.
+    vi.stubGlobal('window', {});
+    const getAnalytics = vi.fn(() => ({}));
+    vi.doMock('firebase/app', () => ({
+      initializeApp: vi.fn(() => ({})),
+      getApps: () => [],
+      getApp: vi.fn(),
+    }));
+    vi.doMock('firebase/auth', () => ({
+      getAuth: vi.fn(() => ({})),
+      onIdTokenChanged: vi.fn(),
+      signInWithEmailAndPassword: vi.fn(),
+      createUserWithEmailAndPassword: vi.fn(),
+      sendPasswordResetEmail: vi.fn(),
+      signOut: vi.fn(),
+      updateProfile: vi.fn(),
+    }));
+    vi.doMock('firebase/analytics', () => ({ isSupported: async () => true, getAnalytics }));
+    try {
+      const { loadFirebaseSdk } = await import('./firebase');
+      const sdk = await loadFirebaseSdk();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(sdk.auth).not.toBeNull();
+      expect(getAnalytics).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+      vi.doUnmock('firebase/app');
+      vi.doUnmock('firebase/auth');
+      vi.doUnmock('firebase/analytics');
+      vi.resetModules();
+    }
   });
 
   it('maps known Firebase Auth errors to friendly user-facing messages', () => {

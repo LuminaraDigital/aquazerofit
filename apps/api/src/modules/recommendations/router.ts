@@ -361,8 +361,10 @@ recommendationsRouter.post(
       };
       await upsertDoc('ai', recommendation);
       // Real providers failed and the gateway fell back to offline templates -
-      // do not charge. Keyless mock (no providers configured) keeps degraded
-      // false and bills normally per product rules. Same stance as the chat lane.
+      // do not charge. The keyless mock (no providers configured) is degraded
+      // too in production ('no_provider'), so it is not charged there either;
+      // only in development and tests does it bill, where it IS the product.
+      // Same stance as the chat lane.
       await settleReservation(reservationId, result.meta.degraded !== true);
 
       res.status(201).json({ recommendation, remaining });

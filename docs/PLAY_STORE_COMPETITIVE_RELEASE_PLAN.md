@@ -17,7 +17,7 @@ Ship a unified Android experience where adaptive calories, workout readiness, se
 | P0-3 | Readiness UI | Android + API | `ReadinessChip.kt`, `DashboardViewModel`, `WorkoutLibraryViewModel` | Protect/Maintain/Progress on Home and Workouts |
 | P0-4 | Adaptive flag alignment | API + Android | `ADAPTIVE_TARGETS=true`, `ProgressViewModel.kt` | Progress card hidden when flag off; server targets authoritative |
 | P0-5 | Brag card share | Android | `AchievementUnlockBanner.kt`, `CelebrationHost.kt`, Dashboard/Progress | Share intent on achievement unlock |
-| P0-6 | Challenge deep links | Android + Web | `strings.xml`, `ChallengesScreen.kt`, `assetlinks.json`, web `Challenges.tsx` | Share URL includes `https://app.aquazero.fit/challenges?code=`; web reads `code` param |
+| P0-6 | Challenge deep links | Android + Web | `strings.xml`, `ChallengesScreen.kt`, `assetlinks.json`, web `Challenges.tsx` | Share URL includes `https://aquazerofit.com/challenges?code=`; web reads `code` param |
 
 ### WS2: P1 Daily Energy Loop
 
@@ -33,7 +33,7 @@ Ship a unified Android experience where adaptive calories, workout readiness, se
 | Gate | Action | Verify |
 |------|--------|--------|
 | API env | Set `ADAPTIVE_TARGETS=true` on production API | `GET /me/targets` returns `adaptiveEnabled: true` after 7+ days data |
-| App Links | Host `/.well-known/assetlinks.json` on `app.aquazero.fit` | Play App Signing SHA-256; no disambiguation sheet |
+| App Links | Host `/.well-known/assetlinks.json` on `aquazerofit.com` | Play App Signing SHA-256; no disambiguation sheet |
 | Health Connect | Complete Play Console Health apps declaration | Only if Health Connect ship is in scope for v1 |
 | Closed testing | 20+ testers, 14 days (new dev accounts) | Play Console policy |
 | Release build | `./gradlew ktlintCheck detekt test bundleRelease` | CI green |

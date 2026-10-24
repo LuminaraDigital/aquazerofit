@@ -1,5 +1,5 @@
 /**
- * /me — profile, targets, consents, telegram link, export, deletion.
+ * /me: profile, targets, consents, telegram link, export, deletion.
  */
 import { Router } from 'express';
 import {
@@ -46,7 +46,7 @@ meRouter.use('/memory', memoryRouter);
 /**
  * What this account can currently do, and how much of today's allowance is
  * left. Exposed so the plan surface can state the actual position rather than
- * marketing it — "you have used 38 of 50 credits today" is a fact the user can
+ * marketing it. "you have used 38 of 50 credits today" is a fact the user can
  * act on, where "upgrade for more!" is not.
  *
  * Read-only by construction. There is deliberately no route here (or anywhere
@@ -61,7 +61,7 @@ meRouter.get(
     const userId = userIdOf(req);
     const user = getStore().byId<User>('users', userId);
     if (!user) throw new AppError('NOT_FOUND', 'Account not found.');
-    // The daily grant is lazy — it is appended by the first `reserve` of the
+    // The daily grant is lazy: it is appended by the first `reserve` of the
     // day, not by a scheduler. Reading the balance without it would report a
     // true-but-meaningless 0 to anyone who has not yet triggered an AI action,
     // which on this surface reads as "you have nothing" rather than "you have
@@ -148,12 +148,15 @@ meRouter.patch('/', (req, res) => {
   res.json({ user: updateIdentity(userIdOf(req), input) });
 });
 
-meRouter.delete('/', (req, res) => {
-  const result = requestDeletion(userIdOf(req));
-  res.json({
-    ...result,
-    message: result.purged
-      ? 'Your account and data have been deleted.'
-      : 'Deletion requested. Your account will be removed after the grace period; call again to delete immediately.',
-  });
-});
+meRouter.delete(
+  '/',
+  asyncHandler(async (req, res) => {
+    const result = await requestDeletion(userIdOf(req));
+    res.json({
+      ...result,
+      message: result.purged
+        ? 'Your account and data have been deleted.'
+        : 'Deletion requested. Your account will be removed after the grace period; call again to delete immediately.',
+    });
+  }),
+);

@@ -92,8 +92,8 @@ export function sha256Hex(value: string): string {
  * Constant-time string equality that cannot throw.
  *
  * `crypto.timingSafeEqual` raises a RangeError when the two buffers differ in
- * length, which turns "the caller sent a short token" — the single most likely
- * thing an attacker probing a token endpoint will do — into an unhandled 500.
+ * length, which turns "the caller sent a short token", the single most likely
+ * thing an attacker probing a token endpoint will do, into an unhandled 500.
  * Comparing lengths first is not a leak: length is observable from the
  * ciphertext-free request anyway, and every value compared here is a
  * fixed-width digest, so a mismatch means malformed input rather than a near
@@ -145,7 +145,7 @@ export function revokeFamily(familyId: string): void {
 
 /**
  * Rotate a refresh token: single use. A second presentation of the same token
- * is treated as theft — the entire family is revoked (AQF-07 §2.1).
+ * is treated as theft: the entire family is revoked (AQF-07 §2.1).
  *
  * Atomic compare-and-swap ensures multi-instance safety:
  * - JsonStore: single-writer in one process, CAS is a no-op but keeps the interface.
@@ -258,7 +258,12 @@ export const requireAuth: RequestHandler = (req: Request, _res: Response, next: 
       // clearly-invalid Firebase token that is also not a legacy JWT still
       // fails below.
       if (err instanceof AppError) {
-        // Re-throw AppErrors from ensureUserFromFirebase; continue for verify failures.
+        // ensureUserFromFirebase refuses an unverified email link with
+        // AUTH_EMAIL_UNVERIFIED. That must reach the client. Falling through
+        // to the legacy JWT would hide it and, for a token that is not one
+        // we issued, turn a 403 into a generic 401. AUTH_INVALID and
+        // AUTH_REQUIRED still fall through so a non-Firebase bearer can be a
+        // legacy access JWT.
         if (err.code !== 'AUTH_INVALID' && err.code !== 'AUTH_REQUIRED') {
           next(err);
           return;

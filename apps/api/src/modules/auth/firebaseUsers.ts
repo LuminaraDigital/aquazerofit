@@ -1,7 +1,25 @@
 /**
- * Local User hydration for verified Firebase identities (web Auth path).
+ * Local User hydration for Firebase identities (web Auth path).
  * Kept separate from platform/auth.ts to avoid a circular import with the
  * JWT/refresh module that requireAuth lives in.
+ *
+ * Linking an existing account by email requires email_verified === true,
+ * administrators included. An unverified token that names an existing email
+ * throws AUTH_EMAIL_UNVERIFIED ("Verify your email first") and does not
+ * write firebaseUid, role, or emailVerified on that account.
+ *
+ * A token that matches no existing account still provisions a new local
+ * user. That is the current product rule: there is nobody to take over, the
+ * new row is role "user" and tier "free", and it cannot attach itself to
+ * someone else. emailVerified is stored true only when the token says so,
+ * or when config.isDev is true (the same non-production convenience password
+ * registration uses). Production (NODE_ENV=production) leaves emailVerified
+ * false until a later verified sign-in.
+ *
+ * An identity already linked by firebaseUid loads that user even when this
+ * token's email is unverified. The uid binding is the identity. This path
+ * does not read a role from the token (there is none) and sets emailVerified
+ * only when the token reports the email verified.
  */
 import type { User } from '@aquazerofit/shared';
 import { containsProfanity } from '@aquazerofit/shared';
@@ -35,9 +53,10 @@ function findUserByFirebaseUid(uid: string): User | undefined {
 }
 
 /**
- * Resolve or create the local User for a verified Firebase identity.
- * Links by email when an existing account matches, otherwise provisions.
- * Credentials stay in Firebase Auth - no password hash is written here.
+ * Resolve or create the local User for a Firebase identity.
+ * Links by email only when email_verified is true. Otherwise provisions a
+ * new user, or refuses when that email is already taken.
+ * Credentials stay in Firebase Auth. No password hash is written here.
  */
 export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string): User {
   const store = getStore();
@@ -61,8 +80,22 @@ export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string):
   if (email) {
     const byEmail = findUserByEmail(email);
     if (byEmail) {
-      let user: User = { ...byEmail, firebaseUid: identity.uid };
-      if (identity.emailVerified) user = { ...user, emailVerified: true };
+      // Unverified must not link, including when byEmail.role is admin.
+      // Refuse before any write so a retry after verification is clean.
+      if (identity.emailVerified !== true) {
+        auditAuthEvent(
+          byEmail.id,
+          'firebase.link.rejected',
+          {
+            reason: 'email_unverified',
+            emailHash: hashIdentifier(email),
+            firebaseUidHash: hashIdentifier(identity.uid),
+          },
+          ip,
+        );
+        throw new AppError('AUTH_EMAIL_UNVERIFIED', 'Verify your email first');
+      }
+      let user: User = { ...byEmail, firebaseUid: identity.uid, emailVerified: true };
       if (user.deletionRequestedAt) {
         user = { ...user, deletionRequestedAt: null };
         auditAuthEvent(user.id, 'deletion.cancelled', undefined, ip);

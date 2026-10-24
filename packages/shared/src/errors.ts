@@ -9,6 +9,11 @@ export const ERROR_CODES = {
   AUTH_INVALID: 401,
   AUTH_TG_INVALID: 401,
   AUTH_TG_STALE: 401,
+  // The Firebase ID token verified, but email_verified was not true, so the
+  // identity must not be linked to an existing account (administrators
+  // included). 403, not 401: the token is not missing or expired, and clients
+  // that retry 401s must not loop. Show `message` ("Verify your email first").
+  AUTH_EMAIL_UNVERIFIED: 403,
   FORBIDDEN: 403,
   // Distinct from FORBIDDEN so clients can deep-link to the consent screen:
   // the resource exists but access requires an explicit opt-in (AQF-07 §3.4).
@@ -19,14 +24,14 @@ export const ERROR_CODES = {
   // The store did not recognise the purchase, or it is in a state that holds
   // no entitlement. Distinct from PAYMENT_UNAVAILABLE because this one is
   // final: retrying the same token will fail the same way, so a client must
-  // stop rather than back off. Also the forged-token path — never grant on it.
+  // stop rather than back off. Also the forged-token path. Never grant on it.
   PURCHASE_INVALID: 402,
   SAFETY_INPUT: 422,
   SAFETY_OUTPUT: 422,
   RATE_LIMITED: 429,
   AI_UNAVAILABLE: 503,
   // Distinct from AI_UNAVAILABLE so a client can tell "the coach can't answer
-  // right now" from "this deployment cannot take payments at all" — the first
+  // right now" from "this deployment cannot take payments at all". The first
   // is worth retrying, the second is worth hiding the buy button for.
   PAYMENT_UNAVAILABLE: 503,
   INTERNAL: 500,

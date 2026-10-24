@@ -237,9 +237,7 @@ private fun Ladder(record: FightRecordStatusDto) {
     AzfCard(modifier = Modifier.fillMaxWidth()) {
         SectionHeading(stringResource(R.string.fight_record_ladder_heading))
         record.ladder.forEach { rung ->
-            // A tier this build cannot name decodes to null; skip that rung.
-            val tier = rung.tier ?: return@forEach
-            val isHeld = isRungHeld(tier, record.current.tier)
+            val isHeld = isRungHeld(rung.tier, record.current.tier)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -247,9 +245,9 @@ private fun Ladder(record: FightRecordStatusDto) {
                     .padding(top = AzfSpacing.ElementGapSmall)
                     .semantics(mergeDescendants = true) { stateDescription = if (isHeld) held else ahead },
             ) {
-                BeltBadge(tier = tier, width = 48.dp)
+                BeltBadge(tier = rung.tier, width = 48.dp)
                 Text(
-                    text = beltName(tier),
+                    text = beltName(rung.tier),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
@@ -284,11 +282,10 @@ private fun Ladder(record: FightRecordStatusDto) {
 /** Highest belt from every season, newest first, as the server orders them. */
 @Composable
 private fun Shelf(record: FightRecordStatusDto) {
-    val belts = record.belts.filter { it.tier != null }
     AzfCard(modifier = Modifier.fillMaxWidth()) {
         SectionHeading(stringResource(R.string.fight_record_shelf_heading))
-        if (belts.isEmpty()) {
-            record.ladder.firstOrNull { it.tier != null }?.let { first ->
+        if (record.belts.isEmpty()) {
+            record.ladder.firstOrNull()?.let { first ->
                 Text(
                     text = pluralStringResource(R.plurals.fight_record_shelf_empty, first.activeDays, first.activeDays),
                     style = MaterialTheme.typography.bodyMedium,
@@ -297,7 +294,7 @@ private fun Shelf(record: FightRecordStatusDto) {
                 )
             }
         }
-        belts.forEach { belt ->
+        record.belts.forEach { belt ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier

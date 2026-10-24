@@ -24,9 +24,6 @@ import java.time.LocalDate
 internal sealed interface NextBelt {
     data class Days(val days: Int, val tier: BeltTier) : NextBelt
 
-    /** A rung this build cannot name (a tier added after it shipped). */
-    data class DaysToUnnamed(val days: Int) : NextBelt
-
     /** Black is held: the top of the ladder this season. */
     data object TopOfLadder : NextBelt
 
@@ -39,8 +36,7 @@ internal sealed interface NextBelt {
          */
         fun of(progress: FightRecordSeasonProgressDto): NextBelt {
             val next = progress.next ?: return TopOfLadder
-            val days = (next.activeDays - progress.activeDays).coerceAtLeast(1)
-            return next.tier?.let { Days(days, it) } ?: DaysToUnnamed(days)
+            return Days((next.activeDays - progress.activeDays).coerceAtLeast(1), next.tier)
         }
     }
 }
@@ -62,10 +58,11 @@ internal fun beltNameRes(tier: BeltTier?): Int = when (tier) {
     BeltTier.PURPLE -> R.string.fight_record_belt_purple
     BeltTier.BROWN -> R.string.fight_record_belt_brown
     BeltTier.BLACK -> R.string.fight_record_belt_black
+    BeltTier.UNKNOWN -> R.string.fight_record_belt_new
     null -> R.string.fight_record_no_belt
 }
 
-/** "Blue Belt", or "No belt yet" before the first rung. */
+/** "Blue Belt", "New belt" for a tier this build cannot name, or "No belt yet". */
 @Composable
 internal fun beltName(tier: BeltTier?): String = stringResource(beltNameRes(tier))
 
@@ -77,11 +74,6 @@ internal fun nextBeltText(progress: FightRecordSeasonProgressDto): String = when
         next.days,
         next.days,
         beltName(next.tier),
-    )
-    is NextBelt.DaysToUnnamed -> pluralStringResource(
-        R.plurals.fight_record_next_belt_unnamed,
-        next.days,
-        next.days,
     )
     NextBelt.TopOfLadder -> stringResource(R.string.fight_record_top_of_ladder)
 }

@@ -38,9 +38,9 @@ class FightRecordUiTest {
 
     @Test
     fun `a next rung this build cannot name still gets its day count`() {
-        val current = fightRecordStatus(activeDays = 50, next = BeltRungDto(tier = null, activeDays = 60)).current
+        val current = fightRecordStatus(activeDays = 50, next = BeltRungDto(BeltTier.UNKNOWN, 60)).current
 
-        assertEquals(NextBelt.DaysToUnnamed(10), NextBelt.of(current))
+        assertEquals(NextBelt.Days(10, BeltTier.UNKNOWN), NextBelt.of(current))
     }
 
     @Test
@@ -63,5 +63,7 @@ class FightRecordUiTest {
         assertTrue(isRungHeld(BeltTier.BLUE, BeltTier.BLUE))
         assertFalse(isRungHeld(BeltTier.PURPLE, BeltTier.BLUE))
         assertFalse(isRungHeld(BeltTier.WHITE, null))
+        // A tier newer than this build sits above every rung it knows.
+        assertTrue(BeltTier.entries.all { isRungHeld(it, BeltTier.UNKNOWN) })
     }
 }

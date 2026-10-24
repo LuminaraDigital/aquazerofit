@@ -50,6 +50,7 @@ internal fun BeltBadge(
     width: Dp = 80.dp,
 ) {
     val outline = MaterialTheme.colorScheme.outline
+    val unknown = MaterialTheme.colorScheme.primary
     Spacer(
         modifier = modifier
             .size(width = width, height = width * VIEW_HEIGHT / VIEW_WIDTH)
@@ -67,7 +68,7 @@ internal fun BeltBadge(
                         drawBox(scale, BAND, outline, dashed)
                         return@onDrawBehind
                     }
-                    val fill = beltColour(tier)
+                    val fill = beltColour(tier, unknown)
                     drawBox(scale, BAND, fill, null)
                     drawBox(scale, BAND, outline, stroke)
                     drawBox(scale, RANK_BAR, rankBarColour(tier), null)
@@ -82,13 +83,19 @@ internal fun BeltBadge(
     )
 }
 
-/** Belt colours, mirroring `BELT_COLOUR` in `apps/web/src/lib/fightRecord.ts`. */
-private fun beltColour(tier: BeltTier): Color = when (tier) {
+/**
+ * Belt colours, mirroring `BELT_COLOUR` in `apps/web/src/lib/fightRecord.ts`.
+ * A tier newer than this build has no colour to mirror, so it takes the
+ * theme's accent: plainly a belt, and not one of the five it might be mistaken
+ * for.
+ */
+private fun beltColour(tier: BeltTier, unknown: Color): Color = when (tier) {
     BeltTier.WHITE -> Color(0xFFF4F6F8)
     BeltTier.BLUE -> Color(0xFF2F6FED)
     BeltTier.PURPLE -> Color(0xFF7B4FD6)
     BeltTier.BROWN -> Color(0xFF8A5A3B)
     BeltTier.BLACK -> Color(0xFF16181D)
+    BeltTier.UNKNOWN -> unknown
 }
 
 /** The rank bar: black on every belt, red on a black belt (`rankBarColour` on the web). */

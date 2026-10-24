@@ -47,7 +47,7 @@ class FightRecordDtoTest {
         assertEquals(23, record.current.daysLeft)
         assertEquals(BeltTier.BLUE, record.current.tier)
         assertEquals(BeltRungDto(BeltTier.PURPLE, 24), record.current.next)
-        assertEquals(BeltTier.entries, record.ladder.map { it.tier })
+        assertEquals(BeltTier.entries - BeltTier.UNKNOWN, record.ladder.map { it.tier })
         assertEquals(listOf(3, 12, 24, 36, 48), record.ladder.map { it.activeDays })
         assertEquals(BeltTier.BLUE, record.belts.single().tier)
         assertNull(record.celebrate)
@@ -97,7 +97,7 @@ class FightRecordDtoTest {
     }
 
     @Test
-    fun `a tier this build has never heard of decodes to null instead of failing`() {
+    fun `a tier this build has never heard of decodes as unknown instead of failing`() {
         val record = decode(
             """
             {"fightRecord": {"current": {
@@ -114,11 +114,31 @@ class FightRecordDtoTest {
             """,
         ).fightRecord!!
 
-        assertNull(record.current.tier)
-        assertNull(record.current.next!!.tier)
-        assertEquals(listOf(BeltTier.BLACK, null), record.ladder.map { it.tier })
-        // The known belt survives beside the unknown one.
-        assertEquals(listOf(null, BeltTier.BLACK), record.belts.map { it.tier })
+        // Unknown, not null: the holder of a new belt is not told "No belt yet".
+        assertEquals(BeltTier.UNKNOWN, record.current.tier)
+        assertEquals(BeltTier.UNKNOWN, record.current.next!!.tier)
+        assertEquals(listOf(BeltTier.BLACK, BeltTier.UNKNOWN), record.ladder.map { it.tier })
+        assertEquals(listOf(BeltTier.UNKNOWN, BeltTier.BLACK), record.belts.map { it.tier })
+    }
+
+    @Test
+    fun `the offline cache round trip keeps no belt as null and a new belt as unknown`() {
+        val envelope = decode(
+            """
+            {"fightRecord": {"current": {
+              "season": {"id": "season-1", "number": 1, "name": "Fight Camp",
+                         "startsOn": "2026-10-19", "endsOn": "2026-12-13"},
+              "activeDays": 1, "daysLeft": 50, "tier": null,
+              "next": {"tier": "red", "activeDays": 3}
+            }}}
+            """,
+        )
+
+        val cached = AzfJson.encodeToString(FightRecordEnvelopeDto.serializer(), envelope)
+        val reread = AzfJson.decodeFromString(FightRecordEnvelopeDto.serializer(), cached).fightRecord!!
+
+        assertNull(reread.current.tier)
+        assertEquals(BeltTier.UNKNOWN, reread.current.next!!.tier)
     }
 
     private fun decode(json: String): FightRecordEnvelopeDto =

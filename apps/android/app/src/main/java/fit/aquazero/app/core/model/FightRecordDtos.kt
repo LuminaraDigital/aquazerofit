@@ -1,7 +1,12 @@
 package fit.aquazero.app.core.model
 
-import kotlinx.serialization.SerialName
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 // Fight Record: seasons and Consistency Belts (AZF-W3-05 §4.3), mirroring
 // `packages/shared/src/types/fightRecord.ts`.
@@ -10,29 +15,38 @@ import kotlinx.serialization.Serializable
  * Mirrors TS `BELT_TIERS`. Ascending and load-bearing: a held-rung check is an
  * ordinal comparison, which is why the server only ever appends at the top.
  *
- * Every field typed with this enum is nullable with a `null` default, and that
- * is the whole forward-compatibility story: under `AzfJson.coerceInputValues`
- * a tier this build has never heard of decodes to `null` instead of failing
- * the payload. Callers read a null rung or belt tier as "skip that row" and a
- * null current tier as "No belt yet", so a server that appends a tier above
- * black degrades one row instead of blanking the whole surface.
+ * [UNKNOWN] is a tier added after this build shipped, read by
+ * [BeltTierSerializer] instead of failing the payload. It sits last for the
+ * same append-only reason, so every known rung counts as held beneath it.
+ * "No belt yet" is a different fact and stays a null tier: folding the two
+ * together would tell the holder of a new belt that they have none.
  */
-@Serializable
-enum class BeltTier {
-    @SerialName("white")
-    WHITE,
+@Serializable(with = BeltTierSerializer::class)
+enum class BeltTier(internal val wire: String) {
+    WHITE("white"),
+    BLUE("blue"),
+    PURPLE("purple"),
+    BROWN("brown"),
+    BLACK("black"),
+    UNKNOWN("unknown"),
+}
 
-    @SerialName("blue")
-    BLUE,
+/**
+ * Wire names in, [BeltTier.UNKNOWN] for anything else. A plain enum would
+ * need a non-null default to coerce into, and with `explicitNulls = false` a
+ * defaulted nullable field cannot survive the offline cache: the encoder
+ * drops a null, and decoding the gap would bring back the default.
+ */
+internal object BeltTierSerializer : KSerializer<BeltTier> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("fit.aquazero.app.core.model.BeltTier", PrimitiveKind.STRING)
 
-    @SerialName("purple")
-    PURPLE,
+    override fun deserialize(decoder: Decoder): BeltTier {
+        val wire = decoder.decodeString()
+        return BeltTier.entries.firstOrNull { it.wire == wire } ?: BeltTier.UNKNOWN
+    }
 
-    @SerialName("brown")
-    BROWN,
-
-    @SerialName("black")
-    BLACK,
+    override fun serialize(encoder: Encoder, value: BeltTier) = encoder.encodeString(value.wire)
 }
 
 /** Mirrors TS `Season`: a 56-day span of the user's local dates, inclusive. */
@@ -51,7 +65,7 @@ data class SeasonDto(
 /** Mirrors TS `BeltRung`: the active days in a season that earn [tier]. */
 @Serializable
 data class BeltRungDto(
-    val tier: BeltTier? = null,
+    val tier: BeltTier,
     val activeDays: Int = 0,
 )
 
@@ -61,7 +75,7 @@ data class BeltAwardDto(
     val id: String = "",
     val seasonNumber: Int = 0,
     val seasonName: String = "",
-    val tier: BeltTier? = null,
+    val tier: BeltTier,
     val awardedAt: String = "",
 )
 

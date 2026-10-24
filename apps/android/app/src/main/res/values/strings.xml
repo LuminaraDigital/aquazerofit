@@ -1284,14 +1284,11 @@
     <string name="fight_record_belt_purple">Purple Belt</string>
     <string name="fight_record_belt_brown">Brown Belt</string>
     <string name="fight_record_belt_black">Black Belt</string>
+    <string name="fight_record_belt_new">New belt</string>
     <string name="fight_record_no_belt">No belt yet</string>
     <plurals name="fight_record_next_belt">
         <item quantity="one">%1$d active day to your %2$s.</item>
         <item quantity="other">%1$d active days to your %2$s.</item>
-    </plurals>
-    <plurals name="fight_record_next_belt_unnamed">
-        <item quantity="one">%1$d active day to your next belt.</item>
-        <item quantity="other">%1$d active days to your next belt.</item>
     </plurals>
     <string name="fight_record_top_of_ladder">Black Belt: the top of the ladder this season.</string>
     <plurals name="fight_record_days_left">

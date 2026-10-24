@@ -6,7 +6,9 @@ import {
   FRAME_ANCESTORS,
   SCRIPT_SRC,
   SECURITY_HEADERS,
+  WORKER_SRC,
   contentSecurityPolicy,
+  secureSpaResponse,
   withSecurityHeaders,
 } from './securityHeaders.ts';
 import worker from './index.ts';
@@ -40,6 +42,7 @@ test('script-src and connect-src match Telegram, Turnstile, Firebase, and the AP
   for (const source of [
     "'self'",
     API_ORIGIN,
+    'https://challenges.cloudflare.com',
     'https://identitytoolkit.googleapis.com',
     'https://securetoken.googleapis.com',
     'https://firebaseinstallations.googleapis.com',
@@ -48,6 +51,12 @@ test('script-src and connect-src match Telegram, Turnstile, Firebase, and the AP
   ]) {
     assert.ok(connect.includes(source), `connect-src missing ${source}`);
   }
+  assert.deepEqual(sources(policy, 'worker-src'), [...WORKER_SRC]);
+  assert.deepEqual(WORKER_SRC, ["'none'"]);
+  assert.ok(sources(policy, 'frame-src').includes('https://*.firebaseapp.com'));
+  assert.equal(policy.includes('unsafe-eval'), false);
+  assert.equal(policy.includes('unsafe-inline') && policy.includes('script-src'), true);
+  assert.equal(sources(policy, 'script-src').includes("'unsafe-inline'"), false);
   assert.deepEqual(scripts, [...SCRIPT_SRC]);
   assert.deepEqual(connect, [...CONNECT_SRC]);
 });
@@ -105,6 +114,28 @@ test('proxied API requests carry the Worker secret and the edge client ip', asyn
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test('HTML JSON-LD receives a script nonce and other responses do not', async () => {
+  const html = '<html><head><script type="application/ld+json">{"@context":"https://schema.org"}</script></head></html>';
+  const first = await secureSpaResponse(
+    new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+  );
+  const second = await secureSpaResponse(
+    new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+  );
+  const body = await first.text();
+  const policy = first.headers.get('Content-Security-Policy') ?? '';
+  const nonce = sources(policy, 'script-src')[0];
+  assert.match(nonce, /^'nonce-[A-Za-z0-9+/=]+'$/);
+  const nonceValue = nonce.slice("'nonce-".length, -1);
+  assert.ok(body.includes(`<script type="application/ld+json" nonce="${nonceValue}">`));
+  assert.notEqual(first.headers.get('Content-Security-Policy'), second.headers.get('Content-Security-Policy'));
+  const plain = await secureSpaResponse(
+    new Response('{"ok":true}', { headers: { 'content-type': 'application/json' } }),
+  );
+  assert.equal(plain.headers.get('Content-Security-Policy'), contentSecurityPolicy());
+  assert.equal(sources(plain.headers.get('Content-Security-Policy') ?? '', 'script-src').some((s) => s.startsWith("'nonce-")), false);
 });
 
 test('the asset path applies those headers and does not invent X-Frame-Options', async () => {

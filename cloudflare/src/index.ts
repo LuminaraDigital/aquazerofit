@@ -1,6 +1,6 @@
 /// <reference path="../worker-configuration.d.ts" />
 import { canonicalRedirect, isProxiedPath, upstreamRequest } from './proxy.ts';
-import { withSecurityHeaders } from './securityHeaders.ts';
+import { secureSpaResponse } from './securityHeaders.ts';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -11,6 +11,6 @@ export default {
       const upstream = upstreamRequest(request, env.API_ORIGIN, env.ORIGIN_SHARED_SECRET);
       return fetch(upstream.url, upstream.init);
     }
-    return withSecurityHeaders(await env.ASSETS.fetch(request));
+    return secureSpaResponse(await env.ASSETS.fetch(request));
   },
 };

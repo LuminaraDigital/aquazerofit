@@ -10,7 +10,7 @@ import {
   GROWTH_EVENT_NAMES,
   MEMORY_FACT_CATEGORIES,
 } from './types';
-import { MEMORY_FACT_MAX_CHARS, RANGES } from './constants';
+import { MEMORY_FACT_MAX_CHARS, RANGES, TG_INIT_DATA_MAX_BYTES } from './constants';
 import { COACHES } from './coaches';
 import { containsProfanity, PROFANITY_MESSAGE } from './profanity';
 
@@ -18,7 +18,7 @@ import { containsProfanity, PROFANITY_MESSAGE } from './profanity';
 
 /**
  * A real calendar date in YYYY-MM-DD. The regex alone let impossible dates
- * (2026-13-40) through — round-tripping through Date proves the components
+ * (2026-13-40) through - round-tripping through Date proves the components
  * describe a day that exists (UTC so no timezone can shift the day).
  */
 export const localDateSchema = z
@@ -70,10 +70,21 @@ export const passwordResetConfirmSchema = z.object({
   newPassword: passwordSchema,
 });
 
-export const telegramAuthSchema = z.object({ initData: z.string().min(10) });
+export const telegramAuthSchema = z.object({
+  initData: z.string().min(10).max(TG_INIT_DATA_MAX_BYTES),
+});
 
 /**
- * POST /me/credentials — a Telegram-provisioned account (no credentials record)
+ * POST /me/link-telegram. `confirm` must be true before an existing Telegram
+ * id is replaced. Without it, the call links only when this account has no
+ * Telegram id yet, or when the id is the same one again.
+ */
+export const linkTelegramSchema = telegramAuthSchema.extend({
+  confirm: z.boolean().optional(),
+});
+
+/**
+ * POST /me/credentials - a Telegram-provisioned account (no credentials record)
  * sets a real email + password so it can sign in on the web. Same password
  * policy as registration; the email replaces the synthetic tg-…@ placeholder.
  */
@@ -303,7 +314,7 @@ export type AddMemoryFactInput = z.infer<typeof addMemoryFactSchema>;
 
 /**
  * PATCH on a fact: confirm/reject a suggestion or edit its wording. 'suggested'
- * is deliberately not settable — only the extraction pipeline creates
+ * is deliberately not settable - only the extraction pipeline creates
  * suggestions; a user touching a fact always resolves it.
  */
 export const updateMemoryFactSchema = z
@@ -362,7 +373,7 @@ export const growthEventSchema = z.object({
   /**
    * Derived from GROWTH_EVENT_NAMES rather than restated. The list used to be
    * written out twice, which meant a new event name added to the type passed
-   * typecheck on the client and was then rejected at 400 by the server — a
+   * typecheck on the client and was then rejected at 400 by the server - a
    * drift that only shows up in production telemetry going quiet.
    */
   name: z.enum(GROWTH_EVENT_NAMES),

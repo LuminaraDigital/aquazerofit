@@ -9,10 +9,11 @@ export const ERROR_CODES = {
   AUTH_INVALID: 401,
   AUTH_TG_INVALID: 401,
   AUTH_TG_STALE: 401,
-  // The Firebase ID token verified, but email_verified was not true, so the
-  // identity must not be linked to an existing account (administrators
-  // included). 403, not 401: the token is not missing or expired, and clients
-  // that retry 401s must not loop. Show `message` ("Verify your email first").
+  // The Firebase ID token verified, but the link must not proceed. Either
+  // email_verified was not true on the token, or the existing account's
+  // emailVerified is false (an address that was stored without mailbox
+  // proof). Administrators included. 403, not 401: the token is not missing
+  // or expired, and clients that retry 401s must not loop.
   AUTH_EMAIL_UNVERIFIED: 403,
   FORBIDDEN: 403,
   // Distinct from FORBIDDEN so clients can deep-link to the consent screen:

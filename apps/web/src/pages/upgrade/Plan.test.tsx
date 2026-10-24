@@ -7,20 +7,39 @@
  * balance — rather than a value proposition, so the numbers come from the API
  * fixture and are asserted as rendered.
  *
- * Second, and the reason this file is emphatic about it: there is no payment
- * provider in this product. So there must be no purchase control, and nothing
- * that changes `tier`. A button wired to nothing is worse than an honest
+ * Second, and the reason this file is emphatic about it: a purchase control
+ * appears only when the deployment can actually take a payment, with Stripe's
+ * price on it. Otherwise there is no purchase control at all, and nothing here
+ * ever changes `tier`. A button wired to nothing is worse than an honest
  * sentence, and a self-serve tier flip with no payment behind it would be a
  * vulnerability rather than a placeholder.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS, MAX_BANKED_CREDITS } from '@aquazerofit/shared';
-import type { Entitlements } from '@/lib/queries';
+import type { BillingConfig, Entitlements } from '@/lib/queries';
 
-const mocks = vi.hoisted(() => ({ useEntitlements: vi.fn() }));
-vi.mock('@/lib/queries', () => ({ useEntitlements: mocks.useEntitlements }));
+const mocks = vi.hoisted(() => ({
+  useEntitlements: vi.fn(),
+  useBillingConfig: vi.fn(),
+  startCheckout: vi.fn(),
+  // The sync hook's state for the session in the URL; idle unless a case says otherwise.
+  syncCheckout: vi.fn(
+    (_sessionId: string | null): { isError: boolean; isSuccess: boolean; data?: { tier: string } } => ({
+      isError: false,
+      isSuccess: false,
+    }),
+  ),
+  isTMA: vi.fn(() => false),
+}));
+vi.mock('@/lib/queries', () => ({
+  useEntitlements: mocks.useEntitlements,
+  useBillingConfig: mocks.useBillingConfig,
+  useStartStripeCheckout: () => ({ mutate: mocks.startCheckout, isPending: false, isError: false }),
+  useStripeCheckoutSync: mocks.syncCheckout,
+}));
+vi.mock('@/lib/telegram', () => ({ isTMA: mocks.isTMA }));
 
 import Plan from './Plan';
 
@@ -34,13 +53,18 @@ const FREE: Entitlements = {
 
 const PREMIUM: Entitlements = { ...FREE, tier: 'premium', creditsRemaining: 47 };
 
+const NO_STRIPE: BillingConfig = { stripe: { available: false, price: null } };
+const STRIPE: BillingConfig = {
+  stripe: { available: true, price: { amount: 999, currency: 'aud', interval: 'month' } },
+};
+
 interface QueryState {
   data?: Entitlements;
   isLoading?: boolean;
   isError?: boolean;
 }
 
-function renderWith(state: QueryState) {
+function renderWith(state: QueryState, billing: BillingConfig = NO_STRIPE, url = '/plan') {
   mocks.useEntitlements.mockReturnValue({
     data: undefined,
     isLoading: false,
@@ -48,8 +72,9 @@ function renderWith(state: QueryState) {
     refetch: vi.fn(),
     ...state,
   });
+  mocks.useBillingConfig.mockReturnValue({ data: billing, isLoading: false });
   return render(
-    <MemoryRouter initialEntries={['/plan']}>
+    <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route path="/plan" element={<Plan />} />
         <Route path="/progress" element={<p>progress</p>} />
@@ -61,6 +86,8 @@ function renderWith(state: QueryState) {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mocks.syncCheckout.mockReset();
+  mocks.syncCheckout.mockImplementation(() => ({ isError: false, isSuccess: false }));
 });
 
 describe('plan page — free tier', () => {
@@ -115,11 +142,11 @@ describe('plan page — free tier', () => {
     expect(within(photo as HTMLElement).getByText(`${CREDIT_COSTS.mealPhoto} credits`)).toBeTruthy();
   });
 
-  it('says the purchase step does not exist instead of faking one', () => {
+  it('says the purchase step is not available instead of faking one when payment is not configured', () => {
     const { container } = renderWith({ data: FREE });
 
-    expect(screen.getByRole('heading', { name: /upgrading is not available yet/i })).toBeTruthy();
-    expect(screen.getByText(/payment is not built yet/i)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /upgrading is not available here yet/i })).toBeTruthy();
+    expect(screen.getByText(/you cannot buy premium from this screen yet/i)).toBeTruthy();
 
     // No checkout affordance of any kind — not even a disabled one.
     for (const role of ['button', 'link'] as const) {
@@ -141,8 +168,14 @@ describe('plan page — premium tier', () => {
     expect(screen.getByRole('heading', { name: /what premium gives you/i })).toBeTruthy();
     expect(screen.getByText('On')).toBeTruthy();
 
-    expect(screen.queryByText(/upgrading is not available yet/i)).toBeNull();
-    expect(screen.queryByText(/payment is not built yet/i)).toBeNull();
+    expect(screen.queryByText(/upgrading is not available/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
+  });
+
+  it('is never offered a second subscription, even where checkout is available', () => {
+    renderWith({ data: PREMIUM }, STRIPE);
+
+    expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
   });
 
   it('still prices credits, because credits are spent on premium too', () => {
@@ -158,7 +191,7 @@ describe('plan page — non-content states', () => {
     const { container } = renderWith({ isLoading: true });
 
     expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
-    expect(screen.queryByText(/upgrading is not available yet/i)).toBeNull();
+    expect(screen.queryByText(/upgrading is not available/i)).toBeNull();
   });
 
   it('offers a retry rather than an empty page when the request fails', () => {
@@ -166,5 +199,53 @@ describe('plan page — non-content states', () => {
 
     expect(screen.getByRole('alert')).toBeTruthy();
     expect(screen.getByRole('button', { name: /try again/i })).toBeTruthy();
+  });
+});
+
+describe('plan page — Stripe checkout', () => {
+  it("offers Subscribe with Stripe's price on the button, and opens checkout when pressed", () => {
+    renderWith({ data: FREE }, STRIPE);
+
+    const subscribe = screen.getByRole('button', { name: /subscribe for .*9\.99 \/ month/i });
+    expect(screen.queryByText(/upgrading is not available/i)).toBeNull();
+
+    fireEvent.click(subscribe);
+    expect(mocks.startCheckout).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps Stripe out of the Telegram Mini App, where Telegram requires Stars', () => {
+    mocks.isTMA.mockReturnValueOnce(true);
+    renderWith({ data: FREE }, STRIPE);
+
+    expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
+    expect(screen.getByRole('heading', { name: /upgrading is not available here yet/i })).toBeTruthy();
+  });
+
+  it('settles the session Stripe sends the buyer back with', () => {
+    renderWith({ data: FREE }, STRIPE, '/plan?checkout=success&session_id=cs_test_abc');
+
+    expect(mocks.syncCheckout).toHaveBeenCalledWith('cs_test_abc');
+    expect(screen.getByRole('status').textContent).toMatch(/confirming your payment/i);
+  });
+
+  it('says premium is on once the server has confirmed the payment', () => {
+    mocks.syncCheckout.mockReturnValue({ isError: false, isSuccess: true, data: { tier: 'premium' } });
+    renderWith({ data: FREE }, STRIPE, '/plan?checkout=success&session_id=cs_test_abc');
+
+    expect(screen.getByRole('status').textContent).toMatch(/payment received. premium is on/i);
+  });
+
+  it('says so plainly when the payment could not be confirmed, rather than spinning', () => {
+    mocks.syncCheckout.mockReturnValue({ isError: true, isSuccess: false });
+    renderWith({ data: FREE }, STRIPE, '/plan?checkout=success&session_id=cs_test_abc');
+
+    expect(screen.getByRole('status').textContent).toMatch(/could not confirm this checkout yet/i);
+  });
+
+  it('says nothing was charged when the buyer backs out of checkout', () => {
+    renderWith({ data: FREE }, STRIPE, '/plan?checkout=cancelled');
+
+    expect(screen.getByRole('status').textContent).toMatch(/nothing was charged/i);
+    expect(mocks.syncCheckout.mock.calls.every(([sessionId]) => sessionId === null)).toBe(true);
   });
 });

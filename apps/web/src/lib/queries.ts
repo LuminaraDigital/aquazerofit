@@ -189,9 +189,8 @@ export function useLinkTelegram() {
 
 /**
  * GET /me/entitlements — read-only. There is deliberately no companion
- * mutation: nothing client-side may change `tier`, because with no payment
- * provider behind it a self-serve tier flip is an entitlement any caller could
- * grant themselves.
+ * mutation: nothing client-side may change `tier`. Premium arrives only from a
+ * payment the server has confirmed with the provider itself.
  *
  * Answers a bare object today; `unwrap` keeps the hook stable if it is ever
  * moved into the house `{ entitlements }` envelope.
@@ -202,6 +201,62 @@ export function useEntitlements(): UseQueryResult<Entitlements | null> {
     queryFn: async () =>
       unwrap<Entitlements>(await orNull(() => api<unknown>('/me/entitlements')), 'entitlements'),
     enabled: tokenStore.isAuthenticated,
+  });
+}
+
+/** GET /billing/config — which purchase rails this deployment can take, and Stripe's price. */
+export interface BillingConfig {
+  stripe?: {
+    available: boolean;
+    /** Minor units, e.g. 999 for $9.99. Null whenever `available` is false. */
+    price: { amount: number; currency: string; interval: string } | null;
+  };
+}
+
+export function useBillingConfig(): UseQueryResult<BillingConfig> {
+  return useQuery({
+    queryKey: ['billing', 'config'],
+    queryFn: () => api<BillingConfig>('/billing/config', { auth: false }),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * POST /billing/stripe/checkout, then leave for Stripe's hosted page. The page
+ * is left on success, so there is no onSuccess state to manage here.
+ */
+export function useStartStripeCheckout() {
+  return useMutation({
+    mutationFn: () => api<{ url: string }>('/billing/stripe/checkout', { method: 'POST' }),
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+}
+
+/**
+ * POST /billing/stripe/sync — settle the session Stripe redirected back with.
+ *
+ * A query, not a mutation, although it POSTs: settling is idempotent server
+ * side, and a mutation fired from an effect loses its result to StrictMode's
+ * dev remount. Re-asks a few times while Stripe is still confirming, so the
+ * page turns premium without a reload.
+ */
+export function useStripeCheckoutSync(sessionId: string | null) {
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: ['billing', 'stripe', 'sync', sessionId],
+    queryFn: async () => {
+      const res = await api<{ tier: UserTier; premiumUntil: string | null }>('/billing/stripe/sync', {
+        method: 'POST',
+        body: { sessionId },
+      });
+      void qc.invalidateQueries({ queryKey: queryKeys.entitlements });
+      return res;
+    },
+    enabled: Boolean(sessionId),
+    retry: false,
+    staleTime: Infinity,
+    refetchInterval: (query) =>
+      query.state.data?.tier === 'free' && query.state.dataUpdateCount < 10 ? 3000 : false,
   });
 }
 

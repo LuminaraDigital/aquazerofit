@@ -127,7 +127,7 @@ instance exists.
 
 ## Follow-ups, not part of this cutover
 
-- Stripe. The API does not read `STRIPE_*`.
+- Stripe. The API reads `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET` (see `.env.example`); none is mounted on this service yet, so checkout stays off.
 - Orange-cloud in front of `run.app`, then `TRUST_PROXY=2`, then closing public ingress on the API hostname. Grey-cloud is not the public path. The Worker is.
 - Firestore. The API is off. The store stays on Cloud SQL.
 - Meal-photo object storage. Cloud Run disk is ephemeral.

@@ -14,10 +14,19 @@ import { getStore, newId } from './store';
 import { effectiveTier } from '../modules/billing/entitlements';
 import { verifyFirebaseIdToken } from './firebaseAdmin';
 
+/** Session opened by Telegram launch-data sign-in. */
+export type SessionChannel = 'telegram';
+
 export interface AuthUser {
   id: string;
   role: UserRole;
   tier: UserTier;
+  /**
+   * Set when this access token belongs to a session opened with Telegram
+   * initData. Absent on password and Firebase sessions. Rotation copies it
+   * from the refresh-token family so a refreshed Mini App token stays one.
+   */
+  channel?: SessionChannel;
 }
 
 declare global {
@@ -44,18 +53,36 @@ export interface RefreshTokenRecord {
   usedAt: string | null;
   revokedAt: string | null;
   createdAt: string;
+  /**
+   * Present when the family was opened by Telegram initData. Copied onto
+   * every rotation so the access token keeps `channel: telegram`.
+   */
+  channel?: SessionChannel;
 }
 
 // ----- access tokens -----
 
-export function signAccess(user: Pick<User, 'id' | 'role' | 'tier' | 'premiumUntil'>): string {
+export function signAccess(
+  user: Pick<User, 'id' | 'role' | 'tier' | 'premiumUntil'>,
+  channel?: SessionChannel,
+): string {
   // effectiveTier, not the raw field: a token minted from a lapsed
   // subscription would otherwise claim premium for its whole 15-minute life on
   // any path that trusts the claim rather than re-reading the document.
-  return jwt.sign({ role: user.role, tier: effectiveTier(user) }, config.jwtAccessSecret, {
-    subject: user.id,
-    expiresIn: config.accessTtlSeconds,
-  });
+  // `channel` is a session fact, not a privilege. Callers that gate on it
+  // still re-read the user document for role and tier.
+  return jwt.sign(
+    {
+      role: user.role,
+      tier: effectiveTier(user),
+      ...(channel === 'telegram' ? { channel: 'telegram' as const } : {}),
+    },
+    config.jwtAccessSecret,
+    {
+      subject: user.id,
+      expiresIn: config.accessTtlSeconds,
+    },
+  );
 }
 
 export function verifyAccess(token: string): AuthUser {
@@ -66,10 +93,12 @@ export function verifyAccess(token: string): AuthUser {
     if (typeof payload === 'string' || typeof payload.sub !== 'string') {
       throw new AppError('AUTH_INVALID', 'Invalid access token');
     }
+    const channel = (payload as { channel?: unknown }).channel;
     return {
       id: payload.sub,
       role: (payload as { role?: UserRole }).role ?? 'user',
       tier: (payload as { tier?: UserTier }).tier ?? 'free',
+      ...(channel === 'telegram' ? { channel: 'telegram' as const } : {}),
     };
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -114,7 +143,11 @@ export interface IssuedRefresh {
   token: string;
 }
 
-export function issueRefresh(userId: string, familyId?: string): IssuedRefresh {
+export function issueRefresh(
+  userId: string,
+  familyId?: string,
+  channel?: SessionChannel,
+): IssuedRefresh {
   const now = new Date();
   const token = crypto.randomBytes(48).toString('base64url');
   const record: RefreshTokenRecord = {
@@ -127,6 +160,7 @@ export function issueRefresh(userId: string, familyId?: string): IssuedRefresh {
     usedAt: null,
     revokedAt: null,
     createdAt: now.toISOString(),
+    ...(channel === 'telegram' ? { channel: 'telegram' as const } : {}),
   };
   getStore().upsert('users', record);
   return { record, token };
@@ -152,7 +186,9 @@ export function revokeFamily(familyId: string): void {
  * - PostgresStore: uses an UPDATE ... WHERE usedAt IS NULL AND revokedAt IS NULL
  *   with a returning clause so only one concurrent refresh succeeds.
  */
-export async function rotateRefresh(token: string): Promise<IssuedRefresh & { userId: string }> {
+export async function rotateRefresh(
+  token: string,
+): Promise<IssuedRefresh & { userId: string; channel?: SessionChannel }> {
   const store = getStore();
   const tokenHash = sha256Hex(token);
   const existing = store.findOne<RefreshTokenRecord>(
@@ -181,8 +217,8 @@ export async function rotateRefresh(token: string): Promise<IssuedRefresh & { us
     throw new AppError('AUTH_INVALID', 'Refresh token reuse detected; session revoked');
   }
 
-  const next = issueRefresh(existing.userId, existing.familyId);
-  return { ...next, userId: existing.userId };
+  const next = issueRefresh(existing.userId, existing.familyId, existing.channel);
+  return { ...next, userId: existing.userId, channel: existing.channel };
 }
 
 export function revokeFamilyByToken(token: string): void {
@@ -278,6 +314,7 @@ export const requireAuth: RequestHandler = (req: Request, _res: Response, next: 
         throw new AppError('AUTH_INVALID', 'Account no longer exists');
       }
       attachUser(req, user);
+      if (claims.channel === 'telegram' && req.user) req.user.channel = 'telegram';
       next();
     } catch (err) {
       next(err instanceof AppError ? err : new AppError('AUTH_INVALID', 'Access token is invalid or expired'));

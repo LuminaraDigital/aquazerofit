@@ -481,7 +481,12 @@ export async function sweepExpiredDeletions(now = new Date()): Promise<number> {
 
 // ----- telegram link -----
 
-export function linkTelegram(userId: string, tgId: number, tgUsername?: string): PublicUser {
+export function linkTelegram(
+  userId: string,
+  tgId: number,
+  tgUsername?: string,
+  confirm = false,
+): PublicUser {
   const store = getStore();
   const user = store.byId<User>('users', userId);
   if (!user) throw new AppError('NOT_FOUND', 'Account not found');
@@ -492,12 +497,20 @@ export function linkTelegram(userId: string, tgId: number, tgUsername?: string):
   if (existing) {
     throw new AppError('CONFLICT', 'This Telegram account is already linked to another user');
   }
+  const replacing = typeof user.tgId === 'number' && user.tgId !== tgId;
+  if (replacing && confirm !== true) {
+    throw new AppError(
+      'CONFLICT',
+      'This account is already linked to another Telegram user. Confirm to replace that link.',
+    );
+  }
   const updated: User = { ...user, tgId, tgUsername };
   store.upsert('users', updated);
   // The raw Telegram id is an identifier. The audit log keeps a short hash,
   // the same scheme purge uses, so a log export cannot be joined back to a
-  // person who only knows this file.
-  auditDataAccess(userId, 'telegram.linked', {
+  // person who only knows this file. A first link and a confirmed replacement
+  // both store that hash; the action name is what distinguishes them.
+  auditDataAccess(userId, replacing ? 'telegram.relinked' : 'telegram.linked', {
     tgIdHash: sha256Hex(String(tgId)).slice(0, 16),
   });
   return toPublicUser(updated);

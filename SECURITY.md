@@ -61,6 +61,31 @@ them without a new exploitation path will be closed as known:
   revocation). Split-origin hosting (`VITE_API_BASE_URL` on another site)
   is outside this cookie design: Lax, host-only, and `credentials: false`
   mean the cookie is not sent cross-site.
+- **Telegram Web does not widen the refresh cookie.** A Mini App inside
+  web.telegram.org is a third-party iframe, so the Lax cookie is not sent.
+  The client re-runs initData auth when cookie refresh fails
+  (`apps/web/src/lib/api.ts`). SameSite=None; Secure was rejected: refresh
+  and logout have no CSRF token, and None would let another site send
+  `azf_rt` and rotate or revoke the session even though CORS
+  `credentials: false` hides the response. Launch data older than 10
+  minutes cannot refresh the session. The user reopens the Mini App. The
+  refresh token from the JSON body is not copied into JavaScript memory.
+- **Unverified email is not a Firebase link key.** `POST /me/credentials`
+  stores a changed address with `emailVerified: false` in every environment,
+  including dev. There is no email-verification token flow. Password reset
+  proves a mailbox only while changing the password, and it is not reused
+  here. Firebase sign-in returns 403 `AUTH_EMAIL_UNVERIFIED` when the token
+  is unverified or when the existing account's email is unverified, and it
+  does not write `firebaseUid`. Password login does not read the flag.
+  What is left: a mailbox-proof flow that sets `emailVerified` only after
+  the address is confirmed, and a way to release an unverified claim.
+  Until then, register still returns CONFLICT while that row holds the
+  address, so the address can be reserved. That is not an account takeover.
+- **Stripe checkout is refused for Telegram sessions.** Access tokens from
+  initData auth carry `channel: telegram`, and refresh rotation keeps it.
+  `POST /billing/stripe/checkout` returns 403 for that channel and does not
+  call Stripe. Password and Firebase sessions are unchanged. The block is
+  the session, not a client header.
 - **Pure-JS bcrypt at cost 12** (`bcryptjs`) on register, sign-in, and
   password change (`BCRYPT_ROUNDS` in `apps/api/src/modules/auth/service.ts`;
   cost 4 under vitest). Seeded demo and admin hashes in

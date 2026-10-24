@@ -1,4 +1,4 @@
-package fit.aquazero.app.feature.dashboard
+package fit.aquazero.app.feature.fightrecord
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -37,14 +37,7 @@ import fit.aquazero.app.core.model.BeltTier
 import fit.aquazero.app.core.model.FightRecordSeasonProgressDto
 import fit.aquazero.app.core.model.FightRecordStatusDto
 import fit.aquazero.app.core.model.SeasonDto
-import fit.aquazero.app.core.ui.BeltBadge
 import fit.aquazero.app.core.ui.CardSkeleton
-import fit.aquazero.app.core.ui.FightRecordUiState
-import fit.aquazero.app.core.ui.beltName
-import fit.aquazero.app.core.ui.daysLeftText
-import fit.aquazero.app.core.ui.nextBeltProgress
-import fit.aquazero.app.core.ui.nextBeltText
-import fit.aquazero.app.core.ui.seasonDatesText
 
 /**
  * Season card on the dashboard (AZF-W3-05 US-01), a port of
@@ -56,8 +49,9 @@ import fit.aquazero.app.core.ui.seasonDatesText
  * calorie or body figure appears on this surface.
  *
  * Renders nothing at all when Fight Record is off for the account, so a dark
- * launch leaves the dashboard exactly as it was. [modifier] carries the gap
- * above the card for the same reason: when the card is absent, so is its gap.
+ * launch leaves the dashboard exactly as it was. The dashboard owns only the
+ * slot and hands its spacing in through [modifier], so when the card is
+ * absent, so is its gap; it imports nothing from this feature.
  *
  * Display-only on Android (R1a): no celebration sheet and no share here; the
  * Fight Record screen holds the one share action.
@@ -66,7 +60,7 @@ import fit.aquazero.app.core.ui.seasonDatesText
 fun SeasonCard(
     onOpenFightRecord: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: SeasonCardViewModel = hiltViewModel(),
+    viewModel: FightRecordViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SeasonCardContent(
@@ -120,11 +114,9 @@ private fun SeasonCardBody(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            // Decorative: the belt is named in full right below it.
             BeltBadge(
                 tier = current.tier,
                 width = 56.dp,
-                decorative = true,
                 modifier = Modifier.padding(start = AzfSpacing.ElementGapSmall, top = 4.dp),
             )
         }

@@ -1,4 +1,4 @@
-package fit.aquazero.app.core.ui
+package fit.aquazero.app.feature.fightrecord
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

@@ -1,4 +1,4 @@
-package fit.aquazero.app.core.ui
+package fit.aquazero.app.feature.fightrecord
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,10 +17,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -44,30 +40,19 @@ import fit.aquazero.app.core.model.BeltTier
  * belt colours are the sport's, not the theme's: a white belt on a light
  * surface and a black belt on Deep Sea would otherwise vanish.
  *
- * @param decorative set when adjacent text already names the belt, so a
- *   screen reader does not hear it twice.
+ * Always decorative: every surface names the belt in text right beside it, so
+ * a label here would only make a screen reader say it twice.
  */
 @Composable
-fun BeltBadge(
+internal fun BeltBadge(
     tier: BeltTier?,
     modifier: Modifier = Modifier,
     width: Dp = 80.dp,
-    decorative: Boolean = false,
 ) {
     val outline = MaterialTheme.colorScheme.outline
-    val label = beltName(tier)
-    val a11y = if (decorative) {
-        Modifier
-    } else {
-        Modifier.semantics {
-            contentDescription = label
-            role = Role.Image
-        }
-    }
     Spacer(
         modifier = modifier
             .size(width = width, height = width * VIEW_HEIGHT / VIEW_WIDTH)
-            .then(a11y)
             .drawWithCache {
                 val scale = size.width / VIEW_WIDTH
                 val leftTail = tailPath(scale, LEFT_TAIL)

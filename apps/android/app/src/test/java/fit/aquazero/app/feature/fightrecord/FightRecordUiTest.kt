@@ -1,21 +1,18 @@
-package fit.aquazero.app.core.ui
+package fit.aquazero.app.feature.fightrecord
 
 import fit.aquazero.app.core.data.fightRecordStatus
-import fit.aquazero.app.core.model.BeltAwardDto
 import fit.aquazero.app.core.model.BeltRungDto
 import fit.aquazero.app.core.model.BeltTier
-import fit.aquazero.app.core.model.FightRecordEnvelopeDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The rules both Fight Record surfaces share: which of the four states to
- * show, what the next belt asks for, and how full the bar is. The sentences
- * themselves are string resources; what is tested here is the arithmetic and
- * the choice of sentence, which is where a wrong answer would come from.
+ * The rules both Fight Record surfaces share: what the next belt asks for,
+ * how full the bar is and which rungs are held. The sentences themselves are
+ * string resources; what is tested here is the arithmetic and the choice of
+ * sentence, which is where a wrong answer would come from.
  */
 class FightRecordUiTest {
 
@@ -66,32 +63,5 @@ class FightRecordUiTest {
         assertTrue(isRungHeld(BeltTier.BLUE, BeltTier.BLUE))
         assertFalse(isRungHeld(BeltTier.PURPLE, BeltTier.BLUE))
         assertFalse(isRungHeld(BeltTier.WHITE, null))
-    }
-
-    @Test
-    fun `only this season's belt is offered for sharing`() {
-        val lastSeason = BeltAwardDto(id = "b2", seasonNumber = 2, seasonName = "Ground Game", tier = BeltTier.BROWN)
-        val lastSeasonOnly = fightRecordStatus(belts = listOf(lastSeason))
-        assertNull(currentSeasonBelt(lastSeasonOnly))
-        assertEquals("b3", currentSeasonBelt(fightRecordStatus())!!.id)
-    }
-
-    @Test
-    fun `a cached answer wins over the fetch, whatever the fetch did`() {
-        val on = FightRecordEnvelopeDto(fightRecordStatus())
-        val off = FightRecordEnvelopeDto(fightRecord = null)
-
-        FightRecordFetch.entries.forEach { fetch ->
-            assertTrue(FightRecordUiState.of(on, fetch) is FightRecordUiState.Ready)
-            assertEquals(FightRecordUiState.Off, FightRecordUiState.of(off, fetch))
-        }
-    }
-
-    @Test
-    fun `with nothing cached, the fetch decides between loading and retry`() {
-        assertEquals(FightRecordUiState.Loading, FightRecordUiState.of(null, FightRecordFetch.InFlight))
-        assertEquals(FightRecordUiState.Failed, FightRecordUiState.of(null, FightRecordFetch.Failed))
-        // Done before Room re-emits the row it just wrote: still loading.
-        assertEquals(FightRecordUiState.Loading, FightRecordUiState.of(null, FightRecordFetch.Done))
     }
 }

@@ -53,15 +53,6 @@ import fit.aquazero.app.core.model.BeltTier
 import fit.aquazero.app.core.model.FightRecordSeasonProgressDto
 import fit.aquazero.app.core.model.FightRecordStatusDto
 import fit.aquazero.app.core.model.SeasonDto
-import fit.aquazero.app.core.ui.BeltBadge
-import fit.aquazero.app.core.ui.FightRecordUiState
-import fit.aquazero.app.core.ui.beltName
-import fit.aquazero.app.core.ui.beltNameRes
-import fit.aquazero.app.core.ui.currentSeasonBelt
-import fit.aquazero.app.core.ui.daysLeftText
-import fit.aquazero.app.core.ui.isRungHeld
-import fit.aquazero.app.core.ui.nextBeltText
-import fit.aquazero.app.core.ui.seasonDatesText
 
 /**
  * Fight Record (AZF-W3-05 US-09), a port of
@@ -88,7 +79,7 @@ fun FightRecordScreen(
         state = state,
         onBack = onBack,
         onRetry = viewModel::refresh,
-        onShare = { award -> context.shareBelt(award) },
+        onShare = { tier, seasonNumber -> context.shareBelt(tier, seasonNumber) },
         modifier = modifier,
     )
 }
@@ -99,7 +90,7 @@ internal fun FightRecordContent(
     state: FightRecordUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
-    onShare: (BeltAwardDto) -> Unit,
+    onShare: (BeltTier, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -163,10 +154,10 @@ internal fun FightRecordContent(
 }
 
 @Composable
-private fun CurrentSeason(record: FightRecordStatusDto, onShare: (BeltAwardDto) -> Unit) {
+private fun CurrentSeason(record: FightRecordStatusDto, onShare: (BeltTier, Int) -> Unit) {
     val current = record.current
     val season = current.season
-    val shareable = currentSeasonBelt(record)
+    val held = current.tier
     AzfCard(modifier = Modifier.fillMaxWidth(), tier = AzfCardTier.Hero) {
         Text(
             text = stringResource(R.string.fight_record_season_named, season.number, season.name).uppercase(),
@@ -182,8 +173,7 @@ private fun CurrentSeason(record: FightRecordStatusDto, onShare: (BeltAwardDto) 
 
         Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Decorative: the belt is named in full beside it.
-            BeltBadge(tier = current.tier, width = 80.dp, decorative = true)
+            BeltBadge(tier = current.tier, width = 80.dp)
             Column(modifier = Modifier.padding(start = AzfSpacing.ElementGapMedium)) {
                 Text(
                     text = beltName(current.tier),
@@ -214,11 +204,11 @@ private fun CurrentSeason(record: FightRecordStatusDto, onShare: (BeltAwardDto) 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        if (shareable != null) {
+        if (held != null) {
             Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
             PrimaryButton(
                 text = stringResource(R.string.fight_record_share),
-                onClick = { onShare(shareable) },
+                onClick = { onShare(held, season.number) },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -247,7 +237,7 @@ private fun Ladder(record: FightRecordStatusDto) {
                     .padding(top = AzfSpacing.ElementGapSmall)
                     .semantics(mergeDescendants = true) { stateDescription = if (isHeld) held else ahead },
             ) {
-                BeltBadge(tier = tier, width = 48.dp, decorative = true)
+                BeltBadge(tier = tier, width = 48.dp)
                 Text(
                     text = beltName(tier),
                     style = MaterialTheme.typography.bodyMedium,
@@ -305,7 +295,7 @@ private fun Shelf(record: FightRecordStatusDto) {
                     .padding(top = AzfSpacing.ElementGapSmall)
                     .semantics(mergeDescendants = true) {},
             ) {
-                BeltBadge(tier = belt.tier, width = 48.dp, decorative = true)
+                BeltBadge(tier = belt.tier, width = 48.dp)
                 Column(modifier = Modifier.padding(start = AzfSpacing.ElementGapMedium)) {
                     Text(
                         text = beltName(belt.tier),
@@ -341,11 +331,11 @@ private fun SectionHeading(text: String) {
  * personal invite link either: Android has no attribution links yet, so the
  * public welcome page is the honest destination.
  */
-private fun Context.shareBelt(award: BeltAwardDto) {
+private fun Context.shareBelt(tier: BeltTier, seasonNumber: Int) {
     val text = getString(
         R.string.fight_record_share_text,
-        getString(beltNameRes(award.tier)),
-        award.seasonNumber,
+        getString(beltNameRes(tier)),
+        seasonNumber,
         WELCOME_URL,
     )
     val intent = Intent(Intent.ACTION_SEND).apply {
@@ -399,7 +389,7 @@ private fun FightRecordPreview() {
             ),
             onBack = {},
             onRetry = {},
-            onShare = {},
+            onShare = { _, _ -> },
         )
     }
 }
@@ -408,6 +398,6 @@ private fun FightRecordPreview() {
 @Composable
 private fun FightRecordOffPreview() {
     AzfTheme {
-        FightRecordContent(state = FightRecordUiState.Off, onBack = {}, onRetry = {}, onShare = {})
+        FightRecordContent(state = FightRecordUiState.Off, onBack = {}, onRetry = {}, onShare = { _, _ -> })
     }
 }

@@ -52,6 +52,7 @@ import fit.aquazero.app.feature.coach.CoachScreen
 import fit.aquazero.app.feature.coach.CoachSelectScreen
 import fit.aquazero.app.feature.dashboard.DashboardScreen
 import fit.aquazero.app.feature.fightrecord.FightRecordScreen
+import fit.aquazero.app.feature.fightrecord.SeasonCard
 import fit.aquazero.app.feature.nutrition.AnalysisResultsScreen
 import fit.aquazero.app.feature.nutrition.CaptureMealScreen
 import fit.aquazero.app.feature.nutrition.MealPlanScreen
@@ -320,7 +321,12 @@ private fun MainShell(
                                     },
                                     onOpenProgress = { switchTab(AzfTab.Progress) },
                                     onOpenCoach = { prompt -> openCoach(prompt) },
-                                    onOpenFightRecord = { backStack.add(FightRecordKey) },
+                                    seasonCard = { modifier ->
+                                        SeasonCard(
+                                            onOpenFightRecord = { backStack.add(FightRecordKey) },
+                                            modifier = modifier,
+                                        )
+                                    },
                                 )
                             }
                         }

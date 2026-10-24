@@ -46,11 +46,19 @@ steps:
       - |
         set -euo pipefail
         image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE}:$COMMIT_SHA"
-        # --image keeps the current service spec (secrets, volumes, env,
-        # scaling). --update-env-vars changes only APP_VERSION.
+        # --image keeps the current service spec (secrets, volumes, env).
+        # Scaling is not left to it: the store hydrates once into memory and
+        # is single-instance only (docs/OPERATIONS.md), so every deploy pins
+        # min and max to 1 rather than inheriting whatever the live service
+        # drifted to. AZF_INSTANCE_COUNT=1 is the declaration the API's boot
+        # guard requires on Cloud Run, set in the same command so the two
+        # cannot disagree. --update-env-vars changes only the variables it
+        # names; both share one flag rather than relying on repeats merging.
         gcloud run deploy aquazerofit-api \
           --image="$${image}" \
-          --update-env-vars="APP_VERSION=$COMMIT_SHA" \
+          --min-instances=1 \
+          --max-instances=1 \
+          --update-env-vars="APP_VERSION=$COMMIT_SHA,AZF_INSTANCE_COUNT=1" \
           --region="${_REGION}" \
           --project="$PROJECT_ID" \
           --quiet

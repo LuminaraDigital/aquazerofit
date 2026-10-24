@@ -114,6 +114,45 @@ export const config = {
   },
 
   /**
+   * The value ORIGIN_SHARED_SECRET held before a rotation, accepted beside it
+   * until the Worker sends the new one.
+   *
+   * The two sides cannot change at the same instant, and with the gate on
+   * every request in between would be refused. The other escape, turning the
+   * gate off for the rotation, reopens run.app at exactly the moment a leak
+   * made rotating urgent. Empty, the default and the resting state, accepts
+   * nothing extra. Set it only for the overlap in docs/OPERATIONS.md and
+   * remove it once the Worker is switched: while it is set, the old value
+   * still opens the origin.
+   */
+  get originSharedSecretPrevious(): string {
+    return process.env.ORIGIN_SHARED_SECRET_PREVIOUS?.trim() ?? '';
+  },
+
+  /**
+   * Refuse with 403 every request that does not carry the Worker's
+   * ORIGIN_SHARED_SECRET (requireWorkerOrigin in platform/clientIp.ts).
+   *
+   * Cloud Run ingress cannot be narrowed to one Cloudflare Worker, so the
+   * *.run.app URL answers anyone who finds it, and a caller there skips
+   * everything the edge does. Only this process can say no. /health and
+   * /ready stay open: Cloud Run's probes and uptime checks dial the origin
+   * directly and cannot present the secret.
+   *
+   * OFF by default, and that default is the rollout order rather than a
+   * weakening. Switched on before both sides hold the same secret, or while a
+   * provider webhook (Telegram, Stripe, Play RTDN) is still registered on
+   * run.app instead of the public host, it refuses real users and real
+   * payments. None of those providers can add a custom header, so a webhook
+   * aimed at run.app can never pass. docs/OPERATIONS.md has the sequence. On
+   * with no secret is refused at boot (assertOriginSecretConfigured below).
+   */
+  get requireOriginSecret(): boolean {
+    const raw = process.env.REQUIRE_ORIGIN_SECRET?.trim().toLowerCase();
+    return raw === 'true' || raw === '1';
+  },
+
+  /**
    * Auth-lane requests per minute for one client IP.
    *
    * 60 is one request a second. A Mini App open is a couple of /auth calls,
@@ -513,6 +552,8 @@ export const config = {
    * NaN means AZF_INSTANCE_COUNT was set to something that is not a positive
    * integer. That is not treated as "probably one" - a guard that cannot read
    * its own input has not verified anything, so it refuses.
+   *
+   * Unset reads as 1, which the guard accepts everywhere except Cloud Run.
    */
   get instanceCount(): number {
     const raw = process.env[INSTANCE_COUNT_ENV]?.trim();
@@ -649,30 +690,125 @@ function isProduction(): boolean {
  * horizontal scaling safe. Raising AZF_INSTANCE_COUNT before it lands does not
  * make the deployment scalable, it makes the data loss legal.
  *
+ * ON CLOUD RUN THE DEFAULT IS NOT ENOUGH. Cloud Run autoscales (to 100
+ * instances unless max-instances says otherwise), and cloudbuild.yaml deploys
+ * with `gcloud run deploy --image`, which keeps whatever scaling the live
+ * service already has. An unset variable there means nobody declared
+ * anything, and the default of 1 would wave through a service capped at 100.
+ * So when K_SERVICE is present (Cloud Run sets it on every revision) the
+ * variable must be set explicitly. cloudbuild.yaml sets it in the same
+ * command that pins min and max instances to 1, so the declaration and the
+ * scaling travel together.
+ *
+ * That is a declaration check, not a measurement, and its reach is narrow.
+ * The process cannot read max-instances, so a service raised by hand in the
+ * console boots with the variable still at 1. And since cloudbuild.yaml sets
+ * the variable on every deploy, what it mostly catches is a revision made some
+ * other way on a service that never had it. It stays because that case is
+ * exactly a fresh service sitting on Cloud Run's default ceiling of 100.
+ *
  * Skipped under test (the suite runs many workers in one repo and never boots
- * a serving process) and satisfied silently by the default of 1, so ordinary
- * local development never sees it.
+ * a serving process) and, off Cloud Run, satisfied silently by the default of
+ * 1, so ordinary local development never sees it.
  */
 export function assertSingleInstance(): void {
   if (config.isTest) return;
-  const declared = config.instanceCount;
-  if (declared === 1) return;
-
   const raw = process.env[INSTANCE_COUNT_ENV]?.trim() ?? '';
-  const problem = Number.isNaN(declared)
-    ? `${INSTANCE_COUNT_ENV} is set to ${JSON.stringify(raw)}, which is not a positive integer`
-    : `${INSTANCE_COUNT_ENV}=${declared} declares ${declared} concurrent instances`;
+  if (raw === '' && process.env.K_SERVICE?.trim()) {
+    throw singleInstanceRefusal(
+      `${INSTANCE_COUNT_ENV} is unset on Cloud Run, which autoscales unless max-instances is ` +
+        'pinned, so the default of 1 declares nothing',
+    );
+  }
+  const declared = config.instanceCount;
+  if (Number.isNaN(declared)) {
+    throw singleInstanceRefusal(
+      `${INSTANCE_COUNT_ENV} is set to ${JSON.stringify(raw)}, which is not a positive integer`,
+    );
+  }
+  if (declared > 1) {
+    throw singleInstanceRefusal(
+      `${INSTANCE_COUNT_ENV}=${declared} declares ${declared} concurrent instances`,
+    );
+  }
+}
 
-  throw new Error(
+/** The refusal every branch above throws: the problem, then why, then what to run instead. */
+function singleInstanceRefusal(problem: string): Error {
+  return new Error(
     `Refusing to start: ${problem}. This API is single-instance only. Each instance ` +
       'hydrates its own in-memory copy of the store at boot and never re-reads, so a write ' +
       'on one instance is invisible to the others and the last flush silently overwrites ' +
       "the other instances' version of the same document - health logs are lost with no " +
-      'error anywhere. Run exactly one instance (managed PaaS: one dedicated machine, NOT ' +
-      'autoscale; Docker Compose: do not use --scale on the api service; Azure Container ' +
-      'Apps: min=max=1), and unset ' +
-      `${INSTANCE_COUNT_ENV} or set it to 1. Scaling out requires the async getStore() ` +
-      'refactor first, so reads go to Postgres rather than to a per-instance memory copy.',
+      'error anywhere. Run exactly one instance (Cloud Run: --min-instances=1 ' +
+      '--max-instances=1, which cloudbuild.yaml applies on every deploy; managed PaaS: one ' +
+      'dedicated machine, NOT autoscale; Docker Compose: do not use --scale on the api service; ' +
+      `Azure Container Apps: min=max=1), and set ${INSTANCE_COUNT_ENV}=1 (it may be left ` +
+      'unset only off Cloud Run). Scaling out requires the async getStore() refactor first, ' +
+      'so reads go to Postgres rather than to a per-instance memory copy.',
+  );
+}
+
+/**
+ * Shortest origin secret the gate will run on. A floor, not a strength
+ * measure: the documented recipe (`openssl rand -hex 32`) gives 64 hex
+ * characters, so anything under half that was not made that way.
+ */
+const MIN_ORIGIN_SECRET_LENGTH = 32;
+
+/**
+ * Origin-gate guard: refuse to boot with REQUIRE_ORIGIN_SECRET on and no
+ * usable ORIGIN_SHARED_SECRET to compare against.
+ *
+ * An empty secret never matches (originSecretMatches in platform/clientIp.ts),
+ * so the gate would refuse every request - the whole site and every webhook -
+ * while /health and /ready, which are exempt, kept answering 200. The
+ * platform would read that revision as healthy and send it all the traffic.
+ * A failed deploy keeps the previous revision serving instead.
+ *
+ * A guessable secret is the opposite failure and just as quiet: the gate
+ * looks closed and admits anyone who has the value. The `replace-with-...`
+ * placeholder in .env.production.example is in a public repository, so it is
+ * refused outright, as is anything shorter than MIN_ORIGIN_SECRET_LENGTH.
+ * Neither message echoes the value.
+ *
+ * Off, nothing is judged. The secret then only steers rate-limit buckets, and
+ * a deploy must not fail over it before the operator has chosen the gate.
+ *
+ * Not skipped under test, unlike assertSingleInstance: it reads getters and
+ * only index.ts calls it, so the suite can exercise it directly.
+ */
+export function assertOriginSecretConfigured(): void {
+  if (!config.requireOriginSecret) return;
+  const secret = config.originSharedSecret;
+  if (!secret) {
+    throw new Error(
+      'Refusing to start: REQUIRE_ORIGIN_SECRET is on but ORIGIN_SHARED_SECRET is empty, so every ' +
+        'request except /health and /ready would be refused with 403 while the probes stayed green. ' +
+        'Set ORIGIN_SHARED_SECRET to the value the Worker holds (`npx wrangler secret put ' +
+        'ORIGIN_SHARED_SECRET` in cloudflare/), or unset REQUIRE_ORIGIN_SECRET.',
+    );
+  }
+  assertUnguessableOriginSecret('ORIGIN_SHARED_SECRET', secret);
+  // Optional, but a weak previous value opens the gate exactly as a weak
+  // current one would.
+  const previous = config.originSharedSecretPrevious;
+  if (previous) assertUnguessableOriginSecret('ORIGIN_SHARED_SECRET_PREVIOUS', previous);
+}
+
+function assertUnguessableOriginSecret(name: string, value: string): void {
+  let problem: string;
+  if (value.toLowerCase().startsWith('replace-with')) {
+    problem = 'is the placeholder from .env.production.example, which anyone can read';
+  } else if (value.length < MIN_ORIGIN_SECRET_LENGTH) {
+    problem = `is ${value.length} characters, under the ${MIN_ORIGIN_SECRET_LENGTH}-character floor`;
+  } else {
+    return;
+  }
+  throw new Error(
+    `Refusing to start: ${name} ${problem}, so REQUIRE_ORIGIN_SECRET would admit anyone ` +
+      'who has it. Generate one with `openssl rand -hex 32` and set it on the Worker and on ' +
+      'Cloud Run (docs/OPERATIONS.md, "Closing the run.app bypass").',
   );
 }
 

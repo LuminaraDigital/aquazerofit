@@ -16,7 +16,7 @@ const ctx: CommandContext = {
   supportEmail: 'pay-help@example.com',
   termsUrl: 'https://aquazerofit.com/terms',
   privacyUrl: 'https://aquazerofit.com/privacy',
-  refundUrl: 'https://aquazerofit.com/support#refunds',
+  refundUrl: 'https://aquazerofit.com/refund',
   deletionUrl: 'https://aquazerofit.com/account/deletion',
   chatType: 'private',
 };
@@ -55,7 +55,8 @@ describe('bot commands', () => {
 
     const pay = replyForCommand('paysupport', ctx);
     expect(pay.text).toContain('pay-help@example.com');
-    expect(pay.text).toContain('https://aquazerofit.com/support#refunds');
+    expect(pay.text).toContain('https://aquazerofit.com/refund');
+    expect(pay.text).toContain('A Stars refund is done by support on request.');
     expect(pay.text).not.toContain('info@luminara.digital');
 
     const stop = replyForCommand('stop', ctx);
@@ -66,7 +67,7 @@ describe('bot commands', () => {
     const terms = replyForCommand('terms', ctx);
     expect(terms.text).toContain('https://aquazerofit.com/terms');
     expect(terms.text).toContain('https://aquazerofit.com/privacy');
-    expect(terms.text).toContain('https://aquazerofit.com/support#refunds');
+    expect(terms.text).toContain('https://aquazerofit.com/refund');
 
     const withoutEmail = replyForCommand('paysupport', { ...ctx, supportEmail: '' });
     expect(withoutEmail.text).not.toMatch(/@/);

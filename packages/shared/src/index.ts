@@ -7,3 +7,4 @@ export * from './schemas';
 export * from './wger';
 export * from './mealTrust';
 export * from './profanity';
+export * from './supportContact';

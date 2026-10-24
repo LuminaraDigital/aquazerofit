@@ -6,6 +6,7 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveSupportEmail } from '@aquazerofit/shared';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** apps/api/.data by default, regardless of process cwd. */
@@ -432,14 +433,11 @@ export const config = {
   },
 
   /**
-   * Mailbox named in /paysupport. Empty when unset or not a single address,
-   * so a bad value cannot be pasted into a chat. The reply then points at
-   * the refund page instead of inventing a contact.
+   * Mailbox named on the legal pages and in /paysupport. The rule lives in
+   * resolveSupportEmail: a blank value falls through to info@luminara.digital.
    */
   get supportEmail(): string {
-    const raw = process.env.SUPPORT_EMAIL?.trim() ?? '';
-    if (raw.length > 254 || !/^[^\s@]+@[^\s@]+$/.test(raw)) return '';
-    return raw;
+    return resolveSupportEmail(process.env.SUPPORT_EMAIL);
   },
 
   /**
@@ -461,7 +459,7 @@ export const config = {
   },
 
   get refundUrl(): string {
-    return httpUrl(process.env.REFUND_URL, publicPath('/support#refunds'));
+    return httpUrl(process.env.REFUND_URL, publicPath('/refund'));
   },
 
   get accountDeletionUrl(): string {
@@ -507,7 +505,7 @@ function publicPath(path: string): string {
 /**
  * An absolute http(s) URL from the environment, or `fallback`.
  * `httpsOnly` is for the Mini App button, which Telegram rejects otherwise.
- * Fragments are allowed (the refund page is an anchor on /support).
+ * Fragments are allowed so an override can point at a heading.
  */
 function httpUrl(raw: string | undefined, fallback: string, httpsOnly = false): string {
   const value = raw?.trim() ?? '';

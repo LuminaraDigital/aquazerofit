@@ -3,7 +3,7 @@
  * the product.
  *
  * This module deliberately imports NOTHING and reads no environment. It is
- * consumed twice — once by the browser bundle and once by `vite-plugins/seo.ts`,
+ * consumed twice - once by the browser bundle and once by `vite-plugins/seo.ts`,
  * which runs in Node while Vite is still loading its config:
  *
  *   - No imports, because Vite bundles a config file's *relative* imports but
@@ -17,7 +17,7 @@
  *     Node has `process.env` via Vite's `loadEnv`. Reading either one *inside*
  *     this module would work in one caller and silently return undefined in the
  *     other. Instead `resolveSiteConfig` takes the bag and both callers supply
- *     their own — see `siteConfig.ts` (browser) and the SEO plugin (Node).
+ *     their own - see `siteConfig.ts` (browser) and the SEO plugin (Node).
  */
 
 export interface SiteConfig {
@@ -40,7 +40,7 @@ export const SITE_DEFAULTS: SiteConfig = {
   /**
    * The Mini App short name is what makes `t.me/<bot>/<app>` open the app
    * directly instead of opening a chat the visitor then has to press Start in
-   * — one tap instead of three, on the only conversion step that matters. Set
+   * - one tap instead of three, on the only conversion step that matters. Set
    * it to '' for a deployment with a bot but no registered Mini App; the link
    * degrades to `t.me/<bot>?startapp=…`, which opens the bot's main Mini App.
    */
@@ -78,7 +78,7 @@ export const TELEGRAM_START_PARAM_MAX_CHARS = 64;
 /**
  * Social preview image, resolved against the site origin for OG/Twitter.
  *
- * Must be 1200x630 — the ratio every major crawler crops to. The previous
+ * Must be 1200x630 - the ratio every major crawler crops to. The previous
  * value here was a 1280x900 screenshot, which is close enough to look fine
  * locally and wrong everywhere it actually matters: Twitter and Facebook trim
  * a 1.42:1 image to 1.91:1 by cutting the top and bottom off, which is exactly
@@ -109,23 +109,23 @@ export interface MarketingRoute {
  * Every publicly crawlable route.
  *
  * Single source of the sitemap, the prerendered per-route HTML shells and the
- * runtime `useSeo` defaults. Adding a marketing page means adding it here — a
+ * runtime `useSeo` defaults. Adding a marketing page means adding it here - a
  * page missing from this list still renders perfectly, it is just invisible to
  * search, which is the kind of omission nobody notices for months.
  */
 export const MARKETING_ROUTES: readonly MarketingRoute[] = [
   {
     path: '/',
-    title: 'AquaZeroFit — AI wellness inside Telegram',
+    title: 'AquaZeroFit: AI wellness inside Telegram',
     description:
-      'Photograph a meal and see it counted. Calorie, macro and hydration targets you could recompute by hand, adaptive home training and a coach grounded in your actual day — inside Telegram.',
+      'Photograph a meal and see it counted. Calorie, macro and hydration targets you could recompute by hand, adaptive home training and a coach grounded in your actual day, inside Telegram.',
     summary:
-      'AquaZeroFit is an AI wellness coach that runs inside Telegram. Photograph a meal and it is logged and counted. Your calorie, macro and hydration targets are computed from your own figures using published formulas you could recompute by hand — no invented numbers. Home training adapts to the equipment you actually have, and Aqua Coach answers from your real logged day inside strict wellness boundaries. AquaZeroFit provides general wellness and fitness support only; it does not provide medical diagnosis, treatment or professional healthcare advice. It is free software under the GNU AGPL v3, and it runs in an ordinary web browser as well, for anyone whose network or workplace blocks Telegram.',
+      'AquaZeroFit is an AI wellness coach that runs inside Telegram. Photograph a meal and it is logged and counted. Your calorie, macro and hydration targets are computed from your own figures using published formulas you could recompute by hand. No invented numbers. Home training adapts to the equipment you actually have, and Aqua Coach answers from your real logged day inside strict wellness boundaries. AquaZeroFit provides general wellness and fitness support only; it does not provide medical diagnosis, treatment or professional healthcare advice. It is free software under the GNU AGPL v3, and it runs in an ordinary web browser as well, for anyone whose network or workplace blocks Telegram.',
     priority: 1,
   },
   {
     path: '/features',
-    title: 'Features — meal photos, targets, training | AquaZeroFit',
+    title: 'Features: meal photos, targets, training | AquaZeroFit',
     description:
       'Meal logging by photograph, calorie and macro targets derived from published formulas, equipment-aware home training, and a coach that answers from your logged day.',
     summary:
@@ -134,7 +134,7 @@ export const MARKETING_ROUTES: readonly MarketingRoute[] = [
   },
   {
     path: '/how-it-works',
-    title: 'How it works — from meal photo to target | AquaZeroFit',
+    title: 'How it works: from meal photo to target | AquaZeroFit',
     description:
       'Build a wellness profile, log your day, and see targets computed from your own figures. Every number is one you could recompute by hand.',
     summary:
@@ -143,7 +143,7 @@ export const MARKETING_ROUTES: readonly MarketingRoute[] = [
   },
   {
     path: '/aqua-coach',
-    title: 'Aqua Coach — a coach that knows its limits | AquaZeroFit',
+    title: 'Aqua Coach: a coach that knows its limits | AquaZeroFit',
     description:
       'A conversational wellness coach grounded in your actual logged day, answering inside boundaries it will not cross. General wellness support only, never medical advice.',
     summary:
@@ -161,7 +161,7 @@ export const MARKETING_ROUTES: readonly MarketingRoute[] = [
   },
   {
     path: '/google-play',
-    title: 'AquaZeroFit for Android — coming soon to Google Play',
+    title: 'AquaZeroFit for Android: coming soon to Google Play',
     description:
       'AquaZeroFit is coming soon to Google Play. Track meals, hydration, workouts and progress with an AI wellness coach built around your real day.',
     summary:
@@ -193,8 +193,17 @@ export const MARKETING_ROUTES: readonly MarketingRoute[] = [
     title: 'Terms of use | AquaZeroFit',
     description: 'The terms under which AquaZeroFit is offered, including its wellness boundary.',
     summary:
-      'The terms of use for AquaZeroFit, including the general-wellness boundary, acceptable use, and the GNU AGPL v3 licence the software is offered under.',
+      'The terms of use for AquaZeroFit, including the general-wellness boundary, acceptable use, payments through Stripe on the web and Telegram Stars inside Telegram, and the GNU AGPL v3 licence the software is offered under.',
     priority: 0.4,
+  },
+  {
+    path: '/refund',
+    title: 'Refunds | AquaZeroFit',
+    description:
+      'How to ask AquaZeroFit for a refund of web premium billed by Stripe, or a coach bought with Telegram Stars. Email the support address or send /paysupport.',
+    summary:
+      'How to ask for a refund from AquaZeroFit, operated by Luminara Digital Pty Ltd. Web premium is a Stripe subscription: Stripe bills it again each period, and premium lasts until the end of the period already paid. Inside the Telegram Mini App, coaches are digital goods sold in Telegram Stars. Email info@luminara.digital, or send /paysupport to the bot, and include the account that paid and what you bought. The request itself does not refund the payment.',
+    priority: 0.3,
   },
   {
     path: '/support',

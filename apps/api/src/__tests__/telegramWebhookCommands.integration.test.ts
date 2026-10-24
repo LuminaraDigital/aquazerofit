@@ -108,7 +108,7 @@ describe('command replies', () => {
     }
     const terms = String(fetchCalls[0]!.body.text);
     expect(terms).toContain('/terms');
-    expect(terms).toContain('/support#refunds');
+    expect(terms).toContain('/refund');
   });
 
   it('still acknowledges a message that is not one of those commands', async () => {

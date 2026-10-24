@@ -1,7 +1,7 @@
 /**
  * Shared layout and typography for the legal pages (/privacy, /terms, /support).
  *
- * Narrower measure than the marketing pages — these are read, not scanned — with
+ * Narrower measure than the marketing pages. These are read, not scanned, with
  * a contents rail, and the draft notice pinned above the first clause so nobody
  * reaches the substance without meeting it first.
  */
@@ -69,6 +69,17 @@ export function LegalPage({
                 </>
               )}
             </p>
+            {OPERATOR.supportEmail && (
+              <p className="mt-2 text-[12px] text-on-surface-variant">
+                Support:{' '}
+                <a
+                  href={`mailto:${OPERATOR.supportEmail}`}
+                  className="text-primary hover:text-secondary"
+                >
+                  {OPERATOR.supportEmail}
+                </a>
+              </p>
+            )}
           </Reveal>
         </div>
       </section>

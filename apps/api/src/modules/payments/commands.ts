@@ -68,10 +68,12 @@ export function replyForCommand(command: BotCommandName, ctx: CommandContext): C
         : `Open ${ctx.refundUrl}`;
       return {
         text: [
-          'Payment help and refunds.',
-          `${contact} with the date of the charge and your Telegram username.`,
-          'Coach purchases paid with Telegram Stars are one-time. If a refund is approved, the Stars are returned to your balance and the coach is removed from your account.',
+          'Payment help for AquaZeroFit.',
+          `${contact} and include the account that paid and what you bought.`,
+          'A Stars refund is done by support on request.',
           `Refunds: ${ctx.refundUrl}`,
+          `Terms: ${ctx.termsUrl}`,
+          'Sending /paysupport does not refund a payment by itself. Telegram support cannot refund a purchase made in this bot.',
         ].join('\n'),
       };
     }

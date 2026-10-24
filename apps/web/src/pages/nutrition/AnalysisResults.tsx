@@ -15,6 +15,7 @@ import type { ShareCardPayload } from '@/lib/shareCard';
 import { useMe } from '@/lib/queries';
 import { FoodSearchSheet } from './FoodSearchSheet';
 import { GramsStepper } from './GramsStepper';
+import { AiDegradedNotice, rememberAiDegraded } from './AiDegradedNotice';
 import { fmtInt, round1, todayLocalDate } from '../dashboard/lib';
 import { useTelegramMainAction, useTelegramUnsavedEdits } from '@/lib/useTelegramChrome';
 
@@ -24,8 +25,34 @@ interface ReviewItem {
   foodId?: string;
   name: string;
   grams: number;
-  perGram: { kcal: number; proteinG: number; carbsG: number; fatG: number };
+  /** Null when the item did not match a catalog food. Macros are not guessed. */
+  perGram: { kcal: number; proteinG: number; carbsG: number; fatG: number } | null;
   confidence: number | null;
+  portion?: string;
+}
+
+function jobIsDegraded(job: VisionJob): boolean {
+  if (job.aiDegraded === true) return true;
+  return job.ai?.degraded === true;
+}
+
+function knownMacros(p: VisionJob['predictions'][number]): ReviewItem['perGram'] {
+  if (p.matched === false || !p.foodId) return null;
+  if (
+    typeof p.kcal !== 'number' ||
+    typeof p.proteinG !== 'number' ||
+    typeof p.carbsG !== 'number' ||
+    typeof p.fatG !== 'number' ||
+    p.estimatedGrams <= 0
+  ) {
+    return null;
+  }
+  return {
+    kcal: p.kcal / p.estimatedGrams,
+    proteinG: p.proteinG / p.estimatedGrams,
+    carbsG: p.carbsG / p.estimatedGrams,
+    fatG: p.fatG / p.estimatedGrams,
+  };
 }
 
 function confidenceTone(c: number): { label: string; tone: 'green' | 'aqua' | 'coral' } {
@@ -34,7 +61,8 @@ function confidenceTone(c: number): { label: string; tone: 'green' | 'aqua' | 'c
   return { label: `Low ${Math.round(c * 100)}%`, tone: 'coral' };
 }
 
-function toMealLogItem(item: ReviewItem): MealLogItem {
+function toMealLogItem(item: ReviewItem): MealLogItem | null {
+  if (!item.foodId || !item.perGram) return null;
   return {
     foodId: item.foodId,
     name: item.name,
@@ -55,6 +83,7 @@ export default function AnalysisResults() {
 
   const [items, setItems] = useState<ReviewItem[] | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [replaceKey, setReplaceKey] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [sharePayload, setSharePayload] = useState<ShareCardPayload | null>(null);
 
@@ -75,29 +104,37 @@ export default function AnalysisResults() {
   });
 
   const job = jobQuery.data;
+  const degraded = job ? jobIsDegraded(job) : false;
+
+  useEffect(() => {
+    if (!job || job.status === 'queued' || job.status === 'processing') return;
+    rememberAiDegraded(jobIsDegraded(job));
+  }, [job]);
 
   // Seed the editable list once when predictions arrive - never auto-commit.
+  // A degraded job contributes no foods: the offline list was not a recognition.
   useEffect(() => {
     if (job?.status === 'succeeded' && items === null) {
+      const predictions = jobIsDegraded(job) ? [] : job.predictions;
       setItems(
-        job.predictions.map((p, i) => ({
+        predictions.map((p, i) => ({
           key: `pred-${i}`,
-          foodId: p.foodId,
+          foodId: p.matched === false ? undefined : p.foodId,
           name: p.name,
           grams: Math.max(1, Math.round(p.estimatedGrams)),
-          perGram: {
-            kcal: p.estimatedGrams > 0 ? p.kcal / p.estimatedGrams : 0,
-            proteinG: p.estimatedGrams > 0 ? p.proteinG / p.estimatedGrams : 0,
-            carbsG: p.estimatedGrams > 0 ? p.carbsG / p.estimatedGrams : 0,
-            fatG: p.estimatedGrams > 0 ? p.fatG / p.estimatedGrams : 0,
-          },
+          perGram: knownMacros(p),
           confidence: typeof p.confidence === 'number' ? p.confidence : null,
+          portion: p.portion,
         })),
       );
     }
   }, [job, items]);
 
-  const computed = useMemo(() => (items ?? []).map(toMealLogItem), [items]);
+  const computed = useMemo(
+    () => (items ?? []).map(toMealLogItem).filter((item): item is MealLogItem => item !== null),
+    [items],
+  );
+  const hasUnresolved = (items ?? []).some((item) => !item.foodId || !item.perGram);
   const totals = useMemo(
     () =>
       computed.reduce(
@@ -149,7 +186,7 @@ export default function AnalysisResults() {
       ? {
           text: confirm.isPending ? 'Saving' : 'Log meal',
           onClick: () => confirm.mutate(),
-          enabled: !confirm.isPending && computed.length > 0,
+          enabled: !confirm.isPending && computed.length > 0 && !hasUnresolved,
         }
       : null,
   );
@@ -211,6 +248,10 @@ export default function AnalysisResults() {
         ) : (
           /* Succeeded (or already confirmed) - editable review */
           <>
+            {degraded && (
+              <AiDegradedNotice />
+            )}
+            {computed.length > 0 && (
             <section aria-label="Analysis summary">
               <GlassCard className="p-card-padding flex items-center justify-between">
                 <div>
@@ -234,6 +275,7 @@ export default function AnalysisResults() {
                 </div>
               </GlassCard>
             </section>
+            )}
 
             <section className="space-y-3" aria-label="Detected items">
               <div className="flex justify-between items-center">
@@ -313,21 +355,45 @@ export default function AnalysisResults() {
                           )
                         }
                       />
-                      <span className="text-primary font-bold tabular-nums whitespace-nowrap">
-                        {fmtInt(display.kcal)} kcal
-                      </span>
+                      {display ? (
+                        <span className="text-primary font-bold tabular-nums whitespace-nowrap">
+                          {fmtInt(display.kcal)} kcal
+                        </span>
+                      ) : (
+                        <span className="text-sm font-medium text-on-surface-variant text-right">
+                          No nutrition data
+                        </span>
+                      )}
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] text-on-surface-variant tabular-nums">
-                        P {display.proteinG}g · C {display.carbsG}g · F {display.fatG}g
-                      </p>
+                    <div className="flex items-center justify-between gap-3">
+                      {display ? (
+                        <p className="text-[11px] text-on-surface-variant tabular-nums">
+                          P {display.proteinG}g · C {display.carbsG}g · F {display.fatG}g
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-on-surface-variant">
+                          Match this item from the food list, or remove it. Nothing here was guessed.
+                        </p>
+                      )}
                       {item.confidence != null &&
                         (() => {
                           const c = confidenceTone(item.confidence);
                           return <Chip label={c.label} tone={c.tone} />;
                         })()}
                     </div>
+                    {!display && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplaceKey(item.key);
+                          setAddOpen(true);
+                        }}
+                        className="mt-3 text-sm font-bold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                      >
+                        Choose a food
+                      </button>
+                    )}
                   </GlassCard>
                 );
               })}
@@ -343,7 +409,12 @@ export default function AnalysisResults() {
               <button
                 type="button"
                 onClick={() => confirm.mutate()}
-                disabled={confirm.isPending || computed.length === 0 || job.status === 'confirmed'}
+                disabled={
+                  confirm.isPending ||
+                  computed.length === 0 ||
+                  hasUnresolved ||
+                  job.status === 'confirmed'
+                }
                 className="cta-gradient w-full py-4 rounded-xl font-heading font-semibold uppercase tracking-[0.02em] text-xl text-on-primary shadow-lg shadow-secondary/20 flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <span>
@@ -367,24 +438,30 @@ export default function AnalysisResults() {
       <FoodSearchSheet
         open={addOpen}
         title="Add a missing item"
-        onClose={() => setAddOpen(false)}
+        onClose={() => {
+          setReplaceKey(null);
+          setAddOpen(false);
+        }}
         onPick={(picked) => {
-          setItems((prev) => [
-            ...(prev ?? []),
-            {
-              key: `manual-${Date.now()}`,
-              foodId: picked.foodId,
-              name: picked.name,
-              grams: picked.grams,
-              perGram: {
-                kcal: picked.grams > 0 ? picked.kcal / picked.grams : 0,
-                proteinG: picked.grams > 0 ? picked.proteinG / picked.grams : 0,
-                carbsG: picked.grams > 0 ? picked.carbsG / picked.grams : 0,
-                fatG: picked.grams > 0 ? picked.fatG / picked.grams : 0,
-              },
-              confidence: null,
+          const row: ReviewItem = {
+            key: replaceKey ?? `manual-${Date.now()}`,
+            foodId: picked.foodId,
+            name: picked.name,
+            grams: picked.grams,
+            perGram: {
+              kcal: picked.grams > 0 ? picked.kcal / picked.grams : 0,
+              proteinG: picked.grams > 0 ? picked.proteinG / picked.grams : 0,
+              carbsG: picked.grams > 0 ? picked.carbsG / picked.grams : 0,
+              fatG: picked.grams > 0 ? picked.fatG / picked.grams : 0,
             },
-          ]);
+            confidence: null,
+          };
+          setItems((prev) => {
+            const list = prev ?? [];
+            if (!replaceKey) return [...list, row];
+            return list.map((item) => (item.key === replaceKey ? row : item));
+          });
+          setReplaceKey(null);
           setAddOpen(false);
         }}
       />

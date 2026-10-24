@@ -267,6 +267,8 @@ The gateway tries providers in order and falls back to a deterministic mock engi
 | Variable | Provider | Notes |
 | --- | --- | --- |
 | `GROQ_API_KEY` | Groq | https://console.groq.com/keys |
+| `GROQ_MODEL_VISIONPRIMARY` | Groq | Meal-photo model. Default `qwen/qwen3.8-27b` ([vision docs](https://console.groq.com/docs/vision)) |
+| `AI_VISION_DEADLINE_MS` | Gateway | Meal-photo deadline in ms. Default `20000`. Chat stays at `12000` |
 | `GEMINI_API_KEY` | Google Gemini | https://aistudio.google.com/apikey |
 | `OPENAI_API_KEY` | OpenAI | https://platform.openai.com/api-keys |
 | `NVIDIA_API_KEY` | NVIDIA NIM | https://build.nvidia.com/ |

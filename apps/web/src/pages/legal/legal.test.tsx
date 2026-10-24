@@ -13,7 +13,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { MEMORY_REJECTED_RETENTION_DAYS, RANGES } from '@aquazerofit/shared';
+import {
+  DEFAULT_SUPPORT_EMAIL,
+  FREE_TIER_DAILY_CREDITS,
+  MEMORY_REJECTED_RETENTION_DAYS,
+  PREMIUM_TIER_DAILY_CREDITS,
+  RANGES,
+} from '@aquazerofit/shared';
 
 const mocks = vi.hoisted(() => ({ isTMA: vi.fn(() => false) }));
 vi.mock('../../lib/telegram', () => ({ isTMA: mocks.isTMA }));
@@ -23,6 +29,7 @@ import GooglePlayPrivacyPage from './GooglePlayPrivacy';
 import TermsPage from './Terms';
 import SupportPage from './Support';
 import AccountDeletionPage from './AccountDeletion';
+import RefundPage from './Refund';
 import { isPublished, OPERATOR } from './operator';
 import { marketingRoute } from '../../lib/site';
 
@@ -64,20 +71,21 @@ describe('legal pages', () => {
       ['/privacy', <PrivacyPage key="p" />],
       ['/google-play/privacy-policy', <GooglePlayPrivacyPage key="gp" />],
       ['/terms', <TermsPage key="t" />],
+      ['/refund', <RefundPage key="r" />],
       ['/support', <SupportPage key="s" />],
       ['/account/deletion', <AccountDeletionPage key="d" />],
     ] as const) {
       renderAt(path, element);
-      expect(screen.getByText(/draft — not yet in force/i)).toBeTruthy();
+      expect(screen.getByText(/draft: not yet in force/i)).toBeTruthy();
       cleanup();
     }
   });
 
   it('marks a missing operator fact visibly rather than leaving a blank', () => {
     // Retargeted when the nine facts already in force on the live deployment
-    // were ported into OPERATOR. The guarantee is unchanged — an unsupplied
+    // were ported into OPERATOR. The guarantee is unchanged - an unsupplied
     // fact must render as a conspicuous marker rather than a silent gap that
-    // reads like a finished sentence — but it now has to be asserted against a
+    // reads like a finished sentence - but it now has to be asserted against a
     // field that is genuinely still null, or it proves nothing.
     expect(OPERATOR.aiProvidersVerifiedOn).toBeNull();
     renderAt('/privacy', <PrivacyPage />);
@@ -154,8 +162,8 @@ describe('Google Play privacy policy', () => {
 /**
  * Play requires a public URL where an account can be deleted without the app
  * installed, and requires it to state what deletion actually does. These
- * assertions are against the semantics in apps/api/src/modules/me/service.ts —
- * two steps, a 30-day grace period, an anonymised remainder — because a page
+ * assertions are against the semantics in apps/api/src/modules/me/service.ts -
+ * two steps, a 30-day grace period, an anonymised remainder - because a page
  * that describes a different flow than the code runs is the failure mode this
  * requirement exists to prevent.
  */
@@ -197,10 +205,57 @@ describe('terms of use', () => {
     expect(screen.getByRole('heading', { name: /the software licence/i })).toBeTruthy();
   });
 
-  it('does not promise paid plans the service cannot take payment for', () => {
+  it('describes the payments the code actually takes', () => {
     renderAt('/terms', <TermsPage />);
 
-    expect(screen.getByText(/credits are not sold/i)).toBeTruthy();
+    expect(screen.getByText(/subscription billed by Stripe/i)).toBeTruthy();
+    expect(screen.getByText(/sold in Telegram Stars/i)).toBeTruthy();
+    expect(screen.getAllByText(/\/paysupport/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: /refund page/i }).getAttribute('href')).toBe('/refund');
+    expect(screen.getAllByText(DEFAULT_SUPPORT_EMAIL).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(new RegExp(`${PREMIUM_TIER_DAILY_CREDITS} credits each day`, 'i')),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(new RegExp(`${FREE_TIER_DAILY_CREDITS} credits each day`, 'i')),
+    ).toBeTruthy();
+    // The price lives on Stripe's price object, and there is no Customer Portal
+    // session in the billing code. Neither belongs in the terms.
+    expect(screen.queryByText(/9\.99/)).toBeNull();
+    expect(screen.queryByText(/customer portal/i)).toBeNull();
+    expect(screen.queryByText(/no payment provider/i)).toBeNull();
+    expect(screen.queryByText(/credits are not sold/i)).toBeNull();
+  });
+});
+
+describe('refund page', () => {
+  it('is a real page, with the support email and /paysupport', () => {
+    renderAt('/refund', <RefundPage />);
+
+    expect(screen.getByRole('heading', { level: 1, name: /^refunds$/i })).toBeTruthy();
+    expect(screen.getAllByText(DEFAULT_SUPPORT_EMAIL).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\/paysupport/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/sold in Telegram Stars/i)).toBeTruthy();
+    expect(screen.getByText(/subscription billed by Stripe/i)).toBeTruthy();
+    expect(screen.queryByText(/full refund/i)).toBeNull();
+    expect(screen.queryByText(/14 days/i)).toBeNull();
+    expect(screen.queryByText(/customer portal/i)).toBeNull();
+  });
+
+  it('is a route in the app, so /refund does not fall through to the home page', async () => {
+    const { default: App } = await import('../../App');
+    render(
+      <MemoryRouter initialEntries={['/refund']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: /^refunds$/i })).toBeTruthy();
+  });
+
+  it('is listed for the prerendered shell, at the slashless path', () => {
+    expect(marketingRoute('/refund')?.path).toBe('/refund');
+    expect(marketingRoute('/refund')?.summary).toContain(DEFAULT_SUPPORT_EMAIL);
+    expect(marketingRoute('/refund/')?.path).toBe('/refund');
   });
 });
 

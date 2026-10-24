@@ -1,5 +1,5 @@
 /**
- * /terms — terms of use for the hosted service.
+ * /terms: terms of use for the hosted service.
  *
  * Note the distinction this page has to hold: the AGPL v3 governs the software
  * and the rights it gives you over the code. These terms govern use of the
@@ -9,7 +9,12 @@
  * write for the operator's jurisdiction; they are marked rather than guessed.
  */
 import { Link } from 'react-router-dom';
-import { FREE_TIER_DAILY_CREDITS, RANGES, SOURCE_CODE_URL } from '@aquazerofit/shared';
+import {
+  FREE_TIER_DAILY_CREDITS,
+  PREMIUM_TIER_DAILY_CREDITS,
+  RANGES,
+  SOURCE_CODE_URL,
+} from '@aquazerofit/shared';
 import { LegalPage, List, Notice, P, Section, type Clause } from './LegalLayout';
 import { Fact } from './operator';
 
@@ -21,7 +26,7 @@ const CLAUSES: Clause[] = [
   { id: 'account', heading: 'Your account' },
   { id: 'acceptable-use', heading: 'Acceptable use' },
   { id: 'ai-output', heading: 'AI output' },
-  { id: 'credits', heading: 'Credits and availability' },
+  { id: 'credits', heading: 'Credits, payments and availability' },
   { id: 'your-content', heading: 'Your content' },
   { id: 'software-licence', heading: 'The software licence' },
   { id: 'termination', heading: 'Ending the agreement' },
@@ -35,7 +40,7 @@ export default function TermsPage() {
       path="/terms"
       crumb="Terms"
       title="Terms of use"
-      lead="The rules for using the hosted AquaZeroFit service. Short, and worth reading — particularly the parts about what the service is not."
+      lead="The rules for using the hosted AquaZeroFit service. Short, and worth reading, particularly the parts about what the service is not."
       clauses={CLAUSES}
     >
       <Section id="agreement" index={1} heading="This agreement">
@@ -85,7 +90,7 @@ export default function TermsPage() {
           items={[
             'Give accurate details. The targets the service computes are only as sound as the figures you enter.',
             'Keep your credentials to yourself. You are responsible for activity under your account.',
-            'One person per account. Do not share an account with someone whose body and goals are not yours — the maths will be wrong for both of you.',
+            'One person per account. Do not share an account with someone whose body and goals are not yours. The maths will be wrong for both of you.',
             'Tell us promptly if you believe your account has been accessed by someone else.',
           ]}
         />
@@ -103,7 +108,7 @@ export default function TermsPage() {
           ]}
         />
         <P>
-          Testing the safety guardrails in good faith and reporting what you find is welcome — that
+          Testing the safety guardrails in good faith and reporting what you find is welcome. That
           is what the{' '}
           <a
             href={`${SOURCE_CODE_URL}/blob/main/SECURITY.md`}
@@ -124,7 +129,7 @@ export default function TermsPage() {
           decide what to log and what to eat.
         </P>
         <P>
-          Numbers presented as fact — your targets, your logged totals, your trends — are computed
+          Numbers presented as fact (your targets, your logged totals, your trends) are computed
           deterministically rather than generated, and the{' '}
           <Link to="/safety" className="text-primary hover:text-secondary">
             safety page
@@ -133,16 +138,52 @@ export default function TermsPage() {
         </P>
       </Section>
 
-      <Section id="credits" index={8} heading="Credits and availability">
+      <Section id="credits" index={8} heading="Credits, payments and availability">
         <P>
-          AI features consume credits, and the free allowance is {FREE_TIER_DAILY_CREDITS} credits
-          each day. Deterministic features — targets, logging, hydration, the exercise library,
-          charts — do not consume credits and keep working when the allowance is spent.
+          AI features consume credits. The free allowance is {FREE_TIER_DAILY_CREDITS} credits each
+          day. Premium raises that allowance to {PREMIUM_TIER_DAILY_CREDITS} credits each day.
+          Deterministic features (targets, logging, hydration, the exercise library, charts) do not
+          consume credits and keep working when the allowance is spent.
+        </P>
+        <P>Credits are a daily allowance. They are not a product you can buy on their own.</P>
+        <P>
+          On the web, premium is a subscription billed by Stripe. You pay on Stripe&apos;s checkout
+          page, and the card details stay with Stripe. The price and the billing period are the ones
+          Stripe holds for this service. The plan page shows both before you pay, which is why these
+          terms do not copy a price into this sentence. Each time Stripe marks an invoice paid,
+          premium runs through the end of the period on that invoice, including the first payment
+          and each renewal.
         </P>
         <P>
-          Credits are not sold. The service integrates no payment provider, so there is nothing to
-          buy and no subscription to cancel. If paid plans are ever introduced, their prices,
-          renewal and refund terms must be set out in this clause before that happens.
+          The app has no button that cancels a Stripe subscription. To ask for a cancellation, email{' '}
+          <Fact name="supportEmail" hint="support contact" /> or, in Telegram, send /paysupport to
+          the bot. The bot replies with that email and a link to the{' '}
+          <Link to="/refund" className="text-primary hover:text-secondary">
+            refund page
+          </Link>
+          . Premium runs through the end of the period on the last paid invoice. It ends when Stripe
+          reports that subscription deleted, if that subscription is still the one on the account. A
+          deletion for a subscription a later purchase has replaced leaves the later period in place.
+        </P>
+        <P>
+          Inside the Telegram Mini App, digital goods are sold in Telegram Stars. The Mini App does
+          not open Stripe checkout. A locked coach can be bought for the Stars price shown for that
+          coach before you pay. The price comes from the roster, not from the request. The purchase
+          unlocks that coach on your account. There is no renewal. The same coach also unlocks when
+          you reach the level the roster requires, and the purchase is refused if you already have
+          that coach.
+        </P>
+        <P>
+          On Android, when Google Play billing is configured, premium is a Play subscription. The
+          app opens Google Play&apos;s subscription settings, which is where that subscription is
+          managed and cancelled. A Play subscription that Google reports as revoked or expired ends
+          premium.
+        </P>
+        <P>
+          To ask for a refund, use the same email or send /paysupport. Say which account paid and
+          what you bought. The refund page sets out the same steps. The app has no refund button,
+          and neither that page nor the /paysupport reply refunds a payment by itself. Telegram&apos;s
+          own support cannot refund a purchase made in this bot.
         </P>
         <P>
           The service is provided as it is available. It may change, be interrupted for maintenance,
@@ -176,7 +217,7 @@ export default function TermsPage() {
         </P>
         <P>
           Because the service is offered over a network, the corresponding source of the running
-          version is available to you —{' '}
+          version is available to you:{' '}
           <a
             href={SOURCE_CODE_URL}
             target="_blank"
@@ -193,7 +234,7 @@ export default function TermsPage() {
       <Section id="termination" index={11} heading="Ending the agreement">
         <P>
           You can stop at any time by deleting your account in the app. Deletion erases your data as
-          described in the privacy notice, after a 30-day grace period — or immediately if you
+          described in the privacy notice, after a 30-day grace period, or immediately if you
           confirm the request a second time.
         </P>
         <P>
@@ -208,7 +249,7 @@ export default function TermsPage() {
           Nothing in these terms limits rights you have under consumer law that cannot be limited.
         </P>
         <P>
-          The remaining limitations of liability — their scope and any cap — must be drafted for{' '}
+          The remaining limitations of liability, their scope and any cap, must be drafted for{' '}
           <Fact name="jurisdiction" hint="governing jurisdiction" /> by a lawyer before these terms
           are relied upon. Consumer protection law in many jurisdictions restricts what a service
           like this may exclude, and a boilerplate clause copied from elsewhere is as likely to be

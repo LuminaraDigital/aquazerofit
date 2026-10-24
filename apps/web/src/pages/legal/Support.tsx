@@ -1,5 +1,5 @@
 /**
- * /support — help, contact routes and reporting channels.
+ * /support: help, contact routes and reporting channels.
  *
  * The crisis signpost leads the page deliberately. On a product that handles
  * eating and body weight, the person who most needs the support page is not
@@ -22,7 +22,7 @@ const ANSWERS: Answer[] = [
     question: 'My calorie target looks wrong',
     answer: (
       <>
-        Check the figures in your wellness profile first — height, weight, activity level and goal
+        Check the figures in your wellness profile first: height, weight, activity level and goal
         all move the number. If your target looks higher than you expected, it may have been clamped
         to the calorie floor, in which case the app shows an advisory beside it. The{' '}
         <Link to="/features#targets" className="text-primary hover:text-secondary">
@@ -51,7 +51,7 @@ const ANSWERS: Answer[] = [
     answer: (
       <>
         Expected, and the reason the result arrives as an editable proposal rather than a logged
-        entry — a photograph cannot weigh your dinner. Correct the portions before confirming. Good
+        entry. A photograph cannot weigh your dinner. Correct the portions before confirming. Good
         light and a top-down angle noticeably improve the estimate.
       </>
     ),
@@ -61,9 +61,22 @@ const ANSWERS: Answer[] = [
     answer: (
       <>
         You have likely spent the day&apos;s free allowance of {FREE_TIER_DAILY_CREDITS} credits; it
-        resets daily. Everything deterministic — targets, logging, hydration, the exercise library,
-        charts — keeps working regardless, and a provider outage has the same effect on AI features
+        resets daily. Everything deterministic (targets, logging, hydration, the exercise library,
+        charts) keeps working regardless, and a provider outage has the same effect on AI features
         while leaving the rest running.
+      </>
+    ),
+  },
+  {
+    question: 'I paid and I want a refund',
+    answer: (
+      <>
+        Email the support address below, or in Telegram send /paysupport to the bot. Say which
+        account paid and what you bought. The{' '}
+        <Link to="/refund" className="text-primary hover:text-secondary">
+          refund page
+        </Link>{' '}
+        sets out the same steps. Sending the message does not reverse the charge by itself.
       </>
     ),
   },
@@ -256,7 +269,7 @@ export default function SupportPage() {
                 If something here is difficult to use with a screen reader, a keyboard, or at a
                 larger text size, that is a bug and we want to hear about it. Send it to{' '}
                 <Fact name="supportEmail" hint="support contact" /> and describe what you were
-                trying to do — it will be treated as a defect, not a request.
+                trying to do. It will be treated as a defect, not a request.
               </p>
             </div>
           </Reveal>

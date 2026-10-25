@@ -74,7 +74,11 @@ function isAuthPath(path: string): boolean {
  * the only other route that reads a stored document unauthenticated.
  */
 function isAnonymousWritePath(path: string): boolean {
-  return path.includes('/analytics/events') || path.includes('/challenges/peek');
+  return (
+    path.includes('/analytics/events') ||
+    path.includes('/challenges/peek') ||
+    path.includes('/squads/peek')
+  );
 }
 
 /** Best-effort subject extraction for limiter keying only. This is not authentication. */

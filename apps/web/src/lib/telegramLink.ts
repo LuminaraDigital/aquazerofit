@@ -89,12 +89,20 @@ export function decodePayload(payload: string | null | undefined): Partial<Attri
  * if one is set and otherwise the chat — still a working link, one tap worse.
  */
 export function telegramAppUrl(attr: Partial<Attribution> = {}): string {
+  return telegramStartAppUrl(encodePayload(attr));
+}
+
+/**
+ * The Mini App link carrying a ready-made `startapp` payload (a squad
+ * invite, a share code), or the bare link when there is none. The payload
+ * must already satisfy Telegram's 64-character `[A-Za-z0-9_-]` rule.
+ */
+export function telegramStartAppUrl(startParam: string | null): string {
   const { telegramBotUsername, telegramMiniAppShortName } = SITE;
   const base = telegramMiniAppShortName
     ? `https://t.me/${telegramBotUsername}/${telegramMiniAppShortName}`
     : `https://t.me/${telegramBotUsername}`;
-  const payload = encodePayload(attr);
-  return payload ? `${base}?startapp=${payload}` : base;
+  return startParam ? `${base}?startapp=${startParam}` : base;
 }
 
 /**

@@ -99,6 +99,7 @@ describe('the fightCamp block on GET /fight-record', () => {
       theme: seasonTheme(1),
       enrolment: { enrolled: false, prompt: 'primary' },
       grace: null,
+      squads: null,
     });
     await enrol(grace);
     expect((await read(grace)).body.fightCamp.enrolment).toEqual({ enrolled: true, prompt: 'primary' });
@@ -120,6 +121,7 @@ describe('the fightCamp block on GET /fight-record', () => {
       theme: seasonTheme(2),
       enrolment: { enrolled: false, prompt: 'primary' },
       grace: null,
+      squads: null,
     });
   });
 

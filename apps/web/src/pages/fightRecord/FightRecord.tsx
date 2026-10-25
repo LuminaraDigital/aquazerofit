@@ -13,7 +13,7 @@
  * A user the feature is off for is sent home rather than shown a teaser.
  */
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { tierRank, type BeltAwardView, type FightRecordStatus } from '@aquazerofit/shared';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { AppBackground } from '@/components/layout/AppBackground';
@@ -30,6 +30,7 @@ import {
   beltName,
   daysPhrase,
   nextBeltCopy,
+  useFightCamp,
   useFightRecord,
   useSetEmojiStatus,
 } from '@/lib/fightRecord';
@@ -170,11 +171,36 @@ function Record({ record }: { record: FightRecordStatus }) {
         )}
       </GlassCard>
 
+      <SquadBlock />
+
       <TelegramStatusSetting record={record} />
 
       <BeltCelebration record={record} />
       <BeltShareSheet award={sharing} adult={record.adult} onClose={() => setSharing(null)} />
     </div>
+  );
+}
+
+/** Fight Camp squads (AZF-P1 Epic C): only where the feature is on for an adult. */
+function SquadBlock() {
+  const squads = useFightCamp().data?.squads;
+  if (!squads) return null;
+  const { current } = squads;
+  return (
+    <GlassCard className="p-5">
+      <h2 className="font-heading text-lg font-semibold text-on-surface">Your squad</h2>
+      <p className="mt-1 text-sm text-on-surface-variant text-pretty">
+        {current
+          ? `${current.name}: see this week's board and send a cheer.`
+          : 'Up to five people who show up together this season.'}
+      </p>
+      <Link
+        to="/squad"
+        className="mt-3 inline-flex min-h-[44px] items-center text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+      >
+        {current ? 'Open my squad' : 'Start or join a squad'}
+      </Link>
+    </GlassCard>
   );
 }
 

@@ -15,6 +15,7 @@ import { ConsistencyChip } from '@/components/progress/ConsistencyChip';
 import { ReadinessChip } from '@/components/progress/ReadinessChip';
 import { WeeklyInsightCard } from '@/components/progress/WeeklyInsightCard';
 import { todayWorkoutQuery, queryKeys, useProgressInsight, useReadiness } from '@/lib/queries';
+import { useFightCamp } from '@/lib/fightRecord';
 import { useTelegramMainAction } from '@/lib/useTelegramChrome';
 import { MacroBar } from './MacroBar';
 import { WaterCard } from './WaterCard';
@@ -64,6 +65,8 @@ export default function Dashboard() {
   });
   const insightQuery = useProgressInsight();
   const readinessQuery = useReadiness();
+  // Shares the SeasonCard's cache entry: one GET /fight-record for both.
+  const fightCamp = useFightCamp().data;
 
   const user = asUser(profileQuery.data);
   const firstName = user?.displayName?.split(' ')[0] ?? '';
@@ -288,6 +291,7 @@ export default function Dashboard() {
         <section className="mb-5 reveal reveal-4" aria-label="Consistency">
           <ConsistencyCard
             consistency={progress?.consistency}
+            grace={fightCamp?.grace}
             loading={progressQuery.isPending}
           />
         </section>

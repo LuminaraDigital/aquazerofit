@@ -66,6 +66,28 @@ function sse(chunks: string[]) {
 
 const delta = (content: string) => `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`;
 
+/**
+ * An SSE response that delivers `chunks` and then breaks mid-body, the way a
+ * reset connection or the deadline abort does. Pull-based, because erroring a
+ * stream straight after enqueueing discards the chunks before they are read.
+ */
+function sseThenBreak(chunks: string[]) {
+  const encoder = new TextEncoder();
+  const pending = [...chunks];
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const next = pending.shift();
+        if (next === undefined) controller.error(new Error('terminated'));
+        else controller.enqueue(encoder.encode(next));
+      },
+    }),
+  };
+}
+
 function failure(status: number) {
   return { ok: false, status, headers: { get: () => null } };
 }
@@ -157,6 +179,50 @@ describe('stream retries and fallback', () => {
     expect(groqCalls(calls)).toHaveLength(2);
     expect(result.text).toBe('Recovered.');
     expect(result.meta.degraded).toBe(false);
+  });
+
+  /*
+   * Tokens already sent cannot be taken back. A retry or the offline engine
+   * would stream a second answer after the first, and a retry that succeeded
+   * would be billed as a whole answer.
+   */
+  it('returns what streamed, degraded, when the stream breaks after its first token', async () => {
+    process.env.GROQ_API_KEY = 'test-key';
+    let groqAttempts = 0;
+    const { calls } = stubFetch((call) => {
+      if (!call.url.includes('groq.com')) return Promise.reject(new Error('offline'));
+      groqAttempts += 1;
+      return groqAttempts === 1 ? sseThenBreak([delta('Half '), delta('an answer')]) : sse([delta('A second answer.')]);
+    });
+    const onToken = vi.fn();
+    const onComplete = vi.fn();
+
+    const { tokens, result } = await drain(stream('chatFast', MESSAGES, { onToken, onComplete }));
+
+    expect(tokens).toEqual(['Half ', 'an answer']);
+    expect(onToken).toHaveBeenCalledTimes(2);
+    expect(result.text).toBe('Half an answer');
+    expect(onComplete).toHaveBeenCalledWith('Half an answer');
+    expect(result.meta.provider).toBe('groq');
+    expect(result.meta.degraded).toBe(true);
+    expect(result.meta.degradedReason).toBe('stream_interrupted');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('still retries a stream that breaks before its first token', async () => {
+    process.env.GROQ_API_KEY = 'test-key';
+    let groqAttempts = 0;
+    const { calls } = stubFetch((call) => {
+      if (!call.url.includes('groq.com')) return Promise.reject(new Error('offline'));
+      groqAttempts += 1;
+      return groqAttempts === 1 ? sseThenBreak([]) : sse([delta('Recovered.')]);
+    });
+
+    const { tokens, result } = await drain(stream('chatFast', MESSAGES, {}));
+
+    expect(tokens).toEqual(['Recovered.']);
+    expect(result.meta.degraded).toBe(false);
+    expect(groqCalls(calls)).toHaveLength(2);
   });
 
   it('treats a missing response body as retryable', async () => {

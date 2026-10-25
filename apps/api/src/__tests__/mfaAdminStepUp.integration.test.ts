@@ -93,7 +93,7 @@ beforeEach(() => {
 
 afterAll(async () => {
   delete process.env.MFA_REQUIRE_ADMIN;
-  await getStore().flush();
+  await getStore().close();
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
   } catch {

@@ -14,7 +14,7 @@ const { createWgerImageMedia } = await import('../data/wger/importer');
 const app = createApp();
 
 afterAll(async () => {
-  await getStore().flush();
+  await getStore().close();
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 

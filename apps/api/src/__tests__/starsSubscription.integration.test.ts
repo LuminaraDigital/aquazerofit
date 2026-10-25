@@ -105,7 +105,7 @@ beforeEach(() => {
 
 afterAll(async () => {
   vi.unstubAllGlobals();
-  await getStore().flush();
+  await getStore().close();
   delete process.env.TELEGRAM_WEBHOOK_SECRET;
   delete process.env.TELEGRAM_BOT_TOKEN;
   delete process.env.TELEGRAM_STARS_PREMIUM_PRICE;

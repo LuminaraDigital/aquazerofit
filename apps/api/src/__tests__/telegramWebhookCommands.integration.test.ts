@@ -60,7 +60,7 @@ afterEach(() => {
 
 afterAll(async () => {
   vi.unstubAllGlobals();
-  await getStore().flush();
+  await getStore().close();
   delete process.env.TELEGRAM_WEBHOOK_SECRET;
   delete process.env.TELEGRAM_MINI_APP_URL;
   delete process.env.SUPPORT_EMAIL;

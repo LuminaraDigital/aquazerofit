@@ -120,7 +120,7 @@ afterAll(async () => {
     if (v === undefined) delete process.env[k];
     else process.env[k] = v;
   }
-  await getStore().flush();
+  await getStore().close();
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
   } catch {

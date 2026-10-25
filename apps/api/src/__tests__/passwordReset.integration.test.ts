@@ -25,7 +25,7 @@ const NEW_PASSWORD = 'BrandNewPass7word';
 const NEUTRAL_MESSAGE = 'If that account exists, reset instructions have been issued.';
 
 afterAll(async () => {
-  await getStore().flush();
+  await getStore().close();
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
   } catch {

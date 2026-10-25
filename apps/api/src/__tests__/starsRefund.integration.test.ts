@@ -69,7 +69,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   vi.unstubAllGlobals();
-  await getStore().flush();
+  await getStore().close();
   delete process.env.TELEGRAM_WEBHOOK_SECRET;
   delete process.env.TELEGRAM_BOT_TOKEN;
   // Overlay filesystems (the API image build) can return ENOTEMPTY while a

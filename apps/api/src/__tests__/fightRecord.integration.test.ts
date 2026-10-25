@@ -87,7 +87,7 @@ afterAll(async () => {
   vi.unstubAllGlobals();
   delete process.env.TELEGRAM_BOT_TOKEN;
   delete process.env.TELEGRAM_BELT_EMOJI_IDS;
-  await getStore().flush();
+  await getStore().close();
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
   } catch {

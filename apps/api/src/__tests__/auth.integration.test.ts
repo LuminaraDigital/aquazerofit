@@ -21,7 +21,7 @@ const EMAIL = 'tester@example.com';
 const PASSWORD = 'CorrectHorse9Battery';
 
 afterAll(async () => {
-  await getStore().flush();
+  await getStore().close();
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
   } catch {

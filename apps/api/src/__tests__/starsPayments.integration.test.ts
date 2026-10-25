@@ -35,7 +35,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await getStore().flush();
+  await getStore().close();
   delete process.env.TELEGRAM_WEBHOOK_SECRET;
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });

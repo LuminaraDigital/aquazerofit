@@ -61,7 +61,7 @@ afterEach(() => {
 });
 
 afterAll(async () => {
-  await getStore().flush();
+  await getStore().close();
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 

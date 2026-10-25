@@ -181,7 +181,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await getStore().flush();
+  await getStore().close();
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
   } catch {

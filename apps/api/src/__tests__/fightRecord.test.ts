@@ -37,7 +37,7 @@ const service = await import('../modules/fightRecord/service');
 const { AppError } = await import('../platform/errors');
 
 afterAll(async () => {
-  await getStore().flush();
+  await getStore().close();
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
   } catch {

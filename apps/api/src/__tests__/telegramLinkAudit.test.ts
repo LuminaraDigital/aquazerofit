@@ -17,7 +17,7 @@ const { sha256Hex } = await import('../platform/auth');
 const { AppError } = await import('../platform/errors');
 
 afterAll(async () => {
-  await getStore().flush();
+  await getStore().close();
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 

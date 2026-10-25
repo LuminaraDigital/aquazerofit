@@ -80,7 +80,7 @@ afterEach(async () => {
   // Drain first. Writes flush on a coalescing macrotask, so removing the
   // directory straight away races the flush and fills the run with ENOENT
   // noise from a store nobody is testing any more.
-  for (const s of opened.splice(0)) await s.flush();
+  for (const s of opened.splice(0)) await s.close();
   for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 

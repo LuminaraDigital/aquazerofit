@@ -417,7 +417,7 @@ export class PostgresStore extends MemoryBackedStore {
 
   /** Drain pending writes and release the pool (graceful shutdown). */
   async close(): Promise<void> {
-    await this.flush();
+    await super.close();
     await this.pool?.end();
   }
 

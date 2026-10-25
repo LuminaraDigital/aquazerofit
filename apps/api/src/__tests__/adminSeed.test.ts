@@ -16,12 +16,12 @@ import type { User } from '@aquazerofit/shared';
 import { resetSeededDirs, seedIfNeeded } from '../data/seed';
 import { JsonStore } from '../platform/store';
 
-const dirs: string[] = [];
+const stores: JsonStore[] = [];
 
 function freshStore(): JsonStore {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'azf-admin-seed-'));
-  dirs.push(dir);
-  return new JsonStore(dir);
+  const store = new JsonStore(fs.mkdtempSync(path.join(os.tmpdir(), 'azf-admin-seed-')));
+  stores.push(store);
+  return store;
 }
 
 const adminOf = (store: JsonStore) => store.byId<User>('users', 'usr-admin');
@@ -39,10 +39,11 @@ afterEach(() => {
   warn.mockRestore();
 });
 
-afterAll(() => {
-  for (const dir of dirs) {
+afterAll(async () => {
+  for (const store of stores) {
+    await store.close();
     try {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(store.dataDir, { recursive: true, force: true });
     } catch {
       /* best-effort cleanup on Windows */
     }

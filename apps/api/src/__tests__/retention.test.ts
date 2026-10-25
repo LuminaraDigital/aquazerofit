@@ -20,7 +20,7 @@ type Subject = import('../modules/admin/retention').RetentionSubject;
 
 afterAll(async () => {
   vi.useRealTimers();
-  await getStore().flush();
+  await getStore().close();
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
   } catch {

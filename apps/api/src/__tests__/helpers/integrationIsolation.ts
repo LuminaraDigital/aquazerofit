@@ -63,7 +63,7 @@ export async function teardownIsolatedDataDir(
   savedAzfDataDir: string | undefined,
   savedProviderEnv?: Map<string, string | undefined>,
 ): Promise<void> {
-  await getStore().flush();
+  await getStore().close();
   resetStoreSingletonForTests();
   if (savedAzfDataDir === undefined) delete process.env.AZF_DATA_DIR;
   else process.env.AZF_DATA_DIR = savedAzfDataDir;

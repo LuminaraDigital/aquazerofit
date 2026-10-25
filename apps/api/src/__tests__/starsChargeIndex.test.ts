@@ -26,7 +26,7 @@ function newStore(): JsonStore {
 }
 
 afterEach(async () => {
-  for (const store of opened.splice(0)) await store.flush();
+  for (const store of opened.splice(0)) await store.close();
   for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 

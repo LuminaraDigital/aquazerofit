@@ -105,7 +105,7 @@ afterAll(async () => {
   // Each upload schedules a background analysis ~1.2 s later; let it settle so
   // it cannot race the cleanup below.
   await new Promise((resolve) => setTimeout(resolve, 1500));
-  await getStore().flush();
+  await getStore().close();
   for (const file of written) {
     try {
       fs.unlinkSync(file);

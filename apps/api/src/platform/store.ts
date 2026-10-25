@@ -248,6 +248,8 @@ export abstract class MemoryBackedStore {
   private dirty = new Map<ContainerName, ContainerDelta>();
   private writeQueue: Promise<void> = Promise.resolve();
   private flushScheduled = false;
+  /** Set by close(): from then on writes stay in memory and nothing is persisted. */
+  private closed = false;
   /** container -> index name -> index. Empty for containers with no indexes. */
   private readonly indexes = new Map<ContainerName, Map<string, SecondaryIndex>>();
 
@@ -516,6 +518,10 @@ export abstract class MemoryBackedStore {
   }
 
   private enqueueFlush(): void {
+    // The one gate for all three callers (the coalescing timer, flush(),
+    // close()). After close() the backing may already be gone - a suite's
+    // deleted data dir, an ended pool - so a late write must not reach it.
+    if (this.closed) return;
     const batch = this.dirty;
     this.dirty = new Map();
     this.writeQueue = this.writeQueue
@@ -561,6 +567,23 @@ export abstract class MemoryBackedStore {
   /** Await all pending writes (tests, graceful shutdown, seed script). */
   async flush(): Promise<void> {
     if (this.dirty.size > 0) this.enqueueFlush();
+    await this.writeQueue;
+  }
+
+  /**
+   * Persist everything written so far, then stop persisting.
+   *
+   * The cut-off is the call, not the end of the drain: a write that lands
+   * while the last batch is in flight stays in memory and is never persisted.
+   * That is what makes deleting the backing straight afterwards safe, which
+   * flush() cannot promise - background work can write again after flush()
+   * resolves (seeding writes the demo credentials when a bcrypt hash in a
+   * worker comes back), and that write would persist into whatever was
+   * removed in between.
+   */
+  async close(): Promise<void> {
+    if (this.dirty.size > 0) this.enqueueFlush();
+    this.closed = true;
     await this.writeQueue;
   }
 

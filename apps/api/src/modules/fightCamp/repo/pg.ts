@@ -477,13 +477,30 @@ export class PgEngageRepo implements EngageRepo {
 
   // ----- experiments -----
 
-  async assignArm(userId: string, experiment: 'early_cheers', arm: ExperimentArm, at: string): Promise<boolean> {
+  async assignArm(
+    userId: string,
+    experiment: 'early_cheers',
+    arm: ExperimentArm,
+    at: string,
+  ): Promise<{ arm: ExperimentArm; recorded: boolean }> {
+    // Read first: after the first read of week one this is the only query. A
+    // lost insert race reads the winner's row, committed once DO NOTHING returns.
+    const held = async () =>
+      (
+        await this.db.query<{ arm: ExperimentArm }>(
+          'SELECT arm FROM engage.experiment_arms WHERE user_id = $1 AND experiment = $2',
+          [userId, experiment],
+        )
+      ).rows[0]?.arm;
+    const before = await held();
+    if (before) return { arm: before, recorded: false };
     const { rows } = await this.db.query(
       `INSERT INTO engage.experiment_arms (user_id, experiment, arm, assigned_at) VALUES ($1, $2, $3, $4)
        ON CONFLICT (user_id, experiment) DO NOTHING RETURNING user_id`,
       [userId, experiment, arm, at],
     );
-    return rows.length > 0;
+    if (rows.length > 0) return { arm, recorded: true };
+    return { arm: (await held()) ?? arm, recorded: false };
   }
 
   // ----- Cut Man grace -----

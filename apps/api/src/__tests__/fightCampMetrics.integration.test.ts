@@ -44,6 +44,10 @@ function shareEvent(userId: string, at: string): void {
 }
 
 beforeAll(async () => {
+  // Every figure here counts the whole store, so it holds only the fixture:
+  // the demo account seeds asynchronously and, under load, can land after
+  // the clock moves, becoming one more weekly active.
+  process.env.AZF_SEED_DEMO = 'false';
   vi.useFakeTimers({ toFake: ['Date'] });
   pin(SIGNUP);
   h = await fightCampHarness('fc-metrics');
@@ -101,6 +105,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   vi.useRealTimers();
+  delete process.env.AZF_SEED_DEMO;
   await h.cleanup();
 });
 

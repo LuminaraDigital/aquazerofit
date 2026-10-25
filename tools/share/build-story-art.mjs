@@ -21,7 +21,7 @@
  * The colours, season names and belt shapes mirror packages/shared
  * (SEASON_ACCENTS, SEASON_NAMES) and apps/web/src/lib/fightRecord.ts
  * (BELT_COLOUR). This script cannot import TypeScript, so a change there means
- * a change here and a re-run; the web test `storyArt.test.ts` fails if any
+ * a change here and a re-run; the web test `shareKit.test.tsx` fails if any
  * file the app can ask for is missing.
  */
 import { createRequire } from 'node:module';

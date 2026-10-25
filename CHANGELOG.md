@@ -20,6 +20,10 @@ Tagged releases are `v1.0.0`, `v1.1.0`, `v1.2.0` and `v1.3.0`. Anything after
 
 ### Added
 
+- Fight Camp (AZF-P1), shipped dark behind `FIGHT_RECORD_ENABLED` plus one
+  `FC_*` sub-flag per feature: a relational `engage` Postgres schema with a
+  forward-only migration runner, covered by export and erasure. Per-slice
+  record in `docs/specs/AZF-P1_Fight_Camp_Build_Record.md`.
 - Staging promotion path (`feature` to `staging` to `main`), with disjoint
   staging and production environment examples, and retention telemetry for
   onboarding, first value, error and abandon (commit `4e3f335`).

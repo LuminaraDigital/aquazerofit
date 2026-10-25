@@ -19,6 +19,7 @@ import {
 } from './platform/bootGuards';
 import { warnIfBotProtectionUnconfigured } from './platform/botProtection';
 import { describeStoreInitFailure, getStore, initStore } from './platform/store';
+import { initEngage } from './modules/fightCamp/repo';
 import { sweepExpiredDeletions } from './modules/me/service';
 import { sweepIdempotencyRecords } from './modules/logs/service';
 import { recoverStuckVisionJobs, sweepVisionArtifacts } from './modules/vision/router';
@@ -61,6 +62,19 @@ try {
   await initStore();
 } catch (err) {
   console.error(`[fatal] store initialisation failed: ${describeStoreInitFailure(err)}`);
+  console.error(err);
+  process.exit(1);
+}
+
+// Fight Camp's relational tables ride the same pool and must be migrated
+// before the first request. Fatal for the same reason as the store: serving
+// with a schema the code does not match would fail every Fight Camp write in
+// ways that look like user errors.
+try {
+  const engage = await initEngage();
+  console.log(`[engage] repository: ${engage}`);
+} catch (err) {
+  console.error(`[fatal] engage migrations failed: ${describeStoreInitFailure(err)}`);
   console.error(err);
   process.exit(1);
 }

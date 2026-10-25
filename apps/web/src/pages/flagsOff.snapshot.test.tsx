@@ -36,6 +36,10 @@ vi.mock('@/lib/api', async (original) => ({
 import Dashboard from './dashboard/Dashboard';
 import FightRecordPage from './fightRecord/FightRecord';
 import NotificationSettings from './settings/NotificationSettings';
+import { ApiError } from '@/lib/api';
+
+/** Every route Fight Camp added. With the flags off, none of them should be asked for. */
+const FIGHT_CAMP_ROUTE = /^\/(?:fight-camp|squads|cheers|share|gifts|grace)(?:\/|$)/;
 
 const PINNED = new Date('2026-11-18T10:00:00.000Z');
 
@@ -61,6 +65,8 @@ beforeAll(async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(PINNED);
   mocks.api.mockImplementation(async (route: string) => {
+    // As the API answers with every flag off. The test also asserts nothing asked.
+    if (FIGHT_CAMP_ROUTE.test(route)) throw new ApiError(404, { code: 'NOT_FOUND', message: 'Resource not found' });
     if (route === '/fight-record') return recorded.fightRecordOn;
     if (route === '/progress/summary') return recorded.progressSummary;
     if (route === '/coaches/progression') return recorded.progression;
@@ -104,6 +110,8 @@ describe('every Fight Camp flag off', () => {
     ['fight-record', () => <FightRecordPage />, '/fight-record'],
     ['notification-settings', () => <NotificationSettings />, '/settings/notifications'],
   ] as const)('renders %s exactly as before Fight Camp', async (name, page, at) => {
+    mocks.api.mockClear();
     await expect(await settled(page(), at)).toMatchFileSnapshot(`./__snapshots__/flagsOff.${name}.html`);
+    expect(mocks.api.mock.calls.map(([route]) => String(route)).filter((r) => FIGHT_CAMP_ROUTE.test(r))).toEqual([]);
   });
 });

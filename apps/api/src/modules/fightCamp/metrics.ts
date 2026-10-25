@@ -109,11 +109,15 @@ function subjects(): Subject[] {
     }));
 }
 
-/** At least three active days in the first seven, or null while week one is not over. */
-function completedWeekOne(s: Subject, today: string): boolean | null {
-  if (daysBetween(s.signupDate, today) < 7) return null;
+/**
+ * At least three active days in the seven from `dayZero`, or null while week
+ * one is not over. `dayZero` is the one stored with the arm, so the analysis
+ * counts the same week the treatment ran in.
+ */
+function completedWeekOne(s: Subject, dayZero: string, today: string): boolean | null {
+  if (daysBetween(dayZero, today) < 7) return null;
   let days = 0;
-  for (let i = 0; i < 7; i += 1) if (s.activeDates.has(addDays(s.signupDate, i))) days += 1;
+  for (let i = 0; i < 7; i += 1) if (s.activeDates.has(addDays(dayZero, i))) days += 1;
   return days >= 3;
 }
 
@@ -124,13 +128,14 @@ export async function engageMetrics(today: string, seasonNumber: number = season
   const last7 = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
   const since28 = addDays(today, -27);
 
-  // Share rate and share-to-install.
+  // Share rate and share-to-install, both over member accounts only.
+  const members = new Set(people.map((s) => s.id));
   const weeklyActive = people.filter((s) => last7.some((d) => s.activeDates.has(d))).length;
   const weekStartIso = `${addDays(today, -6)}T00:00:00.000Z`;
   const sharers = new Set(
     getStore()
       .where<GrowthEvent>('audit', (d) => (d as GrowthEvent).type === 'growthEvent')
-      .filter((e) => e.userId && SHARE_EVENTS.has(e.name) && e.createdAt >= weekStartIso)
+      .filter((e) => e.userId && members.has(e.userId) && SHARE_EVENTS.has(e.name) && e.createdAt >= weekStartIso)
       .map((e) => e.userId!),
   ).size;
   const [landed28d, attributed28d] = await Promise.all([
@@ -138,15 +143,18 @@ export async function engageMetrics(today: string, seasonNumber: number = season
     repo.shareAttributionsSince(`${since28}T00:00:00.000Z`),
   ]);
 
-  // Squad D30 lift: joined within a week of signup vs everyone else from the same signup weeks.
+  // Squad D30 lift: people who joined a squad in their first seven days,
+  // against people from the same signup weeks who never joined one. Only
+  // people whose day 30 has passed are counted, so this week's signups do not
+  // hold the whole figure back.
   const firstJoins = new Map((await repo.squadFirstJoins()).map((j) => [j.userId, j.joinedAt.slice(0, 10)]));
-  const squadCohort = people.filter((s) => {
+  const measurable = people.filter((s) => addDays(s.signupDate, Math.max(...D30_OFFSETS)) <= today);
+  const squadCohort = measurable.filter((s) => {
     const joined = firstJoins.get(s.id);
-    return joined !== undefined && daysBetween(s.signupDate, joined) <= 7;
+    return joined !== undefined && daysBetween(s.signupDate, joined) < 7;
   });
   const squadWeeks = new Set(squadCohort.map((s) => weekStartOf(s.signupDate)));
-  const inSquadCohort = new Set(squadCohort.map((s) => s.id));
-  const soloCohort = people.filter((s) => !inSquadCohort.has(s.id) && squadWeeks.has(weekStartOf(s.signupDate)));
+  const soloCohort = measurable.filter((s) => !firstJoins.has(s.id) && squadWeeks.has(weekStartOf(s.signupDate)));
   const d30 = (cohort: Subject[]) => {
     const kept = cohort.length > 0 ? retained(cohort, D30_OFFSETS, today) : null;
     return kept === null ? null : kept / cohort.length;
@@ -161,14 +169,14 @@ export async function engageMetrics(today: string, seasonNumber: number = season
   const reenrolled = enrolledNext ? enrolledThen.filter((id) => enrolledNext.has(id)).length : null;
 
   // Early cheers: week-one completion by arm.
-  const arms = new Map((await repo.armsOf('early_cheers')).map((a) => [a.userId, a.arm]));
+  const arms = new Map((await repo.armsOf('early_cheers')).map((a) => [a.userId, a]));
   const tally = { treatment: { users: 0, completed: 0 }, holdout: { users: 0, completed: 0 } };
   for (const s of people) {
-    const arm = arms.get(s.id);
-    const completed = arm ? completedWeekOne(s, today) : null;
-    if (!arm || completed === null) continue;
-    tally[arm].users += 1;
-    if (completed) tally[arm].completed += 1;
+    const placed = arms.get(s.id);
+    const completed = placed ? completedWeekOne(s, placed.dayZero, today) : null;
+    if (!placed || completed === null) continue;
+    tally[placed.arm].users += 1;
+    if (completed) tally[placed.arm].completed += 1;
   }
   const test = twoProportionZ(tally.treatment.completed, tally.treatment.users, tally.holdout.completed, tally.holdout.users);
 

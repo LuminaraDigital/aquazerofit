@@ -47,6 +47,14 @@ interface OutboxDao {
     @Query("SELECT COUNT(*) FROM outbox WHERE state IN ('QUEUED', 'IN_FLIGHT', 'FAILED')")
     suspend fun pendingCountOnce(): Int
 
+    /**
+     * Ops that will still run. Unlike [pendingCount] it leaves FAILED out: a
+     * rejected op is terminal, so a count that includes it can never reach
+     * zero again in that session, and "the queue has drained" is never seen.
+     */
+    @Query("SELECT COUNT(*) FROM outbox WHERE state IN ('QUEUED', 'IN_FLIGHT')")
+    fun liveCount(): Flow<Int>
+
     @Query(
         "UPDATE outbox SET state = :to, attempts = attempts + 1, " +
             "firstInFlightAt = CASE WHEN firstInFlightAt = 0 THEN :nowMs ELSE firstInFlightAt END " +

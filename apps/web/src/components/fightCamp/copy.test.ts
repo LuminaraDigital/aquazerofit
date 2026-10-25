@@ -36,18 +36,21 @@ const JSX_COMMENT = /\{\s*\/\*[\s\S]*?\*\/\s*\}/g;
 const LINE_COMMENT = /(^|[^:'"`\\])\/\/.*$/gm;
 const LITERAL = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
 const JSX_TEXT = />([^<>{}]*[A-Za-z][^<>{}]*)</g;
+/** Enum values, codes and event names ('failed', 'gift_paid'): protocol, not copy. */
+const MACHINE_TOKEN = /^[a-z][a-z0-9_]*$/;
 
 function copyStrings(source: string): string[] {
   const code = source.replace(JSX_COMMENT, '').replace(BLOCK_COMMENT, '').replace(LINE_COMMENT, '$1');
   return [
     ...[...code.matchAll(LITERAL)].map((m) => m[1] ?? m[2] ?? m[3] ?? ''),
     ...[...code.matchAll(JSX_TEXT)].map((m) => m[1]!.trim()),
-  ].filter(Boolean);
+  ].filter((s) => s && !MACHINE_TOKEN.test(s));
 }
 
 describe('Fight Camp web copy', () => {
   it('reads literals and JSX text, not comments', () => {
-    expect(copyStrings(`const a = 'x'; // 'streak'\n<p>Showed up</p>{/* lost */}`)).toEqual(['x', 'Showed up']);
+    expect(copyStrings(`const a = 'X'; // 'streak'\n<p>Showed up</p>{/* lost */}`)).toEqual(['X', 'Showed up']);
+    expect(copyStrings(`if (status === 'failed') say('You failed.')`)).toEqual(['You failed.']);
   });
 
   it.each(PHASE_ONE)('%s uses no banned words', (file) => {

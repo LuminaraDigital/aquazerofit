@@ -106,6 +106,17 @@ export interface AttributionRow {
   createdAt: string;
 }
 
+/** The user's grace ledger, as seen from inside their lock. */
+export interface GraceLedger {
+  /** Every row, in write order. */
+  entries(): Promise<GraceRow[]>;
+  /**
+   * Append in the order given; rows a unique rule refuses (an earn already
+   * held, a date already bridged) are skipped. Returns how many were new.
+   */
+  append(rows: readonly GraceRow[]): Promise<number>;
+}
+
 export type CreateSquadOutcome =
   | { ok: true }
   | { ok: false; reason: 'already_member' | 'corner_taken' | 'code_taken' };
@@ -190,10 +201,14 @@ export interface EngageRepo {
   coachCheersTo(userId: string): Promise<CheerRow[]>;
 
   // ----- Cut Man grace -----
-  /** Every ledger row for the user in insertion order (created_at, then id). */
+  /** Every ledger row for the user, in write order. */
   graceEntries(userId: string): Promise<GraceRow[]>;
-  /** Inserts what the unique rules allow; returns how many were new. */
-  addGrace(rows: readonly GraceRow[]): Promise<number>;
+  /**
+   * Run `fn` holding the user's grace lock, so one read-plan-write cycle
+   * cannot interleave with another (two tabs, or the dashboard's parallel
+   * reads). The ledger handed to `fn` is the only way to write grace.
+   */
+  withGraceLedger<T>(userId: string, fn: (ledger: GraceLedger) => Promise<T>): Promise<T>;
 
   // ----- nudges -----
   /** Claim the user's one nudge for a local date. False when already claimed. */

@@ -29,9 +29,8 @@ import { isLaneAllowed } from '../ai/tierPolicy';
 import { loadPrompt } from '../ai/prompts';
 import { hasConsent } from '../me/service';
 import { asyncHandler, byIdDoc, getUser, nowIso, upsertDoc } from '../ai/util';
-import { getProgressSummary } from './service';
-import { fcEnabled } from '../fightCamp/flags';
-import { syncGrace } from '../fightCamp/grace';
+import { activeDatesOf, getProgressSummary, loadActivity } from './service';
+import { bridgesForDisplay } from '../fightCamp/grace';
 import {
   NOT_ENOUGH_DATA_NARRATIVE,
   computeChanges,
@@ -51,8 +50,9 @@ progressRouter.get(
     const today = todayFor(req);
     // Cut Man days shape the consistency run only while that feature is on;
     // off, this is the R1a summary with no Fight Camp query at all.
-    const bridged = fcEnabled('grace', userId) ? (await syncGrace(userId, today)).bridged : undefined;
-    res.json(getProgressSummary(userId, today, bridged));
+    const activity = loadActivity(userId);
+    const bridged = await bridgesForDisplay(userId, today, activeDatesOf(activity), { write: true });
+    res.json(getProgressSummary(userId, today, bridged, activity));
   }),
 );
 

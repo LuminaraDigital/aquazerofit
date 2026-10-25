@@ -67,9 +67,9 @@ describe('no billing path writes grace', () => {
     },
   );
 
-  it('keeps the ledger writer the only caller of addGrace outside the repository', () => {
+  it('keeps the ledger writer the only file that opens the grace ledger', () => {
     const callers = [...reachable(path.join(srcDir, 'app.ts'))].filter(
-      (f) => !f.includes(`${path.sep}repo${path.sep}`) && /\.addGrace\(/.test(fs.readFileSync(f, 'utf8')),
+      (f) => !f.includes(`${path.sep}repo${path.sep}`) && /\.withGraceLedger\(/.test(fs.readFileSync(f, 'utf8')),
     );
     expect(callers).toEqual([GRACE_WRITER]);
   });

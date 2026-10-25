@@ -340,22 +340,50 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
   });
 
   describe('Cut Man grace ledger', () => {
-    it('records each earned milestone and each bridged date once, in insertion order', async () => {
+    const append = (userId: string, rows: GraceRow[]) =>
+      repo.withGraceLedger(userId, (ledger) => ledger.append(rows));
+
+    it('records each earned milestone and each bridged date once, in write order', async () => {
       const userId = uid('u');
-      const added = await repo.addGrace([
+      const added = await append(userId, [
+        graceRow(userId, { milestone: 14, localDate: '2026-11-03', createdAt: at(9) }),
         graceRow(userId, { milestone: 7, createdAt: at(1) }),
         graceRow(userId, { milestone: 7, createdAt: at(2) }),
-        graceRow(userId, { milestone: 14, localDate: '2026-11-03', createdAt: at(3) }),
-        graceRow(userId, { entry: 'applied', milestone: null, localDate: '2026-11-05', createdAt: at(4) }),
+        graceRow(userId, { entry: 'applied', milestone: null, localDate: '2026-11-05', createdAt: at(0) }),
         graceRow(userId, { entry: 'applied', milestone: null, localDate: '2026-11-05', createdAt: at(5) }),
       ]);
       expect(added).toBe(3);
+      // Write order, not timestamp order: the fold must not depend on clocks.
       expect((await repo.graceEntries(userId)).map((g) => [g.entry, g.milestone, g.localDate])).toEqual([
-        ['earned', 7, '2026-10-25'],
         ['earned', 14, '2026-11-03'],
+        ['earned', 7, '2026-10-25'],
         ['applied', null, '2026-11-05'],
       ]);
       expect(await repo.graceEntries(uid('nobody'))).toEqual([]);
+    });
+
+    it('lets one holder at a time read and write a user\u2019s ledger', async () => {
+      const userId = uid('u');
+      const order: string[] = [];
+      const holder = (name: string, rows: GraceRow[]) =>
+        repo.withGraceLedger(userId, async (ledger) => {
+          order.push(`${name}:read:${(await ledger.entries()).length}`);
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          await ledger.append(rows);
+          order.push(`${name}:wrote`);
+        });
+      await Promise.all([
+        holder('a', [graceRow(userId, { milestone: 7 })]),
+        holder('b', [graceRow(userId, { milestone: 14 })]),
+      ]);
+      // b saw a's row: the second cycle started after the first one ended.
+      expect(order).toEqual(['a:read:0', 'a:wrote', 'b:read:1', 'b:wrote']);
+    });
+
+    it('releases the lock when a holder throws', async () => {
+      const userId = uid('u');
+      await expect(repo.withGraceLedger(userId, async () => Promise.reject(new Error('boom')))).rejects.toThrow('boom');
+      await expect(repo.withGraceLedger(userId, async (ledger) => ledger.append([graceRow(userId)]))).resolves.toBe(1);
     });
   });
 
@@ -409,7 +437,7 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       await repo.enrol({ userId: owner, seasonNumber: 1, source: 'squad', enrolledAt: at(0) });
       await repo.insertCheer(cheerRow({ fromUserId: owner, toUserId: mate, squadId: squad.id }));
       await repo.insertCheer(cheerRow({ fromUserId: mate, toUserId: owner, squadId: squad.id }));
-      await repo.addGrace([graceRow(owner)]);
+      await repo.withGraceLedger(owner, (ledger) => ledger.append([graceRow(owner)]));
       await repo.claimNudge(owner, '2026-10-20', 'cheer', at(0));
 
       const bundle = await repo.exportUser(owner);
@@ -432,7 +460,7 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       const sent = cheerRow({ fromUserId: owner, toUserId: mate });
       await repo.insertCheer(sent);
       await repo.insertCheer(cheerRow({ fromUserId: mate, toUserId: owner }));
-      await repo.addGrace([graceRow(owner)]);
+      await repo.withGraceLedger(owner, (ledger) => ledger.append([graceRow(owner)]));
       await repo.claimNudge(owner, '2026-10-20', 'cheer', at(0));
       const code = `Ef${String(++seq).padStart(6, '0')}`;
       await repo.insertShareLink({ code, userId: owner, kind: 'belt', seasonNumber: 1, createdAt: at(0) });

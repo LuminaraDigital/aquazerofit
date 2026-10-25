@@ -38,6 +38,7 @@ import { obfuscatedAccountIdFor, playBillingConfigured, verifyPurchase } from '.
 import {
   createCheckoutSession,
   handleStripeEvent,
+  liveSubscriptionOf,
   premiumPrice,
   stripeSignatureValid,
   syncCheckoutSession,
@@ -324,7 +325,9 @@ billingRouter.post(
 
 /**
  * Open a Checkout page. Refused for an account that is already premium from
- * any source: a second subscription would bill the user twice for one tier.
+ * any source, or whose earlier Stripe subscription Stripe may still charge (a
+ * renewal being retried after the grace ran out): a second subscription would
+ * bill the user twice for one tier.
  */
 billingRouter.post(
   '/stripe/checkout',
@@ -342,6 +345,12 @@ billingRouter.post(
     }
     if (tierOf(userId) === 'premium') {
       throw new AppError('CONFLICT', 'This account is already on premium.');
+    }
+    if (await liveSubscriptionOf(userId)) {
+      throw new AppError(
+        'CONFLICT',
+        'This account already has a card subscription. Contact Support to update or cancel it.',
+      );
     }
     res.json({ url: await createCheckoutSession(userId) });
   }),

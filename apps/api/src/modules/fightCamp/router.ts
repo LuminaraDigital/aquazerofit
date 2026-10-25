@@ -26,9 +26,10 @@ import {
 } from '@aquazerofit/shared';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { config } from '../../platform/config';
-import { asyncHandler } from '../../platform/errors';
+import { AppError, asyncHandler } from '../../platform/errors';
 import { todayFor } from '../../platform/dates';
 import { enrol } from './enrolment';
+import { seasonRecap } from './recap';
 import { requireFeature, requireFeatureSwitch } from './flags';
 import { prepareSquadInvite, squadCorner } from './corner';
 import { cheerInbox, decodeCursor, markCheersSeen, sendCheer } from './cheers';
@@ -62,6 +63,18 @@ fightCampRouter.post(
     const { source } = enrolInputSchema.parse(req.body ?? {});
     const { enrolment, created } = await enrol(userId, source, todayFor(req));
     res.status(created ? 201 : 200).json({ enrolment });
+  }),
+);
+
+/** A finished season's recap: effort only. 404 for the current season or one with no activity. */
+fightCampRouter.get(
+  '/recap/:seasonNumber',
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    requireFeature('enrol', userId);
+    const recap = await seasonRecap(userId, Number(req.params.seasonNumber), todayFor(req));
+    if (!recap) throw new AppError('NOT_FOUND', 'There is no recap for that season.');
+    res.json({ recap });
   }),
 );
 

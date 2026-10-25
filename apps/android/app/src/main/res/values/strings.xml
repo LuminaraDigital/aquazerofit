@@ -575,6 +575,7 @@
     <string name="capture_error_shutter">That shot didn\'t save. Try again.</string>
     <string name="capture_rate_limited">Things are busy right now - your photo is queued and will upload shortly.</string>
     <string name="capture_upload_failed">That photo didn\'t upload. Try again.</string>
+    <string name="capture_premium_required">This feature is part of AquaZeroFit Premium.</string>
     <string name="capture_error_unsupported_type">That file type isn\'t supported. Use a JPEG, PNG or HEIC photo.</string>
     <string name="capture_error_too_large">That photo is over the 10 MB limit. Try a smaller one.</string>
     <string name="capture_error_unreadable">That photo couldn\'t be read. Try another one.</string>
@@ -1203,6 +1204,8 @@
     <string name="plan_lane_locked">Premium</string>
     <string name="plan_lane_insight_title">A coach-written weekly note</string>
     <string name="plan_lane_insight_body">On premium, the narrative at the top of your weekly summary is written by the coach. On free it is written from your own numbers by the app itself - you still get the summary, and every "what changed" line in it, every week.</string>
+    <string name="plan_lane_vision_title">Meal photo analysis</string>
+    <string name="plan_lane_vision_body">Photographing a plate and having the model read it is part of Premium. Search and barcode logging stay on the free plan. A premium photo still spends meal-photo credits.</string>
     <string name="plan_lane_generic_body">This part of the coach runs on a model lane the free tier does not reach.</string>
     <string name="plan_difference_footnote">Your targets, your logging, your training plans, the coach chat and every number in your weekly summary work the same way on both plans.</string>
     <string name="plan_costs_heading">What each AI action costs</string>

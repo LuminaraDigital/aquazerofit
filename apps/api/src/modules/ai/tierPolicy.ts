@@ -1,12 +1,25 @@
 /**
  * TierPolicy (AQF-09 §2.3): free-tier lane confinement.
- * The free tier is confined to non-premium lanes; the batch insight lane is
- * premium-only. Route by task, not by habit (AQF-10 §6).
+ *
+ * Premium lanes are the ones a free account must not send to a real provider:
+ * - insightBatch: coach-written weekly note. Free accounts still receive the
+ *   deterministic summary; the progress route checks isLaneAllowed and falls
+ *   back instead of throwing.
+ * - visionPrimary: meal-photo recognition. A photograph is an image-token
+ *   call. Search and barcode logging do not use this lane.
+ *
+ * chatFast (coach chat) and planStructured (plans, meal recommendations,
+ * meal-text drafts) stay on the free credit meter. Plan generation caps at
+ * 4096 output tokens and costs 5 of the 10-credit daily grant, so a free
+ * account can run it at most twice a day, and an empty balance already falls
+ * back to the deterministic planner. Exercise-swap ranking rides chatFast
+ * (512 tokens) and only when no variation-group sibling exists.
+ * safetyCheap is guardrails and memory extraction, not a product surface.
  */
 import { AppError } from '../../platform/errors';
 import type { ModelGroup, UserTier } from '@aquazerofit/shared';
 
-export const PREMIUM_LANES: readonly ModelGroup[] = ['insightBatch'] as const;
+export const PREMIUM_LANES: readonly ModelGroup[] = ['insightBatch', 'visionPrimary'] as const;
 
 export function isLaneAllowed(tier: UserTier, task: ModelGroup): boolean {
   if (tier === 'premium') return true;

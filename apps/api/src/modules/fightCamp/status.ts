@@ -11,15 +11,18 @@ import { FC_FEATURES } from '../../platform/fightCampConfig';
 import { enrolmentStatus } from './enrolment';
 import { fcEnabled } from './flags';
 import { syncGrace } from './grace';
-import { squadsStatus } from './squads';
+import { firstNameOf, squadsStatus } from './squads';
 import { unseenCheers } from './cheers';
 import { syncEarlyCheers } from './earlyCheers';
-import { engageRepo } from './repo';
 import { recapOffer } from './recap';
 import { isAdult } from '../fightRecord/service';
 import { getProfile } from '../me/service';
 
-export async function fightCampStatus(userId: string, today: string): Promise<FightCampStatus | null> {
+export async function fightCampStatus(
+  userId: string,
+  today: string,
+  timezone: string | undefined,
+): Promise<FightCampStatus | null> {
   if (!FC_FEATURES.some((feature) => fcEnabled(feature, userId))) return null;
   const season = seasonFor(today);
   return {
@@ -27,17 +30,15 @@ export async function fightCampStatus(userId: string, today: string): Promise<Fi
     enrolment: fcEnabled('enrol', userId) ? await enrolmentStatus(userId, today) : null,
     grace: fcEnabled('grace', userId) ? (await syncGrace(userId, today)).view : null,
     squads: fcEnabled('squads', userId) ? await squadsStatus(userId, today) : null,
-    cheers: fcEnabled('cheers', userId) && isAdult(getProfile(userId)) ? await cheersStatus(userId, today) : null,
-    shareKit:
-      fcEnabled('shareKit', userId) && isAdult(getProfile(userId))
-        ? { joined: (await engageRepo().inviteesOf(userId)).length }
-        : null,
+    cheers:
+      fcEnabled('cheers', userId) && isAdult(getProfile(userId)) ? await cheersStatus(userId, today, timezone) : null,
+    shareKit: fcEnabled('shareKit', userId) && isAdult(getProfile(userId)) ? { firstName: firstNameOf(userId) } : null,
     recap: fcEnabled('enrol', userId) ? recapOffer(userId, today) : null,
   };
 }
 
-async function cheersStatus(userId: string, today: string): Promise<{ unseen: number }> {
+async function cheersStatus(userId: string, today: string, timezone: string | undefined): Promise<{ unseen: number }> {
   // A new person's coach cheers land before the count is read.
-  await syncEarlyCheers(userId, today);
+  await syncEarlyCheers(userId, today, timezone);
   return { unseen: await unseenCheers(userId) };
 }

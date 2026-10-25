@@ -18,10 +18,11 @@ import { randomInt } from 'node:crypto';
 import { seasonFor, type ShareKindP1, type ShareLinkView, type ShareSummary, type User } from '@aquazerofit/shared';
 import { config } from '../../platform/config';
 import { getStore } from '../../platform/store';
+import { getProfile } from '../me/service';
 import { logEvent } from '../../platform/telemetry';
 import { fcEnabled } from './flags';
 import { engageRepo, type ShareLinkRow, type Surface } from './repo';
-import { displayNameOf } from './squads';
+import { adultMembers, displayNameOf } from './squads';
 
 const CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 /** An account this young can still be credited to a share link. */
@@ -71,8 +72,14 @@ export async function landOn(code: string, surface: Surface): Promise<string> {
   return `${home}?ref=sh_${link.code}`;
 }
 
+/**
+ * Under a day old, and not known to be a minor. An age not given yet still
+ * counts: a new account usually claims before onboarding asks for it.
+ */
 function isNewAccount(userId: string, now: Date): boolean {
   const createdAt = getStore().byId<User>('users', userId)?.createdAt;
+  const age = getProfile(userId)?.age;
+  if (typeof age === 'number' && age < 18) return false;
   return createdAt !== undefined && now.getTime() - Date.parse(createdAt) < ATTRIBUTION_WINDOW_MS;
 }
 
@@ -111,7 +118,7 @@ export async function shareSummary(userId: string, today: string): Promise<Share
   const repo = engageRepo();
   const invitees = await repo.inviteesOf(userId);
   const mine = await repo.activeMembership(userId, seasonFor(today).number);
-  const mates = mine ? new Set((await repo.activeMembers(mine.squadId)).map((m) => m.userId)) : new Set<string>();
+  const mates = mine ? new Set((await adultMembers(mine.squadId)).map((m) => m.userId)) : new Set<string>();
   return {
     joined: invitees.length,
     inYourSquad: invitees.filter((id) => mates.has(id)).map(displayNameOf),

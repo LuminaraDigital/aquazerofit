@@ -38,6 +38,8 @@ import {
   useCreateSquad,
   useJoinSquad,
   useLeaveSquad,
+  useRemoveMember,
+  useRotateInviteCode,
   useShowMyNumbers,
   useSquad,
 } from '@/lib/fightCamp';
@@ -112,7 +114,7 @@ function NoSquad() {
     <div className="mt-4 space-y-5">
       <p className="text-sm leading-relaxed text-on-surface-variant text-pretty">
         A squad is up to {SQUAD_MAX_MEMBERS} people who show up together this season. You see each
-        other&apos;s belts and send cheers. Daily numbers stay hidden unless each person turns them on.
+        other&apos;s first names and belts. Daily numbers stay hidden unless each person turns them on.
       </p>
 
       <GlassCard className="p-5">
@@ -147,13 +149,13 @@ function NoSquad() {
             id="squad-code"
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="SQD-XXXXXX"
+            placeholder="SQD-XXXXXXXXXX"
             required
             autoComplete="off"
             autoCapitalize="characters"
             className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 font-mono uppercase tracking-wider text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
           />
-          <SecondaryButton type="submit" loading={join.isPending} disabled={code.trim().length < 10}>
+          <SecondaryButton type="submit" loading={join.isPending} disabled={code.trim().length < 14}>
             Join squad
           </SecondaryButton>
         </form>
@@ -261,6 +263,7 @@ function Member({ squad }: { squad: SquadView }) {
 
       <WeekBoard squad={squad} />
       <ShowMyNumbers squad={squad} />
+      {squad.me.role === 'owner' && <OwnerTools squad={squad} />}
 
       <SecondaryButton onClick={() => setLeaving(true)}>Leave squad</SecondaryButton>
       <BottomSheet open={leaving} onClose={() => setLeaving(false)} title={`Leave ${squad.name}?`}>
@@ -284,6 +287,80 @@ function Member({ squad }: { squad: SquadView }) {
         </div>
       </BottomSheet>
     </div>
+  );
+}
+
+/**
+ * For the person who runs the squad: retire a code that went further than
+ * intended, and take out someone who should not be there.
+ */
+function OwnerTools({ squad }: { squad: SquadView }) {
+  const toast = useToast();
+  const rotate = useRotateInviteCode();
+  const remove = useRemoveMember(squad.id);
+  const [removing, setRemoving] = useState<SquadMemberView | null>(null);
+  const others = squad.members.filter((m) => !m.isMe);
+  return (
+    <GlassCard className="p-5">
+      <h2 className="font-heading text-lg font-semibold text-on-surface">You run this squad</h2>
+      <p className="mt-1 text-sm leading-relaxed text-on-surface-variant text-pretty">
+        A new code stops every invite link you have shared. People already in the squad stay.
+      </p>
+      <SecondaryButton
+        className="mt-3"
+        loading={rotate.isPending}
+        onClick={() =>
+          rotate.mutate(squad.id, {
+            onSuccess: () => toast.success('New invite code ready. Old links no longer work.'),
+            onError: (e) => toast.error(squadErrorMessage(e, 'Could not change the code. Try again.')),
+          })
+        }
+      >
+        New invite code
+      </SecondaryButton>
+      {others.length > 0 && (
+        <ul className="mt-4 space-y-1" aria-label="Members you can remove">
+          {others.map((member) => (
+            <li key={member.ref} className="flex min-h-[44px] items-center justify-between gap-3">
+              <span className="truncate text-sm text-on-surface">{member.displayName}</span>
+              <button
+                type="button"
+                onClick={() => setRemoving(member)}
+                aria-label={`Remove ${member.displayName} from the squad`}
+                className="min-h-[44px] rounded-lg px-2 text-sm font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <BottomSheet
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        title={`Remove ${removing?.displayName ?? 'member'}?`}
+      >
+        <p className="text-base leading-relaxed text-on-surface text-pretty">
+          They leave the squad straight away and can join another one. Consider a new invite code
+          too, so the link they had stops working.
+        </p>
+        <div className="mt-5 space-y-3">
+          <PrimaryButton
+            loading={remove.isPending}
+            onClick={() =>
+              removing &&
+              remove.mutate(removing.ref, {
+                onSuccess: () => setRemoving(null),
+                onError: (e) => toast.error(squadErrorMessage(e, 'Could not remove them. Try again.')),
+              })
+            }
+          >
+            Remove from squad
+          </PrimaryButton>
+          <SecondaryButton onClick={() => setRemoving(null)}>Keep them</SecondaryButton>
+        </div>
+      </BottomSheet>
+    </GlassCard>
   );
 }
 

@@ -174,8 +174,8 @@ export interface EngageRepo {
   activeMembership(userId: string, seasonNumber: number): Promise<MemberRow | null>;
   /** Active members, earliest joined first. */
   activeMembers(squadId: string): Promise<MemberRow[]>;
-  /** A membership row by its public ref, active or not. */
-  memberByRef(memberRef: string): Promise<MemberRow | null>;
+  /** The active member of this squad with this ref, or null. Scoped so a ref can never reach across squads. */
+  activeMemberByRef(squadId: string, memberRef: string): Promise<MemberRow | null>;
   /** Atomic: capacity, archival and the one-squad rule are checked together. */
   joinSquad(squadId: string, member: MemberRow): Promise<JoinSquadOutcome>;
   /**
@@ -185,6 +185,8 @@ export interface EngageRepo {
    */
   leaveSquad(squadId: string, userId: string, at: string): Promise<boolean>;
   setShowStats(squadId: string, userId: string, showStats: boolean): Promise<MemberRow | null>;
+  /** Replace a live squad's invite code. */
+  setInviteCode(squadId: string, inviteCode: string): Promise<'ok' | 'code_taken' | 'not_found'>;
   squadsCreatedSince(userId: string, since: string): Promise<number>;
 
   // ----- cheers -----

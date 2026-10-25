@@ -74,9 +74,9 @@ afterEach(() => {
 
 describe('fightCampStartPath', () => {
   it('opens a squad invite and leaves every other payload alone', () => {
-    expect(fightCampStartPath('sq_SQD-ABC234')).toBe('/s/SQD-ABC234');
-    expect(fightCampStartPath('sq_sqd-abc234')).toBe('/s/SQD-ABC234');
-    expect(fightCampStartPath('sq_SQD-0000')).toBeNull();
+    expect(fightCampStartPath('sq_SQD-ABC2345678')).toBe('/s/SQD-ABC2345678');
+    expect(fightCampStartPath('sq_sqd-abc2345678')).toBe('/s/SQD-ABC2345678');
+    expect(fightCampStartPath('sq_SQD-ABC234')).toBeNull();
     expect(fightCampStartPath('r-abc__c-AQUA-ABCDEF')).toBeNull();
     expect(fightCampStartPath(null)).toBeNull();
   });
@@ -133,13 +133,13 @@ describe('Invite to squad in the Mini App', () => {
     id: 'sqd-1',
     name: 'Gym Crew',
     seasonNumber: 3,
-    inviteCode: 'SQD-ABC234',
-    inviteUrl: 'https://aquazerofit.com/s/SQD-ABC234',
-    tgStartParam: 'sq_SQD-ABC234',
+    inviteCode: 'SQD-ABC2345678',
+    inviteUrl: 'https://aquazerofit.com/s/SQD-ABC2345678',
+    tgStartParam: 'sq_SQD-ABC2345678',
     isCorner: true,
     weekStart: '2027-03-15',
     members: [{ ref: 'm_aaaaaaaaaaaa', displayName: 'Rizal', isMe: true, role: 'owner', beltTier: null, weekActiveDays: 1 }],
-    me: { ref: 'm_aaaaaaaaaaaa', showStats: false },
+    me: { ref: 'm_aaaaaaaaaaaa', showStats: false, role: 'owner' as const },
   };
 
   it('sends a prepared message through Telegram’s chooser', async () => {
@@ -158,6 +158,6 @@ describe('Invite to squad in the Mini App', () => {
     await waitFor(() => expect(mocks.openTelegramLink).toHaveBeenCalled());
     const url = mocks.openTelegramLink.mock.calls[0]![0] as string;
     expect(url).toMatch(/^https:\/\/t\.me\/share\/url\?url=/);
-    expect(decodeURIComponent(url)).toContain('startapp=sq_SQD-ABC234');
+    expect(decodeURIComponent(url)).toContain('startapp=sq_SQD-ABC2345678');
   });
 });

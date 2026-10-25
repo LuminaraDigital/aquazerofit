@@ -16,6 +16,7 @@ on the items in PRD §8.
 | Slice | Date | What landed |
 |---|---|---|
 | S1 | 2026-10-25 | `engage` Postgres schema (`0001_engage_init.sql`), forward-only migration runner under a transaction-scoped advisory lock, run at boot after the store; `platform/sql.ts` over the existing pool (no second pool); `EngageRepo` with Postgres and in-memory adapters and one contract suite run on both (PGlite in-process on every run, a real server in CI); export and erasure cover every engage table, enforced by a table-enumeration test; `FC_*` sub-flags in `platform/fightCampConfig.ts` and the composed `fcEnabled` gate; env vars documented, commented out, in all three env examples |
+| S2 | 2026-10-25 | `POST /fight-camp/enrolments` (201 first, 200 idempotent repeat) behind `FC_ENROL_ENABLED`; additive `fightCamp` block on `GET /fight-record` (absent while every sub-flag is off, so R1a and Android see no change); one accent and one coach line per season keyed by `season % 6`; SeasonCard "Join Fight Camp: Season N" as the primary action in the first 14 days, a quiet text action after; `fc_enrolled` server event; banned-copy scans over API strings and rendered cards |
 
 ## Conflicts with the PRD, resolved in favour of the code (PRD §0.6)
 

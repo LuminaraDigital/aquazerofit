@@ -490,9 +490,9 @@ export interface FightCampStatus {
    */
   recap: { seasonNumber: number; seasonName: string } | null;
   /**
-   * FC_GIFTING with a price set, for an adult whose account is linked to
-   * Telegram, where Stars are paid. `received` is the newest gift granted to
-   * them in the last week.
+   * FC_GIFTING with a price set, for an adult. Paying also needs a
+   * Telegram-linked account and a client that can open a Stars invoice.
+   * `received` is the newest gift granted to them in the last week.
    */
   gifting: { stars: number; received: { fromName: string; grantedAt: string } | null } | null;
 }

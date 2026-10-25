@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { BottomNav } from '../ui/BottomNav';
 import { ErrorBoundary } from './ErrorBoundary';
+import { useClaimShareAttribution } from '../../lib/startApp';
 
 const AppBackground = lazy(() =>
   import('./AppBackground').then((m) => ({ default: m.AppBackground })),
@@ -18,6 +19,8 @@ const DesktopAmbient = lazy(() =>
  */
 export function AppLayout() {
   const { pathname } = useLocation();
+  // Inside the signed-in layout, so this only ever runs for an account.
+  useClaimShareAttribution(true);
   return (
     <>
       <Suspense fallback={null}>

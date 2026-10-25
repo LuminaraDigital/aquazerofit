@@ -27,8 +27,8 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
-import { Switch } from '@/components/ui/fields';
 import { effortCard, renderEffortCard, type EffortCardInput } from '@/lib/effortCard';
+import { ToggleSwitch } from './ToggleSwitch';
 import { useShareLink, useShareSummary } from '@/lib/fightCamp';
 import { useFightCamp } from '@/lib/fightRecord';
 import { trackGrowth } from '@/lib/growth';
@@ -54,15 +54,16 @@ export interface ShareKitSheetProps {
 export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }: ShareKitSheetProps) {
   const toast = useToast();
   const sizeName = useId();
+  const nameLabel = useId();
   const [format, setFormat] = useState<ShareFormat>('story');
   const [showName, setShowName] = useState(false);
   const [image, setImage] = useState<{ url: string; blob: Blob } | null>(null);
-  const [renderFailed, setRenderFailed] = useState(false);
+  const [renderError, setRenderError] = useState(false);
   const firstName = useFightCamp().data?.shareKit?.firstName ?? null;
   const shareLink = useShareLink(card.kind, open && !fixedLink);
   const summary = useShareSummary(open).data;
   const link = fixedLink ?? shareLink.data ?? null;
-  const failed = renderFailed || (!fixedLink && shareLink.isError);
+  const unavailable = renderError || (!fixedLink && shareLink.isError);
   const saveByHand = isTMA() && typeof navigator.share !== 'function';
 
   useEffect(() => {
@@ -83,7 +84,7 @@ export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }
     // The previous card goes first, so nothing can share or save it once the
     // choice that made it has changed.
     setImage(null);
-    setRenderFailed(false);
+    setRenderError(false);
     if (!open || !content) return;
     let url: string | null = null;
     let cancelled = false;
@@ -94,7 +95,7 @@ export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }
         setImage({ url, blob });
       })
       .catch(() => {
-        if (!cancelled) setRenderFailed(true);
+        if (!cancelled) setRenderError(true);
       });
     return () => {
       cancelled = true;
@@ -184,7 +185,7 @@ export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }
             className="max-h-[46vh] w-auto rounded-2xl border border-outline-variant/40"
             style={{ aspectRatio: `${size.width} / ${size.height}` }}
           />
-        ) : failed ? (
+        ) : unavailable ? (
           <p role="alert" className="py-8 text-center text-sm text-on-surface text-pretty">
             Your card could not be made just now. Close this and try again.
           </p>
@@ -216,8 +217,10 @@ export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }
 
       {firstName && (
         <div className="mt-4 flex items-center justify-between gap-3">
-          <p className="text-sm text-on-surface">Show my first name</p>
-          <Switch checked={showName} onChange={setShowName} label="Show my first name on the card" />
+          <p id={nameLabel} className="text-sm text-on-surface">
+            Show my first name on the card
+          </p>
+          <ToggleSwitch checked={showName} onChange={setShowName} labelledBy={nameLabel} />
         </div>
       )}
 

@@ -255,6 +255,7 @@ telegramWebhookRouter.post(
             totalAmount: payment.total_amount,
             currency: payment.currency,
             telegramPaymentChargeId: payment.telegram_payment_charge_id,
+            payerTelegramId: update.message?.from?.id,
           });
           if (outcome.status === 'rejected' || outcome.status === 'failed') {
             logEvent('gift_payment_not_granted', { status: outcome.status });

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   launchedFromGroup: vi.fn(() => true),
   getTelegramInitData: vi.fn(() => 'signed-init-data'),
   shareMessage: vi.fn(async () => true),
+  canShareMessage: vi.fn(() => true),
   openTelegramLink: vi.fn(),
 }));
 vi.mock('@/lib/api', async (original) => ({
@@ -26,6 +27,7 @@ vi.mock('@/lib/telegram', async (original) => ({
   launchedFromGroup: mocks.launchedFromGroup,
   getTelegramInitData: mocks.getTelegramInitData,
   shareMessage: mocks.shareMessage,
+  canShareMessage: mocks.canShareMessage,
   openTelegramLink: mocks.openTelegramLink,
 }));
 
@@ -69,6 +71,7 @@ afterEach(() => {
   mocks.isTMA.mockReturnValue(true);
   mocks.launchedFromGroup.mockReturnValue(true);
   mocks.shareMessage.mockClear();
+  mocks.canShareMessage.mockReturnValue(true);
   mocks.openTelegramLink.mockClear();
 });
 
@@ -88,7 +91,16 @@ describe('SquadCornerSheet', () => {
     renderSheet();
     expect(await screen.findByRole('dialog', { name: "Start this group's Squad Corner" })).toBeTruthy();
     expect(screen.getByText(SQUAD_CONSENT_TEXT)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Squad name'), { target: { value: 'Gym Crew' } });
+    // Typed one character at a time, as a person would: the field must keep
+    // focus between keystrokes (the sheet's focus trap once stole it back).
+    const field = screen.getByLabelText('Squad name') as HTMLInputElement;
+    field.focus();
+    let typed = '';
+    for (const ch of 'Gym Crew') {
+      typed += ch;
+      fireEvent.change(field, { target: { value: typed } });
+      expect(document.activeElement).toBe(field);
+    }
     fireEvent.click(screen.getByRole('button', { name: 'Agree and start' }));
     expect(await screen.findByText('Squad page')).toBeTruthy();
     expect(calls.find((c) => (c.body as { action?: string })?.action === 'create')?.body).toEqual({
@@ -150,8 +162,17 @@ describe('Invite to squad in the Mini App', () => {
     expect(mocks.openTelegramLink).not.toHaveBeenCalled();
   });
 
-  it('falls back to a share link when the client cannot send one', async () => {
+  it('opens no second share screen when the person cancels Telegram\u2019s chooser', async () => {
     mocks.shareMessage.mockResolvedValueOnce(false);
+    serve({ state: 'member', squad: null }, squad);
+    renderWithClient(<SquadPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Invite to squad' }));
+    await waitFor(() => expect(mocks.shareMessage).toHaveBeenCalled());
+    expect(mocks.openTelegramLink).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a share link when the client cannot send one', async () => {
+    mocks.canShareMessage.mockReturnValue(false);
     serve({ state: 'member', squad: null }, squad);
     renderWithClient(<SquadPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Invite to squad' }));

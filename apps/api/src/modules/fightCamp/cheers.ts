@@ -24,7 +24,9 @@ import { getStore, newId } from '../../platform/store';
 import { logEvent } from '../../platform/telemetry';
 import { engageRepo, type CheerCursor, type CheerRow } from './repo';
 import { sendNudge } from './nudges';
-import { displayNameOf, requireSquadAdult } from './squads';
+import { displayNameOf, requireSquadAdult, telegramSafe } from './squads';
+import { fcEnabled } from './flags';
+import { localDateFor } from '../../platform/dates';
 import { isAdult } from '../fightRecord/service';
 import { getProfile } from '../me/service';
 
@@ -46,6 +48,17 @@ function isNewAccount(userId: string, now: Date): boolean {
   return createdAt !== undefined && now.getTime() - Date.parse(createdAt) < NEW_ACCOUNT_DAYS * DAY_MS;
 }
 
+/**
+ * The day "one cheer a day" counts on. The sender's stored timezone when
+ * there is one: the X-Timezone header is the client's word, and any zone
+ * from UTC-12 to UTC+14 would let a sender claim two or three different
+ * dates within minutes.
+ */
+function senderLocalDate(senderId: string, today: string, now: Date): string {
+  const timezone = getStore().byId<User>('users', senderId)?.timezone;
+  return timezone ? localDateFor(timezone, now) : today;
+}
+
 export function encodeCursor(cursor: CheerCursor): string {
   return Buffer.from(JSON.stringify([cursor.createdAt, cursor.id])).toString('base64url');
 }
@@ -57,7 +70,11 @@ export function decodeCursor(raw: unknown): CheerCursor | null {
     const value = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as unknown;
     if (!Array.isArray(value) || value.length !== 2) return null;
     const [createdAt, id] = value as [unknown, unknown];
-    if (typeof createdAt !== 'string' || Number.isNaN(Date.parse(createdAt)) || typeof id !== 'string') return null;
+    // Exactly what encodeCursor wrote: an ISO instant and an id. V8 parses
+    // "1" or "foo 2" as dates, which Postgres would then refuse with a 500.
+    if (typeof createdAt !== 'string' || typeof id !== 'string' || !/^[\w-]{1,64}$/.test(id)) return null;
+    const parsed = new Date(createdAt);
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== createdAt) return null;
     return { createdAt, id };
   } catch {
     return null;
@@ -103,9 +120,20 @@ export async function sendCheer(
   // reach anyone elsewhere; a mate no longer known to be an adult is out of
   // reach too (squads.adultMembers takes them out on the next read).
   const target = me ? await repo.activeMemberByRef(me.squadId, input.to) : null;
-  if (!me || !target || target.userId === senderId || !isAdult(getProfile(target.userId))) {
+  // Both ends must have squads and cheers on: someone the rollout no longer
+  // includes would otherwise be cheered (and messaged) while their own Fight
+  // Camp answers 404 and they cannot reach their squad to leave it.
+  if (
+    !me ||
+    !target ||
+    target.userId === senderId ||
+    !isAdult(getProfile(target.userId)) ||
+    !fcEnabled('squads', target.userId) ||
+    !fcEnabled('cheers', target.userId)
+  ) {
     notSquadMate();
   }
+  const localDate = senderLocalDate(senderId, today, now);
   const row: CheerRow = {
     id: newId('cheer'),
     fromKind: 'member',
@@ -114,7 +142,7 @@ export async function sendCheer(
     toUserId: target.userId,
     squadId: me.squadId,
     cheer: input.cheer,
-    localDate: today,
+    localDate,
     createdAt: now.toISOString(),
     seenAt: null,
   };
@@ -132,7 +160,7 @@ export async function sendCheer(
   void sendNudge(
     target.userId,
     'cheer',
-    `${displayNameOf(senderId)} sent you a ${CHEER_EMOJI[input.cheer]} cheer on AquaZeroFit.`,
+    `${telegramSafe(displayNameOf(senderId), 'A squad mate')} sent you a ${CHEER_EMOJI[input.cheer]} cheer on AquaZeroFit.`,
     now,
   );
   return { id: row.id, cheer: row.cheer, createdAt: row.createdAt };

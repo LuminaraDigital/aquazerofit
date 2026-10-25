@@ -74,6 +74,17 @@ export const issueMemberRef = () => `m_${randomFrom(REF_ALPHABET, 12)}`;
 const FALLBACK_NAME = 'Fight Camp member';
 
 /**
+ * Text that goes into a Telegram message the bot sends. Plain-text mode
+ * stops markup, but Telegram still turns URLs and @mentions into links, so a
+ * name like "evil.example/login" would arrive as a link from our bot. Only
+ * letters, numbers, spaces, apostrophes and hyphens get through; anything
+ * else becomes the fallback.
+ */
+export function telegramSafe(text: string, fallback: string): string {
+  return /^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N} '’-]*$/u.test(text) ? text : fallback;
+}
+
+/**
  * A member's first name, masked like huddle names. Names the account never
  * chose (the email local part registration fills in, Telegram's numbered
  * fallback) are not shown: they can identify someone who never typed them.
@@ -216,9 +227,22 @@ async function viewOf(squad: SquadRow, viewerId: string, today: string): Promise
     tgStartParam: `sq_${squad.inviteCode}`,
     isCorner: squad.cornerHash !== null,
     weekStart,
-    members: members.map((m) => memberView(m, viewerId, today, weekStart, cheered, welcome)),
+    members: distinctNames(members.map((m) => memberView(m, viewerId, today, weekStart, cheered, welcome))),
     me: { ref: me.memberRef, showStats: me.showStats, role: me.role },
   };
+}
+
+/**
+ * Several members can share the fallback name. Numbering the repeats keeps
+ * each row, and each "Cheer <name>" button, telling people apart.
+ */
+function distinctNames(views: SquadMemberView[]): SquadMemberView[] {
+  const seen = new Map<string, number>();
+  return views.map((view) => {
+    const n = (seen.get(view.displayName) ?? 0) + 1;
+    seen.set(view.displayName, n);
+    return n === 1 ? view : { ...view, displayName: `${view.displayName} ${n}` };
+  });
 }
 
 function memberView(
@@ -390,6 +414,8 @@ export async function joinSquad(
         fail('CONFLICT', 'squad_full', 'That squad is full. Squads have room for five.');
       case 'already_member':
         fail('CONFLICT', 'squad_already_member', 'You are already in a squad this season.');
+      case 'removed':
+        fail('FORBIDDEN', 'squad_removed', 'You were taken out of this squad, so you can not rejoin it this season.');
       default:
         notFound();
     }
@@ -458,7 +484,7 @@ export async function removeMember(userId: string, squadId: string, memberRef: s
   if (!target || target.userId === userId) {
     fail('NOT_FOUND', 'squad_member_not_found', 'That member is not in this squad.');
   }
-  await engageRepo().leaveSquad(squadId, target.userId, now.toISOString());
+  await engageRepo().leaveSquad(squadId, target.userId, now.toISOString(), { removed: true });
   auditDataAccess(userId, 'fightCamp.squad.memberRemoved', { squadId });
   logEvent('squad_member_removed', { season: target.seasonNumber });
 }

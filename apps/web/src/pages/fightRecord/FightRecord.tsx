@@ -25,6 +25,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useToast } from '@/components/ui/Toast';
 import { BeltBadge } from '@/components/fightRecord/BeltBadge';
 import { BeltCelebration, BeltShareSheet } from '@/components/fightRecord/BeltCelebration';
+import { CheersInbox } from '@/components/fightCamp/Cheers';
 import { formatDate } from '@/lib/format';
 import {
   beltName,
@@ -172,6 +173,7 @@ function Record({ record }: { record: FightRecordStatus }) {
       </GlassCard>
 
       <SquadBlock />
+      <CheersBlock />
 
       <TelegramStatusSetting record={record} />
 
@@ -179,6 +181,11 @@ function Record({ record }: { record: FightRecordStatus }) {
       <BeltShareSheet award={sharing} adult={record.adult} onClose={() => setSharing(null)} />
     </div>
   );
+}
+
+/** Fight Camp cheers (AZF-P1 Epic D): only where the feature is on for an adult. */
+function CheersBlock() {
+  return useFightCamp().data?.cheers ? <CheersInbox /> : null;
 }
 
 /** Fight Camp squads (AZF-P1 Epic C): only where the feature is on for an adult. */
@@ -191,7 +198,7 @@ function SquadBlock() {
       <h2 className="font-heading text-lg font-semibold text-on-surface">Your squad</h2>
       <p className="mt-1 text-sm text-on-surface-variant text-pretty">
         {current
-          ? `${current.name}: see who showed up this week.`
+          ? `${current.name}: see who showed up this week, and cheer them on.`
           : 'Up to five people who show up together this season.'}
       </p>
       <Link

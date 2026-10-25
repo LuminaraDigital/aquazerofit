@@ -6,6 +6,7 @@
  *   /grace       the Cut Man bank
  *   /squads      squads: peek (public), current, create, join, leave,
  *                settings, Squad Corner, Telegram invite messages
+ *   /cheers      send, inbox, mark seen, and the bot-nudge setting
  */
 import { Router } from 'express';
 import {
@@ -14,6 +15,9 @@ import {
   joinSquadInputSchema,
   squadCodeSchema,
   squadCornerInputSchema,
+  cheersSeenInputSchema,
+  nudgeSettingsInputSchema,
+  sendCheerInputSchema,
   updateMySquadSettingsSchema,
 } from '@aquazerofit/shared';
 import { requireAuth, userIdOf } from '../../platform/auth';
@@ -22,6 +26,8 @@ import { todayFor } from '../../platform/dates';
 import { enrol } from './enrolment';
 import { requireFeature, requireFeatureSwitch } from './flags';
 import { prepareSquadInvite, squadCorner } from './corner';
+import { cheerInbox, decodeCursor, markCheersSeen, sendCheer } from './cheers';
+import { engageRepo } from './repo';
 import { syncGrace } from './grace';
 import {
   createSquad,
@@ -164,5 +170,60 @@ squadsRouter.post(
   '/:id/invite-message',
   asyncHandler(async (req, res) => {
     res.json({ preparedMessageId: await prepareSquadInvite(userIdOf(req), String(req.params.id)) });
+  }),
+);
+
+export const cheersRouter = Router();
+
+cheersRouter.use(requireAuth);
+
+cheersRouter.use((req, _res, next) => {
+  const userId = userIdOf(req);
+  requireFeature('cheers', userId);
+  requireSquadAdult(userId);
+  next();
+});
+
+/** 201 with the cheer; 409 cheer_already_today; 403 not_squad_mate. 30 a minute (rateLimiter). */
+cheersRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const input = sendCheerInputSchema.parse(req.body);
+    res.status(201).json({ cheer: await sendCheer(userIdOf(req), input, todayFor(req)) });
+  }),
+);
+
+/** The last thirty days, newest first. `cursor` is the previous page's nextCursor. */
+cheersRouter.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    res.json(await cheerInbox(userIdOf(req), decodeCursor(req.query.cursor), todayFor(req)));
+  }),
+);
+
+cheersRouter.post(
+  '/seen',
+  asyncHandler(async (req, res) => {
+    const { ids } = cheersSeenInputSchema.parse(req.body);
+    await markCheersSeen(userIdOf(req), ids);
+    res.status(204).end();
+  }),
+);
+
+/** Bot messages for cheers: on unless switched off. The master switch is the reminders consent. */
+cheersRouter.get(
+  '/nudges',
+  asyncHandler(async (req, res) => {
+    const settings = await engageRepo().nudgeSettings(userIdOf(req));
+    res.json({ nudges: { cheer: settings.cheer !== false } });
+  }),
+);
+
+cheersRouter.put(
+  '/nudges',
+  asyncHandler(async (req, res) => {
+    const { cheer } = nudgeSettingsInputSchema.parse(req.body);
+    await engageRepo().setNudgeSetting(userIdOf(req), 'cheer', cheer, new Date().toISOString());
+    res.json({ nudges: { cheer } });
   }),
 );

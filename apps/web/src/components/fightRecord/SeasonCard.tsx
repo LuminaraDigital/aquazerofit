@@ -72,6 +72,16 @@ export function SeasonCard() {
           <p className="mt-3 text-sm text-on-surface text-pretty">{camp.theme.coachLine}</p>
         )}
         {camp?.grace && <CutManChip grace={camp.grace} />}
+        {camp?.cheers && camp.cheers.unseen > 0 && (
+          <button
+            type="button"
+            onClick={() => navigate('/fight-record#cheers')}
+            className="mt-3 flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <span aria-hidden="true">🔥</span>
+            {camp.cheers.unseen} new {camp.cheers.unseen === 1 ? 'cheer' : 'cheers'} from your squad
+          </button>
+        )}
         {camp?.enrolment && <EnrolAction enrolment={camp.enrolment} season={season} />}
 
         <div className="mt-3 flex items-center justify-between gap-3">

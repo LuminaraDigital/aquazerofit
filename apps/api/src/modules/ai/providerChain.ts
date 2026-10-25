@@ -1,10 +1,11 @@
 /**
  * The real-provider half of the AI gateway: which providers exist, which
- * model each runs per lane, the per-lane deadlines, and how one attempt
- * against one provider is made, classified, retried and circuit-broken.
+ * model each runs per lane, the per-lane deadlines, how one attempt against
+ * one provider is made (plain or streamed), and the walk down the chain that
+ * classifies, retries and circuit-breaks those attempts under one deadline.
  *
- * Split out of gateway.ts so that file stays about routing: the walk down the
- * chain, the shared deadline, the offline fallback and the degraded verdict.
+ * Split out of gateway.ts so that file stays about routing: preparing the
+ * call, the budget kill switch, the offline fallback and the degraded verdict.
  * Nothing here knows about the offline engine or about billing, and nothing in
  * gateway.ts builds an HTTP request. The onboarding checklist in gateway.ts's
  * header still governs every change to PROVIDERS below.
@@ -114,8 +115,8 @@ export const PROVIDERS: ProviderDef[] = [
  * OLLAMA_BASE_URL is as real as a keyed API. A key-optional provider with
  * neither is the opportunistic localhost probe and does not count.
  *
- * The single answer for both provider loops and the boot warning, so what
- * gets retried, what marks a fallback degraded and what the warning calls
+ * The single answer for the chain walk and the boot warning, so what gets
+ * retried, what marks a fallback degraded and what the warning calls
  * "configured" cannot drift apart.
  */
 export function isConfigured(provider: ProviderDef): boolean {
@@ -293,6 +294,50 @@ interface OpenAiCompletion {
   usage?: { total_tokens?: number };
 }
 
+/**
+ * POST one chat completion and refuse a failed status. Shared by the plain
+ * and the streamed attempt, so the request they send and the retry verdict on
+ * a bad status cannot drift apart.
+ */
+async function postCompletion(
+  provider: ProviderDef,
+  model: string,
+  task: ModelGroup,
+  messages: WireMessage[],
+  opts: GatewayOptions,
+  signal: AbortSignal,
+  stream: boolean,
+): Promise<Response> {
+  const key = process.env[provider.keyEnv];
+  if (!key && !provider.keyOptional) throw new ProviderError(`missing ${provider.keyEnv}`, false);
+  const baseUrl = (provider.baseUrlEnv && process.env[provider.baseUrlEnv]) || provider.baseUrl;
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    temperature: opts.temperature ?? 0.4,
+    max_tokens: clampMaxTokens(opts.maxTokens, task),
+    ...(stream ? { stream: true } : {}),
+  };
+  if (opts.json) body.response_format = { type: 'json_object' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (key) headers.Authorization = `Bearer ${key}`;
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok) {
+    // Rate limits and server faults are the provider's problem and pass; a
+    // 4xx is ours (bad key, bad model, bad payload) and will fail identically
+    // on every retry, so it must not burn the deadline.
+    const retryable = res.status === 429 || res.status >= 500;
+    const retryAfterMs = parseRetryAfter(res.headers?.get?.('retry-after'));
+    throw new ProviderError(`${provider.name} responded ${res.status}`, retryable, retryAfterMs);
+  }
+  return res;
+}
+
 export async function callProvider(
   provider: ProviderDef,
   task: ModelGroup,
@@ -301,38 +346,13 @@ export async function callProvider(
   /** Time this single attempt may take: the lesser of its timeout and what is left of the deadline. */
   budgetMs: number,
 ): Promise<{ text: string; json?: unknown; tokens: number; model: string }> {
-  const key = process.env[provider.keyEnv];
-  if (!key && !provider.keyOptional) throw new ProviderError(`missing ${provider.keyEnv}`, false);
-  const baseUrl = (provider.baseUrlEnv && process.env[provider.baseUrlEnv]) || provider.baseUrl;
   const model = modelFor(provider, task);
   const controller = new AbortController();
   // AbortController rather than a race, so a timed-out request is actually
   // cancelled instead of left running against a socket nobody reads.
   const timer = setTimeout(() => controller.abort(), budgetMs);
   try {
-    const body: Record<string, unknown> = {
-      model,
-      messages,
-      temperature: opts.temperature ?? 0.4,
-      max_tokens: clampMaxTokens(opts.maxTokens, task),
-    };
-    if (opts.json) body.response_format = { type: 'json_object' };
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (key) headers.Authorization = `Bearer ${key}`;
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      // Rate limits and server faults are the provider's problem and pass; a
-      // 4xx is ours (bad key, bad model, bad payload) and will fail identically
-      // on every retry, so it must not burn the deadline.
-      const retryable = res.status === 429 || res.status >= 500;
-      const retryAfterMs = parseRetryAfter(res.headers?.get?.('retry-after'));
-      throw new ProviderError(`${provider.name} responded ${res.status}`, retryable, retryAfterMs);
-    }
+    const res = await postCompletion(provider, model, task, messages, opts, controller.signal, false);
     const data = (await res.json()) as OpenAiCompletion;
     const text = data.choices?.[0]?.message?.content;
     if (typeof text !== 'string' || text.length === 0) {
@@ -357,6 +377,47 @@ export async function callProvider(
   }
 }
 
+/**
+ * The streamed attempt: callProvider's request with `stream: true`, yielding
+ * each text delta of the SSE body as it arrives. The budget covers the whole
+ * stream, not only the response headers, and lines that are not data frames
+ * or do not parse are skipped.
+ */
+export async function* openProviderStream(
+  provider: ProviderDef,
+  task: ModelGroup,
+  messages: WireMessage[],
+  opts: GatewayOptions,
+  budgetMs: number,
+): AsyncGenerator<string, void, undefined> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), budgetMs);
+  try {
+    const res = await postCompletion(provider, modelFor(provider, task), task, messages, opts, controller.signal, true);
+    if (!res.body) throw new ProviderError(`${provider.name} returned empty response body`, true);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        let token: unknown;
+        try {
+          token = JSON.parse(data).choices?.[0]?.delta?.content;
+        } catch {
+          continue;
+        }
+        if (typeof token === 'string' && token.length > 0) yield token;
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function clampMaxTokens(requested: number | undefined, task: ModelGroup): number {
   const defaultForTask = MODEL_GROUP_MAX_TOKENS[task] ?? DEFAULT_OUTPUT_TOKENS;
   const wanted = requested ?? defaultForTask;
@@ -372,4 +433,105 @@ export function classify(err: unknown): ProviderError {
   if (err instanceof ProviderError) return err;
   const message = err instanceof Error ? err.message : 'unknown provider error';
   return new ProviderError(message, true);
+}
+
+/** How a walk that produced no answer ended: all the degraded verdict needs. */
+export interface ChainMiss {
+  /**
+   * A configured provider was tried, or skipped because its breaker was open
+   * or it cannot see the photo. That is what separates "everything real
+   * failed" from "nothing is configured, the offline engine is the intended
+   * answer" (outside production; see offlineVerdict in gateway.ts).
+   */
+  realProviderInPlay: boolean;
+  deadlineExceeded: boolean;
+}
+
+export interface ChainCall {
+  task: ModelGroup;
+  /** Only providers flagged supportsVision are tried. */
+  hasImages: boolean;
+  /** GatewayOptions.deadlineMs: may tighten the lane ceiling, never extend it. */
+  deadlineMs?: number;
+  /** GatewayOptions.timeoutMs: the cap on any one attempt. */
+  timeoutMs?: number;
+  /** Told about every failed attempt, including the ones that are retried. */
+  onFailure: (provider: ProviderDef, failure: ProviderError, latencyMs: number) => void;
+}
+
+/**
+ * One try against one provider within `budgetMs`: return the answer or throw.
+ * Whatever it yields is passed straight through, which is how the streaming
+ * lane emits tokens from inside an attempt the walk may still retry.
+ */
+export type ChainAttempt<T> = (provider: ProviderDef, budgetMs: number) => AsyncGenerator<string, T, undefined>;
+
+/**
+ * Walk the chain once, for complete() and stream() alike, so the two cannot
+ * drift on what is skipped, what is retried or what counts as degraded. Never
+ * throws for provider trouble: it returns the first answer, or how it ran out.
+ *
+ * The whole walk shares one deadline. A configured provider gets up to
+ * 1 + MAX_RETRIES_PER_PROVIDER attempts, retried only for transient failures,
+ * and the photo lane holds part of the deadline back for the next provider
+ * that could still take the photo.
+ */
+export async function* walkChain<T>(
+  call: ChainCall,
+  attempt: ChainAttempt<T>,
+): AsyncGenerator<string, { answer: T } | ChainMiss, undefined> {
+  const ceiling = deadlineCeilingMs(call.task);
+  const deadlineMs = Math.min(call.deadlineMs ?? ceiling, ceiling);
+  const deadlineAt = Date.now() + deadlineMs;
+  const remainingMs = (): number => deadlineAt - Date.now();
+  let realProviderInPlay = false;
+
+  for (const [index, provider] of PROVIDERS.entries()) {
+    const configured = isConfigured(provider);
+    if (!configured && !provider.keyOptional) continue;
+    // Counted before the breaker and vision checks: a provider skipped because
+    // it is failing, or cannot see the photo, is still a real dependency the
+    // user did not get, so a mock answer after it is degraded (and not billed).
+    realProviderInPlay = realProviderInPlay || configured;
+    if (call.hasImages && !provider.supportsVision) continue;
+    if (circuitIsOpen(provider.name)) continue;
+    // A key-optional provider with neither key nor base URL is an
+    // opportunistic local probe (Ollama on localhost), not a configured
+    // dependency: one shot, no retries, and it never marks the result degraded.
+    const maxAttempts = configured ? 1 + MAX_RETRIES_PER_PROVIDER : 1;
+    const reserve = visionReserveMs(call, index, deadlineMs);
+
+    for (let n = 1; n <= maxAttempts; n += 1) {
+      const room = remainingMs() - reserve;
+      if (room < MIN_ATTEMPT_MS) return { realProviderInPlay, deadlineExceeded: true };
+      const started = Date.now();
+      try {
+        const answer = yield* attempt(provider, Math.min(room, call.timeoutMs ?? DEFAULT_TIMEOUT_MS));
+        recordProviderSuccess(provider.name);
+        return { answer };
+      } catch (err) {
+        const failure = classify(err);
+        call.onFailure(provider, failure, Date.now() - started);
+        if (!failure.retryable || n === maxAttempts) break;
+        const wait = failure.retryAfterMs ?? backoffDelayMs(n);
+        // Sleeping past the deadline, or into the slice reserved for the next
+        // vision provider, only delays the fallback. Move on instead.
+        if (wait + reserve >= remainingMs()) break;
+        await sleep(wait);
+      }
+    }
+    // One failure per provider per call: the breaker measures bad calls, not
+    // bad attempts, so a single flaky request cannot blackhole a provider.
+    recordProviderFailure(provider.name);
+  }
+  return { realProviderInPlay, deadlineExceeded: false };
+}
+
+/** visionHopBudgetMs when a later provider could still take the photo, else 0. */
+function visionReserveMs(call: ChainCall, index: number, deadlineMs: number): number {
+  if (call.task !== 'visionPrimary') return 0;
+  const nextCanTakeIt = PROVIDERS.slice(index + 1).some(
+    (next) => isConfigured(next) && (!call.hasImages || next.supportsVision) && !circuitIsOpen(next.name),
+  );
+  return nextCanTakeIt ? visionHopBudgetMs(deadlineMs) : 0;
 }

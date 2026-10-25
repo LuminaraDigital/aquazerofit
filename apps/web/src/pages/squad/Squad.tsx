@@ -262,6 +262,17 @@ function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
         )}
       </GlassCard>
 
+      {canCheer &&
+        squad.members
+          .filter((m) => m.welcome && !m.cheeredToday)
+          .map((member) => (
+            <GlassCard key={member.ref} className="flex items-center justify-between gap-3 p-4">
+              <p className="min-w-0 text-sm text-on-surface text-pretty">
+                <span className="font-semibold">{member.displayName}</span> just joined. Send a cheer?
+              </p>
+              <CheerButton member={member} />
+            </GlassCard>
+          ))}
       <WeekBoard squad={squad} canCheer={canCheer} />
       <ShowMyNumbers squad={squad} />
       {squad.me.role === 'owner' && <OwnerTools squad={squad} />}

@@ -10,6 +10,7 @@
  * reach into the store, which is the isolation a database gives for free.
  */
 import type { NudgeKind, ShareKindP1 } from '@aquazerofit/shared';
+import type { Surface } from './types';
 import { ARCHIVED_SQUAD_NAME } from './types';
 import type {
   AttributionRow,
@@ -384,6 +385,55 @@ export class MemoryEngageRepo implements EngageRepo {
     return this.attributions
       .filter((a) => a.shareCode !== null && codes.has(a.shareCode))
       .map((a) => a.inviteeUserId);
+  }
+
+  // ----- metrics -----
+
+  private landings = new Map<string, number>();
+
+  async recordLanding(day: string, kind: ShareKindP1, surface: Surface): Promise<void> {
+    const key = `${day}|${kind}|${surface}`;
+    this.landings.set(key, (this.landings.get(key) ?? 0) + 1);
+  }
+
+  async landingsSince(day: string): Promise<number> {
+    let n = 0;
+    for (const [key, opens] of this.landings) if (key.split('|')[0]! >= day) n += opens;
+    return n;
+  }
+
+  async shareAttributionsSince(since: string): Promise<number> {
+    return this.attributions.filter((a) => a.shareCode !== null && a.createdAt >= since).length;
+  }
+
+  async squadFirstJoins(): Promise<Array<{ userId: string; joinedAt: string }>> {
+    const first = new Map<string, string>();
+    for (const m of this.members) {
+      const held = first.get(m.userId);
+      if (held === undefined || m.joinedAt < held) first.set(m.userId, m.joinedAt);
+    }
+    return [...first].map(([userId, joinedAt]) => ({ userId, joinedAt }));
+  }
+
+  async enrolledUsers(seasonNumber: number): Promise<string[]> {
+    return this.enrolments.filter((e) => e.seasonNumber === seasonNumber).map((e) => e.userId);
+  }
+
+  async armsOf(experiment: 'early_cheers'): Promise<Array<{ userId: string; arm: ExperimentArm }>> {
+    return this.arms.filter((a) => a.experiment === experiment).map(({ userId, arm }) => ({ userId, arm }));
+  }
+
+  async graceAppliedIn(seasonNumber: number): Promise<number> {
+    return this.grace.filter((g) => g.entry === 'applied' && g.seasonNumber === seasonNumber).length;
+  }
+
+  async cheersPerSender(from: string, to: string): Promise<number[]> {
+    const counts = new Map<string, number>();
+    for (const c of this.cheers) {
+      if (c.fromKind !== 'member' || c.fromUserId === null || c.localDate < from || c.localDate > to) continue;
+      counts.set(c.fromUserId, (counts.get(c.fromUserId) ?? 0) + 1);
+    }
+    return [...counts.values()];
   }
 
   // ----- privacy -----

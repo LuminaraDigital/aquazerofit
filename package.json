@@ -26,6 +26,7 @@
     "assets:cards": "node tools/cards/build-card.mjs",
     "assets:belts": "node tools/belts/build-belt-art.mjs",
     "assets:share": "node tools/share/build-story-art.mjs",
+    "report:engage": "node tools/engage/kill-report.mjs",
     "screenshots:optimise": "node tools/screenshots/optimise.mjs",
     "docs:setup": "npm --prefix tools/docgen install",
     "docs:build": "node tools/docgen/md-to-docx.js"

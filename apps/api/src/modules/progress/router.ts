@@ -30,6 +30,8 @@ import { loadPrompt } from '../ai/prompts';
 import { hasConsent } from '../me/service';
 import { asyncHandler, byIdDoc, getUser, nowIso, upsertDoc } from '../ai/util';
 import { getProgressSummary } from './service';
+import { fcEnabled } from '../fightCamp/flags';
+import { syncGrace } from '../fightCamp/grace';
 import {
   NOT_ENOUGH_DATA_NARRATIVE,
   computeChanges,
@@ -42,9 +44,17 @@ import {
 export const progressRouter = Router();
 progressRouter.use(requireAuth);
 
-progressRouter.get('/summary', (req, res) => {
-  res.json(getProgressSummary(userIdOf(req), todayFor(req)));
-});
+progressRouter.get(
+  '/summary',
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    const today = todayFor(req);
+    // Cut Man days shape the consistency run only while that feature is on;
+    // off, this is the R1a summary with no Fight Camp query at all.
+    const bridged = fcEnabled('grace', userId) ? (await syncGrace(userId, today)).bridged : undefined;
+    res.json(getProgressSummary(userId, today, bridged));
+  }),
+);
 
 // ---------------------------------------------------------------------------
 

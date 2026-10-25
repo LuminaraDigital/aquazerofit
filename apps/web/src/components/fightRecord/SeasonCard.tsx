@@ -23,6 +23,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { formatDate } from '@/lib/format';
 import { beltName, nextBeltCopy, useFightCamp, useFightRecord } from '@/lib/fightRecord';
 import { EnrolAction } from '@/components/fightCamp/EnrolAction';
+import { CutManChip } from '@/components/fightCamp/CutMan';
 import { BeltBadge } from './BeltBadge';
 import { BeltCelebration } from './BeltCelebration';
 
@@ -70,6 +71,7 @@ export function SeasonCard() {
         {camp && (
           <p className="mt-3 text-sm text-on-surface text-pretty">{camp.theme.coachLine}</p>
         )}
+        {camp?.grace && <CutManChip grace={camp.grace} />}
         {camp?.enrolment && <EnrolAction enrolment={camp.enrolment} season={season} />}
 
         <div className="mt-3 flex items-center justify-between gap-3">

@@ -11,12 +11,12 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(here, '..', '..', '..', '.env') });
 
 import { createApp } from './app';
+import { config } from './platform/config';
 import {
-  config,
   assertOriginSecretConfigured,
   assertProductionSecrets,
   assertSingleInstance,
-} from './platform/config';
+} from './platform/bootGuards';
 import { warnIfBotProtectionUnconfigured } from './platform/botProtection';
 import { describeStoreInitFailure, getStore, initStore } from './platform/store';
 import { sweepExpiredDeletions } from './modules/me/service';

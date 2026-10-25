@@ -21,6 +21,7 @@
  * request rather than once per statement.
  */
 import type { CheerKind, EnrolSource, NudgeKind, ShareKindP1 } from '@aquazerofit/shared';
+import type { GiftExport, GiftStore } from './gifts';
 
 export interface EnrolmentRow {
   userId: string;
@@ -147,7 +148,7 @@ export interface CheerPage {
 }
 
 /** Everything engage holds about one person, for GET /me/export. */
-export interface EngageExport {
+export interface EngageExport extends GiftExport {
   enrolments: EnrolmentRow[];
   memberships: Array<Omit<MemberRow, 'userId'> & { squadName: string }>;
   squadsCreated: Array<Pick<SquadRow, 'id' | 'name' | 'seasonNumber' | 'createdAt'>>;
@@ -164,6 +165,9 @@ export interface EngageExport {
 }
 
 export interface EngageRepo {
+  /** Epic G gifts: their own store, on the same database. */
+  readonly gifts: GiftStore;
+
   // ----- enrolment -----
   /** Idempotent: a second call returns the stored row with created=false. */
   enrol(row: EnrolmentRow): Promise<{ row: EnrolmentRow; created: boolean }>;
@@ -271,7 +275,8 @@ export interface EngageRepo {
    * grace, nudges, share links and their own attribution; null them as the
    * sender of cheers and as a squad's creator; delete cheers sent to them.
    * A squad they named that nobody is left in loses its name and its group
-   * binding too: the name is free text they typed.
+   * binding too: the name is free text they typed. Gifts keep their rows,
+   * the financial record, with this person nulled out.
    */
   eraseUser(userId: string, at: string): Promise<void>;
 }
@@ -306,6 +311,7 @@ export const ENGAGE_TABLE_PRIVACY = {
   share_landings: { userData: false },
   share_links: { userData: true, exportedAs: 'shareLinks', erasure: 'delete' },
   referral_attributions: { userData: true, exportedAs: 'attribution', erasure: 'delete' },
+  gifts: { userData: true, exportedAs: 'giftsSent, giftsReceived', erasure: 'null gifter and recipient; keep the row' },
 } as const satisfies Record<
   string,
   { userData: false } | { userData: true; exportedAs: string; erasure: string }

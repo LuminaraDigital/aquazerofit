@@ -8,7 +8,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import type { ApiErrorBody } from '@aquazerofit/shared';
-import { clientIpForRateLimit } from './clientIp';
+import { clientIpForRateLimit, clientNetworkKey } from './clientIp';
 import { config } from './config';
 
 const WINDOW_MS = 60_000;
@@ -116,8 +116,9 @@ export function rateLimiter(req: Request, res: Response, next: NextFunction): vo
 
   // Auth lane is per-IP only (requests are unauthenticated by nature);
   // other lanes: per user (or per IP when anonymous) AND per IP.
-  // The address is CF-Connecting-IP when the Worker secret matches, else the socket.
-  const clientIp = clientIpForRateLimit(req);
+  // The address is CF-Connecting-IP when the Worker secret matches, else the
+  // socket; an IPv6 address counts as its /64 (clientNetworkKey).
+  const clientIp = clientNetworkKey(clientIpForRateLimit(req));
   const ipKey = `${lane}:ip:${clientIp}`;
 
   /*

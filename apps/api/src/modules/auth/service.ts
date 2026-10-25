@@ -4,6 +4,7 @@
  */
 import crypto from 'node:crypto';
 import type { AuthResponse, User } from '@aquazerofit/shared';
+import { clientNetworkKey } from '../../platform/clientIp';
 import { AppError } from '../../platform/errors';
 import { config } from '../../platform/config';
 import { getStore, newId } from '../../platform/store';
@@ -150,14 +151,10 @@ const telegramNewAccountsByIp = new Map<string, number[]>();
 const telegramNewAccountsGlobal: number[] = [];
 const telegramNewAccountsBySubnet = new Map<string, number[]>();
 
-function subnetKey(ip: string): string {
-  // IPv4 /24 or IPv6 /64
-  if (ip.includes(':')) {
-    const parts = ip.split(':');
-    return parts.slice(0, 4).join(':') + '::/64';
-  }
-  const parts = ip.split('.');
-  return parts.slice(0, 3).join('.') + '.0/24';
+/** IPv4 /24, or the IPv6 /64 the client already keys on. */
+function subnetKey(clientKey: string): string {
+  const parts = clientKey.split('.');
+  return parts.length === 4 ? `${parts.slice(0, 3).join('.')}.0/24` : clientKey;
 }
 
 function pruneTelegramNewAccounts(now: number): void {
@@ -188,7 +185,7 @@ function pruneTelegramNewAccounts(now: number): void {
 
 function assertTelegramNewAccountAllowed(ip: string | undefined, now: number): void {
   pruneTelegramNewAccounts(now);
-  const key = ip?.trim() || 'unknown';
+  const key = clientNetworkKey(ip?.trim() || 'unknown');
   const perIpLimit = config.telegramSignupPerIpPerMinute;
   const subnetLimit = config.telegramSignupSubnetDaily;
   const globalLimit = config.telegramSignupGlobalDaily;

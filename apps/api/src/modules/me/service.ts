@@ -25,6 +25,7 @@ import {
 } from './adaptive';
 import { removeUserFromChallenges } from '../challenges/service';
 import { clearEmojiStatusOnErasure } from '../fightRecord/emojiStatus';
+import { engageRepo } from '../fightCamp/repo';
 import { effectiveTier } from '../billing/entitlements';
 import { cancelStripeSubscriptions } from '../billing/stripe';
 import { addDays } from '../../platform/dates';
@@ -295,7 +296,7 @@ export function saveConsents(userId: string, input: Omit<ConsentState, 'updatedA
 // to keep in sync.
 const USER_SCOPED_CONTAINERS: ContainerName[] = ['profiles', 'logs', 'plans', 'ai', 'ledger', 'audit'];
 
-export function exportUserData(userId: string): Record<string, unknown> {
+export async function exportUserData(userId: string): Promise<Record<string, unknown>> {
   const store = getStore();
   const user = store.byId<User>('users', userId);
   const bundle: Record<string, unknown> = {
@@ -308,6 +309,14 @@ export function exportUserData(userId: string): Record<string, unknown> {
       container,
       (d) => d.userId === userId,
     );
+  }
+  // Fight Camp lives in Postgres tables rather than these containers. Present
+  // whenever it holds anything, whatever the feature flags say now: a user
+  // whose squad was switched off still owns what they put there. Absent when
+  // empty, so an account that never used it exports exactly what it did.
+  const engage = await engageRepo().exportUser(userId);
+  if (Object.values(engage).some((part) => (Array.isArray(part) ? part.length > 0 : part !== null))) {
+    bundle.engage = engage;
   }
   auditDataAccess(userId, 'export', {});
   return bundle;
@@ -396,6 +405,10 @@ export async function purgeUser(userId: string): Promise<void> {
   if (firebaseUid) {
     await removeFirebaseIdentity(firebaseUid);
   }
+
+  // Fight Camp's tables next, for the same reason: a database error here
+  // throws before any document is touched, so a retry finds the account whole.
+  await engageRepo().eraseUser(userId, new Date().toISOString());
 
   // Meal photo files on disk belong to the user's vision jobs. Remove them
   // before the job docs go (missing files are tolerated: best-effort cleanup).

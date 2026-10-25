@@ -132,11 +132,14 @@ meRouter.put('/consents', (req, res) => {
   res.json({ consents: saveConsents(userIdOf(req), input) });
 });
 
-meRouter.get('/export', (req, res) => {
-  const bundle = exportUserData(userIdOf(req));
-  res.setHeader('Content-Disposition', 'attachment; filename="aquazerofit-export.json"');
-  res.json(bundle);
-});
+meRouter.get(
+  '/export',
+  asyncHandler(async (req, res) => {
+    const bundle = await exportUserData(userIdOf(req));
+    res.setHeader('Content-Disposition', 'attachment; filename="aquazerofit-export.json"');
+    res.json(bundle);
+  }),
+);
 
 meRouter.get('/', (req, res) => {
   const user = getStore().byId<User>('users', userIdOf(req));

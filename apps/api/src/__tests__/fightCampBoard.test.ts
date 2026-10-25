@@ -14,6 +14,7 @@ const member = (displayName: string, weekActiveDays: number | null, ref = displa
   beltTier: null,
   weekActiveDays,
   cheeredToday: false,
+  welcome: false,
 });
 
 describe('weekStartOf', () => {

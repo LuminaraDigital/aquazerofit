@@ -227,6 +227,12 @@ export interface SquadMemberView {
   weekActiveDays: number | null;
   /** Whether the viewer has cheered this member today. False while cheers are off. */
   cheeredToday: boolean;
+  /**
+   * New to AquaZeroFit and to the squad this week, and never cheered by the
+   * viewer: the board offers one "just joined" prompt (US-D2 AC3). False
+   * while cheers are off.
+   */
+  welcome: boolean;
 }
 
 export interface SquadView {

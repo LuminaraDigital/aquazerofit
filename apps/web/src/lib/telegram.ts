@@ -55,7 +55,13 @@ export interface TelegramWebApp {
    * grants access still goes through the server, which re-parses `initData`
    * and verifies its HMAC.
    */
-  initDataUnsafe?: { start_param?: string };
+  initDataUnsafe?: {
+    start_param?: string;
+    /** Present when launched from a chat: 'sender', 'private', 'group', 'supergroup' or 'channel'. */
+    chat_type?: string;
+    /** Opaque, stable per chat. Only the server's hash of it is ever stored. */
+    chat_instance?: string;
+  };
   version?: string;
   platform?: string;
   colorScheme?: 'light' | 'dark';
@@ -92,6 +98,8 @@ export interface TelegramWebApp {
   shareToStory?(mediaUrl: string, params?: { text?: string }): void;
   /** Bot API 8.0+. The callback receives whether access was granted. */
   requestEmojiStatusAccess?(callback?: (allowed: boolean) => void): void;
+  /** Bot API 8.0+. Opens Telegram's chat chooser for a prepared message. */
+  shareMessage?(preparedMessageId: string, callback?: (sent: boolean) => void): void;
 }
 
 /** Terminal states Telegram reports back from an invoice. */
@@ -772,6 +780,38 @@ export function requestEmojiStatusAccess(): Promise<boolean> {
   return new Promise((resolve) => {
     try {
       request.call(tg, (allowed) => resolve(allowed === true));
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+/**
+ * Was the Mini App opened from a Telegram group? Read from the unsigned
+ * launch data, so it only decides whether to ask the server: the server
+ * verifies the signed initData before anything is looked up or bound.
+ */
+export function launchedFromGroup(): boolean {
+  const unsafe = getWebApp()?.initDataUnsafe;
+  return (unsafe?.chat_type === 'group' || unsafe?.chat_type === 'supergroup') && Boolean(unsafe.chat_instance);
+}
+
+/** Can this client send a prepared message through Telegram's chooser? Bot API 8.0+. */
+export function canShareMessage(): boolean {
+  return telegramSupports('8.0') && typeof getWebApp()?.shareMessage === 'function';
+}
+
+/**
+ * Open Telegram's chooser for a prepared message. Resolves false when the
+ * client cannot, so callers fall back to a share link in the same branch.
+ */
+export function shareMessage(preparedMessageId: string): Promise<boolean> {
+  const tg = getWebApp();
+  const share = tg?.shareMessage;
+  if (!canShareMessage() || !share) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    try {
+      share.call(tg, preparedMessageId, (sent) => resolve(sent === true));
     } catch {
       resolve(false);
     }

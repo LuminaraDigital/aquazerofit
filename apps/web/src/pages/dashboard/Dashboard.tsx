@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { CoachCard } from '@/components/coach/CoachCard';
 import { ConsistencyCard } from '@/components/progress/ConsistencyCard';
 import { SeasonCard } from '@/components/fightRecord/SeasonCard';
+import { SquadCornerSheet } from '@/components/fightCamp/SquadCornerSheet';
 import { ConsistencyChip } from '@/components/progress/ConsistencyChip';
 import { ReadinessChip } from '@/components/progress/ReadinessChip';
 import { WeeklyInsightCard } from '@/components/progress/WeeklyInsightCard';
@@ -300,6 +301,8 @@ export default function Dashboard() {
         <section className="mb-5 reveal reveal-4 empty:hidden" aria-label="Season">
           <SeasonCard />
         </section>
+        {/* Opened from a Telegram group: offers that group's squad. Renders nothing otherwise. */}
+        <SquadCornerSheet />
 
         {/* Weekly insight */}
         <section className="mb-5 reveal reveal-4" aria-label="Your week">

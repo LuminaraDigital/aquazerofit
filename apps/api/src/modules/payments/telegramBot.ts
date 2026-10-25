@@ -212,3 +212,30 @@ export async function editUserStarSubscription(
     is_canceled: isCanceled,
   });
 }
+
+/**
+ * Store a message the user can then send to chats they choose with
+ * `WebApp.shareMessage(id)` (Bot API 8.0). The user picks every recipient in
+ * Telegram's own chooser; this call names none. Returns Telegram's id, which
+ * expires after a while, so callers mint one per share.
+ */
+export async function savePreparedInlineMessage(
+  telegramUserId: number,
+  article: { id: string; title: string; description: string; text: string; button: { text: string; url: string } },
+): Promise<BotResult<{ id: string; expiration_date: number }>> {
+  return callBot<{ id: string; expiration_date: number }>('savePreparedInlineMessage', {
+    user_id: telegramUserId,
+    result: {
+      type: 'article',
+      id: article.id,
+      title: article.title,
+      description: article.description,
+      input_message_content: { message_text: article.text, link_preview_options: { is_disabled: true } },
+      reply_markup: { inline_keyboard: [[{ text: article.button.text, url: article.button.url }]] },
+    },
+    allow_user_chats: true,
+    allow_group_chats: true,
+    allow_bot_chats: false,
+    allow_channel_chats: false,
+  });
+}

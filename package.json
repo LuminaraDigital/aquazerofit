@@ -19,6 +19,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "eval": "tsx evals/runner.ts",
     "smoke": "node scripts/smoke-check.mjs",
+    "scan:bundle": "node scripts/scan-bundle-crypto.mjs",
     "verify": "npm run typecheck && npm run test && npm run eval",
     "deploy:web": "npm run build --workspace packages/shared && npm run build --workspace apps/web && firebase deploy --only hosting",
     "start": "npm run start --workspace apps/api",

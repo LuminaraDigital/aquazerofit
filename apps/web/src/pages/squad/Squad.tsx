@@ -14,6 +14,8 @@ import { Navigate } from 'react-router-dom';
 import {
   SQUAD_CONSENT_TEXT,
   SQUAD_MAX_MEMBERS,
+  seasonByNumber,
+  seasonTheme,
   squadBoard,
   type SquadMemberView,
   type SquadView,
@@ -29,6 +31,7 @@ import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { useToast } from '@/components/ui/Toast';
 import { BeltBadge } from '@/components/fightRecord/BeltBadge';
 import { CheerButton } from '@/components/fightCamp/Cheers';
+import { ShareKitSheet } from '@/components/fightCamp/ShareKitSheet';
 import { BottomSheet } from '@/pages/training/BottomSheet';
 import { formatDate } from '@/lib/format';
 import { beltName, useFightCamp } from '@/lib/fightRecord';
@@ -37,6 +40,7 @@ import {
   squadErrorMessage,
   squadTelegramUrl,
   useCreateSquad,
+  useFirstName,
   useJoinSquad,
   useLeaveSquad,
   useRemoveMember,
@@ -209,6 +213,10 @@ export function ConsentSheet({
 function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
   const toast = useToast();
   const [leaving, setLeaving] = useState(false);
+  const shareKit = Boolean(useFightCamp().data?.shareKit);
+  const firstName = useFirstName();
+  const [kit, setKit] = useState<'week' | 'squad_invite' | null>(null);
+  const myWeek = squad.members.find((m) => m.isMe)?.weekActiveDays ?? 0;
   const leave = useLeaveSquad();
 
   const invite = async () => {
@@ -280,6 +288,29 @@ function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
             </GlassCard>
           ))}
       <WeekBoard squad={squad} canCheer={canCheer} />
+      {shareKit && (
+        <div className="grid grid-cols-2 gap-3">
+          <SecondaryButton onClick={() => setKit('week')}>Share my week</SecondaryButton>
+          <SecondaryButton onClick={() => setKit('squad_invite')}>Share invite card</SecondaryButton>
+        </div>
+      )}
+      {kit && (
+        <ShareKitSheet
+          open
+          onClose={() => setKit(null)}
+          firstName={firstName}
+          accentId={seasonTheme(squad.seasonNumber).accentId}
+          card={{
+            kind: kit,
+            season: seasonByNumber(squad.seasonNumber),
+            accent: seasonTheme(squad.seasonNumber).accent,
+            belt: null,
+            weekActiveDays: myWeek,
+            squadName: squad.name,
+          }}
+          link={kit === 'squad_invite' ? { url: squad.inviteUrl, tgStartParam: squad.tgStartParam } : undefined}
+        />
+      )}
       <ShowMyNumbers squad={squad} />
       {squad.me.role === 'owner' && <OwnerTools squad={squad} />}
 

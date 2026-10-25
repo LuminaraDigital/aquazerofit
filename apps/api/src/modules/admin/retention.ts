@@ -69,6 +69,8 @@ export interface RetentionReport {
 
 const D30_FIRST = 28;
 const D30_LAST = 31;
+/** D30 is "active on any of days 28 to 31": shared with the Fight Camp metrics. */
+export const D30_OFFSETS: readonly number[] = Array.from({ length: D30_LAST - D30_FIRST + 1 }, (_, i) => D30_FIRST + i);
 const WAL_MIN_DAYS = 3;
 
 function mondayOf(isoDate: string): string {
@@ -86,7 +88,7 @@ function activeOnAny(dates: ReadonlySet<string>, from: string, offsets: readonly
  * measured whole or not at all, so a partly elapsed week cannot read as a
  * drop.
  */
-function retained(
+export function retained(
   members: readonly RetentionSubject[],
   offsets: readonly number[],
   today: string,
@@ -109,7 +111,6 @@ export function cohortRetention(
     if (week < oldest || subject.signupDate > today) continue;
     byWeek.set(week, [...(byWeek.get(week) ?? []), subject]);
   }
-  const d30Offsets = Array.from({ length: D30_LAST - D30_FIRST + 1 }, (_, i) => D30_FIRST + i);
   return [...byWeek.entries()]
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([weekOf, members]) => ({
@@ -117,7 +118,7 @@ export function cohortRetention(
       users: members.length,
       d1: retained(members, [1], today),
       d7: retained(members, [7], today),
-      d30: retained(members, d30Offsets, today),
+      d30: retained(members, D30_OFFSETS, today),
     }));
 }
 
@@ -141,7 +142,7 @@ export function weeklyActiveLoggers(
   });
 }
 
-function isMemberAccount(doc: { id: string }): doc is User {
+export function isMemberAccount(doc: { id: string }): doc is User {
   const d = doc as User & { type?: string };
   return (d.type === undefined || d.type === 'user') && typeof d.email === 'string' && d.role !== 'admin';
 }

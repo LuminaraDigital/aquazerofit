@@ -148,6 +148,16 @@ export interface CheerPage {
 }
 
 /** Everything engage holds about one person, for GET /me/export. */
+/** One person's place in an experiment. */
+export interface ArmRow {
+  userId: string;
+  experiment: 'early_cheers';
+  arm: ExperimentArm;
+  /** Their first local day, in the calendar the arm was recorded in: week one starts here. */
+  dayZero: string;
+  assignedAt: string;
+}
+
 export interface EngageExport extends GiftExport {
   enrolments: EnrolmentRow[];
   memberships: Array<Omit<MemberRow, 'userId'> & { squadName: string }>;
@@ -159,7 +169,7 @@ export interface EngageExport extends GiftExport {
   grace: GraceRow[];
   nudges: Array<{ localDate: string; kind: string; sentAt: string }>;
   nudgeSettings: Array<{ kind: NudgeKind; enabled: boolean; updatedAt: string }>;
-  experiments: Array<{ experiment: string; arm: ExperimentArm; assignedAt: string }>;
+  experiments: Array<Omit<ArmRow, 'userId'>>;
   shareLinks: ShareLinkRow[];
   attribution: Omit<AttributionRow, 'inviteeUserId'> | null;
 }
@@ -220,12 +230,7 @@ export interface EngageRepo {
    * record, which is the one to use. `recorded` is true only for the call
    * that wrote it.
    */
-  assignArm(
-    userId: string,
-    experiment: 'early_cheers',
-    arm: ExperimentArm,
-    at: string,
-  ): Promise<{ arm: ExperimentArm; recorded: boolean }>;
+  assignArm(row: ArmRow): Promise<{ arm: ExperimentArm; recorded: boolean }>;
 
   // ----- Cut Man grace -----
   /** Every ledger row for the user, in write order. */
@@ -262,7 +267,7 @@ export interface EngageRepo {
   /** Each person's first squad join, ever. */
   squadFirstJoins(): Promise<Array<{ userId: string; joinedAt: string }>>;
   enrolledUsers(seasonNumber: number): Promise<string[]>;
-  armsOf(experiment: 'early_cheers'): Promise<Array<{ userId: string; arm: ExperimentArm }>>;
+  armsOf(experiment: 'early_cheers'): Promise<Array<Pick<ArmRow, 'userId' | 'arm' | 'dayZero'>>>;
   graceAppliedIn(seasonNumber: number): Promise<number>;
   /** Member cheers sent per sender with sender-local dates in [from, to]. */
   cheersPerSender(from: string, to: string): Promise<number[]>;

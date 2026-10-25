@@ -10,10 +10,10 @@
  * reach into the store, which is the isolation a database gives for free.
  */
 import type { NudgeKind, ShareKindP1 } from '@aquazerofit/shared';
-import type { Surface } from './types';
 import { MemoryGiftStore } from './gifts';
 import { ARCHIVED_SQUAD_NAME } from './types';
 import type {
+  ArmRow,
   AttributionRow,
   CheerPage,
   CheerRow,
@@ -29,6 +29,7 @@ import type {
   MemberRow,
   ShareLinkRow,
   SquadRow,
+  Surface,
 } from './types';
 
 const copy = <T extends object>(row: T): T => ({ ...row });
@@ -55,7 +56,7 @@ export class MemoryEngageRepo implements EngageRepo {
   private grace: GraceRow[] = [];
   private nudges: Array<{ userId: string; localDate: string; kind: string; sentAt: string }> = [];
   private nudgePrefs: Array<{ userId: string; kind: NudgeKind; enabled: boolean; updatedAt: string }> = [];
-  private arms: Array<{ userId: string; experiment: string; arm: ExperimentArm; assignedAt: string }> = [];
+  private arms: ArmRow[] = [];
   private links: ShareLinkRow[] = [];
   private attributions: AttributionRow[] = [];
 
@@ -281,16 +282,11 @@ export class MemoryEngageRepo implements EngageRepo {
 
   // ----- experiments -----
 
-  async assignArm(
-    userId: string,
-    experiment: 'early_cheers',
-    arm: ExperimentArm,
-    at: string,
-  ): Promise<{ arm: ExperimentArm; recorded: boolean }> {
-    const held = this.arms.find((a) => a.userId === userId && a.experiment === experiment);
+  async assignArm(row: ArmRow): Promise<{ arm: ExperimentArm; recorded: boolean }> {
+    const held = this.arms.find((a) => a.userId === row.userId && a.experiment === row.experiment);
     if (held) return { arm: held.arm, recorded: false };
-    this.arms.push({ userId, experiment, arm, assignedAt: at });
-    return { arm, recorded: true };
+    this.arms.push({ ...row });
+    return { arm: row.arm, recorded: true };
   }
 
   // ----- Cut Man grace -----
@@ -427,8 +423,8 @@ export class MemoryEngageRepo implements EngageRepo {
     return this.enrolments.filter((e) => e.seasonNumber === seasonNumber).map((e) => e.userId);
   }
 
-  async armsOf(experiment: 'early_cheers'): Promise<Array<{ userId: string; arm: ExperimentArm }>> {
-    return this.arms.filter((a) => a.experiment === experiment).map(({ userId, arm }) => ({ userId, arm }));
+  async armsOf(experiment: 'early_cheers'): Promise<Array<Pick<ArmRow, 'userId' | 'arm' | 'dayZero'>>> {
+    return this.arms.filter((a) => a.experiment === experiment).map(({ userId, arm, dayZero }) => ({ userId, arm, dayZero }));
   }
 
   async graceAppliedIn(seasonNumber: number): Promise<number> {
@@ -482,7 +478,7 @@ export class MemoryEngageRepo implements EngageRepo {
         .map(({ kind, enabled, updatedAt }) => ({ kind, enabled, updatedAt })),
       experiments: this.arms
         .filter((a) => a.userId === userId)
-        .map(({ experiment, arm, assignedAt }) => ({ experiment, arm, assignedAt })),
+        .map(({ userId: _omit, ...rest }) => rest),
       shareLinks: this.links.filter((l) => l.userId === userId).map(copy),
       attribution: attribution
         ? (({ inviteeUserId: _omit, ...rest }) => rest)(attribution)

@@ -20,6 +20,11 @@ describe('bundle crypto scan', () => {
     'Back up your seed phrase',
     'Pay with Bitcoin',
     'Built on the blockchain',
+    'Buy $TON today',
+    'Earn tokens for every workout',
+    'Collect coins as you train',
+    'Token rewards for showing up',
+    'Mint your belt',
   ])('catches "%s"', (text) => {
     expect(cryptoHits(text).length).toBeGreaterThan(0);
   });
@@ -31,6 +36,8 @@ describe('bundle crypto scan', () => {
     'Premium price',
     'A mint green accent',
     'tonConnectUiEvents',
+    'Your access token was refreshed',
+    'Earn your belt by showing up',
   ])('leaves "%s" alone', (text) => {
     expect(cryptoHits(text)).toEqual([]);
   });

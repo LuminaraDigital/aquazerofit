@@ -36,7 +36,7 @@ import { requireFeature, requireFeatureSwitch } from './flags';
 import { prepareSquadInvite, squadCorner } from './corner';
 import { cheerInbox, decodeCursor, markCheersSeen, sendCheer } from './cheers';
 import { syncEarlyCheers } from './earlyCheers';
-import { attributeSquadJoin, claimShareAttribution, landOn, shareLinkFor, shareSummary } from './share';
+import { attributeSquadJoin, claimShareAttribution, isPreviewAgent, landOn, shareLinkFor, shareSummary } from './share';
 import { createGiftInvoice } from './gifts';
 import { fightCampConfig } from '../../platform/fightCampConfig';
 import { engageRepo } from './repo';
@@ -281,7 +281,9 @@ shareRouter.get(
     let target = `${config.appPublicUrl}/`;
     try {
       requireFeatureSwitch('shareKit');
-      if (code.success) target = await landOn(code.data, surface);
+      // The Mini App's own beacon is a launch; on the web, a preview fetcher is not a visit.
+      const count = surface === 'tma' || !isPreviewAgent(req.get('user-agent'));
+      if (code.success) target = await landOn(code.data, surface, count);
     } catch {
       // Off, or the lookup failed: home, without a ref.
     }

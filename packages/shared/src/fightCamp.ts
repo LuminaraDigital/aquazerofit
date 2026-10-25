@@ -66,6 +66,9 @@ export const squadCodeSchema = z
   .toUpperCase()
   .regex(/^SQD-[A-HJ-NP-Z2-9]{10}$/);
 export const memberRefSchema = z.string().regex(/^m_[A-Za-z0-9]{12}$/);
+/** `startapp` payload prefixes: a squad invite, and a Share Kit link (also the `?ref=` on the web). */
+export const SQUAD_START_PREFIX = 'sq_';
+export const SHARE_START_PREFIX = 'sh_';
 export const shareCodeSchema = z.string().regex(/^[A-Za-z0-9]{8}$/);
 
 export const enrolInputSchema = z.object({

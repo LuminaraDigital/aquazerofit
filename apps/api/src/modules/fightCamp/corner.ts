@@ -14,7 +14,6 @@
  */
 import { createHmac } from 'node:crypto';
 import {
-  seasonByNumber,
   seasonFor,
   type SquadCornerInput,
   type SquadCornerView,
@@ -27,7 +26,7 @@ import { logEvent } from '../../platform/telemetry';
 import { validateTelegramInitData } from '../auth/telegram';
 import { botConfigured, savePreparedInlineMessage } from '../payments/telegramBot';
 import { engageRepo } from './repo';
-import { createSquad, joinSquad, membershipIn, requireSquadAdult } from './squads';
+import { createSquad, joinSquad, membershipIn, peekOf, requireSquadAdult } from './squads';
 
 const GROUP_CHAT_TYPES = new Set(['group', 'supergroup']);
 
@@ -77,14 +76,9 @@ export async function squadCorner(userId: string, input: SquadCornerInput, today
 
   const squad = await engageRepo().squadByCorner(season, hash);
   if (!squad) return { state: 'none', squad: null };
-  const members = await engageRepo().activeMembers(squad.id);
-  const peek = {
-    name: squad.name,
-    memberCount: members.length,
-    seasonName: seasonByNumber(squad.seasonNumber).name,
-    full: members.length >= squad.maxMembers,
-  };
-  const state = members.some((m) => m.userId === userId) ? 'member' : peek.full ? 'full' : 'joinable';
+  const peek = await peekOf(squad);
+  const mine = await engageRepo().activeMembership(userId, season);
+  const state = mine?.squadId === squad.id ? 'member' : peek.full ? 'full' : 'joinable';
   return { state, squad: peek };
 }
 

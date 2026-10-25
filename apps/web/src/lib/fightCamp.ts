@@ -103,6 +103,38 @@ export function useJoinSquad() {
   );
 }
 
+/** Owner only: a fresh invite code; links with the old one stop working. */
+export function useRotateInviteCode() {
+  return useSquadWrite(async (squadId: string) =>
+    unwrap<SquadView>(
+      await api<unknown>(`/squads/${encodeURIComponent(squadId)}/rotate-code`, { method: 'POST' }),
+      'squad',
+    ),
+  );
+}
+
+/** Owner only: take a member out of the squad. */
+export function useRemoveMember(squadId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (memberRef: string) =>
+      api<void>(`/squads/${encodeURIComponent(squadId)}/members/${encodeURIComponent(memberRef)}/remove`, {
+        method: 'POST',
+      }),
+    onSuccess: (_void, memberRef) =>
+      qc.setQueryData<SquadView | null>(squadKey, (squad) =>
+        squad ? { ...squad, members: squad.members.filter((m) => m.ref !== memberRef) } : squad,
+      ),
+    onSettled: () => void qc.invalidateQueries({ queryKey: squadKey }),
+  });
+}
+
+/** The reason code the API put in an error's details, if any. */
+export function errorReason(error: unknown): string | null {
+  const reason = error instanceof ApiError ? (error.body?.details as { reason?: unknown } | undefined)?.reason : null;
+  return typeof reason === 'string' ? reason : null;
+}
+
 export function useLeaveSquad() {
   return useSquadWrite(async (squadId: string) => {
     await api<void>(`/squads/${encodeURIComponent(squadId)}/leave`, { method: 'POST' });

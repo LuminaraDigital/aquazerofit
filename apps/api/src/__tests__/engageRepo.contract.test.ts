@@ -244,7 +244,11 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
           leftAt: null,
         }),
       });
-      expect((await repo.memberByRef(earlyRow.memberRef))?.userId).toBe(early);
+      expect((await repo.activeMemberByRef(squad.id, earlyRow.memberRef))?.userId).toBe(early);
+      // Scoped: the same ref in another squad, or a ref that left, resolves to nobody.
+      expect(await repo.activeMemberByRef('another-squad', earlyRow.memberRef)).toBeNull();
+      await repo.leaveSquad(squad.id, early, at(41));
+      expect(await repo.activeMemberByRef(squad.id, earlyRow.memberRef)).toBeNull();
       expect((await repo.activeMembers(squad.id)).find((m) => m.userId === late)?.role).toBe('owner');
     });
 
@@ -257,6 +261,18 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       await repo.leaveSquad(squad.id, owner, at(6));
       const heir = (await repo.activeMembers(squad.id)).find((m) => m.role === 'owner');
       expect(heir?.userId).toBe(upper);
+    });
+
+    it('replaces a live squad\u2019s invite code, refusing a taken one and an archived squad', async () => {
+      const { squad, owner } = await seedSquad(repo);
+      const { squad: other } = await seedSquad(repo);
+      expect(await repo.setInviteCode(squad.id, other.inviteCode)).toBe('code_taken');
+      const fresh = nextCode();
+      expect(await repo.setInviteCode(squad.id, fresh)).toBe('ok');
+      expect(await repo.squadByCode(fresh)).toMatchObject({ id: squad.id });
+      expect(await repo.squadByCode(squad.inviteCode)).toBeNull();
+      await repo.leaveSquad(squad.id, owner, at(50));
+      expect(await repo.setInviteCode(squad.id, nextCode())).toBe('not_found');
     });
 
     it('updates show_stats for active members only and counts recent creates', async () => {

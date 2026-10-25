@@ -7,9 +7,18 @@
  *  - members are addressed by an opaque `member_ref`, never a user id, and
  *    every member-scoped action first proves the caller is an active member
  *    of the squad named in the path (the IDOR tests cover each route);
- *  - a member's belt is visible to the squad (they agreed to that at join),
- *    their weekly active days only if they turned "show my numbers" on;
- *  - the weekly board counts active days and nothing else, one per day.
+ *  - a member's first name and belt are visible to the squad (they agreed to
+ *    that at join), their weekly active days only if they turned "show my
+ *    numbers" on; an auto-filled name (an email's local part, "Telegram
+ *    user 123") is never shown;
+ *  - the weekly board counts active days and nothing else, one per day;
+ *  - adults only, continuously: a member whose age is no longer known to be
+ *    18 or over is taken out of the squad the next time anyone reads it.
+ *
+ * Invite codes are bearer capabilities, so they are long (32^10), every
+ * lookup that fails before membership answers the same 404, repeated
+ * misses lock the caller out for an hour, and an owner can rotate the code
+ * or remove a member who should not be there.
  *
  * Integrity rules (capacity, one squad a season, ownership passing on) are
  * enforced atomically in the repository; this file turns its outcomes into
@@ -17,6 +26,7 @@
  */
 import { randomInt } from 'node:crypto';
 import {
+  SQUAD_CODE_LENGTH,
   SQUAD_CODE_PREFIX,
   SQUAD_CONSENT_VERSION,
   SQUAD_MAX_MEMBERS,
@@ -43,9 +53,12 @@ export type JoinVia = 'code' | 'link' | 'corner';
 
 /** Squads one person may start in a rolling day (PRD §5.3). */
 export const SQUAD_CREATES_PER_DAY = 5;
+/** Failed code lookups per person per hour before joins are refused for the hour. */
+export const SQUAD_CODE_MISSES_PER_HOUR = 10;
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const REF_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const HOUR_MS = 3_600_000;
 
 function randomFrom(alphabet: string, length: number): string {
   let out = '';
@@ -53,25 +66,43 @@ function randomFrom(alphabet: string, length: number): string {
   return out;
 }
 
-/**
- * Invite codes are bearer capabilities, like huddle codes: whoever holds one
- * can join. CSPRNG, never Math.random.
- */
-const issueCode = () => `${SQUAD_CODE_PREFIX}-${randomFrom(CODE_ALPHABET, 6)}`;
+/** CSPRNG, never Math.random: a predictable code is a guessable one. */
+const issueCode = () => `${SQUAD_CODE_PREFIX}-${randomFrom(CODE_ALPHABET, SQUAD_CODE_LENGTH)}`;
 export const issueMemberRef = () => `m_${randomFrom(REF_ALPHABET, 12)}`;
 
-/** Masked like huddle names: a stored name that fails the filter is never shown. */
-function displayNameOf(userId: string): string {
-  const name = getStore().byId<User>('users', userId)?.displayName?.trim();
-  return name && !containsProfanity(name) ? name : 'Fight Camp member';
+const FALLBACK_NAME = 'Fight Camp member';
+
+/**
+ * A member's first name, masked like huddle names. Names the account never
+ * chose (the email local part registration fills in, Telegram's numbered
+ * fallback) are not shown: they can identify someone who never typed them.
+ */
+export function displayNameOf(userId: string): string {
+  const user = getStore().byId<User>('users', userId);
+  const name = user?.displayName?.trim() ?? '';
+  const autoFilled = name === user?.email.split('@')[0] || /^Telegram user \d+$/.test(name);
+  const first = name.split(/\s+/)[0] ?? '';
+  return first && !autoFilled && !containsProfanity(first) ? first : FALLBACK_NAME;
 }
 
 function fail(code: 'FORBIDDEN' | 'CONFLICT' | 'NOT_FOUND', reason: string, message: string): never {
   throw new AppError(code, message, { reason });
 }
 
+function notFound(): never {
+  fail('NOT_FOUND', 'squad_not_found', 'That squad code does not match a squad this season.');
+}
+
+/**
+ * Adults only. An unknown age is its own reason so a new account arriving
+ * by invite can be sent to add it, rather than being told it is a minor.
+ */
 export function requireSquadAdult(userId: string): void {
-  if (!isAdult(getProfile(userId))) {
+  const age = getProfile(userId)?.age;
+  if (typeof age !== 'number') {
+    fail('FORBIDDEN', 'squad_age_unknown', 'Add your age in your wellness essentials to join a squad.');
+  }
+  if (!isAdult({ age })) {
     fail('FORBIDDEN', 'squad_adult_only', 'Squads are for members aged 18 and over. Your belts stay on your own Fight Record.');
   }
 }
@@ -99,23 +130,55 @@ export async function membershipIn(userId: string, squadId: string): Promise<Mem
   return member;
 }
 
+/**
+ * Active members who are still known adults. Anyone else is taken out of
+ * the squad here, on read, so a profile edit to under 18 (or a deleted
+ * profile) cannot leave someone listed in a group of adults.
+ */
+export async function adultMembers(squadId: string, now: Date = new Date()): Promise<MemberRow[]> {
+  const members = await engageRepo().activeMembers(squadId);
+  const adults: MemberRow[] = [];
+  for (const member of members) {
+    if (isAdult(getProfile(member.userId))) {
+      adults.push(member);
+    } else {
+      await engageRepo().leaveSquad(squadId, member.userId, now.toISOString());
+      logEvent('squad_member_auto_left', { reason: 'age' });
+    }
+  }
+  return adults;
+}
+
 // ----- read model -----
 
+/**
+ * One audit record per viewer, squad and day is enough to show the cross-user
+ * read happened; one per request would let a single user write hundreds of
+ * thousands. Per process and bounded: a restart can at worst repeat a line.
+ */
+const auditedViews = new Set<string>();
+
+function auditView(viewerId: string, squadId: string, today: string, others: readonly MemberRow[]): void {
+  const key = `${viewerId}|${squadId}|${today}`;
+  if (auditedViews.has(key)) return;
+  if (auditedViews.size > 50_000) auditedViews.clear();
+  auditedViews.add(key);
+  auditDataAccess(viewerId, 'fightCamp.squad.viewed', {
+    squadId,
+    members: others.length,
+    numbersShown: others.filter((m) => m.showStats).length,
+  });
+}
+
 async function viewOf(squad: SquadRow, viewerId: string, today: string): Promise<SquadView> {
-  const members = await engageRepo().activeMembers(squad.id);
-  const me = members.find((m) => m.userId === viewerId)!;
+  const members = await adultMembers(squad.id);
+  const me = members.find((m) => m.userId === viewerId);
+  if (!me) notFound();
   const weekStart = weekStartOf(today);
   const others = members.filter((m) => m.userId !== viewerId);
-  if (others.length > 0) {
-    // One user's view reads other users' activity (their belts, and the
-    // numbers of anyone who chose to show them). The trail records that it
-    // happened and how much, not what was seen.
-    auditDataAccess(viewerId, 'fightCamp.squad.viewed', {
-      squadId: squad.id,
-      members: others.length,
-      numbersShown: others.filter((m) => m.showStats).length,
-    });
-  }
+  // One user's view reads other users' activity (their belts, and the
+  // numbers of anyone who chose to show them).
+  if (others.length > 0) auditView(viewerId, squad.id, today, others);
   return {
     id: squad.id,
     name: squad.name,
@@ -126,21 +189,22 @@ async function viewOf(squad: SquadRow, viewerId: string, today: string): Promise
     isCorner: squad.cornerHash !== null,
     weekStart,
     members: members.map((m) => memberView(m, viewerId, today, weekStart)),
-    me: { ref: me.memberRef, showStats: me.showStats },
+    me: { ref: me.memberRef, showStats: me.showStats, role: me.role },
   };
 }
 
 function memberView(m: MemberRow, viewerId: string, today: string, weekStart: string): SquadMemberView {
   const isMe = m.userId === viewerId;
+  // One activity load per member, shared by the belt and the week count.
+  const activeDates = activeDatesOf(loadActivity(m.userId));
   return {
     ref: m.memberRef,
     displayName: displayNameOf(m.userId),
     isMe,
     role: m.role,
-    beltTier: seasonBeltTier(m.userId, today),
+    beltTier: seasonBeltTier(m.userId, today, activeDates),
     // Your own numbers are always yours to see; anyone else's only by choice.
-    weekActiveDays:
-      isMe || m.showStats ? squadWeekPoints(activeDatesOf(loadActivity(m.userId)), weekStart) : null,
+    weekActiveDays: isMe || m.showStats ? squadWeekPoints(activeDates, weekStart) : null,
   };
 }
 
@@ -165,11 +229,8 @@ async function liveSquadByCode(code: string, today: string): Promise<SquadRow | 
   return squad && squad.archivedAt === null && squad.seasonNumber === seasonFor(today).number ? squad : null;
 }
 
-/** The public invite preview: name, size and season, and nobody's name. */
-export async function peekSquad(code: string, today: string): Promise<SquadPeekView | null> {
-  const squad = await liveSquadByCode(code, today);
-  if (!squad) return null;
-  const memberCount = (await engageRepo().activeMembers(squad.id)).length;
+export async function peekOf(squad: SquadRow): Promise<SquadPeekView> {
+  const memberCount = (await adultMembers(squad.id)).length;
   return {
     name: squad.name,
     memberCount,
@@ -178,10 +239,53 @@ export async function peekSquad(code: string, today: string): Promise<SquadPeekV
   };
 }
 
+/** The public invite preview: name, size and season, and nobody's name. */
+export async function peekSquad(code: string, today: string): Promise<SquadPeekView | null> {
+  const squad = await liveSquadByCode(code, today);
+  return squad ? peekOf(squad) : null;
+}
+
+// ----- failed code lookups -----
+
+const misses = new Map<string, number[]>();
+
+function recentMisses(userId: string, now: number): number[] {
+  const kept = (misses.get(userId) ?? []).filter((t) => now - t < HOUR_MS);
+  if (kept.length > 0) misses.set(userId, kept);
+  else misses.delete(userId);
+  return kept;
+}
+
+function refuseIfGuessing(userId: string, now: Date): void {
+  const recent = recentMisses(userId, now.getTime());
+  if (recent.length >= SQUAD_CODE_MISSES_PER_HOUR) {
+    throw new AppError('RATE_LIMITED', 'Too many codes that did not match. Try again in an hour.', {
+      reason: 'squad_code_attempts',
+      retryAfterSeconds: Math.max(1, Math.ceil((recent[0]! + HOUR_MS - now.getTime()) / 1000)),
+    });
+  }
+}
+
+function recordMiss(userId: string, now: Date): void {
+  misses.set(userId, [...recentMisses(userId, now.getTime()), now.getTime()]);
+}
+
+/** Test-only: forget recorded misses. */
+export function clearSquadCodeMissesForTests(): void {
+  if (!config.isTest) throw new Error('clearSquadCodeMissesForTests is only available under test');
+  misses.clear();
+}
+
 // ----- writes -----
 
 function recordConsent(userId: string, squadId: string): void {
   auditDataAccess(userId, 'fightCamp.squad.consent', { squadId, consentTextVersion: SQUAD_CONSENT_VERSION });
+}
+
+async function requireNoSquad(userId: string, today: string): Promise<void> {
+  if (await engageRepo().activeMembership(userId, seasonFor(today).number)) {
+    fail('CONFLICT', 'squad_already_member', 'You are already in a squad this season.');
+  }
 }
 
 export async function createSquad(
@@ -193,9 +297,9 @@ export async function createSquad(
 ): Promise<SquadView> {
   requireSquadAdult(userId);
   const repo = engageRepo();
-  const since = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+  const since = new Date(now.getTime() - 24 * HOUR_MS).toISOString();
   if ((await repo.squadsCreatedSince(userId, since)) >= SQUAD_CREATES_PER_DAY) {
-    throw new AppError('RATE_LIMITED', 'You have started a few squads today. Try again tomorrow.', {
+    throw new AppError('RATE_LIMITED', 'You have started five squads in the last day. Try again later.', {
       reason: 'squad_create_limit',
       retryAfterSeconds: 3600,
     });
@@ -226,7 +330,7 @@ export async function createSquad(
     if (outcome.reason === 'corner_taken') {
       fail('CONFLICT', 'squad_corner_taken', 'This group already has a Squad Corner this season.');
     }
-    // code_taken: a 1-in-a-billion collision. Draw again.
+    // code_taken: a vanishingly rare collision. Draw again.
   }
   throw new AppError('INTERNAL', 'Could not issue a squad code. Try again.');
 }
@@ -239,9 +343,9 @@ export async function joinSquad(
   now: Date = new Date(),
 ): Promise<SquadView> {
   requireSquadAdult(userId);
-  if (squad.seasonNumber !== seasonFor(today).number) {
-    fail('NOT_FOUND', 'squad_not_found', 'That squad code does not match a squad this season.');
-  }
+  if (squad.seasonNumber !== seasonFor(today).number) notFound();
+  // Departed minors free their places before capacity is judged.
+  await adultMembers(squad.id, now);
   const outcome = await engageRepo().joinSquad(squad.id, newMember(squad, userId, 'member', now.toISOString()));
   if (!outcome.ok) {
     switch (outcome.reason) {
@@ -250,7 +354,7 @@ export async function joinSquad(
       case 'already_member':
         fail('CONFLICT', 'squad_already_member', 'You are already in a squad this season.');
       default:
-        fail('NOT_FOUND', 'squad_not_found', 'That squad code does not match a squad this season.');
+        notFound();
     }
   }
   recordConsent(userId, squad.id);
@@ -259,11 +363,27 @@ export async function joinSquad(
   return viewOf(squad, userId, today);
 }
 
-export async function joinSquadByCode(userId: string, code: string, today: string, via: JoinVia): Promise<SquadView> {
+/**
+ * Join by invite code. Membership is checked before the code is looked up,
+ * so someone already in a squad learns nothing about whether a code is live,
+ * and every code that matches nothing counts toward the hourly lockout.
+ */
+export async function joinSquadByCode(
+  userId: string,
+  code: string,
+  today: string,
+  via: JoinVia,
+  now: Date = new Date(),
+): Promise<SquadView> {
   requireSquadAdult(userId);
+  await requireNoSquad(userId, today);
+  refuseIfGuessing(userId, now);
   const squad = await liveSquadByCode(code, today);
-  if (!squad) fail('NOT_FOUND', 'squad_not_found', 'That squad code does not match a squad this season.');
-  return joinSquad(userId, squad, today, via);
+  if (!squad) {
+    recordMiss(userId, now);
+    notFound();
+  }
+  return joinSquad(userId, squad, today, via, now);
 }
 
 export async function leaveSquad(userId: string, squadId: string, now: Date = new Date()): Promise<void> {
@@ -271,6 +391,53 @@ export async function leaveSquad(userId: string, squadId: string, now: Date = ne
   await engageRepo().leaveSquad(squadId, userId, now.toISOString());
   const size = (await engageRepo().activeMembers(squadId)).length;
   logEvent('squad_left', { season: member.seasonNumber, size_after: size });
+}
+
+async function requireOwner(userId: string, squadId: string): Promise<MemberRow> {
+  const member = await membershipIn(userId, squadId);
+  if (member.role !== 'owner') {
+    fail('FORBIDDEN', 'squad_owner_only', 'Only the person who runs the squad can do that.');
+  }
+  return member;
+}
+
+/** Owner only: a new invite code. Every link with the old one stops working. */
+export async function rotateInviteCode(userId: string, squadId: string, today: string): Promise<SquadView> {
+  await requireOwner(userId, squadId);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if ((await engageRepo().setInviteCode(squadId, issueCode())) === 'ok') {
+      auditDataAccess(userId, 'fightCamp.squad.codeRotated', { squadId });
+      const squad = await engageRepo().squad(squadId);
+      return viewOf(squad!, userId, today);
+    }
+  }
+  throw new AppError('INTERNAL', 'Could not issue a squad code. Try again.');
+}
+
+/** Owner only: take a member out of the squad. They can still join another. */
+export async function removeMember(userId: string, squadId: string, memberRef: string, now: Date = new Date()): Promise<void> {
+  await requireOwner(userId, squadId);
+  const target = await engageRepo().activeMemberByRef(squadId, memberRef);
+  if (!target || target.userId === userId) {
+    fail('NOT_FOUND', 'squad_member_not_found', 'That member is not in this squad.');
+  }
+  await engageRepo().leaveSquad(squadId, target.userId, now.toISOString());
+  auditDataAccess(userId, 'fightCamp.squad.memberRemoved', { squadId });
+  logEvent('squad_member_removed', { season: target.seasonNumber });
+}
+
+/**
+ * A caller who is no longer a known adult is taken out of their squad when
+ * they next ask for it, so they are not left listed somewhere they cannot
+ * reach to leave.
+ */
+export async function leaveIfNoLongerAdult(userId: string, today: string): Promise<void> {
+  if (isAdult(getProfile(userId))) return;
+  const membership = await engageRepo().activeMembership(userId, seasonFor(today).number);
+  if (membership) {
+    await engageRepo().leaveSquad(membership.squadId, userId, new Date().toISOString());
+    logEvent('squad_member_auto_left', { reason: 'age' });
+  }
 }
 
 export async function setShowStats(

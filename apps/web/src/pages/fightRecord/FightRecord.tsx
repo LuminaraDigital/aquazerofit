@@ -191,7 +191,7 @@ function SquadBlock() {
       <h2 className="font-heading text-lg font-semibold text-on-surface">Your squad</h2>
       <p className="mt-1 text-sm text-on-surface-variant text-pretty">
         {current
-          ? `${current.name}: see this week's board and send a cheer.`
+          ? `${current.name}: see who showed up this week.`
           : 'Up to five people who show up together this season.'}
       </p>
       <Link

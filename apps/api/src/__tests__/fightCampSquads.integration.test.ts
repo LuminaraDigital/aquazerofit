@@ -16,6 +16,8 @@ import { fightCampHarness, type FightCampHarness, type Person } from './helpers/
 const { addDays } = await import('../platform/dates');
 const { resetRateLimiter } = await import('../platform/rateLimiter');
 const { getStore } = await import('../platform/store');
+const { clearSquadCodeMissesForTests } = await import('../modules/fightCamp/squads');
+const { engageRepo } = await import('../modules/fightCamp/repo');
 
 let h: FightCampHarness;
 const TODAY = addDays(SEASON_ONE_STARTS_ON, 9); // a Wednesday
@@ -26,7 +28,10 @@ beforeAll(async () => {
   h = await fightCampHarness('fc-squads');
 });
 
-afterEach(() => h.disableAll());
+afterEach(() => {
+  h.disableAll();
+  clearSquadCodeMissesForTests();
+});
 
 afterAll(async () => {
   vi.useRealTimers();
@@ -52,14 +57,26 @@ async function squadOf(size: number) {
 }
 
 describe('with squads off', () => {
+  it('answers 404 for a real squad once the flag is off', async () => {
+    h.enable('squads');
+    const { people, squad } = await squadOf(1);
+    h.disableAll();
+    const owner = people[0]!;
+    expect((await current(owner)).status).toBe(404);
+    expect((await post(owner, `/squads/${squad.id}/leave`)).status).toBe(404);
+    const patch = await request(h.app).patch(`${h.base}/squads/${squad.id}/me`).set(owner.auth()).send({ showStats: true });
+    expect(patch.status).toBe(404);
+    expect((await peek(squad.inviteCode)).status).toBe(404);
+  });
+
   it('answers 404 on every route, the public peek included', async () => {
     const mia = await h.register('Mia');
     h.enable('enrol');
     expect((await create(mia)).status).toBe(404);
     expect((await current(mia)).status).toBe(404);
-    expect((await join(mia, 'SQD-ABCDEF')).status).toBe(404);
+    expect((await join(mia, 'SQD-AAAAAAAAAA')).status).toBe(404);
     expect((await post(mia, '/squads/x/leave')).status).toBe(404);
-    expect((await peek('SQD-ABCDEF')).status).toBe(404);
+    expect((await peek('SQD-AAAAAAAAAA')).status).toBe(404);
   });
 });
 
@@ -71,7 +88,7 @@ describe('creating (US-C1)', () => {
     expect(res.status).toBe(201);
     const squad = res.body.squad;
     expect(squad).toMatchObject({ name: 'Corner Crew', seasonNumber: 1, isCorner: false });
-    expect(squad.inviteCode).toMatch(/^SQD-[A-HJ-NP-Z2-9]{6}$/);
+    expect(squad.inviteCode).toMatch(/^SQD-[A-HJ-NP-Z2-9]{10}$/);
     expect(squad.inviteUrl).toMatch(new RegExp(`/s/${squad.inviteCode}$`));
     expect(squad.tgStartParam).toBe(`sq_${squad.inviteCode}`);
     expect(squad.tgStartParam.length).toBeLessThanOrEqual(64);
@@ -101,16 +118,18 @@ describe('creating (US-C1)', () => {
     expect(second.body).toMatchObject({ code: 'CONFLICT', details: { reason: 'squad_already_member' } });
   });
 
-  it('refuses minors and unknown ages, kindly', async () => {
+  it('refuses minors kindly, and tells an unknown age to add it', async () => {
     h.enable('squads');
     const teen = await h.register('Teen', { age: 16 });
+    const teenRes = await create(teen);
+    expect(teenRes.status).toBe(403);
+    expect(teenRes.body.details.reason).toBe('squad_adult_only');
+    expect((await current(teen)).status).toBe(403);
+
     const unknown = await h.register('Unknown', { age: null });
-    for (const who of [teen, unknown]) {
-      const res = await create(who);
-      expect(res.status).toBe(403);
-      expect(res.body.details.reason).toBe('squad_adult_only');
-      expect((await current(who)).status).toBe(403);
-    }
+    const unknownRes = await create(unknown);
+    expect(unknownRes.status).toBe(403);
+    expect(unknownRes.body.details.reason).toBe('squad_age_unknown');
   });
 
   it('limits how many squads one person can start in a day', async () => {
@@ -137,7 +156,7 @@ describe('peeking and joining (US-C2)', () => {
     const raw = JSON.stringify(res.body);
     for (const person of people) expect(raw).not.toContain(person.userId);
     expect(raw).not.toContain('Member0');
-    expect((await peek('SQD-AAAAAA')).body).toEqual({ squad: null });
+    expect((await peek('SQD-AAAAAAAAAA')).body).toEqual({ squad: null });
     expect((await peek('not-a-code')).body).toEqual({ squad: null });
   });
 
@@ -165,7 +184,7 @@ describe('peeking and joining (US-C2)', () => {
     expect(again.status).toBe(409);
     expect(again.body.details.reason).toBe('squad_already_member');
 
-    expect((await join(late, 'SQD-ZZZZZZ')).status).toBe(404);
+    expect((await join(late, 'SQD-ZZZZZZZZZZ')).status).toBe(404);
     expect((await post(late, '/squads/join', { code: other.inviteCode })).status).toBe(400);
   });
 
@@ -176,6 +195,32 @@ describe('peeking and joining (US-C2)', () => {
     const res = await join(teen, squad.inviteCode);
     expect(res.status).toBe(403);
     expect(res.body.details.reason).toBe('squad_adult_only');
+  });
+});
+
+describe('guessing codes', () => {
+  it('tells someone already in a squad nothing about whether a code is live', async () => {
+    h.enable('squads');
+    const { squad } = await squadOf(1);
+    const { people } = await squadOf(1);
+    const insider = people[0]!;
+    const live = await join(insider, squad.inviteCode);
+    const unknown = await join(insider, 'SQD-QQQQQQQQQQ');
+    expect([live.status, unknown.status]).toEqual([409, 409]);
+    expect(live.body.details.reason).toBe('squad_already_member');
+    expect(unknown.body.details.reason).toBe('squad_already_member');
+  });
+
+  it('locks a person out for an hour after ten codes that match nothing', async () => {
+    h.enable('squads');
+    const guesser = await h.register('Guesser');
+    for (let i = 0; i < 10; i += 1) {
+      expect((await join(guesser, `SQD-${'BCDEFGHJKL'[i]!.repeat(10)}`)).status).toBe(404);
+    }
+    const { squad } = await squadOf(1);
+    const locked = await join(guesser, squad.inviteCode);
+    expect(locked.status).toBe(429);
+    expect(locked.body.details.reason).toBe('squad_code_attempts');
   });
 });
 
@@ -207,15 +252,41 @@ describe('the squad view (US-B1, US-C5)', () => {
     for (const person of people) expect(raw).not.toContain(person.userId);
   });
 
-  it('records the consent and the cross-user read in the audit trail', async () => {
+  it('records the consent with its version, and the cross-user read once a day', async () => {
     h.enable('squads');
     const { people } = await squadOf(2);
-    await current(people[1]!);
-    const actions = getStore()
-      .where<{ id: string; userId?: string; action?: string }>('audit', (d) => d.userId === people[1]!.userId)
-      .map((d) => d.action);
-    expect(actions).toContain('fightCamp.squad.consent');
-    expect(actions).toContain('fightCamp.squad.viewed');
+    for (let i = 0; i < 5; i += 1) await current(people[1]!);
+    const events = getStore().where<{ id: string; userId?: string; action?: string; detail?: { consentTextVersion?: string } }>(
+      'audit',
+      (d) => d.userId === people[1]!.userId,
+    );
+    expect(events.find((d) => d.action === 'fightCamp.squad.consent')?.detail?.consentTextVersion).toBe(
+      'squad-consent-v1',
+    );
+    expect(events.filter((d) => d.action === 'fightCamp.squad.viewed')).toHaveLength(1);
+  });
+
+  it('shows first names only, never an auto-filled name', async () => {
+    h.enable('squads');
+    const full = await h.register('Rizal Pratama');
+    const made = await create(full);
+    expect(made.body.squad.members[0].displayName).toBe('Rizal');
+    const user = getStore().byId<{ id: string; email: string }>('users', full.userId)!;
+    getStore().upsert('users', { ...user, displayName: user.email.split('@')[0] });
+    expect((await current(full)).body.squad.members[0].displayName).toBe('Fight Camp member');
+  });
+
+  it('takes out a member who is no longer known to be an adult', async () => {
+    h.enable('squads');
+    const { people, squad } = await squadOf(3);
+    const [owner, , later] = people as [Person, Person, Person];
+    h.setAge(later.userId, 16);
+    const view = (await current(owner)).body.squad;
+    expect(view.members).toHaveLength(2);
+    expect((await engageRepo().activeMembership(later.userId, 1))).toBeNull();
+    expect((await peek(squad.inviteCode)).body.squad.memberCount).toBe(2);
+    const teenView = await current(later);
+    expect(teenView.status).toBe(403);
   });
 
   it('carries the squad into the fightCamp block for adults only', async () => {
@@ -226,6 +297,48 @@ describe('the squad view (US-B1, US-C5)', () => {
     const teen = await h.register('Teen', { age: 16 });
     const teenFr = await request(h.app).get(`${h.base}/fight-record`).set(teen.auth());
     expect(teenFr.body.fightCamp.squads).toBeNull();
+  });
+});
+
+describe('owners', () => {
+  it('rotate the invite code, retiring every old link', async () => {
+    h.enable('squads');
+    const { people, squad } = await squadOf(2);
+    const rotated = await post(people[0]!, `/squads/${squad.id}/rotate-code`);
+    expect(rotated.status).toBe(200);
+    const fresh = rotated.body.squad.inviteCode as string;
+    expect(fresh).not.toBe(squad.inviteCode);
+    expect((await peek(squad.inviteCode)).body.squad).toBeNull();
+    expect((await peek(fresh)).body.squad.memberCount).toBe(2);
+    const notOwner = await post(people[1]!, `/squads/${squad.id}/rotate-code`);
+    expect(notOwner.status).toBe(403);
+    expect(notOwner.body.details.reason).toBe('squad_owner_only');
+  });
+
+  it('remove a member, who can then join elsewhere', async () => {
+    h.enable('squads');
+    const { people, squad } = await squadOf(3);
+    const [owner, mate] = people as [Person, Person];
+    const view = (await current(owner)).body.squad;
+    const mateRef = view.members.find((m: { displayName: string }) => m.displayName === 'Member1').ref;
+    expect((await post(mate, `/squads/${squad.id}/members/${mateRef}/remove`)).status).toBe(403);
+    expect((await post(owner, `/squads/${squad.id}/members/${mateRef}/remove`)).status).toBe(204);
+    expect((await current(mate)).body.squad).toBeNull();
+    expect((await post(owner, `/squads/${squad.id}/members/${mateRef}/remove`)).status).toBe(404);
+    expect((await post(owner, `/squads/${squad.id}/members/${view.me.ref}/remove`)).status).toBe(404);
+    const { squad: other } = await squadOf(1);
+    expect((await join(mate, other.inviteCode)).status).toBe(200);
+  });
+});
+
+describe('the last place', () => {
+  it('goes to exactly one of two people joining at once', async () => {
+    h.enable('squads');
+    const { squad } = await squadOf(4);
+    const [a, b] = await Promise.all([h.register('RaceA'), h.register('RaceB')]);
+    const results = await Promise.all([join(a, squad.inviteCode), join(b, squad.inviteCode)]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect((await peek(squad.inviteCode)).body.squad.memberCount).toBe(5);
   });
 });
 
@@ -275,7 +388,7 @@ describe('the public peek rate limit', () => {
     resetRateLimiter();
     try {
       const statuses: number[] = [];
-      for (let i = 0; i < 31; i += 1) statuses.push((await peek('SQD-AAAAAA')).status);
+      for (let i = 0; i < 31; i += 1) statuses.push((await peek('SQD-AAAAAAAAAA')).status);
       expect(statuses.slice(0, 30).every((s) => s === 200)).toBe(true);
       expect(statuses[30]).toBe(429);
     } finally {

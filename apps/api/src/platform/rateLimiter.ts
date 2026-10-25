@@ -16,6 +16,8 @@ const DEFAULT_LIMIT = 300;
 const STRICT_LIMIT = 20;
 /** Unauthenticated telemetry writes and invite peeks. */
 const ANON_LIMIT = 30;
+const CHEER_LIMIT = 30;
+const LANE_LIMITS = { anon: ANON_LIMIT, strict: STRICT_LIMIT, cheer: CHEER_LIMIT, default: DEFAULT_LIMIT } as const;
 
 /** key -> sorted request timestamps within the current window */
 const buckets = new Map<string, number[]>();
@@ -61,6 +63,11 @@ const AI_PATHS = [
 
 function isStrictPath(path: string): boolean {
   return AI_PATHS.some((p) => path.includes(p));
+}
+
+/** Sending a cheer: 30 a minute per person (AZF-P1 §5.3). Reading the inbox is not limited here. */
+function isCheerSend(req: Request): boolean {
+  return req.method === 'POST' && /\/cheers\/?$/.test(req.path);
 }
 
 function isAuthPath(path: string): boolean {
@@ -115,8 +122,9 @@ export function rateLimiter(req: Request, res: Response, next: NextFunction): vo
   const auth = isAuthPath(req.path);
   const anon = !auth && isAnonymousWritePath(req.path);
   const strict = !auth && !anon && isStrictPath(req.path);
-  const limit = auth ? config.authRateLimitPerMinute : anon ? ANON_LIMIT : strict ? STRICT_LIMIT : DEFAULT_LIMIT;
-  const lane = auth ? 'auth' : anon ? 'anon' : strict ? 'strict' : 'default';
+  const cheer = !auth && !anon && !strict && isCheerSend(req);
+  const lane = auth ? 'auth' : anon ? 'anon' : strict ? 'strict' : cheer ? 'cheer' : 'default';
+  const limit = lane === 'auth' ? config.authRateLimitPerMinute : LANE_LIMITS[lane];
 
   // Auth lane is per-IP only (requests are unauthenticated by nature);
   // other lanes: per user (or per IP when anonymous) AND per IP.

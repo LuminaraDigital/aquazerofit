@@ -35,10 +35,10 @@ const SQUAD: SquadView = {
   isCorner: false,
   weekStart: '2027-03-15',
   members: [
-    { ref: 'm_aaaaaaaaaaaa', displayName: 'Mia', isMe: true, role: 'owner', beltTier: 'blue', weekActiveDays: 4 },
-    { ref: 'm_bbbbbbbbbbbb', displayName: 'Rizal', isMe: false, role: 'member', beltTier: 'white', weekActiveDays: 4 },
-    { ref: 'm_cccccccccccc', displayName: 'Jay', isMe: false, role: 'member', beltTier: null, weekActiveDays: 0 },
-    { ref: 'm_dddddddddddd', displayName: 'Grace', isMe: false, role: 'member', beltTier: 'purple', weekActiveDays: null },
+    { ref: 'm_aaaaaaaaaaaa', displayName: 'Mia', isMe: true, role: 'owner', beltTier: 'blue', weekActiveDays: 4, cheeredToday: false },
+    { ref: 'm_bbbbbbbbbbbb', displayName: 'Rizal', isMe: false, role: 'member', beltTier: 'white', weekActiveDays: 4, cheeredToday: false },
+    { ref: 'm_cccccccccccc', displayName: 'Jay', isMe: false, role: 'member', beltTier: null, weekActiveDays: 0, cheeredToday: false },
+    { ref: 'm_dddddddddddd', displayName: 'Grace', isMe: false, role: 'member', beltTier: 'purple', weekActiveDays: null, cheeredToday: false },
   ],
   me: { ref: 'm_aaaaaaaaaaaa', showStats: false, role: 'owner' as const },
 };

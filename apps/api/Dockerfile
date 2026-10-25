@@ -61,11 +61,13 @@ RUN npm run typecheck --workspace packages/shared \
 # Empty catalog analytics args skip init. Pass both as build-args only after
 # the operator creates them in TON Builders. Do not bake a token into this file.
 COPY apps/web apps/web
+ARG VITE_SITE_ORIGIN=
 ARG VITE_FIREBASE_API_KEY=
 ARG VITE_FIREBASE_APP_ID=
 ARG VITE_TG_ANALYTICS_TOKEN=
 ARG VITE_TG_ANALYTICS_APP_NAME=
-ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
+ENV VITE_SITE_ORIGIN=$VITE_SITE_ORIGIN \
+    VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
     VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID \
     VITE_TG_ANALYTICS_TOKEN=$VITE_TG_ANALYTICS_TOKEN \
     VITE_TG_ANALYTICS_APP_NAME=$VITE_TG_ANALYTICS_APP_NAME

@@ -30,7 +30,7 @@ import { AppError } from '../../platform/errors';
 import { fightCampConfig } from '../../platform/fightCampConfig';
 import { getStore, newId } from '../../platform/store';
 import { logEvent } from '../../platform/telemetry';
-import { effectiveTier, grantPremium, revokePremiumOnce } from '../billing/entitlements';
+import { effectiveTier, grantPremium, revokePremium, revokePremiumOnce } from '../billing/entitlements';
 import { isAdult } from '../fightRecord/service';
 import { getProfile } from '../me/service';
 import { starsAlreadyRefunded } from '../payments/stars';
@@ -40,6 +40,8 @@ import { engageRepo, type GiftRow } from './repo';
 import { adultMembers, displayNameOf, telegramSafe } from './squads';
 
 const DAY_MS = 86_400_000;
+/** A gift link left unpaid this long is declined at checkout, like the other Stars invoices. */
+const GIFT_INVOICE_TTL_MS = DAY_MS;
 
 type Refusal = 'gift_not_eligible' | 'recipient_has_premium';
 
@@ -117,8 +119,10 @@ export async function createGiftInvoice(userId: string, toRef: string, now: Date
 
 /**
  * Telegram's pre-checkout, re-validated from scratch: the payload must name a
- * pending gift, the amount its price, the payer the gifter, and the two of
- * them must still be eligible. The payload itself is never trusted or logged.
+ * pending gift made in the last day at today's price, the payer must be the
+ * gifter, and the two of them must still be eligible. A link made before a
+ * price change is declined rather than sold at the old price. The payload
+ * itself is never trusted or logged.
  */
 export async function giftCheckoutAccepts(
   query: { currency: string; total_amount: number; invoice_payload: string; payerTelegramId?: number },
@@ -126,6 +130,8 @@ export async function giftCheckoutAccepts(
 ): Promise<boolean> {
   const gift = await engageRepo().gifts.byPayload(query.invoice_payload);
   if (gift?.status !== 'pending' || !gift.gifterUserId || !gift.recipientUserId || !gift.squadId) return false;
+  if (now.getTime() - Date.parse(gift.createdAt) > GIFT_INVOICE_TTL_MS) return false;
+  if (gift.starsAmount !== fightCampConfig.giftPremium7dStars) return false;
   if (query.currency !== 'XTR' || query.total_amount < gift.starsAmount) return false;
   if (telegramIdOf(userOf(gift.gifterUserId)) !== query.payerTelegramId) return false;
   return (await eligibility(gift.gifterUserId, gift.recipientUserId, gift.squadId, now)) === null;
@@ -133,15 +139,15 @@ export async function giftCheckoutAccepts(
 
 export type GiftPaymentOutcome =
   | { status: 'granted' | 'duplicate' }
-  | { status: 'rejected' | 'failed'; reason: string };
+  | { status: 'rejected' | 'failed'; reason: string; gift?: GiftRow };
 
 async function grantWeek(gift: GiftRow, chargeId: string, now: Date): Promise<GiftPaymentOutcome> {
+  const gifts = engageRepo().gifts;
   const recipient = userOf(gift.recipientUserId);
   if (!recipient) {
-    // Paid, but there is no one left to give it to: refunded by an operator.
-    await engageRepo().gifts.settle(gift.id, 'failed', now.toISOString());
+    await gifts.settle(gift.id, 'failed', now.toISOString());
     logEvent('gift_grant_failed', { reason: 'recipient_gone' });
-    return { status: 'failed', reason: 'The recipient account is gone.' };
+    return { status: 'failed', reason: 'The recipient account is gone.', gift };
   }
   grantPremium({
     userId: recipient.id,
@@ -151,20 +157,23 @@ async function grantWeek(gift: GiftRow, chargeId: string, now: Date): Promise<Gi
     premiumUntil: new Date(now.getTime() + GIFT_PREMIUM_DAYS * DAY_MS).toISOString(),
     reason: 'stars:gift',
   });
-  await engageRepo().gifts.settle(gift.id, 'granted', now.toISOString());
+  // The grant is durable before the row says so: a crash in between leaves
+  // the row paid, and the redelivery finishes the grant instead of skipping it.
+  await getStore().flush();
+  await gifts.settle(gift.id, 'granted', now.toISOString());
+  if ((await gifts.byCharge(chargeId))?.status === 'refunded') {
+    // A refund landed while this delivery was granting. Its revoke was
+    // written before this grant, so it is repeated after it.
+    revokePremium(recipient.id, 'stars', `gift:refund:${chargeId}:late`, 'refunded during settlement', gift.invoicePayload, `gift:${chargeId}`);
+    return { status: 'duplicate' };
+  }
   logEvent('gift_granted', { stars_amount: gift.starsAmount });
   return { status: 'granted' };
 }
 
-/**
- * Settle a paid gift. Idempotent on the charge id: a redelivery, or a first
- * delivery that recorded the payment and stopped before the grant, finishes
- * the grant once and never twice (grantPremium is idempotent on it too).
- * Throws only on a storage fault, so the webhook can ask Telegram to retry.
- */
-export async function completeGiftPayment(
+async function settleGiftPayment(
   payment: { invoicePayload: string; totalAmount: number; currency: string; telegramPaymentChargeId: string },
-  now: Date = new Date(),
+  now: Date,
 ): Promise<GiftPaymentOutcome> {
   const gifts = engageRepo().gifts;
   const chargeId = payment.telegramPaymentChargeId;
@@ -181,7 +190,7 @@ export async function completeGiftPayment(
     return { status: 'rejected', reason: 'Amount did not match the gift.' };
   }
   const marked = await gifts.markPaid(payment.invoicePayload, chargeId);
-  if (marked === 'missing') return { status: 'rejected', reason: 'This gift was already settled.' };
+  if (marked === 'missing') return { status: 'rejected', reason: 'This gift was already paid.' };
   const paid = await gifts.byCharge(chargeId);
   if (marked === 'duplicate') return paid?.status === 'paid' ? grantWeek(paid, chargeId, now) : { status: 'duplicate' };
   logEvent('gift_paid', { stars_amount: payment.totalAmount });
@@ -189,12 +198,51 @@ export async function completeGiftPayment(
 }
 
 /**
- * Refund one gift: the Stars go back to the gifter's Telegram account and
- * the rest of the recipient's week is taken back. Idempotent on the charge
- * id, like the other Stars refunds, and only ever to the account that paid.
+ * Settle a paid gift. Idempotent on the charge id: a redelivery, or a first
+ * delivery that recorded the payment and stopped before the grant, finishes
+ * the grant once and never twice (grantPremium is idempotent on it too).
+ *
+ * A charge that cannot become a gift (the link was already paid, the amount
+ * is short, the recipient is gone) is refunded on the spot to whoever paid
+ * it: nobody keeps Stars for nothing, and nothing waits on an operator.
+ * Throws only on a storage fault, so the webhook can ask Telegram to retry.
+ */
+export async function completeGiftPayment(
+  payment: {
+    invoicePayload: string;
+    totalAmount: number;
+    currency: string;
+    telegramPaymentChargeId: string;
+    payerTelegramId?: number;
+  },
+  now: Date = new Date(),
+): Promise<GiftPaymentOutcome> {
+  const outcome = await settleGiftPayment(payment, now);
+  if (outcome.status !== 'rejected' && outcome.status !== 'failed') return outcome;
+  const payer = payment.payerTelegramId;
+  const returned = typeof payer === 'number' && payer > 0 ? await refundStarPayment(payer, payment.telegramPaymentChargeId) : null;
+  if (returned && (returned.ok || starsAlreadyRefunded(returned.error))) {
+    if (outcome.gift) await engageRepo().gifts.settle(outcome.gift.id, 'refunded', now.toISOString());
+    logEvent('gift_auto_refunded', { stars_amount: payment.totalAmount });
+  } else {
+    logEvent('gift_auto_refund_failed', {});
+  }
+  return outcome;
+}
+
+/**
+ * Refund one gift: the Stars go back to the account that paid and the rest
+ * of the recipient's week is taken back. Idempotent on the charge id, like
+ * the other Stars refunds.
+ *
+ * No Telegram id is stored with a gift (PRD §8.4), so the refund goes to the
+ * gifter's linked account, or to `telegramUserId` when an operator supplies
+ * it (after the gifter erased their account or relinked Telegram). Telegram
+ * refunds a charge only to the user who paid it, so this cannot send money
+ * anywhere else.
  */
 export async function refundGift(
-  input: { telegramPaymentChargeId: string; reason: string },
+  input: { telegramPaymentChargeId: string; reason: string; telegramUserId?: number },
   now: Date = new Date(),
 ): Promise<{ status: 'refunded' | 'already_refunded'; userId: string | null }> {
   const gifts = engageRepo().gifts;
@@ -212,9 +260,9 @@ export async function refundGift(
     return { status: 'already_refunded', userId: gift.gifterUserId };
   }
 
-  const payer = telegramIdOf(userOf(gift.gifterUserId));
+  const payer = input.telegramUserId ?? telegramIdOf(userOf(gift.gifterUserId));
   if (payer === null) {
-    throw new AppError('CONFLICT', 'This gift has no linked Telegram account to refund to.');
+    throw new AppError('CONFLICT', 'This gift has no linked Telegram account to refund to. Give the payer\'s Telegram user id.');
   }
   const result = await refundStarPayment(payer, chargeId);
   if (!result.ok && !starsAlreadyRefunded(result.error)) {
@@ -227,10 +275,14 @@ export async function refundGift(
   return { status: result.ok ? 'refunded' : 'already_refunded', userId: gift.gifterUserId };
 }
 
-/** The `gifting` part of the Fight Camp block; the caller has checked the switch and age. */
+/**
+ * The `gifting` part of the Fight Camp block; the caller has checked the
+ * switch and age. Paying needs a Telegram-linked account, which the invoice
+ * checks; being told about a gift does not.
+ */
 export async function giftingStatus(userId: string, now: Date = new Date()): Promise<FightCampStatus['gifting']> {
   const stars = fightCampConfig.giftPremium7dStars;
-  if (stars === null || telegramIdOf(userOf(userId)) === null) return null;
+  if (stars === null) return null;
   const since = new Date(now.getTime() - GIFT_PREMIUM_DAYS * DAY_MS).toISOString();
   const latest = await engageRepo().gifts.latestGrantedTo(userId, since);
   return {

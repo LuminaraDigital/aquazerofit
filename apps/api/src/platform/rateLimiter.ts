@@ -65,10 +65,14 @@ function isStrictPath(path: string): boolean {
   return AI_PATHS.some((p) => path.includes(p));
 }
 
-/** Sending a cheer: 30 a minute per person (AZF-P1 §5.3). Reading the inbox is not limited here. */
+/**
+ * Sending a cheer or starting a gift invoice: 30 a minute per person (AZF-P1
+ * §5.3). Each reaches another person or Telegram; reading the inbox is not
+ * limited here.
+ */
 function isCheerSend(req: Request): boolean {
   // Case-insensitive like Express routing: /CHEERS reaches the same handler.
-  return req.method === 'POST' && /\/cheers\/?$/i.test(req.path);
+  return req.method === 'POST' && /\/(?:cheers|gifts\/premium\/invoice)\/?$/i.test(req.path);
 }
 
 function isAuthPath(path: string): boolean {

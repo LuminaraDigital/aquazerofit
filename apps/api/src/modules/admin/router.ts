@@ -294,15 +294,13 @@ adminRouter.post(
     };
     // A charge is a coach purchase, a subscription payment or a Fight Camp
     // gift. Each is asked in turn, and the next only when the last has no row.
-    const refunders = [refundStarsPurchase, refundStarsSubscription, refundGift];
     let outcome: { userId: string | null; status: string; coachId?: string } | undefined;
-    for (const [i, refund] of refunders.entries()) {
+    for (const refund of [refundStarsPurchase, refundStarsSubscription, refundGift]) {
       try {
         outcome = await refund(refundInput);
         break;
       } catch (err) {
-        const last = i === refunders.length - 1;
-        if (last || !(err instanceof AppError) || err.code !== 'NOT_FOUND') throw err;
+        if (!(err instanceof AppError) || err.code !== 'NOT_FOUND') throw err;
       }
     }
     if (!outcome) throw new AppError('NOT_FOUND', 'No Stars payment matches that charge.');

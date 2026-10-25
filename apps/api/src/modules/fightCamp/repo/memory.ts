@@ -10,6 +10,7 @@
  * reach into the store, which is the isolation a database gives for free.
  */
 import type { ShareKindP1 } from '@aquazerofit/shared';
+import { ARCHIVED_SQUAD_NAME } from './types';
 import type {
   AttributionRow,
   CheerPage,
@@ -27,6 +28,17 @@ import type {
 } from './types';
 
 const copy = <T extends object>(row: T): T => ({ ...row });
+
+/**
+ * Code-point order, the same as `COLLATE "C"` in the SQL adapter. Not
+ * localeCompare: the database and every locale disagree about case, and a
+ * tie-break that differs between adapters hands a squad to a different heir.
+ */
+const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/** Newest first, ties by id, matching the inbox index order. */
+const newestFirst = (a: CheerRow, b: CheerRow): number =>
+  byCodePoint(b.createdAt, a.createdAt) || byCodePoint(b.id, a.id);
 
 export class MemoryEngageRepo implements EngageRepo {
   private enrolments: EnrolmentRow[] = [];
@@ -101,7 +113,7 @@ export class MemoryEngageRepo implements EngageRepo {
   private activeIn(squadId: string): MemberRow[] {
     return this.members
       .filter((m) => m.squadId === squadId && m.leftAt === null)
-      .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt) || a.memberRef.localeCompare(b.memberRef));
+      .sort((a, b) => byCodePoint(a.joinedAt, b.joinedAt) || byCodePoint(a.memberRef, b.memberRef));
   }
 
   async activeMembership(userId: string, seasonNumber: number): Promise<MemberRow | null> {
@@ -176,6 +188,8 @@ export class MemoryEngageRepo implements EngageRepo {
   // ----- cheers -----
 
   async insertCheer(row: CheerRow): Promise<boolean> {
+    // An id collision is a bug, not a second cheer: Postgres raises on it too.
+    if (this.cheers.some((c) => c.id === row.id)) throw new Error(`duplicate cheer id ${row.id}`);
     const clash = this.cheers.some((c) =>
       row.fromKind === 'member'
         ? c.fromKind === 'member' &&
@@ -190,14 +204,15 @@ export class MemoryEngageRepo implements EngageRepo {
   }
 
   async cheersTo(userId: string, page: CheerPage): Promise<CheerRow[]> {
+    const { before } = page;
     return this.cheers
       .filter(
         (c) =>
           c.toUserId === userId &&
           c.createdAt >= page.since &&
-          (page.before === undefined || c.createdAt < page.before),
+          (before === undefined || newestFirst(c, { ...c, createdAt: before.createdAt, id: before.id }) > 0),
       )
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+      .sort(newestFirst)
       .slice(0, page.limit)
       .map(copy);
   }
@@ -240,7 +255,7 @@ export class MemoryEngageRepo implements EngageRepo {
   async graceEntries(userId: string): Promise<GraceRow[]> {
     return this.grace
       .filter((g) => g.userId === userId)
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+      .sort((a, b) => byCodePoint(a.createdAt, b.createdAt) || byCodePoint(a.id, b.id))
       .map(copy);
   }
 
@@ -255,7 +270,8 @@ export class MemoryEngageRepo implements EngageRepo {
             g.milestone === row.milestone
           : g.entry === 'applied' && g.userId === row.userId && g.localDate === row.localDate,
       );
-      if (clash || this.grace.some((g) => g.id === row.id)) continue;
+      if (this.grace.some((g) => g.id === row.id)) throw new Error(`duplicate grace id ${row.id}`);
+      if (clash) continue;
       this.grace.push(copy(row));
       added += 1;
     }
@@ -280,6 +296,8 @@ export class MemoryEngageRepo implements EngageRepo {
   }
 
   async insertShareLink(row: ShareLinkRow): Promise<InsertShareLinkOutcome> {
+    // The primary key is checked before the reuse index, as in Postgres.
+    if (this.links.some((l) => l.code === row.code)) return 'code_taken';
     if (
       this.links.some(
         (l) => l.userId === row.userId && l.kind === row.kind && l.seasonNumber === row.seasonNumber,
@@ -287,7 +305,6 @@ export class MemoryEngageRepo implements EngageRepo {
     ) {
       return 'exists';
     }
-    if (this.links.some((l) => l.code === row.code)) return 'code_taken';
     this.links.push(copy(row));
     return 'inserted';
   }
@@ -355,7 +372,11 @@ export class MemoryEngageRepo implements EngageRepo {
       await this.leaveSquad(member.squadId, userId, at);
     }
     this.members = this.members.filter((m) => m.userId !== userId);
-    for (const squad of this.squads) if (squad.createdBy === userId) squad.createdBy = null;
+    for (const squad of this.squads) {
+      if (squad.createdBy !== userId) continue;
+      if (squad.archivedAt !== null) Object.assign(squad, { name: ARCHIVED_SQUAD_NAME, cornerHash: null });
+      squad.createdBy = null;
+    }
     this.enrolments = this.enrolments.filter((e) => e.userId !== userId);
     this.cheers = this.cheers.filter((c) => c.toUserId !== userId);
     for (const cheer of this.cheers) if (cheer.fromUserId === userId) cheer.fromUserId = null;

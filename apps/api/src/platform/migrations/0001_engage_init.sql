@@ -1,4 +1,5 @@
--- AZF-P1 Fight Camp: the engage schema (PRD §4.2), minus gifts (0002).
+-- AZF-P1 Fight Camp: the engage schema as it starts (PRD §4.2). Later slices
+-- add their own numbered migrations; this file does not change once merged.
 --
 -- Forward-only. Never edit a migration that has shipped: add the next number.
 -- The runner creates the schema and engage.schema_migrations itself, inside

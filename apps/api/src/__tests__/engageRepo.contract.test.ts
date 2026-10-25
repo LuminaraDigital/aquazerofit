@@ -248,6 +248,17 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       expect((await repo.activeMembers(squad.id)).find((m) => m.userId === late)?.role).toBe('owner');
     });
 
+    it('breaks a join-time tie by code point, the same in every adapter', async () => {
+      const { squad, owner } = await seedSquad(repo);
+      const upper = uid('upper');
+      const lower = uid('lower');
+      await repo.joinSquad(squad.id, memberRow(squad, lower, { joinedAt: at(5), memberRef: 'm_aaaaaaaaaaaa' }));
+      await repo.joinSquad(squad.id, memberRow(squad, upper, { joinedAt: at(5), memberRef: 'm_Abaaaaaaaaaa' }));
+      await repo.leaveSquad(squad.id, owner, at(6));
+      const heir = (await repo.activeMembers(squad.id)).find((m) => m.role === 'owner');
+      expect(heir?.userId).toBe(upper);
+    });
+
     it('updates show_stats for active members only and counts recent creates', async () => {
       const { squad, owner } = await seedSquad(repo);
       expect(await repo.setShowStats(squad.id, uid('stranger'), true)).toBeNull();
@@ -281,7 +292,7 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       for (const row of rows) await repo.insertCheer(row);
       const page = await repo.cheersTo(to, { since: at(-60), limit: 2 });
       expect(page.map((c) => c.id)).toEqual([rows[2]!.id, rows[1]!.id]);
-      const rest = await repo.cheersTo(to, { since: at(-60), limit: 2, before: page[1]!.createdAt });
+      const rest = await repo.cheersTo(to, { since: at(-60), limit: 2, before: page[1]! });
       expect(rest.map((c) => c.id)).toEqual([rows[0]!.id]);
       expect(await repo.cheersTo(to, { since: at(1), limit: 10 })).toHaveLength(2);
 
@@ -292,6 +303,30 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       expect(await repo.unseenCheerCount(to, at(-60))).toBe(1);
       const seen = await repo.cheersTo(to, { since: at(-60), limit: 10 });
       expect(seen.find((c) => c.id === rows[0]!.id)?.seenAt).toBe(at(50));
+    });
+
+    it('pages through cheers that share one instant without skipping any', async () => {
+      const to = uid('to');
+      const ids = ['c-b', 'c-A', 'c-a'].map((suffix) => `${uid('same')}-${suffix}`);
+      for (const id of ids) {
+        await repo.insertCheer(cheerRow({ id, toUserId: to, fromUserId: uid('from'), createdAt: at(7) }));
+      }
+      const seen: string[] = [];
+      let before: CheerRow | undefined;
+      for (;;) {
+        const page = await repo.cheersTo(to, { since: at(-60), limit: 2, ...(before ? { before } : {}) });
+        if (page.length === 0) break;
+        seen.push(...page.map((c) => c.id));
+        before = page.at(-1);
+      }
+      // Code-point order, newest first: lower-case sorts after upper-case.
+      expect(seen).toEqual([...ids].sort().reverse());
+    });
+
+    it('raises on a duplicate cheer id rather than calling it a second cheer', async () => {
+      const row = cheerRow();
+      await repo.insertCheer(row);
+      await expect(repo.insertCheer({ ...row, toUserId: uid('to') })).rejects.toThrow();
     });
 
     it('tallies given and received inside a date range', async () => {
@@ -334,6 +369,14 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
   });
 
   describe('share links and attribution', () => {
+    it('reports a taken code before a reused link when both clash', async () => {
+      const userId = uid('u');
+      const code = `Gh${String((seq += 1)).padStart(6, '0')}`;
+      const row = { code, userId, kind: 'recap' as const, seasonNumber: 1, createdAt: at(0) };
+      await repo.insertShareLink(row);
+      expect(await repo.insertShareLink(row)).toBe('code_taken');
+    });
+
     it('reuses one link per user, kind and season and refuses a taken code', async () => {
       const userId = uid('u');
       const code = `Ab${String(++seq).padStart(6, '0')}`;
@@ -420,6 +463,23 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       expect(await repo.attribute({ inviteeUserId: invitee, shareCode: null, squadId: null, surface: 'web', createdAt: at(2) })).toBe(false);
       expect(await repo.inviteesOf(owner)).toEqual([]);
       expect(await repo.claimNudge(owner, '2026-10-20', 'cheer', at(100))).toBe(true);
+    });
+
+    it('drops the name and group binding of a squad they created and nobody is left in', async () => {
+      const cornerHash = uid('hash');
+      const { squad, owner } = await seedSquad(repo, { name: 'Bob Smith fans', cornerHash });
+      const { squad: shared, owner: sharedOwner } = await seedSquad(repo, { name: 'Shared crew' });
+      await repo.joinSquad(shared.id, memberRow(shared, uid('mate')));
+      await repo.eraseUser(owner, at(99));
+      await repo.eraseUser(sharedOwner, at(99));
+      expect(await repo.squad(squad.id)).toMatchObject({
+        name: 'Archived squad',
+        cornerHash: null,
+        createdBy: null,
+        archivedAt: at(99),
+      });
+      // A squad that lives on keeps the name its members know it by.
+      expect(await repo.squad(shared.id)).toMatchObject({ name: 'Shared crew', createdBy: null, archivedAt: null });
     });
   });
 });

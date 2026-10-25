@@ -14,14 +14,17 @@ import path from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '@aquazerofit/shared';
 import { resetSeededDirs, seedIfNeeded } from '../data/seed';
-import { JsonStore } from '../platform/store';
+import { getStore, JsonStore, resetStoreSingletonForTests } from '../platform/store';
 
 const dirs: string[] = [];
+const opened: JsonStore[] = [];
 
 function freshStore(): JsonStore {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'azf-admin-seed-'));
   dirs.push(dir);
-  return new JsonStore(dir);
+  const store = new JsonStore(dir);
+  opened.push(store);
+  return store;
 }
 
 const adminOf = (store: JsonStore) => store.byId<User>('users', 'usr-admin');
@@ -39,7 +42,8 @@ afterEach(() => {
   warn.mockRestore();
 });
 
-afterAll(() => {
+afterAll(async () => {
+  for (const s of opened.splice(0)) await s.flush();
   for (const dir of dirs) {
     try {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -117,5 +121,18 @@ describe('admin seeding in development', () => {
 
     expect(adminOf(store)).toMatchObject({ email: 'admin@aquazero.fit', role: 'admin' });
     expect(store.byId<User>('users', 'usr-demo')).toBeTruthy();
+  });
+
+  it('awaits in-flight background seeding on getStore().flush() before teardown', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'azf-admin-seed-'));
+    dirs.push(dir);
+    vi.stubEnv('AZF_DATA_DIR', dir);
+    resetStoreSingletonForTests();
+
+    const store = getStore();
+    await store.flush();
+
+    expect(store.byId('users', 'cred-usr-demo')).toBeTruthy();
+    expect(store.byId('users', 'cred-usr-admin')).toBeTruthy();
   });
 });

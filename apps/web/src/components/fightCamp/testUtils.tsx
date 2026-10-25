@@ -43,6 +43,7 @@ export function campWith(overrides: Partial<FightCampStatus> = {}): FightCampSta
     squads: null,
     cheers: null,
     shareKit: null,
+    recap: null,
     ...overrides,
   };
 }

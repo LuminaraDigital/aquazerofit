@@ -26,15 +26,19 @@ const LITERAL = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`
 /** String and template literals, after removing comments. */
 function stringLiterals(source: string): string[] {
   const code = source.replace(BLOCK_COMMENT, '').replace(LINE_COMMENT, '$1');
-  return [...code.matchAll(LITERAL)].map((m) => m[1] ?? m[2] ?? m[3] ?? '');
+  return [...code.matchAll(LITERAL)].map((m) => m[1] ?? m[2] ?? m[3] ?? '').filter((s) => !MACHINE_TOKEN.test(s));
 }
+
+/** Enum values, codes and event names ('failed', 'gift_paid'): protocol, not copy. */
+const MACHINE_TOKEN = /^[a-z][a-z0-9_]*$/;
 
 describe('Fight Camp API copy', () => {
   const files = sourceFiles(moduleDir);
 
   it('scans a real set of files', () => {
     expect(files.length).toBeGreaterThan(3);
-    expect(stringLiterals(`const a = 'x'; // 'streak'\nconst b = "y";`)).toEqual(['x', 'y']);
+    expect(stringLiterals(`const a = 'X'; // 'streak'\nconst b = "Y";`)).toEqual(['X', 'Y']);
+    expect(stringLiterals(`status === 'failed' ? 'It failed.' : 'Fine'`)).toEqual(['It failed.', 'Fine']);
   });
 
   it.each(files.map((f) => [path.relative(moduleDir, f), f]))('%s uses no banned words', (_name, file) => {

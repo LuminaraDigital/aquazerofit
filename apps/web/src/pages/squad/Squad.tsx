@@ -33,6 +33,7 @@ import { BeltBadge } from '@/components/fightRecord/BeltBadge';
 import { CheerButton } from '@/components/fightCamp/Cheers';
 import { ShareKitSheet } from '@/components/fightCamp/ShareKitSheet';
 import { ToggleSwitch } from '@/components/fightCamp/ToggleSwitch';
+import { GiftButton, GiftReceived, useGiftPrice } from '@/components/fightCamp/Gift';
 import { BottomSheet } from '@/pages/training/BottomSheet';
 import { formatDate } from '@/lib/format';
 import { beltName, useFightCamp } from '@/lib/fightRecord';
@@ -299,6 +300,7 @@ function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
               <CheerButton member={member} />
             </GlassCard>
           ))}
+      <GiftReceived />
       <WeekBoard squad={squad} canCheer={canCheer} />
       {shareKit && (
         <div className={full ? '' : 'grid grid-cols-2 gap-3'}>
@@ -419,6 +421,7 @@ function OwnerTools({ squad }: { squad: SquadView }) {
 }
 
 function MemberRow({ member, rank, canCheer }: { member: SquadMemberView; rank: number | null; canCheer: boolean }) {
+  const giftPrice = useGiftPrice();
   return (
     <li className="flex min-h-[44px] items-center gap-3">
       <span className="w-6 text-center text-sm font-semibold tabular-nums text-on-surface-variant">
@@ -439,6 +442,7 @@ function MemberRow({ member, rank, canCheer }: { member: SquadMemberView; rank: 
         {member.weekActiveDays === null ? 'Hidden' : `${member.weekActiveDays} of 7`}
       </span>
       {canCheer && !member.isMe && <CheerButton member={member} />}
+      {giftPrice !== null && !member.isMe && <GiftButton member={member} stars={giftPrice} />}
     </li>
   );
 }

@@ -114,43 +114,70 @@ describe('computeConsistency with bridges', () => {
 describe('planCutManBridges', () => {
   const plan = (dates: string[], bank: number, bridged: string[] = []) =>
     planCutManBridges(new Set(dates), TODAY, new Set(bridged), bank);
+  const spends = (dates: string[], bank: number, bridged: string[] = []) => plan(dates, bank, bridged).commit;
 
-  it('bridges the day the built-in grace cannot cover', () => {
-    expect(plan([ago(0), ago(3)], 2)).toEqual([ago(2)]);
+  it('bridges the newest miss and leaves the built-in grace for the one behind it', () => {
+    // Active today and three days ago: two misses, one grace day, one bridge.
+    expect(spends([ago(0), ago(3)], 2)).toEqual([ago(1)]);
   });
 
   it('spends nothing when the built-in grace already covers the gap', () => {
-    expect(plan([ago(0), ago(2)], 2)).toEqual([]);
+    expect(spends([ago(0), ago(2)], 2)).toEqual([]);
   });
 
   it('spends up to the bank, and nothing if the bank cannot reach an active day', () => {
-    expect(plan([ago(0), ago(4)], 2)).toEqual([ago(2), ago(3)]);
-    expect(plan([ago(0), ago(4)], 1)).toEqual([]);
-    expect(plan([ago(0), ago(4)], 0)).toEqual([]);
+    expect(spends([ago(0), ago(4)], 2)).toEqual([ago(1), ago(2)]);
+    expect(plan([ago(0), ago(4)], 1)).toEqual({ commit: [], standBy: [] });
+    expect(plan([ago(0), ago(4)], 0)).toEqual({ commit: [], standBy: [] });
   });
 
   it('never spends on misses that lead back to nothing', () => {
-    expect(plan([], 2)).toEqual([]);
-    expect(plan([ago(0)], 2)).toEqual([]);
-    // Today and yesterday missed: today is never charged, yesterday is the
-    // built-in grace, and the rest leads to no active day.
-    expect(plan([ago(9)], 2)).toEqual([]);
+    expect(plan([], 2)).toEqual({ commit: [], standBy: [] });
+    expect(plan([ago(0)], 2)).toEqual({ commit: [], standBy: [] });
+    expect(plan([ago(9)], 2)).toEqual({ commit: [], standBy: [] });
   });
 
-  it('reaches no further back than the last seven days', () => {
-    expect(plan([ago(0), ago(1), ago(2), ago(3), ago(4), ago(5), ago(8)], 2)).toEqual([]);
-    expect(plan([ago(0), ago(1), ago(2), ago(3), ago(4), ago(7)], 2)).toEqual([ago(6)]);
+  it('keeps the long run when an old miss already used the built-in grace (review case)', () => {
+    // Forty days of history, missed only 20 days ago and yesterday. Giving the
+    // grace day to yesterday would end the run at 20 days ago; bridging
+    // yesterday instead keeps all of it.
+    const dates = Array.from({ length: 40 }, (_, i) => ago(i)).filter((d) => d !== ago(20) && d !== ago(1));
+    const decided = plan(dates, 2);
+    expect(decided).toEqual({ commit: [ago(1)], standBy: [] });
+    const activity = activityOn(dates);
+    const kept = computeConsistency(activity, TODAY, { bridgedDates: new Set(decided.commit) });
+    expect(kept.currentDays).toBe(38);
+    expect(computeConsistency(activity, TODAY).currentDays).toBe(19);
+  });
+
+  it('stands by instead of spending while nothing has been logged since the gap (review case)', () => {
+    // Active through three days ago, nothing since. Yesterday is the grace
+    // day's to cover; two days ago would need a bridge, but nobody is back.
+    expect(plan([ago(3), ago(4)], 2)).toEqual({ commit: [], standBy: [ago(1)] });
+    // Back today: now it is spent.
+    expect(plan([ago(0), ago(3), ago(4)], 2)).toEqual({ commit: [ago(1)], standBy: [] });
+  });
+
+  it('reaches no further back than the six days before today', () => {
+    // Six days ago is the oldest date a bridge can cover; the grace day takes
+    // the miss behind it.
+    expect(spends([ago(0), ago(1), ago(2), ago(3), ago(4), ago(5), ago(8)], 2)).toEqual([ago(6)]);
+    // Both misses older than that: nothing to bridge, nothing spent.
+    expect(plan([ago(0), ago(1), ago(2), ago(3), ago(4), ago(5), ago(6), ago(9)], 2)).toEqual({
+      commit: [],
+      standBy: [],
+    });
   });
 
   it('steps over days already bridged without spending again', () => {
-    expect(plan([ago(0), ago(4)], 2, [ago(2), ago(3)])).toEqual([]);
-    expect(plan([ago(0), ago(5)], 1, [ago(3), ago(4)])).toEqual([ago(2)]);
+    expect(spends([ago(0), ago(4)], 2, [ago(1), ago(2)])).toEqual([]);
+    expect(spends([ago(0), ago(5)], 1, [ago(1), ago(2)])).toEqual([ago(3)]);
   });
 
   it('does not charge an incomplete today', () => {
-    // Today missed (not charged), yesterday active, two days ago the grace
-    // day, three days ago bridged, four days ago active.
-    expect(plan([ago(1), ago(4)], 2)).toEqual([ago(3)]);
+    // Today missed (not charged), yesterday active, then two misses back to
+    // an active day four days ago: one bridge, one grace day.
+    expect(plan([ago(1), ago(4)], 2)).toEqual({ commit: [ago(2)], standBy: [] });
   });
 });
 

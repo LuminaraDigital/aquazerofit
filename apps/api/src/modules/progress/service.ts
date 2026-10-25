@@ -193,52 +193,56 @@ function runEndingAt(
   return { days, graceUsed, startDate, bridgesCrossed };
 }
 
+export interface CutManPlan {
+  /** Bridges to write now: each has an active day after it, so the person is back. */
+  commit: string[];
+  /**
+   * Bridges that would carry the run but are not spent yet, because nothing
+   * has been logged since the gap. Shown, not charged: the bank is used when
+   * the person comes back, never while they are away.
+   */
+  standBy: string[];
+}
+
 /**
- * Missed dates a banked Cut Man day should bridge now (AZF-P1 US-E2), newest
- * first, at most `bank` of them.
+ * Which missed dates banked Cut Man days should bridge (AZF-P1 US-E2).
  *
- * The same backwards walk as `runEndingAt`. Where the walk would end because
- * the built-in grace is spent, a missed date inside the last
- * GRACE_BRIDGE_WINDOW_DAYS becomes a tentative bridge. Tentative bridges are
- * committed only when the walk then reaches another active day, so grace is
- * never spent on misses before someone's first active day, or on a gap that
- * leads back to nothing (the "charged only once bridged" rule).
+ * The run already absorbs one miss with the built-in grace day. Bridging the
+ * k newest misses inside the last GRACE_BRIDGE_WINDOW_DAYS leaves that grace
+ * day for the next miss further back, which covers the longest unbroken
+ * stretch of misses k Cut Man days can cover. So: try k = 0 up to the bank,
+ * and take the smallest k that gives the longest run. A k that does not
+ * lengthen the run is never chosen, so grace is not spent on misses before
+ * someone's first active day or on a gap that leads back to nothing.
+ *
+ * Today is never a miss (it is not over), so the bridgeable dates are the six
+ * before it.
  */
 export function planCutManBridges(
   activeDates: ReadonlySet<string>,
   today: string,
   bridged: ReadonlySet<string>,
   bank: number,
-): string[] {
+): CutManPlan {
+  const from = activeDates.has(today) ? today : addDays(today, -1);
   const windowStart = addDays(today, -(GRACE_BRIDGE_WINDOW_DAYS - 1));
-  let cursor = activeDates.has(today) ? today : addDays(today, -1);
-  let graceUsed = 0;
-  let pendingGrace = 0;
-  let tentative: string[] = [];
-  const committed: string[] = [];
-
-  for (;;) {
-    if (activeDates.has(cursor)) {
-      graceUsed += pendingGrace;
-      pendingGrace = 0;
-      committed.push(...tentative);
-      tentative = [];
-    } else if (!bridged.has(cursor)) {
-      if (graceUsed + pendingGrace + 1 <= CONSISTENCY_GRACE_DAYS) {
-        pendingGrace += 1;
-      } else if (cursor >= windowStart && committed.length + tentative.length < bank) {
-        tentative.push(cursor);
-      } else {
-        break;
-      }
-    }
-    // Nothing older than the bridge window can be bridged, so once the walk
-    // is past it with nothing pending there is nothing left to decide.
-    if (cursor < windowStart && tentative.length === 0) break;
-    cursor = addDays(cursor, -1);
+  const candidates: string[] = [];
+  for (let date = from; date >= windowStart; date = addDays(date, -1)) {
+    if (!activeDates.has(date) && !bridged.has(date)) candidates.push(date);
   }
 
-  return committed;
+  let best = { k: 0, days: runEndingAt(activeDates, from, bridged).days };
+  for (let k = 1; k <= Math.min(bank, candidates.length); k += 1) {
+    const days = runEndingAt(activeDates, from, new Set([...bridged, ...candidates.slice(0, k)])).days;
+    if (days > best.days) best = { k, days };
+  }
+
+  const chosen = candidates.slice(0, best.k);
+  const hasActiveAfter = (date: string) => [...activeDates].some((d) => d > date && d <= today);
+  return {
+    commit: chosen.filter(hasActiveAfter),
+    standBy: chosen.filter((date) => !hasActiveAfter(date)),
+  };
 }
 
 /**
@@ -395,9 +399,9 @@ export function getProgressSummary(
   userId: string,
   today: string,
   bridgedDates?: ReadonlySet<string>,
+  activity: UserActivity = loadActivity(userId),
 ): ProgressSummary {
   const store = getStore();
-  const activity = loadActivity(userId);
   const profile = getProfile(userId);
   const streakDays = computeStreak(activity, today);
   const consistency = computeConsistency(activity, today);

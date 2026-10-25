@@ -61,13 +61,25 @@ describe('earning (US-E1)', () => {
   it('earns one Cut Man day per seven active days in a season, banking at most two', async () => {
     h.enable('grace');
     const six = await personAt(6, range(0, 5));
-    expect((await grace(six)).body).toEqual({ grace: { banked: 0, nextEarnInActiveDays: 1, lastApplied: null } });
+    expect((await grace(six)).body).toEqual({
+      grace: { banked: 0, nextEarnInActiveDays: 1, lastApplied: null, standingBy: false },
+    });
 
     const seven = await personAt(7, range(0, 6));
-    expect((await grace(seven)).body.grace).toEqual({ banked: 1, nextEarnInActiveDays: 7, lastApplied: null });
+    expect((await grace(seven)).body.grace).toEqual({
+      banked: 1,
+      nextEarnInActiveDays: 7,
+      lastApplied: null,
+      standingBy: false,
+    });
 
     const many = await personAt(25, range(0, 24));
-    expect((await grace(many)).body.grace).toEqual({ banked: 2, nextEarnInActiveDays: 3, lastApplied: null });
+    expect((await grace(many)).body.grace).toEqual({
+      banked: 2,
+      nextEarnInActiveDays: 3,
+      lastApplied: null,
+      standingBy: false,
+    });
     // One earn row per milestone reached: 7, 14 and 21. The third was not kept.
     // Rows written in one read share a timestamp, so their order is not the
     // claim here; the fold treats a batch of earns the same in any order.
@@ -95,7 +107,7 @@ describe('earning (US-E1)', () => {
 });
 
 describe('applying (US-E2)', () => {
-  it('bridges the second missed day and keeps the run going', async () => {
+  it('bridges the newest miss, lets the grace day cover the one behind it, and keeps the run', async () => {
     h.enable('grace');
     // Fourteen active days (two banked), then day 14 and day 15 missed.
     const mia = await personAt(16, [...range(0, 13), day(16)]);
@@ -104,10 +116,72 @@ describe('applying (US-E2)', () => {
     expect((await grace(mia)).body.grace).toEqual({
       banked: 1,
       nextEarnInActiveDays: 6,
-      lastApplied: day(14),
+      lastApplied: day(15),
+      standingBy: false,
     });
     const applied = (await engageRepo().graceEntries(mia.userId)).filter((g) => g.entry === 'applied');
-    expect(applied.map((g) => g.localDate)).toEqual([day(14)]);
+    expect(applied.map((g) => g.localDate)).toEqual([day(15)]);
+  });
+
+  it('stands by while nothing has been logged since the gap, and spends only on return', async () => {
+    h.enable('grace');
+    const away = await personAt(16, range(0, 13));
+    const held = await summary(away);
+    expect(held.body.consistency.state).not.toBe('resting');
+    expect((await grace(away)).body.grace).toEqual({
+      banked: 2,
+      nextEarnInActiveDays: 7,
+      lastApplied: null,
+      standingBy: true,
+    });
+    expect((await engageRepo().graceEntries(away.userId)).some((g) => g.entry === 'applied')).toBe(false);
+
+    h.seedActive(away.userId, [day(16)]);
+    expect((await grace(away)).body.grace).toMatchObject({ banked: 1, lastApplied: day(15), standingBy: false });
+  });
+
+  it('writes one bridge when the dashboard reads summary and record in parallel', async () => {
+    h.enable('grace');
+    const mia = await personAt(16, [...range(0, 13), day(16)]);
+    const [a, b] = await Promise.all([summary(mia), record(mia)]);
+    expect(a.body.consistency.currentDays).toBe(15);
+    expect(b.body.fightCamp.grace).toMatchObject({ banked: 1, lastApplied: day(15) });
+    const applied = (await engageRepo().graceEntries(mia.userId)).filter((g) => g.entry === 'applied');
+    expect(applied).toHaveLength(1);
+  });
+
+  it('degrades to the plain run, never a failed page, when the grace store is down', async () => {
+    h.enable('grace');
+    const mia = await personAt(16, [...range(0, 13), day(16)]);
+    const { setEngageRepoForTests } = await import('../modules/fightCamp/repo');
+    const { MemoryEngageRepo } = await import('../modules/fightCamp/repo/memory');
+    const down = new MemoryEngageRepo();
+    down.withGraceLedger = async () => {
+      throw new Error('connection terminated');
+    };
+    down.graceEntries = async () => {
+      throw new Error('connection terminated');
+    };
+    setEngageRepoForTests(down);
+    try {
+      const res = await summary(mia);
+      expect(res.status).toBe(200);
+      expect(res.body.consistency.currentDays).toBe(1);
+      const fr = await record(mia);
+      expect(fr.status).toBe(200);
+      expect(fr.body).not.toHaveProperty('fightCamp');
+      expect((await request(h.app).get(`${h.base}/coaches/progression`).set(mia.auth())).status).toBe(200);
+    } finally {
+      setEngageRepoForTests(new MemoryEngageRepo());
+    }
+  });
+
+  it('lets the coach card describe the bridged run without writing anything', async () => {
+    h.enable('grace');
+    const mia = await personAt(16, [...range(0, 13), day(16)]);
+    const res = await request(h.app).get(`${h.base}/coaches/progression`).set(mia.auth());
+    expect(res.status).toBe(200);
+    expect(await engageRepo().graceEntries(mia.userId)).toEqual([]);
   });
 
   it('never counts a bridged day as active, for belts or the window', async () => {
@@ -119,7 +193,7 @@ describe('applying (US-E2)', () => {
     const fr = await record(mia);
     expect(fr.body.fightRecord.current.activeDays).toBe(active.length);
     expect(fr.body.fightRecord.current.tier).toBe('blue');
-    expect(fr.body.fightCamp.grace.lastApplied).toBe(day(14));
+    expect(fr.body.fightCamp.grace.lastApplied).toBe(day(15));
   });
 
   it('spends nothing on a gap that leads back to no active day', async () => {

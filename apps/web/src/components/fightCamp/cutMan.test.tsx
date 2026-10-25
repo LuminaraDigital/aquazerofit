@@ -3,8 +3,7 @@
  * Cut Man on the consistency and season cards (AZF-P1 US-E1 to US-E3).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, screen } from '@testing-library/react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { BANNED_COPY, type ConsistencyStatus } from '@aquazerofit/shared';
 import { todayLocalDate, toLocalDate, parseLocalDate } from '@/lib/format';
 import { campWith, recordWith, renderWithClient, serve } from './testUtils';
@@ -43,11 +42,6 @@ function consistency(overrides: Partial<ConsistencyStatus> = {}): ConsistencySta
   };
 }
 
-function Where() {
-  const location = useLocation();
-  return <p data-testid="where">{location.pathname + location.search}</p>;
-}
-
 describe('CutManNote', () => {
   it('is absent while Cut Man is off for the account', () => {
     renderWithClient(<ConsistencyCard consistency={consistency({ lastActiveDate: daysAgo(1) })} />);
@@ -59,7 +53,7 @@ describe('CutManNote', () => {
     const { container } = renderWithClient(
       <ConsistencyCard
         consistency={consistency()}
-        grace={{ banked: 1, nextEarnInActiveDays: 3, lastApplied: daysAgo(2) }}
+        grace={{ banked: 1, nextEarnInActiveDays: 3, lastApplied: daysAgo(2), standingBy: false }}
       />,
     );
     const weekday = parseLocalDate(daysAgo(2)).toLocaleDateString('en-US', { weekday: 'short' });
@@ -72,38 +66,53 @@ describe('CutManNote', () => {
     renderWithClient(
       <ConsistencyCard
         consistency={consistency()}
-        grace={{ banked: 2, nextEarnInActiveDays: 7, lastApplied: daysAgo(9) }}
+        grace={{ banked: 2, nextEarnInActiveDays: 7, lastApplied: daysAgo(9), standingBy: false }}
       />,
     );
     expect(screen.queryByText(/stepped in/)).toBeNull();
   });
 
-  it('offers one glass of water when today has nothing logged yet, and links to quick-add', () => {
+  it('logs one glass of water in one tap when today has nothing logged yet', async () => {
+    mocks.api.mockResolvedValue({ log: {} });
     renderWithClient(
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <ConsistencyCard
-              consistency={consistency({ lastActiveDate: daysAgo(1) })}
-              grace={{ banked: 0, nextEarnInActiveDays: 2, lastApplied: null }}
-            />
-          }
-        />
-        <Route path="/nutrition" element={<Where />} />
-      </Routes>,
+      <ConsistencyCard
+        consistency={consistency({ lastActiveDate: daysAgo(1) })}
+        grace={{ banked: 0, nextEarnInActiveDays: 2, lastApplied: null, standingBy: false }}
+      />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Keep it simple today: log one glass of water' }));
-    expect(screen.getByTestId('where').textContent).toBe('/nutrition?action=water_add&amount=250');
+    const button = screen.getByRole('button', { name: 'Keep it simple today: log one glass of water' });
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(mocks.api).toHaveBeenCalledWith(
+        '/water-logs',
+        expect.objectContaining({
+          method: 'POST',
+          body: { amountMl: 250, localDate: todayLocalDate() },
+          idempotencyKey: expect.any(String),
+        }),
+      ),
+    );
+    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(true));
+  });
+
+  it('says Cut Man is standing by while a gap waits for a return', () => {
+    const { container } = renderWithClient(
+      <ConsistencyCard
+        consistency={consistency({ lastActiveDate: daysAgo(3) })}
+        grace={{ banked: 2, nextEarnInActiveDays: 7, lastApplied: null, standingBy: true }}
+      />,
+    );
+    expect(screen.getByText('Cut Man is standing by. Log anything today and your run carries on.')).toBeTruthy();
+    expect(container.textContent ?? '').not.toMatch(BANNED_COPY);
   });
 });
 
 describe('CutManChip', () => {
   it('labels the bank, or how far the first day is', () => {
-    expect(cutManChipLabel({ banked: 2, nextEarnInActiveDays: 7, lastApplied: null })).toBe(
+    expect(cutManChipLabel({ banked: 2, nextEarnInActiveDays: 7, lastApplied: null, standingBy: false })).toBe(
       'Cut Man: 2 in your corner',
     );
-    expect(cutManChipLabel({ banked: 0, nextEarnInActiveDays: 1, lastApplied: null })).toBe(
+    expect(cutManChipLabel({ banked: 0, nextEarnInActiveDays: 1, lastApplied: null, standingBy: false })).toBe(
       'Cut Man: first one in 1 active day',
     );
   });
@@ -111,7 +120,7 @@ describe('CutManChip', () => {
   it('appears on the season card only with the grace block', async () => {
     serve(mocks.api, {
       fightRecord: recordWith(),
-      fightCamp: campWith({ grace: { banked: 1, nextEarnInActiveDays: 4, lastApplied: null } }),
+      fightCamp: campWith({ grace: { banked: 1, nextEarnInActiveDays: 4, lastApplied: null, standingBy: false } }),
     });
     renderWithClient(<SeasonCard />);
     expect(await screen.findByText('Cut Man: 1 in your corner')).toBeTruthy();

@@ -10,7 +10,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { EnrolSource, EnrolmentView } from '@aquazerofit/shared';
 import { api } from './api';
 import { unwrap } from './envelopes';
-import { fightRecordKey } from './fightRecord';
+import { fightRecordKey, type FightRecordEnvelope } from './fightRecord';
 
 export function useEnrol() {
   const qc = useQueryClient();
@@ -19,6 +19,20 @@ export function useEnrol() {
       unwrap<EnrolmentView>(
         await api<unknown>('/fight-camp/enrolments', { method: 'POST', body: { source } }),
         'enrolment',
+      ),
+    // Mark the cached status enrolled straight away, so the action cannot be
+    // tapped a second time while the refetch is still on its way.
+    onSuccess: () =>
+      qc.setQueryData<FightRecordEnvelope>(fightRecordKey, (envelope) =>
+        envelope?.fightCamp?.enrolment
+          ? {
+              ...envelope,
+              fightCamp: {
+                ...envelope.fightCamp,
+                enrolment: { ...envelope.fightCamp.enrolment, enrolled: true },
+              },
+            }
+          : envelope,
       ),
     onSettled: () => void qc.invalidateQueries({ queryKey: fightRecordKey }),
   });

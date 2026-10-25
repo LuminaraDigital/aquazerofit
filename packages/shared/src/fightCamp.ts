@@ -154,6 +154,11 @@ export interface GraceView {
   nextEarnInActiveDays: number;
   /** The most recent day Cut Man stepped in, or null. */
   lastApplied: string | null;
+  /**
+   * A banked day is holding the run open over a gap nothing has been logged
+   * after yet. It is spent only if the person comes back.
+   */
+  standingBy: boolean;
 }
 
 export interface EnrolmentView {

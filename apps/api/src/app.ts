@@ -77,7 +77,11 @@ export function createApp() {
               // not this one. Adding it here would widen the page's egress
               // allowance for no benefit.
               frameSrc: ["'self'", TURNSTILE_ORIGIN],
-              connectSrc: ["'self'"],
+              // tganalytics.xyz is the Telegram Mini Apps Analytics catalog
+              // endpoint. The client posts there only inside a Mini App, and
+              // only when both Vite catalog env vars are set. The header is
+              // the same on every SPA response.
+              connectSrc: ["'self'", 'https://tganalytics.xyz'],
               // Coach/exercise media is played from object URLs built in the
               // client; without this, default-src 'self' blocks blob: playback.
               mediaSrc: ["'self'", 'blob:'],

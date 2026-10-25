@@ -32,26 +32,30 @@ export const CRYPTO_PATTERNS = [
   /\bairdrops?\b/i,
   /\bseed phrases?\b/i,
   /\brecovery phrases?\b/i,
-  /\bmint(?:ing|ed)? (?:an? |your |the )?(?:nft|token|coin)s?\b/i,
-  /\btokens? (?:sale|price|launch|listing|holders?|presale|swap)\b/i,
+  /\bmint(?:ing|ed)? (?:an? |your |my |the )?(?:\w+ )?(?:nft|token|coin|belt|card|badge)s?\b/i,
+  /\btokens? (?:sale|price|launch|listing|holders?|presale|swap|rewards?)\b/i,
+  /\b(?:earn|collect|claim|win)\w* (?:\w+ )?(?:tokens?|coins?)\b/i,
   /\bcryptocurrenc(?:y|ies)\b/i,
   // "crypto" alone is the Web Crypto API (crypto.randomUUID); the phrasing is not.
   /\bcrypto (?:coins?|assets?|prices?|rewards?|tokens?|wallets?|trading|exchanges?|projects?)\b/i,
   /\b(?:blockchain|web3|defi)\b/i,
   /\bton ?connect\b/i,
-  /\b(?:BTC|ETH|USDT|USDC|AZX|\$TON)\b/,
+  /\b(?:BTC|ETH|USDT|USDC|AZX)\b|\$TON\b/,
   /\b(?:bitcoin|ethereum|solana|dogecoin|toncoin)\b/i,
   /\bcoin (?:price|listing)\b/i,
   /\b(?:exchange|dex) listing\b/i,
 ];
 
 /**
- * Known, reviewed hits that are not user-facing: [file pattern, text pattern, reason].
- * Add an entry only when a dependency forces one, and say why.
+ * Known, reviewed hits that are not user-facing: [file pattern, exact match,
+ * context pattern, reason]. All three must agree, so an entry clears that one
+ * word in that one setting and nothing that happens to sit beside it. Add an
+ * entry only when a dependency forces one, and say why.
  */
 const ALLOWED = [
   [
     /\.js$/,
+    'ethereum',
     /[`'"]ethereum[`'"]/,
     'A quoted feature name in the browser-fingerprint list of @telegram-apps/analytics, never shown to anyone.',
   ],
@@ -89,7 +93,9 @@ export async function scanBundle(dist) {
   for (const file of files) {
     const rel = path.relative(dist, file).split(path.sep).join('/');
     for (const hit of cryptoHits(await readFile(file, 'utf8'))) {
-      const allowed = ALLOWED.some(([f, t]) => f.test(rel) && t.test(hit.context));
+      const allowed = ALLOWED.some(
+        ([file, word, context]) => file.test(rel) && hit.match.toLowerCase() === word && context.test(hit.context),
+      );
       if (!allowed) found.push({ file: rel, ...hit });
     }
   }

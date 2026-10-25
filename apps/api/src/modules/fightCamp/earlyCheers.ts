@@ -68,7 +68,13 @@ export async function syncEarlyCheers(
   if (day < 0 || day >= WEEK_ONE_DAYS) return;
 
   const repo = engageRepo();
-  const { arm, recorded } = await repo.assignArm(userId, 'early_cheers', earlyCheersArm(userId), now.toISOString());
+  const { arm, recorded } = await repo.assignArm({
+    userId,
+    experiment: 'early_cheers',
+    arm: earlyCheersArm(userId),
+    dayZero: first,
+    assignedAt: now.toISOString(),
+  });
   if (recorded) logEvent('early_cheers_arm', { arm });
   if (arm !== 'treatment') return;
 

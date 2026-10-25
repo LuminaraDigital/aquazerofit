@@ -77,6 +77,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      # The web build is also the Telegram Mini App, which must carry no
+      # crypto wording at all (AZF-P1 §8): scanned after the build, so a
+      # dependency's strings are covered as well as our own.
+      - name: Bundle crypto scan
+        run: npm run scan:bundle
+
   # The runtime image copies node_modules itself. `npm test` cannot see a
   # package that the Dockerfile forgot to copy. The smoke step inside
   # apps/api/Dockerfile resolves the API import graph from the runtime stage

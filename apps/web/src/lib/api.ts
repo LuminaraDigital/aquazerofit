@@ -25,7 +25,7 @@ import { getTelegramInitData, isTMA } from './telegram';
  * API on its own hostname) sets VITE_API_BASE_URL at build time - without it
  * every request would resolve against the static host and 404.
  */
-const BASE = import.meta.env.VITE_API_BASE_URL
+export const API_BASE = import.meta.env.VITE_API_BASE_URL
   ? `${String(import.meta.env.VITE_API_BASE_URL).replace(/\/+$/, '')}/api/v1`
   : '/api/v1';
 
@@ -104,7 +104,7 @@ async function tryFirebaseRefresh(): Promise<boolean> {
  * not an exception.
  */
 async function tryCookieRefresh(): Promise<boolean> {
-  const res = await fetch(`${BASE}/auth/refresh`, {
+  const res = await fetch(`${API_BASE}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: '{}',
@@ -130,7 +130,7 @@ async function tryTelegramReauth(): Promise<boolean> {
   if (!isTMA()) return false;
   const initData = getTelegramInitData();
   if (!initData) return false;
-  const res = await fetch(`${BASE}/auth/telegram`, {
+  const res = await fetch(`${API_BASE}/auth/telegram`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData }),
@@ -218,7 +218,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   headers['X-Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const res = await fetch(`${BASE}${path}${qs}`, {
+  const res = await fetch(`${API_BASE}${path}${qs}`, {
     method,
     headers,
     body: formData ?? (body !== undefined ? JSON.stringify(body) : undefined),
@@ -266,7 +266,7 @@ export async function streamChat(
     if (access && !isJwtLike(access)) {
       throw new ApiError(401, { code: 'AUTH_INVALID', message: 'Invalid access token' });
     }
-    return fetch(`${BASE}/chat/sessions/${sessionId}/messages`, {
+    return fetch(`${API_BASE}/chat/sessions/${sessionId}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

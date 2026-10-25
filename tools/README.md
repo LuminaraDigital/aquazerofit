@@ -19,6 +19,7 @@ Root-level npm scripts exist for each, so they are discoverable from
 | `npm run assets:cards -- <card.svg> <fighter.png> [out.png]` | `tools/cards/build-card.mjs` |
 | `npm run screenshots:optimise` | `tools/screenshots/optimise.mjs` |
 | `npm run assets:belts` | `tools/belts/build-belt-art.mjs` |
+| `npm run assets:share` | `tools/share/build-story-art.mjs` |
 | `npm run docs:setup` then `npm run docs:build -- <in.md> <out.docx>` | `tools/docgen/md-to-docx.js` |
 
 The `--` matters: it passes the arguments through npm to the script rather
@@ -202,3 +203,21 @@ TELEGRAM_BOT_TOKEN=... node tools/belts/create-emoji-set.mjs --owner <telegram-u
 It uploads the emoji PNGs as a custom-emoji set named
 `azf_belts_by_<bot username>` and prints the `TELEGRAM_BELT_EMOJI_IDS` value
 for the API. Re-running it prints the ids again without uploading.
+
+---
+
+## `tools/share/` — Share Kit story art
+
+```bash
+node tools/share/build-story-art.mjs
+```
+
+Writes `apps/web/public/share/story/<kind>-<tier>-<accent>.png`: one 1080×1920
+story image per Fight Camp card kind, belt (or `none`) and season accent, 114
+in all, each a small palette PNG well under the 400 KB budget. Telegram's
+`shareToStory` fetches a public URL itself, so story art cannot be drawn per
+person; each image carries a belt, a season name and the wordmark, never a
+number or anything about the person, and their link rides in the caption.
+Colours and season names mirror `packages/shared/src/fightCamp.ts`; change
+them there and re-run. The web test `shareKit.test.tsx` fails if any image the
+app can ask for is missing.

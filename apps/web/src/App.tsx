@@ -59,6 +59,8 @@ const FightRecord = lazy(() => import('./pages/fightRecord/FightRecord'));
 const Squad = lazy(() => import('./pages/squad/Squad'));
 /* Public squad invite landing: shows what the invite is before sign-in. */
 const SquadJoin = lazy(() => import('./pages/squad/SquadJoin'));
+/* Public Share Kit link: hands the browser to the API's landing redirect. */
+const ShareLanding = lazy(() => import('./pages/share/ShareLanding'));
 
 const PlanPage = lazy(() => import('./pages/upgrade/Plan'));
 
@@ -129,6 +131,7 @@ export default function App() {
         <Route path="/sign-in" element={<SignIn />} />
         <Route path="/mobile/captcha" element={<MobileCaptchaPage />} />
         <Route path="/s/:code" element={<SquadJoin />} />
+        <Route path="/r/:code" element={<ShareLanding />} />
 
         {/* `publicIndex` makes `/` the marketing front door for signed-out web
             visitors while leaving it the app's home for everyone else - see

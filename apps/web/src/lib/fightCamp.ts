@@ -22,6 +22,8 @@ import type {
   SquadCornerInput,
   SquadCornerView,
   SquadMemberView,
+  ShareKindP1,
+  ShareLinkView,
   SquadPeekView,
   SquadView,
 } from '@aquazerofit/shared';
@@ -270,5 +272,30 @@ export function useSetNudgeSettings() {
     mutationFn: async (settings: NudgeSettings) =>
       unwrap<NudgeSettings>(await api<unknown>('/cheers/nudges', { method: 'PUT', body: settings }), 'nudges'),
     onSuccess: (settings) => qc.setQueryData(nudgeSettingsKey, settings),
+  });
+}
+
+// ---------- Share Kit ----------
+
+/**
+ * The person's first name, for a card they choose to sign. Same cache entry
+ * and raw shape as the dashboard's GET /me, so it costs no extra request.
+ */
+export function useFirstName(): string | null {
+  const me = useQuery({ queryKey: ['me', 'user'], queryFn: () => api<unknown>('/me') }).data as
+    | { displayName?: string; user?: { displayName?: string } }
+    | undefined;
+  const name = (me?.user?.displayName ?? me?.displayName ?? '').trim().split(/\s+/)[0];
+  return name ? name : null;
+}
+
+/** The person's reusable link for a card kind this season. */
+export function useShareLink(kind: ShareKindP1, enabled: boolean) {
+  return useQuery({
+    queryKey: ['fightCamp', 'shareLink', kind],
+    queryFn: async () =>
+      unwrap<ShareLinkView>(await api<unknown>('/share/links', { method: 'POST', body: { kind } }), 'shareLink'),
+    enabled,
+    staleTime: Infinity,
   });
 }

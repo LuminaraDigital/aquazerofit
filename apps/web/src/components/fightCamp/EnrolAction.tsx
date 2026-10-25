@@ -10,6 +10,7 @@
  * Enrolment is only a commitment marker: belts accrue either way, so nothing
  * here implies a user who has not joined is missing anything.
  */
+import { useEffect, useRef } from 'react';
 import type { FightCampStatus, Season } from '@aquazerofit/shared';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useToast } from '@/components/ui/Toast';
@@ -23,15 +24,28 @@ interface Props {
 export function EnrolAction({ enrolment, season }: Props) {
   const toast = useToast();
   const enrol = useEnrol();
-  const join = () =>
+  const confirmation = useRef<HTMLParagraphElement>(null);
+  const joinedHere = useRef(false);
+  const join = () => {
+    joinedHere.current = true;
     enrol.mutate('dashboard', {
       onSuccess: () => toast.success(`You're in. Season ${season.number} starts with you.`),
       onError: () => toast.error('Could not join just now. Try again.'),
     });
+  };
+  // The button that had focus is gone once enrolled; hand focus to the line
+  // that replaced it rather than dropping it to the page.
+  useEffect(() => {
+    if (enrolment.enrolled && joinedHere.current) confirmation.current?.focus();
+  }, [enrolment.enrolled]);
 
   if (enrolment.enrolled) {
     return (
-      <p className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-on-surface">
+      <p
+        ref={confirmation}
+        tabIndex={-1}
+        className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-on-surface outline-none"
+      >
         <span className="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">
           sports_mma
         </span>

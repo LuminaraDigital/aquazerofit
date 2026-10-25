@@ -63,7 +63,7 @@ export function SeasonCard() {
           aria-hidden="true"
         >
           <div
-            className="h-full rounded-full bg-primary transition-[width] duration-500 motion-reduce:transition-none"
+            className="h-full rounded-full bg-primary transition-[width] duration-500"
             style={{ width: `${pct}%`, ...(camp ? { backgroundColor: camp.theme.accent } : {}) }}
           />
         </div>

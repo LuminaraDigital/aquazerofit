@@ -560,7 +560,12 @@ export abstract class MemoryBackedStore {
 
   /** Await all pending writes (tests, graceful shutdown, seed script). */
   async flush(): Promise<void> {
-    if (this.dirty.size > 0) this.enqueueFlush();
+    const seed = pendingSeeds.get(this);
+    if (seed) await seed;
+    while (this.dirty.size > 0) {
+      this.enqueueFlush();
+      await this.writeQueue;
+    }
     await this.writeQueue;
   }
 
@@ -679,6 +684,7 @@ export const store = {
 };
 
 let singleton: MemoryBackedStore | null = null;
+const pendingSeeds = new WeakMap<MemoryBackedStore, Promise<void>>();
 
 /**
  * Postgres is used only when an operator actually provisioned a database, and
@@ -720,7 +726,7 @@ export async function initStore(): Promise<MemoryBackedStore> {
   singleton = pg;
   // Seed after hydration, never before: seedIfNeeded's own emptiness checks
   // are only meaningful once the existing rows are in memory.
-  seedIfNeeded(pg);
+  pendingSeeds.set(pg, seedIfNeeded(pg));
   return pg;
 }
 
@@ -785,7 +791,7 @@ export function getStore(): MemoryBackedStore {
   if (!singleton || singleton.dataDir !== dir) {
     const json = new JsonStore(dir);
     singleton = json;
-    seedIfNeeded(json);
+    pendingSeeds.set(json, seedIfNeeded(json));
   }
   return singleton;
 }

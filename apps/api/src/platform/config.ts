@@ -148,12 +148,11 @@ export const config = {
    * run.app instead of the public host, it refuses real users and real
    * payments. None of those providers can add a custom header, so a webhook
    * aimed at run.app can never pass. docs/OPERATIONS.md has the sequence. On
-   * with no secret is refused at boot (assertOriginSecretConfigured in
-   * bootGuards.ts).
+   * with no secret, or a value that is neither on nor off, is refused at boot
+   * (assertOriginSecretConfigured in bootGuards.ts).
    */
   get requireOriginSecret(): boolean {
-    const raw = process.env.REQUIRE_ORIGIN_SECRET?.trim().toLowerCase();
-    return raw === 'true' || raw === '1';
+    return originGateSetting() === 'on';
   },
 
   /**
@@ -712,6 +711,14 @@ function httpUrl(raw: string | undefined, fallback: string, httpsOnly = false): 
 
 function isProduction(): boolean {
   return process.env.NODE_ENV === 'production';
+}
+
+/** REQUIRE_ORIGIN_SECRET as written: on, off, or a value that is neither. */
+export function originGateSetting(): 'on' | 'off' | 'unrecognised' {
+  const raw = process.env.REQUIRE_ORIGIN_SECRET?.trim().toLowerCase() ?? '';
+  if (raw === 'true' || raw === '1') return 'on';
+  if (raw === '' || raw === 'false' || raw === '0') return 'off';
+  return 'unrecognised';
 }
 
 // Startup guard: importing config in a production process without real secrets

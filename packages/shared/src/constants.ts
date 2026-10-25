@@ -60,6 +60,18 @@ export const MEAL_PHOTO_MIME = ['image/jpeg', 'image/png', 'image/heic'] as cons
 /** Telegram launch data freshness window in seconds (AQF-09 §2.1). */
 export const TG_AUTH_MAX_AGE_SECONDS = 600;
 
+/**
+ * How far `auth_date` may sit ahead of this server before launch data is
+ * rejected. Covers a small clock skew between Telegram and the API.
+ */
+export const TG_AUTH_FUTURE_SKEW_SECONDS = 30;
+
+/**
+ * Maximum raw initData size in bytes. A real Mini App payload is a short
+ * signed query string; anything near this cap is not one.
+ */
+export const TG_INIT_DATA_MAX_BYTES = 4096;
+
 /** Credit costs per AI task (business record; gateway budget is the hard ceiling). */
 export const CREDIT_COSTS = {
   chatTurn: 1,
@@ -70,7 +82,7 @@ export const CREDIT_COSTS = {
   progressInsight: 1,
   /**
    * One swap suggestion on the planStructured lane. Priced at 1 rather than
-   * near planGeneration because it reasons over a single slot, not a week —
+   * near planGeneration because it reasons over a single slot, not a week -
    * and because it is charged only on the branch that actually calls the
    * model: a swap served from the deterministic variation group is free.
    */
@@ -79,7 +91,7 @@ export const CREDIT_COSTS = {
    * The fact-extraction pass that runs after a coach turn, plus its amortised
    * rolling-summary refresh. Charged separately from chatTurn rather than
    * folded into it, because it runs only for accounts with aiPersonalisation
-   * consent on — pricing it into every turn would bill the users who opted
+   * consent on - pricing it into every turn would bill the users who opted
    * out for a model call their consent setting prevents.
    */
   memoryExtraction: 1,
@@ -87,17 +99,16 @@ export const CREDIT_COSTS = {
 export type CreditTask = keyof typeof CREDIT_COSTS;
 
 /**
- * The free daily allowance — and the actual paywall.
+ * The free daily allowance for lanes a free account may call.
  *
- * Ten credits is three meal-photo scans, or ten coach messages, or two AI
- * training plans. That is deliberately enough to experience every feature and
- * not enough to live on, which is the shape that converts: nothing is removed
- * from the free tier, so the app never has to take something away from
- * somebody who already had it, and the limit a user meets is one they can see
- * coming and fix.
+ * Ten credits is ten coach messages, five meal suggestions, or two AI
+ * training plans. Meal photographs are not part of this allowance:
+ * visionPrimary is premium, and a free account is refused before a credit
+ * is reserved. Coach chat stays on this meter.
  *
  * It was 50, which at three scans a day is a fortnight of AI for every signup
- * on an unfunded product, and gave a paying user nothing to buy.
+ * on an unfunded product, and gave a paying user nothing to buy. Photos have
+ * since moved to premium; the grant still caps the free coach.
  */
 export const FREE_TIER_DAILY_CREDITS = 10;
 
@@ -106,7 +117,7 @@ export const FREE_TIER_DAILY_CREDITS = 10;
  *
  * Sized against the margin rather than against a round number. A chat turn on
  * the 70B lane costs roughly $0.0015 all-in, so a subscriber who genuinely
- * spent this every day for a month runs to about $7 — against a $9.99
+ * spent this every day for a month runs to about $7 - against a $9.99
  * subscription that nets nearer $8.49 after the store's cut. That is thin but
  * positive. At the 300 this started as, the same user costs about $14 and the
  * plan loses money on precisely the people most likely to buy it: a cap only
@@ -119,7 +130,7 @@ export const FREE_TIER_DAILY_CREDITS = 10;
  *
  * Not the only ceiling: this bounds one account, and the deployment-level
  * AZF_DAILY_TOKEN_BUDGET bounds the aggregate. Neither substitutes for the
- * other — a thousand well-behaved subscribers are still a bill nobody capped.
+ * other - a thousand well-behaved subscribers are still a bill nobody capped.
  */
 export const PREMIUM_TIER_DAILY_CREDITS = 150;
 
@@ -132,7 +143,7 @@ export function dailyCreditsFor(tier: 'free' | 'premium'): number {
  * Ceiling on a carried-over balance.
  *
  * Unspent credits carry over, and the balance is a plain fold with no upper
- * bound — so an account that opened the plan screen daily for a month without
+ * bound - so an account that opened the plan screen daily for a month without
  * spending banked a month of grants and could then discharge the lot in one
  * sitting, throttled only by the per-minute lane. The daily grant is what
  * bounds cost per user per day; without a ceiling it bounded nothing but the
@@ -147,7 +158,7 @@ export function maxBankedCreditsFor(tier: 'free' | 'premium'): number {
 
 /**
  * Kept as the free-tier figure because that is what every existing caller
- * meant by it. New code should ask `maxBankedCreditsFor(tier)` — a premium
+ * meant by it. New code should ask `maxBankedCreditsFor(tier)` - a premium
  * account clamped to the free ceiling would lose most of what it bought on the
  * first day it did not spend.
  */
@@ -243,7 +254,7 @@ export const SOURCE_CODE_URL = 'https://github.com/LuminaraDigital/aquazerofit';
 /**
  * Crisis signposting (AQF-11 §4).
  *
- * The refusal itself is the same everywhere — what changes is the number at
+ * The refusal itself is the same everywhere - what changes is the number at
  * the end of it. A person in Manchester told to ring an Australian landline
  * has been given a refusal dressed as help, which is worse than a refusal, and
  * Play's health-content policy reads it the same way.
@@ -278,7 +289,7 @@ export const CRISIS_HELPLINES: Readonly<Record<string, CrisisHelpline>> = {
 /** Where an unmapped region is sent: a maintained, country-aware directory. */
 export const CRISIS_HELPLINE_DIRECTORY_URL = 'https://findahelpline.com';
 
-/** Region used when the caller told us nothing — the product's home market. */
+/** Region used when the caller told us nothing - the product's home market. */
 export const CRISIS_DEFAULT_REGION = 'AU';
 
 /**
@@ -289,8 +300,8 @@ export const CRISIS_DEFAULT_REGION = 'AU';
  * (`zh-Hant-TW`), and a whole Accept-Language header with quality values
  * (`en-GB,en;q=0.9`). Case and separator are irrelevant.
  *
- * Tags are scanned in the order sent — browsers order Accept-Language by
- * descending preference — and the first region subtag found wins. Returns null
+ * Tags are scanned in the order sent - browsers order Accept-Language by
+ * descending preference - and the first region subtag found wins. Returns null
  * when there is no region to find, which is a different answer from "a region
  * we have no line for": the first falls back to AU, the second to the
  * directory.
@@ -322,7 +333,7 @@ export function crisisHelplineFor(locale: string | null | undefined): CrisisHelp
 /**
  * The crisis refusal, pointed at the caller's own country.
  *
- * No region (or an unparseable locale) yields the AU wording byte-for-byte —
+ * No region (or an unparseable locale) yields the AU wording byte-for-byte -
  * `CRISIS_SIGNPOST` below is defined as this function's output for exactly
  * that reason, so the two can never drift.
  */
@@ -383,7 +394,7 @@ export const BUDDY_CHALLENGE_CODE_PREFIX = 'AQUA';
 
 /**
  * Growth telemetry retention. The events endpoint is unauthenticated, so
- * without a ceiling the audit container grows without bound — these records
+ * without a ceiling the audit container grows without bound - these records
  * answer "did the invite loop work", a question that expires. Swept on boot
  * and every 6 hours alongside the deletion sweep.
  */

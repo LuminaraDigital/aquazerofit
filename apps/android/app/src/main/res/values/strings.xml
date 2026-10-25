@@ -575,6 +575,7 @@
     <string name="capture_error_shutter">That shot didn\'t save. Try again.</string>
     <string name="capture_rate_limited">Things are busy right now - your photo is queued and will upload shortly.</string>
     <string name="capture_upload_failed">That photo didn\'t upload. Try again.</string>
+    <string name="capture_premium_required">This feature is part of AquaZeroFit Premium.</string>
     <string name="capture_error_unsupported_type">That file type isn\'t supported. Use a JPEG, PNG or HEIC photo.</string>
     <string name="capture_error_too_large">That photo is over the 10 MB limit. Try a smaller one.</string>
     <string name="capture_error_unreadable">That photo couldn\'t be read. Try another one.</string>
@@ -1203,6 +1204,8 @@
     <string name="plan_lane_locked">Premium</string>
     <string name="plan_lane_insight_title">A coach-written weekly note</string>
     <string name="plan_lane_insight_body">On premium, the narrative at the top of your weekly summary is written by the coach. On free it is written from your own numbers by the app itself - you still get the summary, and every "what changed" line in it, every week.</string>
+    <string name="plan_lane_vision_title">Meal photo analysis</string>
+    <string name="plan_lane_vision_body">Photographing a plate and having the model read it is part of Premium. Search and barcode logging stay on the free plan. A premium photo still spends meal-photo credits.</string>
     <string name="plan_lane_generic_body">This part of the coach runs on a model lane the free tier does not reach.</string>
     <string name="plan_difference_footnote">Your targets, your logging, your training plans, the coach chat and every number in your weekly summary work the same way on both plans.</string>
     <string name="plan_costs_heading">What each AI action costs</string>
@@ -1272,6 +1275,53 @@
     <string name="challenges_code_copied">Code copied.</string>
     <string name="challenges_share_code">Share invite</string>
     <string name="challenges_share_text">Join my AquaZeroFit huddle:\n%1$s\nCode: %2$s</string>
+
+    <!-- Fight Record: seasons and Consistency Belts (AZF-W3-05). Every string
+         here keeps the copy rules of §2.7, enforced by FightRecordCopyTest:
+         belts count active days, nothing can be taken away, and days left is
+         a plain sentence, never a countdown. The share text carries the belt
+         and season only: no count of days and no health figure. -->
+    <string name="fight_record_title">Fight Record</string>
+    <string name="fight_record_belt_white">White Belt</string>
+    <string name="fight_record_belt_blue">Blue Belt</string>
+    <string name="fight_record_belt_purple">Purple Belt</string>
+    <string name="fight_record_belt_brown">Brown Belt</string>
+    <string name="fight_record_belt_black">Black Belt</string>
+    <string name="fight_record_belt_new">New belt</string>
+    <string name="fight_record_no_belt">No belt yet</string>
+    <plurals name="fight_record_next_belt">
+        <item quantity="one">%1$d active day to your %2$s.</item>
+        <item quantity="other">%1$d active days to your %2$s.</item>
+    </plurals>
+    <string name="fight_record_top_of_ladder">Black Belt: the top of the ladder this season.</string>
+    <plurals name="fight_record_days_left">
+        <item quantity="one">%1$d day left in the season</item>
+        <item quantity="other">%1$d days left in the season</item>
+    </plurals>
+    <string name="fight_record_season_number">Season %1$d</string>
+    <string name="fight_record_season_dates">%1$s to %2$s</string>
+    <string name="fight_record_season_subtitle">%1$s · %2$s</string>
+    <string name="fight_record_intro">A season is eight weeks. Any day you log a meal, water or a weigh-in, or finish a workout, is an active day. Belts count active days, so a quiet day never costs you anything, and every season starts fresh with your old belts kept here.</string>
+    <string name="fight_record_season_named">Season %1$d · %2$s</string>
+    <plurals name="fight_record_active_days">
+        <item quantity="one">%1$d active day this season</item>
+        <item quantity="other">%1$d active days this season</item>
+    </plurals>
+    <string name="fight_record_share">Share my belt</string>
+    <string name="fight_record_share_text">%1$s, Season %2$d on AquaZeroFit.\n%3$s</string>
+    <string name="fight_record_ladder_heading">The ladder</string>
+    <plurals name="fight_record_rung_days">
+        <item quantity="one">%1$d active day</item>
+        <item quantity="other">%1$d active days</item>
+    </plurals>
+    <string name="fight_record_rung_held">Held</string>
+    <string name="fight_record_rung_ahead">Not yet held</string>
+    <string name="fight_record_shelf_heading">Your belts</string>
+    <plurals name="fight_record_shelf_empty">
+        <item quantity="one">Your first belt is %1$d active day away.</item>
+        <item quantity="other">Your first belt is %1$d active days away.</item>
+    </plurals>
+    <string name="fight_record_error">We couldn\'t load your Fight Record.</string>
 
     <!-- Readiness (Protect / Maintain / Progress) -->
     <string name="readiness_mode_protect">Protect</string>

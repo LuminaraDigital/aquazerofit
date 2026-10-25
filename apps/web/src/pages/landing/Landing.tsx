@@ -1,15 +1,15 @@
 /**
- * AquaZeroFit marketing landing page — the web front door, served in place at
+ * AquaZeroFit marketing landing page  -  the web front door, served in place at
  * `/` for signed-out browser visitors.
  *
  * Its single job is conversion into Telegram, where the product actually
  * lives. The web is marketing; Telegram is the app. So the primary CTA leaves
  * this origin, and the browser sign-up sits beside it as the deliberate
- * second path for anyone whose network blocks Telegram — see BrowserPath.
+ * second path for anyone whose network blocks Telegram  -  see BrowserPath.
  *
  * There are no auth or Telegram redirects in here any more. RequireAuth
  * decides who sees this page (signed-out, not in Telegram, at `/`) and this
- * component trusts that decision — a second copy of the rule inside a page
+ * component trusts that decision  -  a second copy of the rule inside a page
  * rendered *at* `/` could only ever redirect `/` to `/`.
  *
  * Motion budget: one WebGL draw call (HeroOrb), CSS transforms driven by
@@ -19,11 +19,15 @@
  *
  * Header and footer live in Chrome.tsx, shared with /features.
  */
+import { lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useSeo } from '../../lib/seo';
-import { AppBackground } from '../../components/layout/AppBackground';
 import { Footer, TelegramCta, TopBar, WebFallbackLink } from './Chrome';
-import { HeroOrb } from './HeroOrb';
+
+const AppBackground = lazy(() =>
+  import('../../components/layout/AppBackground').then((m) => ({ default: m.AppBackground })),
+);
+const HeroOrb = lazy(() => import('./HeroOrb').then((m) => ({ default: m.HeroOrb })));
 import { PhoneShowcase } from './PhoneShowcase';
 import { Reveal, useHashScroll } from './motion';
 import { AkinStage } from '../../components/brand/AkinStage';
@@ -82,7 +86,7 @@ function Hero() {
                 person who needs to know the second one is a real product and
                 not a demo. */}
             <p className="mt-3 text-[12px] leading-relaxed text-on-surface-variant/60">
-              No install — the Mini App opens inside Telegram. Blocked at work?
+              No install. The Mini App opens inside Telegram. Blocked at work?
               The browser version is the same app, same account.
             </p>
           </Reveal>
@@ -115,7 +119,9 @@ function Hero() {
         <div className="relative">
           {/* Offset from the device's centre so the drop's lit rim clears the
               phone instead of hiding entirely behind it. */}
-          <HeroOrb className="pointer-events-none absolute left-[58%] top-[38%] h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 sm:h-[660px] sm:w-[660px]" />
+          <Suspense fallback={null}>
+            <HeroOrb className="pointer-events-none absolute left-[58%] top-[38%] h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 sm:h-[660px] sm:w-[660px]" />
+          </Suspense>
           <div
             className="lp-orbit pointer-events-none absolute left-1/2 top-1/2 h-[380px] w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/10 sm:h-[460px] sm:w-[460px]"
             aria-hidden="true"
@@ -177,7 +183,9 @@ export default function Landing() {
 
   return (
     <div className="relative min-h-screen bg-surface text-on-surface">
-      <AppBackground />
+      <Suspense fallback={null}>
+        <AppBackground />
+      </Suspense>
 
       <a
         href="#main"

@@ -43,8 +43,8 @@ desktop.ini
 apps/api/.data/
 apps/api/uploads/
 # AZF_DATA_DIR is resolved relative to the process cwd, not to apps/api. Running
-# the API from the repo root — which `npm run dev` and the .env's
-# `AZF_DATA_DIR=./.data` both do — puts the live JSON store here instead, where
+# the API from the repo root, which `npm run dev` and the .env's
+# `AZF_DATA_DIR=./.data` both do, puts the live JSON store here instead, where
 # the line above does not reach it. It holds real local accounts: users.json
 # carries email addresses and password hashes, ledger.json carries credit
 # history. Ignore both locations, not just the one the default points at.
@@ -62,13 +62,15 @@ npm-debug.log*
 .vite/
 .turbo/
 node_modules/.cache/
+.wrangler/
+cloudflare/node_modules/
 
-# Generated documents at root — regenerate with tools/docgen.
+# Generated documents at root. Regenerate with tools/docgen.
 # Anchored so the deliverable set in docs/specs/ is still tracked.
 /*.docx
 docker-compose.override.yml
 
-# Android (apps/android) — Gradle build outputs and local machine state.
+# Android (apps/android): Gradle build outputs and local machine state.
 # Source, wrapper and exported Room schemas stay tracked.
 apps/android/.gradle/
 apps/android/build/

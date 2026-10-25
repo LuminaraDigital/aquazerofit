@@ -1,5 +1,6 @@
 /**
- * /billing — the routes that turn a Play purchase into an entitlement.
+ * /billing - the routes that turn a Play or Stripe purchase into an
+ * entitlement. The Stripe half is at the bottom; Play's is described here.
  *
  * Two surfaces with opposite threat models:
  *
@@ -30,17 +31,46 @@ import {
   effectiveTier,
   grantPremium,
   revokePremium,
+  tierOf,
   type EntitlementGrant,
 } from './entitlements';
 import { obfuscatedAccountIdFor, playBillingConfigured, verifyPurchase } from './play';
+import {
+  createCheckoutSession,
+  handleStripeEvent,
+  premiumPrice,
+  stripeSignatureValid,
+  syncCheckoutSession,
+  type StripeEvent,
+} from './stripe';
+import {
+  STARS_SUBSCRIPTION_PERIOD_SECONDS,
+  createPremiumSubscriptionInvoice,
+  starsPremiumAvailable,
+  starsPremiumPrice,
+} from '../payments/starsSubscription';
 import type { User } from '@aquazerofit/shared';
 
 export const billingRouter = Router();
 
 /** Advertised so a client can hide the buy button rather than offer a dead one. */
-billingRouter.get('/config', (_req, res) => {
-  res.json({ play: { available: playBillingConfigured() } });
-});
+billingRouter.get(
+  '/config',
+  asyncHandler(async (_req, res) => {
+    const price = await premiumPrice();
+    const starsPrice = starsPremiumPrice();
+    const starsOn = starsPremiumAvailable();
+    res.json({
+      play: { available: playBillingConfigured() },
+      stripe: { available: price !== null, price },
+      stars: {
+        available: starsOn,
+        price: starsOn ? starsPrice : null,
+        periodSeconds: starsOn ? STARS_SUBSCRIPTION_PERIOD_SECONDS : null,
+      },
+    });
+  }),
+);
 
 const verifySchema = z.object({
   purchaseToken: z.string().min(1).max(4096),
@@ -52,7 +82,7 @@ const verifySchema = z.object({
  *
  * The period comes from Google's response, never from the request. The
  * purchase token doubles as the idempotency key, so the client may safely
- * retry — and it must, because the Android side only acknowledges the purchase
+ * retry - and it must, because the Android side only acknowledges the purchase
  * to Google after this succeeds, and an unacknowledged purchase is auto-
  * refunded after three days.
  */
@@ -93,7 +123,7 @@ billingRouter.post(
      * the check above is concerned, and one account presenting another's token
      * was therefore refused only by accident. `grantPremium` deduplicates on
      * `play:<token>:<expiry>`, so an exact replay settles as a duplicate and
-     * grants the second account nothing — but the expiry is in that key, so the
+     * grants the second account nothing - but the expiry is in that key, so the
      * FIRST renewal makes the very same replay a brand-new event and premium
      * lands on both accounts. One paid subscription, two subscribers, renewing
      * indefinitely: the classic sharing fraud, reachable by anyone who can pass
@@ -172,7 +202,7 @@ interface DeveloperNotification {
  * REVOKED (12) and EXPIRED (13) only. Deliberately NOT canceled (3): a
  * cancellation means auto-renew is off, and the user has still paid through
  * the end of the current period. Treating it as an immediate revocation would
- * take away time somebody bought — the single most reliable way to turn a
+ * take away time somebody bought - the single most reliable way to turn a
  * lapsing customer into a refund request.
  */
 const ENDING_NOTIFICATIONS = new Set([12, 13]);
@@ -214,7 +244,7 @@ billingRouter.post(
     const purchaseToken = sub?.purchaseToken;
     if (!sub || !purchaseToken) {
       // Test messages and non-subscription notifications land here. Acknowledged
-      // and dropped — redelivering them forever helps nobody.
+      // and dropped - redelivering them forever helps nobody.
       res.status(200).json({ ok: true });
       return;
     }
@@ -223,9 +253,9 @@ billingRouter.post(
      * The token is the only identifier Google sends; it does not name our user.
      * The grant record written at purchase time is what maps one to the other,
      * which is why `externalId` is the purchase token rather than an id of our
-     * own. A notification for a token we never granted on is not an error — it
+     * own. A notification for a token we never granted on is not an error - it
      * is a purchase made against a different environment sharing this Play
-     * account — so it is acknowledged and ignored.
+     * account - so it is acknowledged and ignored.
      */
     const priorGrant = getStore().findOne<EntitlementGrant>(
       'ledger',
@@ -256,7 +286,7 @@ billingRouter.post(
           purchaseToken,
         );
       } else {
-        // Everything else — renewal, recovery, restart — is re-verified against
+        // Everything else - renewal, recovery, restart - is re-verified against
         // Google rather than believed. The notification says something changed;
         // only the API says what the period now is.
         const verified = await verifyPurchase(purchaseToken);
@@ -285,5 +315,109 @@ billingRouter.post(
     }
 
     res.status(200).json({ ok: true });
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Stripe Checkout (web)
+// ---------------------------------------------------------------------------
+
+/**
+ * Open a Checkout page. Refused for an account that is already premium from
+ * any source: a second subscription would bill the user twice for one tier.
+ */
+billingRouter.post(
+  '/stripe/checkout',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    // Digital goods inside a Mini App have to be paid with Stars. The session
+    // channel is minted by initData auth and kept across refresh, so this does
+    // not trust a client header. A password or Firebase session is unchanged.
+    if (req.user?.channel === 'telegram') {
+      throw new AppError(
+        'FORBIDDEN',
+        'Card checkout is not available in Telegram. Premium in the Mini App is paid with Stars.',
+      );
+    }
+    if (tierOf(userId) === 'premium') {
+      throw new AppError('CONFLICT', 'This account is already on premium.');
+    }
+    res.json({ url: await createCheckoutSession(userId) });
+  }),
+);
+
+/**
+ * Open a Stars subscription invoice for the Mini App.
+ *
+ * The session channel is minted by initData auth. A password or Firebase
+ * session is refused: Stars is the Mini App rail, and Stripe stays refused
+ * the other way around. The price and the 30-day period are server-side.
+ */
+billingRouter.post(
+  '/stars/subscription',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (req.user?.channel !== 'telegram') {
+      throw new AppError('FORBIDDEN', 'Stars checkout is only available in the Telegram Mini App.');
+    }
+    const result = await createPremiumSubscriptionInvoice(userIdOf(req));
+    res.json(result);
+  }),
+);
+
+const syncSchema = z.object({
+  // Shape-checked before it is spliced into a Stripe URL path.
+  sessionId: z.string().regex(/^cs_[A-Za-z0-9_]{1,250}$/),
+});
+
+/** The success redirect's catch-up: settle the session now rather than wait for the webhook. */
+billingRouter.post(
+  '/stripe/sync',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { sessionId } = syncSchema.parse(req.body ?? {});
+    const userId = userIdOf(req);
+    await syncCheckoutSession(userId, sessionId);
+    const user = getStore().byId<User>('users', userId);
+    res.json({ tier: user ? effectiveTier(user) : 'free', premiumUntil: user?.premiumUntil ?? null });
+  }),
+);
+
+/**
+ * Stripe's event deliveries. `req.body` is the raw Buffer here - app.ts mounts
+ * `express.raw` for this path ahead of `express.json`, because the signature
+ * covers the exact bytes and a re-serialised object cannot be verified.
+ *
+ * Unlike Pub/Sub, Stripe's retries are bounded (about three days), so an
+ * unexpected failure is allowed to 500 and be redelivered - a paid invoice
+ * that was never granted is the expensive outcome. PAYMENT_UNAVAILABLE is the
+ * same kind of failure: Stripe itself unreachable while a refund or dispute is
+ * traced to its invoice. It answers 503 so the delivery comes back, because
+ * acknowledging it would drop that revoke for good. Any other AppError is
+ * final (the account is gone, the payload is not one we can settle) and is
+ * acknowledged.
+ */
+billingRouter.post(
+  '/stripe/webhook',
+  asyncHandler(async (req, res) => {
+    const raw = Buffer.isBuffer(req.body) ? req.body : null;
+    if (!raw || !stripeSignatureValid(raw, req.get('stripe-signature'), config.stripeWebhookSecret)) {
+      logEvent('stripe_webhook_rejected', { reason: 'signature' });
+      res.status(401).json({ code: 'AUTH_INVALID', message: 'Invalid webhook signature.' });
+      return;
+    }
+    const event = JSON.parse(raw.toString('utf8')) as StripeEvent;
+    try {
+      await handleStripeEvent(event);
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      if (err.code === 'PAYMENT_UNAVAILABLE') {
+        logEvent('stripe_webhook_deferred', { type: event.type, reason: err.message });
+        throw err;
+      }
+      logEvent('stripe_webhook_unsettled', { type: event.type, reason: err.message });
+    }
+    res.json({ received: true });
   }),
 );

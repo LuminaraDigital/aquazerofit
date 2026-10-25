@@ -15,6 +15,7 @@ import {
   secureEquals,
   sha256Hex,
   signAccess,
+  type SessionChannel,
 } from '../../platform/auth';
 import { credentialsId, toPublicUser, type CredentialsDoc } from '../me/service';
 import { validateTelegramInitData, type TelegramUser } from './telegram';
@@ -82,10 +83,10 @@ export function findUserByEmail(email: string): User | undefined {
   );
 }
 
-function tokensFor(user: User): AuthResponse {
-  const { token } = issueRefresh(user.id);
+function tokensFor(user: User, channel?: SessionChannel): AuthResponse {
+  const { token } = issueRefresh(user.id, undefined, channel);
   return {
-    accessToken: signAccess(user),
+    accessToken: signAccess(user, channel),
     refreshToken: token,
     user: toPublicUser(user),
   };
@@ -135,15 +136,14 @@ function recordLoginFailure(emailKey: string, now: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Per-IP Telegram auto-provision cap (distinct from the global /auth rate lane).
+// Telegram auto-provision caps (distinct from the /auth rate lane).
 // Only NEW account creation is counted; returning users signing in again are
-// unaffected. Stale buckets are pruned lazily on each check.
+// unaffected. Limits live in config (per IP per minute, per subnet per day,
+// and an optional process-local daily ceiling that defaults to off).
+// Stale buckets are pruned lazily on each check.
 // ---------------------------------------------------------------------------
 
 const TG_NEW_ACCOUNT_WINDOW_MS = 60_000;
-const TG_NEW_ACCOUNT_LIMIT = 3;
-const TG_GLOBAL_DAILY_LIMIT = 100;
-const TG_SUBNET_DAILY_LIMIT = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const telegramNewAccountsByIp = new Map<string, number[]>();
@@ -189,30 +189,33 @@ function pruneTelegramNewAccounts(now: number): void {
 function assertTelegramNewAccountAllowed(ip: string | undefined, now: number): void {
   pruneTelegramNewAccounts(now);
   const key = ip?.trim() || 'unknown';
+  const perIpLimit = config.telegramSignupPerIpPerMinute;
+  const subnetLimit = config.telegramSignupSubnetDaily;
+  const globalLimit = config.telegramSignupGlobalDaily;
   const windowStart = now - TG_NEW_ACCOUNT_WINDOW_MS;
   const stamps = (telegramNewAccountsByIp.get(key) ?? []).filter((t) => t > windowStart);
-  if (stamps.length >= TG_NEW_ACCOUNT_LIMIT) {
+  if (stamps.length >= perIpLimit) {
     const oldest = stamps[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + TG_NEW_ACCOUNT_WINDOW_MS - now) / 1000));
     throw new AppError('RATE_LIMITED', 'Too many new Telegram accounts from this network. Please try again later.', {
       retryAfterSeconds,
     });
   }
-  
-  // Global daily cap
-  if (telegramNewAccountsGlobal.length >= TG_GLOBAL_DAILY_LIMIT) {
-    const oldest = telegramNewAccountsGlobal[0];
+
+  // Process-local daily ceiling. 0 disables it (the launch default).
+  if (globalLimit > 0 && telegramNewAccountsGlobal.length >= globalLimit) {
+    const oldest = telegramNewAccountsGlobal[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + DAY_MS - now) / 1000));
     throw new AppError('RATE_LIMITED', 'Global daily limit for new Telegram accounts reached. Please try again tomorrow.', {
       retryAfterSeconds,
     });
   }
-  
-  // Per-subnet daily cap
+
+  // Per-subnet daily cap.
   const subnet = subnetKey(key);
   const subnetStamps = telegramNewAccountsBySubnet.get(subnet) ?? [];
-  if (subnetStamps.length >= TG_SUBNET_DAILY_LIMIT) {
-    const oldest = subnetStamps[0];
+  if (subnetStamps.length >= subnetLimit) {
+    const oldest = subnetStamps[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + DAY_MS - now) / 1000));
     throw new AppError('RATE_LIMITED', 'Too many new Telegram accounts from this network region. Please try again tomorrow.', {
       retryAfterSeconds,
@@ -253,12 +256,12 @@ export async function register(
     // No mail transport exists yet, so there is no verification link to send.
     // Dev auto-verifies for convenience; production records the truth (false)
     // rather than asserting a verification that never happened. Nothing gates
-    // on this flag today — when the transport lands, gate login here.
+    // on this flag today - when the transport lands, gate login here.
     emailVerified: config.isDev,
     role: 'user',
     tier: 'free',
     // The email prefix is derived, not submitted, so it never passes through
-    // registerSchema — which makes it the one way a refused name could still
+    // registerSchema - which makes it the one way a refused name could still
     // land on an account (someone@ signing up as the slur before the @).
     displayName: safeDisplayName(input.displayName?.trim() || input.email.split('@')[0]!),
     createdAt: now,
@@ -303,15 +306,15 @@ export async function login(input: { email: string; password: string }, ip?: str
 
 export function refresh(refreshToken: string, ip?: string): Promise<AuthResponse> {
   return (async () => {
-    const { token, userId } = await rotateRefresh(refreshToken);
-    const user = getStore().byId<User>('users', userId);
+    const rotated = await rotateRefresh(refreshToken);
+    const user = getStore().byId<User>('users', rotated.userId);
     if (!user || !isUserDoc(user)) {
       throw new AppError('AUTH_INVALID', 'Account no longer exists');
     }
     auditAuthEvent(user.id, 'token.refresh', undefined, ip);
     return {
-      accessToken: signAccess(user),
-      refreshToken: token,
+      accessToken: signAccess(user, rotated.channel),
+      refreshToken: rotated.token,
       user: toPublicUser(user),
     };
   })();
@@ -353,7 +356,7 @@ export function telegramAuth(initData: string, ip?: string): AuthResponse {
   } else {
     auditAuthEvent(user.id, 'login.telegram', { tgIdHash: hashIdentifier(tgUser.id) }, ip);
   }
-  return tokensFor(user);
+  return tokensFor(user, 'telegram');
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +408,7 @@ export function requestPasswordReset(email: string, ip?: string): { devToken?: s
   });
 
   // Dev convenience: also echo the token. Requires both NODE_ENV=development and
-  // exposeDevTokens — staging (NODE_ENV=production) must not leak credentials via logs or response
+  // exposeDevTokens - staging (NODE_ENV=production) must not leak credentials via logs or response
   // bodies even when operators forget to unset dev conveniences.
   const exposeToken = process.env.NODE_ENV === 'development' && config.exposeDevTokens;
   if (exposeToken) {
@@ -446,7 +449,7 @@ export async function confirmPasswordReset(token: string, newPassword: string, i
 /**
  * First-time credentials for a Telegram-provisioned account (AQF-09 §2.3):
  * replace the synthetic tg-…@ placeholder email with one the user owns and
- * create the credentials record that `login` requires. One-shot by design —
+ * create the credentials record that `login` requires. One-shot by design -
  * an account that already has a password changes it via the reset flow, which
  * proves control of the mailbox; this endpoint only proves a valid session.
  */
@@ -472,12 +475,22 @@ export async function setCredentials(
     throw new AppError('CONFLICT', 'An account already exists for this email address');
   }
 
+  const emailChanged = email !== user.email.trim().toLowerCase();
   const updated: User = {
     ...user,
     email,
-    // Same stance as register(): dev auto-verifies for convenience; production
-    // records the truth until a verification transport exists.
-    emailVerified: config.isDev,
+    // A new address is unproved. This codebase has a password-reset token,
+    // not an email-verification token, and the reset flow must not be reused
+    // to flip this flag (it changes the password and revokes every session).
+    // Leave a changed address unverified in every environment, including dev,
+    // so a later verified Firebase sign-in cannot attach to this account.
+    // Password login does not read the flag and still works. An unchanged
+    // address keeps whatever proof it already had.
+    //
+    // What is left: a mailbox-proof flow that sets emailVerified only after
+    // the address is confirmed, and a way to release an unverified claim.
+    // Until then, register returns CONFLICT while this row holds the address.
+    emailVerified: emailChanged ? false : user.emailVerified,
   };
   store.upsert('users', updated);
   store.upsert('users', {

@@ -615,12 +615,14 @@ private fun PlanOptionCard(
 @Composable
 private fun laneTitle(lane: String): String = when (lane) {
     "insightBatch" -> stringResource(R.string.plan_lane_insight_title)
+    "visionPrimary" -> stringResource(R.string.plan_lane_vision_title)
     else -> lane
 }
 
 @Composable
 private fun laneBody(lane: String): String = when (lane) {
     "insightBatch" -> stringResource(R.string.plan_lane_insight_body)
+    "visionPrimary" -> stringResource(R.string.plan_lane_vision_body)
     else -> stringResource(R.string.plan_lane_generic_body)
 }
 

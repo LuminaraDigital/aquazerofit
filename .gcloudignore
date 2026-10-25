@@ -1,0 +1,36 @@
+# Upload filter for `gcloud builds submit`. Independent of .gitignore so a
+# dependency or Android tree is not sent to Cloud Build.
+#
+# Keep the Docker build inputs: Dockerfile, package-lock.json, apps/api,
+# apps/web source, packages, and prompts. The image compiles the SPA itself.
+#
+# A pattern with no slash matches in every directory. Root-only trees are
+# anchored (`/data`, `/docs`, ...) so a source directory of the same name is
+# still uploaded. `apps/api/src/data` was dropped when `data` was unanchored,
+# and the image then built without the seed and wger importer. Recursive
+# excludes (node_modules, coverage, env files, logs) stay unanchored on purpose.
+
+/.git
+/.github
+/.cursor
+/.claude
+/.windsurf
+node_modules
+**/node_modules
+/apps/android
+coverage
+**/coverage
+/data
+/apps/api/uploads
+/apps/api/.data
+**/.data
+/apps/web/dist
+.env
+.env.*
+*.log
+/docs
+/design
+/content
+/evals
+/tools
+/cloudflare

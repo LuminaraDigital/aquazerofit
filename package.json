@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
-  "description": "AquaZeroFit — AI-powered wellness platform (web + Telegram Mini App). An AquaZero product.",
+  "description": "AquaZeroFit: AI-powered wellness platform (web + Telegram Mini App). An AquaZero product.",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -12,7 +12,7 @@
     "dev": "npm run dev --workspace apps/web",
     "api": "npm run dev --workspace apps/api",
     "build": "npm run build --workspace packages/shared && npm run build --workspace apps/api && npm run build --workspace apps/web",
-    "test": "npm run test --workspace packages/shared --if-present && npm run test --workspace apps/api --if-present && npm run test --workspace apps/web --if-present",
+    "test": "npm run test --workspace packages/shared --if-present && npm run test --workspace apps/api --if-present && npm run test --workspace apps/web --if-present && npm test --prefix cloudflare",
     "test:coverage": "npm run test:coverage --workspace apps/api && npm run test:coverage --workspace apps/web",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "seed": "npm run seed --workspace apps/api",
@@ -24,6 +24,7 @@
     "start": "npm run start --workspace apps/api",
     "assets:coaches": "node tools/coaches/build-art.mjs",
     "assets:cards": "node tools/cards/build-card.mjs",
+    "assets:belts": "node tools/belts/build-belt-art.mjs",
     "screenshots:optimise": "node tools/screenshots/optimise.mjs",
     "docs:setup": "npm --prefix tools/docgen install",
     "docs:build": "node tools/docgen/md-to-docx.js"
@@ -32,10 +33,13 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.12",
     "sharp": "^0.35.4",
     "tsx": "^4.16.2"
   },
   "overrides": {
-    "@grpc/grpc-js": "^1.14.6"
+    "@grpc/grpc-js": "^1.14.6",
+    "vite": "^8.3.5",
+    "valibot": "1.5.0"
   }
 }

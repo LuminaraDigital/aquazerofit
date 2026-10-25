@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { MealType } from '@aquazerofit/shared';
 import { MEAL_PHOTO_MAX_BYTES } from '@aquazerofit/shared';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { compressPhoto } from '@/lib/compressPhoto';
 import { Chip } from '@/components/ui/Chip';
 import { useToast } from '@/components/ui/Toast';
+import { AiDegradedNotice, readAiDegradedFlag } from './AiDegradedNotice';
 import { MEAL_LABEL, MEAL_TYPES, mealTypeForNow, todayLocalDate } from '../dashboard/lib';
+import { useTelegramMainAction, useTelegramUnsavedEdits } from '@/lib/useTelegramChrome';
 
 const ACCEPT = 'image/jpeg,image/png,image/heic';
 
 function isAcceptedFile(file: File): boolean {
   if (['image/jpeg', 'image/png', 'image/heic'].includes(file.type)) return true;
-  // Some platforms report an empty MIME for HEIC — fall back to the extension.
+  // Some platforms report an empty MIME for HEIC. Fall back to the extension.
   if (!file.type) return /\.(heic|jpe?g|png)$/i.test(file.name);
   return false;
 }
@@ -25,12 +27,16 @@ function Corner({ className }: { className: string }) {
 
 export default function CaptureMeal() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { show } = useToast();
+  const routedDegraded = Boolean((location.state as { aiDegraded?: boolean } | null)?.aiDegraded);
+  const showDegradedNotice = routedDegraded || readAiDegradedFlag();
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [mealType, setMealType] = useState<MealType>(mealTypeForNow());
   const [error, setError] = useState<string | null>(null);
+  const [premiumGate, setPremiumGate] = useState(false);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -57,11 +63,34 @@ export default function CaptureMeal() {
         show('Upload succeeded but no analysis job was returned');
       }
     },
-    onError: () => show('Upload failed — check your connection and try again'),
+    onError: (e) => {
+      if (e instanceof ApiError && e.code === 'FORBIDDEN') {
+        setPremiumGate(true);
+        setError(e.message || 'This feature is part of AquaZeroFit Premium.');
+        return;
+      }
+      setPremiumGate(false);
+      show('Upload failed. Check your connection and try again');
+    },
   });
+
+  const nativePrimary = useTelegramMainAction(
+    file
+      ? {
+          text: upload.isPending ? 'Uploading' : 'Analyze meal',
+          onClick: () => upload.mutate(file),
+          enabled: !upload.isPending,
+        }
+      : {
+          text: 'Take photo',
+          onClick: () => cameraInputRef.current?.click(),
+        },
+  );
+  useTelegramUnsavedEdits(file !== null && !upload.isSuccess);
 
   const onFileChosen = async (chosen: File | undefined) => {
     setError(null);
+    setPremiumGate(false);
     if (!chosen) return;
     if (!isAcceptedFile(chosen)) {
       setError('That file type is not supported. Please use a JPEG, PNG or HEIC photo.');
@@ -137,7 +166,10 @@ export default function CaptureMeal() {
       {/* UI overlay */}
       <div className="relative z-10 h-full flex flex-col max-w-md mx-auto">
         {/* Header */}
-        <header className="bg-surface/40 backdrop-blur-md px-container-margin py-4 flex justify-between items-center border-b border-outline-variant/30">
+        <header
+          className="bg-surface/40 backdrop-blur-md px-container-margin py-4 flex justify-between items-center border-b border-outline-variant/30"
+          style={{ paddingTop: 'calc(1rem + var(--azf-header-safe-top, 0px))' }}
+        >
           <button
             type="button"
             aria-label="Close meal capture"
@@ -159,6 +191,12 @@ export default function CaptureMeal() {
           <div className="w-10 h-10" aria-hidden="true" />
         </header>
 
+        {showDegradedNotice && (
+          <div className="px-container-margin pt-3">
+            <AiDegradedNotice />
+          </div>
+        )}
+
         {/* Guidance copy */}
         <div className="flex-grow flex items-center justify-center pointer-events-none px-container-margin">
           {!upload.isPending && (
@@ -167,7 +205,7 @@ export default function CaptureMeal() {
                 <span className="material-symbols-outlined text-primary" aria-hidden="true">
                   center_focus_weak
                 </span>
-                {file ? 'Looks good — pick a meal type and analyze' : 'Frame your whole meal in the brackets'}
+                {file ? 'Looks good. Pick a meal type and analyze' : 'Frame your whole meal in the brackets'}
               </p>
               {!file && (
                 <p className="text-on-surface-variant text-xs mt-1">
@@ -190,7 +228,15 @@ export default function CaptureMeal() {
         {error && (
           <div className="px-container-margin mb-3" aria-live="assertive">
             <div className="bg-error-container/80 border border-error rounded-xl px-4 py-3 text-on-error-container text-sm">
-              {error}
+              <p>{error}</p>
+              {premiumGate && (
+                <Link
+                  to="/plan"
+                  className="mt-2 inline-flex font-bold underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  Your plan
+                </Link>
+              )}
             </div>
           </div>
         )}
@@ -227,6 +273,7 @@ export default function CaptureMeal() {
               </span>
             </button>
 
+            {!nativePrimary && (
             <button
               type="button"
               onClick={() => cameraInputRef.current?.click()}
@@ -235,6 +282,7 @@ export default function CaptureMeal() {
             >
               <div className="w-[72px] h-[72px] rounded-full border-2 border-background" aria-hidden="true" />
             </button>
+            )}
 
             <button
               type="button"
@@ -244,6 +292,7 @@ export default function CaptureMeal() {
                   if (previewUrl) URL.revokeObjectURL(previewUrl);
                   setPreviewUrl(null);
                   setError(null);
+                  setPremiumGate(false);
                 }
               }}
               disabled={!file}
@@ -257,7 +306,7 @@ export default function CaptureMeal() {
           </div>
 
           {/* Analyze CTA */}
-          {file && (
+          {file && !nativePrimary && (
             <button
               type="button"
               onClick={() => upload.mutate(file)}

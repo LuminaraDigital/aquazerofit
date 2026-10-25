@@ -1,11 +1,11 @@
 /**
- * /auth/mfa — TOTP enrolment and the admin step-up challenge.
+ * /auth/mfa - TOTP enrolment and the admin step-up challenge.
  *
  * Mounted under the auth router rather than as a top-level module so it lands
- * on the strict /auth rate lane (platform/rateLimiter: 10/min per IP), which is
+ * on the /auth rate lane (platform/rateLimiter, per IP), which is
  * the right lane for a credential-guessing surface. The per-user lockout in
- * ./service is the real brake — the IP lane is disabled under test and does not
- * distinguish accounts — but the two stack.
+ * ./service is the real brake - the IP lane is disabled under test and does not
+ * distinguish accounts - but the two stack.
  *
  * Every route requires an authenticated session: MFA here is a SECOND factor
  * layered on the existing password session, not a login step of its own.

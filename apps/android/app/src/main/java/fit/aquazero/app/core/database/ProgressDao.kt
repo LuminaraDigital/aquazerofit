@@ -6,15 +6,22 @@ import androidx.room3.Transaction
 import androidx.room3.Upsert
 import kotlinx.coroutines.flow.Flow
 
-/** DAO for the progress summary snapshot and trend series caches. */
+/** DAO for the keyed progress snapshots and the trend series caches. */
 @Dao
 interface ProgressDao {
 
+    /** Writes any keyed snapshot; the row's key decides which document it is. */
     @Upsert
     suspend fun upsertSummary(summary: ProgressSummaryEntity)
 
-    @Query("SELECT * FROM progress_summary LIMIT 1")
-    fun summary(): Flow<ProgressSummaryEntity?>
+    /**
+     * One snapshot, by its key (see [ProgressSummaryEntity] for the keys).
+     * The only read: the old unfiltered `LIMIT 1` was correct while the table
+     * held one document, and with the Fight Record snapshot beside it could
+     * hand the progress screen a belt ladder to decode.
+     */
+    @Query("SELECT * FROM progress_summary WHERE userId = :key")
+    fun snapshot(key: String): Flow<ProgressSummaryEntity?>
 
     @Upsert
     suspend fun upsertTrendPoints(points: List<TrendPointEntity>)
@@ -32,6 +39,7 @@ interface ProgressDao {
         if (points.isNotEmpty()) upsertTrendPoints(points)
     }
 
+    /** Every key at once: sign-out must not leave one user's belts for the next. */
     @Query("DELETE FROM progress_summary")
     suspend fun clearSummary()
 

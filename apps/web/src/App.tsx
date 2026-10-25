@@ -1,5 +1,10 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import {
+  useTelegramBackButton,
+  useTelegramHostChrome,
+  useTelegramVerticalSwipes,
+} from './lib/useTelegramChrome';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { RequireAuth, RequireTargets, useProfileGate } from './components/layout/RequireAuth';
@@ -17,6 +22,7 @@ const PrivacyPage = lazy(() => import('./pages/legal/Privacy'));
 /* The privacy-policy URL declared in Play Console; keep the path stable. */
 const GooglePlayPrivacyPage = lazy(() => import('./pages/legal/GooglePlayPrivacy'));
 const TermsPage = lazy(() => import('./pages/legal/Terms'));
+const RefundPage = lazy(() => import('./pages/legal/Refund'));
 const SupportPage = lazy(() => import('./pages/legal/Support'));
 /* Public account-deletion instructions. Play requires this reachable WITHOUT the
    app installed and without signing in, so it sits with the legal pages rather
@@ -48,6 +54,7 @@ const LogWeight = lazy(() => import('./pages/progress/LogWeight'));
 const Coach = lazy(() => import('./pages/coach/Coach'));
 const CoachSelect = lazy(() => import('./pages/coach/CoachSelect'));
 const Challenges = lazy(() => import('./pages/challenges/Challenges'));
+const FightRecord = lazy(() => import('./pages/fightRecord/FightRecord'));
 
 const PlanPage = lazy(() => import('./pages/upgrade/Plan'));
 
@@ -78,11 +85,20 @@ function LandingAlias() {
   return <Navigate to={{ pathname: '/', hash, search }} replace />;
 }
 
+function TelegramChrome() {
+  useTelegramHostChrome();
+  useTelegramBackButton();
+  useTelegramVerticalSwipes();
+  return null;
+}
+
 export default function App() {
   // Last-resort boundary for screens outside AppLayout (auth, settings,
   // capture flows) - AppLayout has its own so the bottom nav survives there.
   const { pathname } = useLocation();
   return (
+    <>
+    <TelegramChrome />
     <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={<RouteFallbackSkeleton />}>
         <Routes>
@@ -95,6 +111,7 @@ export default function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/google-play/privacy-policy" element={<GooglePlayPrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/refund" element={<RefundPage />} />
         <Route path="/support" element={<SupportPage />} />
         <Route path="/account/deletion" element={<AccountDeletionPage />} />
         <Route path="/welcome" element={<Welcome />} />
@@ -148,6 +165,7 @@ export default function App() {
           <Route path="/workouts/:id" element={<WorkoutDetail />} />
           <Route path="/progress/log-weight" element={<LogWeight />} />
           <Route path="/challenges" element={<Challenges />} />
+          <Route path="/fight-record" element={<FightRecord />} />
           {/* Character select renders its own header and nav, like /settings. */}
           <Route path="/coach/select" element={<CoachSelect />} />
           {/* Renders its own header and nav, so it sits outside AppLayout -
@@ -163,5 +181,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </ErrorBoundary>
+    </>
   );
 }

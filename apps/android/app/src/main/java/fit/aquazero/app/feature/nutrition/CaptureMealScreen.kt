@@ -47,6 +47,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -100,7 +101,7 @@ import androidx.compose.ui.tooling.preview.Preview as ComposePreview
  *
  * CameraX Compose viewfinder + `ImageCapture`, meal-type chips prefilled from
  * the time of day, torch, viewfinder brackets and retake. Gallery import goes
- * through the **Android Photo Picker** (`PickVisualMedia`) — deliberately NOT
+ * through the **Android Photo Picker** (`PickVisualMedia`). Deliberately NOT
  * `READ_MEDIA_IMAGES`, which would drag the app into a Play photo-and-video
  * permissions declaration for no user benefit.
  *
@@ -111,6 +112,7 @@ import androidx.compose.ui.tooling.preview.Preview as ComposePreview
 fun CaptureMealScreen(
     onBack: () -> Unit,
     onNavigateToAnalysis: (String) -> Unit,
+    onOpenPlan: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: CaptureMealViewModel = hiltViewModel(),
 ) {
@@ -264,6 +266,7 @@ fun CaptureMealScreen(
             },
             onRetake = viewModel::retake,
             onAnalyze = viewModel::analyze,
+            onOpenPlan = onOpenPlan,
             onRequestPermission = { permissionLauncher.launch(Manifest.permission.CAMERA) },
             onOpenSettings = { context.openAppSettings() },
             modifier = Modifier.fillMaxSize(),
@@ -285,6 +288,7 @@ internal fun CaptureOverlay(
     onShutter: () -> Unit,
     onRetake: () -> Unit,
     onAnalyze: () -> Unit,
+    onOpenPlan: () -> Unit = {},
     onRequestPermission: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -319,7 +323,7 @@ internal fun CaptureOverlay(
         }
 
         // Rendered, not animated in: an error banner must not depend on motion.
-        state.banner?.let { CaptureBannerRow(banner = it) }
+        state.banner?.let { CaptureBannerRow(banner = it, onOpenPlan = onOpenPlan) }
 
         CaptureControls(
             state = state,
@@ -449,11 +453,11 @@ private fun CaptureGuidance(state: CaptureMealUiState) {
     }
 }
 
-/** Inline error banner — matching the web, never a toast that can be missed. */
+/** Inline error banner. Matching the web, never a toast that can be missed. */
 @Composable
-private fun CaptureBannerRow(banner: CaptureBanner) {
+private fun CaptureBannerRow(banner: CaptureBanner, onOpenPlan: () -> Unit) {
     val text = banner.message ?: banner.messageRes?.let { stringResource(it) }.orEmpty()
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
@@ -468,6 +472,11 @@ private fun CaptureBannerRow(banner: CaptureBanner) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onErrorContainer,
         )
+        if (banner.showPlan) {
+            TextButton(onClick = onOpenPlan) {
+                Text(stringResource(R.string.plan_title))
+            }
+        }
     }
 }
 
@@ -736,7 +745,7 @@ internal fun Context.openAppSettings() {
  * difference is a crash. The listener body runs on the MAIN executor, outside
  * the coroutine: if the future completed exceptionally, a bare `get()` throws
  * `ExecutionException` from a Runnable on the main Looper before `resume` is
- * ever reached. Nothing can catch it there — not the enclosing `scope.launch`,
+ * ever reached. Nothing can catch it there: not the enclosing `scope.launch`,
  * not the `runCatching` the call sites open on the following line, not
  * `invokeOnCancellation`. The process dies.
  *
@@ -756,7 +765,7 @@ internal suspend fun <T> ListenableFuture<T>.awaitOnMain(
 }
 
 // ---------------------------------------------------------------------------
-// Previews — the viewfinder cannot render in a preview, so the overlay is
+// Previews. The viewfinder cannot render in a preview, so the overlay is
 // previewed over a flat stand-in surface.
 // ---------------------------------------------------------------------------
 

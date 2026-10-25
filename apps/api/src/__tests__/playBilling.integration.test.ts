@@ -5,7 +5,7 @@
  * product away: a forged purchase token granting premium, an unconfigured
  * deployment granting premium because it could not check, and an
  * unauthenticated webhook granting premium to anyone who finds the URL. Each
- * has exactly one correct answer — grant nothing — and each is pinned below.
+ * has exactly one correct answer  -  grant nothing  -  and each is pinned below.
  *
  * `fetch` is stubbed rather than reaching Google. What is under test is our
  * decision-making around the answer, not Google's API.
@@ -102,8 +102,17 @@ afterEach(() => {
   process.env.PLAY_PACKAGE_NAME = 'fit.aquazero.app';
   process.env.PLAY_RTDN_SECRET = 'rtdn-secret';
   // Reset the account between cases so one grant cannot carry into the next.
-  const user = getStore().byId<User>('users', userId);
-  if (user) getStore().upsert('users', { ...user, premiumUntil: null });
+  // premiumUntil is folded from every surviving grant, so clearing the user
+  // field alone would let an earlier purchase cover the next case.
+  const store = getStore();
+  for (const grant of store.where<{ id: string }>(
+    'ledger',
+    (d) => (d as { type?: string }).type === 'entitlementGrant',
+  )) {
+    store.delete('ledger', grant.id);
+  }
+  const user = store.byId<User>('users', userId);
+  if (user?.premiumUntil) store.upsert('users', { ...user, premiumUntil: null });
 });
 
 afterAll(async () => {
@@ -171,8 +180,8 @@ describe('POST /billing/play/verify', () => {
 
   /*
    * The expensive misconfiguration. A deployment with no Play credentials
-   * cannot check anything, and the tempting shortcut — trust the client
-   * because we cannot verify — hands out the product silently and is invisible
+   * cannot check anything, and the tempting shortcut  -  trust the client
+   * because we cannot verify  -  hands out the product silently and is invisible
    * until the revenue does not arrive.
    */
   it('refuses rather than assuming, when the server has no Play credentials', async () => {
@@ -199,7 +208,7 @@ describe('POST /billing/play/verify', () => {
 
   /*
    * The client acknowledges the purchase to Google only after this succeeds,
-   * and an unacknowledged purchase is auto-refunded after three days — so a
+   * and an unacknowledged purchase is auto-refunded after three days  -  so a
    * retry is the normal path, not an edge case, and it must not stack periods.
    */
   it('is idempotent, so the client can safely retry a verification', async () => {
@@ -224,7 +233,7 @@ describe('POST /billing/play/verify', () => {
    * The regression this route existed with until now. A Play subscription
    * renews under the SAME purchase token, so keying idempotency on the token
    * alone made the first verification the only one that could ever move the
-   * period — every later one deduplicated against it and handed back month
+   * period  -  every later one deduplicated against it and handed back month
    * one. Renewals then worked only while the RTDN webhook was configured and
    * delivering, and nothing on the client could notice if it was not.
    */
@@ -303,8 +312,8 @@ describe('POST /billing/play/verify', () => {
   /*
    * Subscription sharing, on the tokens the identifier check cannot reach.
    *
-   * A purchase with no `obfuscatedExternalAccountId` — a build from before the
-   * client sent one — is unowned as far as that check is concerned, so what
+   * A purchase with no `obfuscatedExternalAccountId`  -  a build from before the
+   * client sent one  -  is unowned as far as that check is concerned, so what
    * stopped a second account presenting it was only the idempotency key
    * `play:<token>:<expiry>`: an exact replay settles as a duplicate and grants
    * the second account nothing.
@@ -312,7 +321,7 @@ describe('POST /billing/play/verify', () => {
    * The expiry is IN that key, so the first renewal turns the identical replay
    * into a brand-new event, and premium lands on both accounts. One
    * subscription, two subscribers, renewing for as long as the payer keeps
-   * paying — and reachable by anyone who can pass a token between two installs.
+   * paying  -  and reachable by anyone who can pass a token between two installs.
    * The token is bound to the first account that settles it instead.
    */
   it('refuses a token already settled against another account, even after a renewal', async () => {
@@ -332,8 +341,8 @@ describe('POST /billing/play/verify', () => {
       .send({ purchaseToken: 'tok-shared', productId: 'azf_premium_monthly' });
     expect(bought.status).toBe(200);
 
-    // A month later the subscription renews, so the expiry — and with it the
-    // idempotency key — has moved. This is the request that used to succeed.
+    // A month later the subscription renews, so the expiry  -  and with it the
+    // idempotency key  -  has moved. This is the request that used to succeed.
     stubGoogle(activeSubscription(inDays(60)));
     const stolen = await request(app)
       .post(`${base}/billing/play/verify`)
@@ -374,7 +383,7 @@ describe('POST /billing/play/webhook', () => {
     },
   });
 
-  it('refuses a delivery with no secret — it is an entitlement-granting URL', async () => {
+  it('refuses a delivery with no secret  -  it is an entitlement-granting URL', async () => {
     const res = await request(app)
       .post(`${base}/billing/play/webhook`)
       .send(pubsub({ subscriptionNotification: { notificationType: 13, purchaseToken: 'x' } }));
@@ -448,14 +457,14 @@ describe('POST /billing/play/webhook', () => {
 
 describe('the account identifier shared with the Android client', () => {
   /*
-   * CROSS-PLATFORM GOLDEN VECTOR — the twin of the assertion in
+   * CROSS-PLATFORM GOLDEN VECTOR  -  the twin of the assertion in
    * apps/android/.../PlayPurchaseRulesTest.kt, same input, same expected digest.
    *
    * The verify route refuses a purchase whose Play-reported account identifier
    * does not equal this function's output. If the two implementations drift,
    * the failure is not partial: every purchase on every device is rejected as
    * belonging to another account, from the very first one. Each side is
-   * correct in isolation, so only a shared constant catches it — and it fails
+   * correct in isolation, so only a shared constant catches it  -  and it fails
    * on whichever side was edited.
    */
   it('is the digest the client is pinned to', () => {

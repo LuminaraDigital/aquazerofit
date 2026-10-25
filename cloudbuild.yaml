@@ -1,0 +1,79 @@
+# Build the monorepo image and deploy that image to the existing Cloud Run
+# service.
+#
+# Operator command, from the repo root, after the IAM and Artifact Registry
+# steps in docs/CLOUDFLARE_CUTOVER.md:
+#   gcloud builds submit --project=aquazerofit --config=cloudbuild.yaml
+#
+# This config does not map aquazerofit.com and does not change Cloudflare DNS.
+# The image tag is the commit SHA, not :latest.
+#
+# Do not switch this back to `gcloud run services replace` with
+# deploy/cloudrun/service.yaml. That file is not a full copy of the live
+# service. A replace drops mounts that exist only on the running revision,
+# including the STRIPE_* secrets and the FIREBASE_ADMIN_JSON volume.
+#
+# The live Artifact Registry repository is `api` and the image name is
+# `aquazerofit-api` (PROJECT/api/aquazerofit-api). The previous substitution
+# pushed PROJECT/aquazerofit/api, which is not the image the service runs.
+substitutions:
+  _REGION: australia-southeast1
+  _AR_REPO: api
+  _IMAGE: aquazerofit-api
+  _VITE_SITE_ORIGIN: https://aquazerofit.com
+  _VITE_TG_ANALYTICS_TOKEN: ''
+  _VITE_TG_ANALYTICS_APP_NAME: ''
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - apps/api/Dockerfile
+      - --build-arg
+      - VITE_SITE_ORIGIN=${_VITE_SITE_ORIGIN}
+      - --build-arg
+      - VITE_TG_ANALYTICS_TOKEN=${_VITE_TG_ANALYTICS_TOKEN}
+      - --build-arg
+      - VITE_TG_ANALYTICS_APP_NAME=${_VITE_TG_ANALYTICS_APP_NAME}
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE}:$COMMIT_SHA
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE}:$COMMIT_SHA
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE}:$COMMIT_SHA"
+        # --image keeps the current service spec (secrets, volumes, env).
+        # Scaling is not left to it: the store hydrates once into memory and
+        # is single-instance only (docs/OPERATIONS.md), so every deploy pins
+        # min and max to 1 rather than inheriting whatever the live service
+        # drifted to. AZF_INSTANCE_COUNT=1 is the declaration the API's boot
+        # guard requires on Cloud Run, set in the same command so the two
+        # cannot disagree. --update-env-vars changes only the variables it
+        # names; both share one flag rather than relying on repeats merging.
+        gcloud run deploy aquazerofit-api \
+          --image="$${image}" \
+          --min-instances=1 \
+          --max-instances=1 \
+          --update-env-vars="APP_VERSION=$COMMIT_SHA,AZF_INSTANCE_COUNT=1" \
+          --region="${_REGION}" \
+          --project="$PROJECT_ID" \
+          --quiet
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 3600s

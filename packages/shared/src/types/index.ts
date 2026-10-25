@@ -16,3 +16,4 @@ export * from './auth';
 export * from './growth';
 export * from './coaches';
 export * from './deeplinks';
+export * from './fightRecord';

@@ -2,7 +2,7 @@
  * Single-origin SPA hosting.
  *
  * In production the API also serves the built web app so the whole product
- * lives behind one domain and one certificate — no CORS, no split origins.
+ * lives behind one domain and one certificate - no CORS, no split origins.
  * That introduces one serious risk this suite guards: the client-side routing
  * fallback must never shadow the API. An unknown /api/v1/* path has to keep
  * returning the JSON error envelope, because a frontend that receives HTML
@@ -13,7 +13,7 @@
  *
  * The fallback is registered as a pathless `app.use`, never `app.get('*')`.
  * Express 5 moved to path-to-regexp v8, which rejects a bare '*' and throws
- * at route-registration time — so the old form did not merely fail to match,
+ * at route-registration time - so the old form did not merely fail to match,
  * it took the whole server down on boot. `assertNoBareWildcardRoute` below
  * pins that, because the failure only shows up on a dependency bump.
  */
@@ -73,6 +73,28 @@ describe('SPA hosting enabled', () => {
     expect(res.text).toContain('id="root"');
   });
 
+  it('serves prerendered legal pages in place, with no redirect', async () => {
+    fs.mkdirSync(path.join(fixtureDir, 'terms'), { recursive: true });
+    fs.writeFileSync(
+      path.join(fixtureDir, 'terms', 'index.html'),
+      '<!doctype html><title>Terms</title><main>terms body</main>',
+      'utf8',
+    );
+    fs.mkdirSync(path.join(fixtureDir, 'refund'), { recursive: true });
+    fs.writeFileSync(
+      path.join(fixtureDir, 'refund', 'index.html'),
+      '<!doctype html><title>Refunds</title><main>refund body</main>',
+      'utf8',
+    );
+
+    for (const url of ['/terms', '/terms/', '/refund', '/refund/']) {
+      const res = await request(createApp()).get(url);
+      expect(res.status, url).toBe(200);
+      expect(res.headers.location, url).toBeUndefined();
+      expect(res.text, url).toContain(url.includes('refund') ? 'refund body' : 'terms body');
+    }
+  });
+
   it('serves a client-side deep link with the shell, not a 404', async () => {
     const res = await request(createApp()).get('/nutrition/analysis/some-job-id');
     expect(res.status).toBe(200);
@@ -81,7 +103,7 @@ describe('SPA hosting enabled', () => {
 
   it('REGRESSION: an unknown API path still returns the JSON error envelope, never HTML', async () => {
     const res = await request(createApp()).get('/api/v1/definitely-not-a-route');
-    // The exact status is an API-design detail — unknown /api/v1 paths answer
+    // The exact status is an API-design detail - unknown /api/v1 paths answer
     // 401 because auth runs before route matching, which deliberately avoids
     // disclosing which routes exist. What matters here is that the SPA
     // fallback did not swallow it and hand back the HTML shell.

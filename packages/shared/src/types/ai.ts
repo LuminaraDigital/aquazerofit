@@ -65,6 +65,12 @@ export interface AiMetadata {
   promptVersion: string;
   confidence?: number;
   generatedAt: string;
+  /**
+   * True when a configured provider failed and the offline engine answered,
+   * or when production has no provider configured at all. Absent on older
+   * records. Callers must not treat that output as a model answer.
+   */
+  degraded?: boolean;
 }
 
 export interface ChatSession {
@@ -101,12 +107,20 @@ export type SafetyCategory = 'safe' | 'medical' | 'crisis' | 'extremeDiet' | 'ou
 export interface VisionPrediction {
   name: string;
   foodId?: string;
+  /** Short portion phrase from the vision model, such as "two rashers". */
+  portion?: string;
   estimatedGrams: number;
   confidence: number; // 0..1
-  kcal: number;
-  proteinG: number;
-  carbsG: number;
-  fatG: number;
+  /**
+   * Present only when the name matched a catalog food. Absent means the
+   * nutrition is unknown. Zero would be a fabricated number.
+   */
+  kcal?: number;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
+  /** False when the name did not match the catalog. */
+  matched?: boolean;
 }
 
 export interface VisionJob {
@@ -118,6 +132,12 @@ export interface VisionJob {
   mealType: MealType;
   predictions: VisionPrediction[];
   ai: AiMetadata | null;
+  /**
+   * True when the offline fallback answered: real providers failed, or
+   * production has none configured. The review screen must say so. Absent on
+   * jobs written before this field.
+   */
+  aiDegraded?: boolean;
   error?: string;
   createdAt: string;
   completedAt?: string;

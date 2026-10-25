@@ -1,8 +1,11 @@
 # Code owners for AquaZeroFit.
 #
 # The last matching pattern wins, so the catch-all comes first and the
-# path-specific lines below it refine — they do not override ownership, they
+# path-specific lines below it refine. They do not override ownership, they
 # document where review attention belongs as the project takes on more hands.
+#
+# Production ships only through a pull request from staging into main.
+# See docs/BRANCHING_AND_STAGING.md.
 #
 # See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 

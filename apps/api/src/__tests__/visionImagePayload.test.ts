@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import sharp from 'sharp';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { User } from '@aquazerofit/shared';
 import type { WireContentPart } from '../modules/ai/gateway';
 import { loadPrompt } from '../modules/ai/prompts';
 import {
@@ -57,6 +58,10 @@ beforeAll(async () => {
     .send({ email: 'vision-image@example.com', password: 'CorrectHorse9Battery' });
   expect(reg.status).toBe(201);
   token = reg.body.accessToken as string;
+  // The upload is a premium lane. This file tests the provider payload.
+  const user = getStore().byId<User>('users', reg.body.user.id as string);
+  expect(user).toBeTruthy();
+  getStore().upsert('users', { ...user!, tier: 'premium' });
 });
 
 afterAll(async () => {
@@ -92,7 +97,14 @@ describe('meal photo → vision provider payload', () => {
       vi.fn(async (url: string, init: { body: string }) => {
         calls.push({ url: String(url), body: JSON.parse(init.body) as ProviderCall['body'] });
         const content = JSON.stringify({
-          predictions: [{ foodId: 'food-chicken-breast', name: 'Chicken Breast (grilled)', estimatedGrams: 150, confidence: 0.9 }],
+          items: [
+            {
+              name: 'Chicken Breast (grilled)',
+              portion: 'one small fillet',
+              estimatedGrams: 150,
+              confidence: 0.9,
+            },
+          ],
         });
         return {
           ok: true,
@@ -128,7 +140,12 @@ describe('meal photo → vision provider payload', () => {
     expect(calls[0]!.url).toContain('openai.com');
     const messages = calls[0]!.body.messages;
     expect(messages[0]).toEqual({ role: 'system', content: loadPrompt('P-01').content });
-    expect(messages[0]!.content).toContain('Strict grounding rule');
+    const prompt = messages[0]!.content as string;
+    expect(prompt.length).toBeLessThan(1_500);
+    expect(prompt).not.toContain('Strict grounding rule');
+    expect(prompt).not.toContain('Kangaroo');
+    expect(JSON.stringify(calls[0]!.body)).not.toContain('food-barramundi');
+    expect(JSON.stringify(calls[0]!.body)).not.toContain('"candidates"');
     const parts = messages.at(-1)!.content as WireContentPart[];
     expect(Array.isArray(parts)).toBe(true);
     expect(parts).toContainEqual({

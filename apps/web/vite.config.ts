@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { seoDevPlugin, seoPlugin } from './vite-plugins/seo';
 
 export default defineConfig({
+  // SUPPORT_EMAIL is the one public mailbox. It is not a secret. The VITE_
+  // prefix still covers the existing build-time settings.
+  envPrefix: ['VITE_', 'SUPPORT_EMAIL'],
   plugins: [react(), seoPlugin(), seoDevPlugin()],
   resolve: {
     alias: {
@@ -16,7 +19,7 @@ export default defineConfig({
   build: {
     /**
      * Stated rather than inherited. Vite's default is already `false`, so this
-     * changes nothing about the output — but "production source maps are not
+     * changes nothing about the output - but "production source maps are not
      * published" is a security property of this deployment, and a property
      * that holds only because nobody has looked at it is one a future Vite
      * default or a copied config can quietly revoke. Maps would hand anyone

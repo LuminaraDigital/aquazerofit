@@ -1,5 +1,5 @@
 /**
- * /auth — register, login, refresh (rotation + family revocation), logout,
+ * /auth - register, login, refresh (rotation + family revocation), logout,
  * Telegram launch-data sign-in (AQF-07 §2).
  */
 import { Router } from 'express';
@@ -13,6 +13,7 @@ import {
 } from '@aquazerofit/shared';
 import { z } from 'zod';
 import { verifyAccess } from '../../platform/auth';
+import { clientIpForRateLimit } from '../../platform/clientIp';
 import { assertHuman, captchaConfig } from '../../platform/botProtection';
 import { asyncHandler } from '../../platform/errors';
 import {
@@ -45,7 +46,7 @@ export const authRouter = Router();
 authRouter.use('/mfa', mfaRouter);
 
 /**
- * Bot-protection discovery. Public and unauthenticated by necessity — it is
+ * Bot-protection discovery. Public and unauthenticated by necessity - it is
  * read before anyone has an account, and the site key it returns is public by
  * design (Cloudflare scopes it to the hostnames on the widget).
  *
@@ -117,7 +118,7 @@ authRouter.post('/logout', (req, res) => {
 
 authRouter.post('/telegram', (req, res) => {
   const { initData } = telegramAuthSchema.parse(req.body);
-  sendAuth(req, res, telegramAuth(initData, req.ip));
+  sendAuth(req, res, telegramAuth(initData, clientIpForRateLimit(req)));
 });
 
 /**

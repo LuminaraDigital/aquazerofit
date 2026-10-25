@@ -1,12 +1,12 @@
 /**
- * /admin — support/monitoring overview and content library management
+ * /admin - support/monitoring overview and content library management
  * (AQF-07 §3.4). requireAdmin on every route.
  */
 import { Router } from 'express';
 import { z } from 'zod';
 import { EQUIPMENT, type Exercise, type MealLog, type User, type WorkoutSession } from '@aquazerofit/shared';
 import { requireAdmin, requireAuth } from '../../platform/auth';
-import { AppError } from '../../platform/errors';
+import { AppError, asyncHandler } from '../../platform/errors';
 import { getStore } from '../../platform/store';
 import { getWgerImportStatus, runWgerImport } from '../../data/wger/importer';
 import { requireFreshMfa } from '../mfa/middleware';
@@ -17,6 +17,10 @@ import {
   grantPremium,
   revokePremium,
 } from '../billing/entitlements';
+import { refundStarsPurchase } from '../payments/stars';
+import { refundStarsSubscription } from '../payments/starsSubscription';
+import { todayFor } from '../../platform/dates';
+import { retentionReport } from './retention';
 
 export const adminRouter = Router();
 /**
@@ -66,8 +70,25 @@ adminRouter.get('/users', (req, res) => {
 });
 
 /**
+ * Retention baseline: D1/D7/D30 by signup week and weekly active loggers
+ * (see ./retention for the definitions). Aggregate counts only, so the
+ * response carries no account identifiers; the read is still audited because
+ * it walks every member's activity.
+ */
+const retentionQuerySchema = z.object({
+  weeks: z.coerce.number().int().min(1).max(52).default(12),
+});
+
+adminRouter.get('/retention', (req, res) => {
+  const { weeks } = retentionQuerySchema.parse(req.query);
+  const report = retentionReport(todayFor(req), weeks);
+  auditDataAccess(req.user!.id, 'admin.retention.read', { weeks });
+  res.json({ report });
+});
+
+/**
  * Content update: attribution fields (licence, licenceAuthor, sourceId) are
- * intentionally NOT editable — they are never stripped (AQF-12 obligation).
+ * intentionally NOT editable - they are never stripped (AQF-12 obligation).
  */
 const exercisePatchSchema = z
   .object({
@@ -81,7 +102,7 @@ const exercisePatchSchema = z
     media: z.array(
       z.object({
         kind: z.enum(['image', 'video']),
-        // Only http(s) URLs or relative /uploads paths — blocks javascript:,
+        // Only http(s) URLs or relative /uploads paths - blocks javascript:,
         // data: and other schemes from ever entering the content library.
         url: z
           .string()
@@ -124,7 +145,7 @@ adminRouter.put('/exercises/:id', (req, res) => {
  * Trigger the wger exercise ETL server-side (wger-integration-plan.md Phase
  * 1.5). The import runs in the background of the API process (full crawl is
  * multi-minute); progress is observable via GET /admin/exercises/import/status.
- * Body: { incremental?: boolean } — incremental uses last_update_global +
+ * Body: { incremental?: boolean } - incremental uses last_update_global +
  * the wger deletion-log.
  */
 const importTriggerSchema = z
@@ -215,9 +236,55 @@ adminRouter.post('/users/:id/premium', (req, res) => {
   res.json({ user: { id: userId, tier: 'premium', premiumUntil: outcome.premiumUntil } });
 });
 
-/** Entitlement history for one account — what support reads on a billing query. */
+/** Entitlement history for one account. What support reads on a billing query. */
 adminRouter.get('/users/:id/premium', (req, res) => {
   const userId = String(req.params.id ?? '');
   auditDataAccess(req.user!.id, 'admin.premium.history', { userId });
   res.json({ grants: entitlementHistory(userId) });
 });
+
+/**
+ * Refund one Telegram Stars purchase.
+ *
+ * Admin and a fresh MFA step-up, same gate as a premium revoke: this call
+ * returns money and removes a coach. Idempotent on the charge id. The
+ * purchase row stays in the ledger; a starsRefund document is appended and
+ * the coach is taken off the account.
+ *
+ * `telegramUserId` is only a fallback for a purchase recorded before we
+ * stored the payer. It cannot retarget a charge that already names who paid.
+ */
+const starsRefundSchema = z.object({
+  telegramPaymentChargeId: z.string().trim().min(1).max(256),
+  reason: z.string().trim().min(1).max(500),
+  telegramUserId: z.number().int().positive().optional(),
+});
+
+adminRouter.post(
+  '/payments/stars/refund',
+  asyncHandler(async (req, res) => {
+    const input = starsRefundSchema.parse(req.body ?? {});
+    const refundInput = {
+      telegramPaymentChargeId: input.telegramPaymentChargeId,
+      reason: input.reason,
+      actorId: req.user!.id,
+      telegramUserId: input.telegramUserId,
+    };
+    let outcome: { userId: string; status: string; coachId?: string };
+    try {
+      outcome = await refundStarsPurchase(refundInput);
+    } catch (err) {
+      // A charge is either a coach purchase or a subscription payment.
+      // The subscription path runs only when the coach ledger has no row.
+      if (!(err instanceof AppError) || err.code !== 'NOT_FOUND') throw err;
+      outcome = await refundStarsSubscription(refundInput);
+    }
+    auditDataAccess(req.user!.id, 'admin.stars.refund', {
+      userId: outcome.userId,
+      coachId: outcome.coachId ?? null,
+      status: outcome.status,
+      reason: input.reason,
+    });
+    res.json({ refund: outcome });
+  }),
+);

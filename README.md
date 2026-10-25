@@ -1,6 +1,6 @@
 ﻿# AquaZeroFit
 
-[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/LuminaraDigital/aquazerofit/ci.yml?label=CI)](https://github.com/LuminaraDigital/aquazerofit/actions/workflows/ci.yml)
 [![Licence: AGPL v3](https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/android-Kotlin%20%2B%20Compose-3DDC84.svg)](apps/android/README.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
@@ -9,12 +9,12 @@ AI-powered wellness platform under the **AquaZero** brand. Users build a wellnes
 
 > AquaZeroFit provides general wellness and fitness support only. It does not provide medical diagnosis, treatment or professional healthcare advice. This boundary is a product requirement, not a disclaimer (AQF-02 §1).
 
-The platform ships **three clients against one backend**. A single React codebase delivers two of them — a responsive web application and a **Telegram Mini App** (theme binding + native controls when launched inside Telegram) — and a **native Android app** (Kotlin + Jetpack Compose) is the third. The Android client is not a wrapper: it is a separate offline-first client speaking the same frozen `/api/v1` contract, and it has [its own README](apps/android/README.md).
+The platform ships **three clients against one backend**. A single React codebase delivers two of them - a responsive web application and a **Telegram Mini App** (theme binding + native controls when launched inside Telegram) - and a **native Android app** (Kotlin + Jetpack Compose) is the third. The Android client is not a wrapper: it is a separate offline-first client speaking the same frozen `/api/v1` contract, and it has [its own README](apps/android/README.md).
 
 ## The product
 
 Captured from the running application (`npm run api` + `npm run dev`) signed in as the
-seeded demo account — not mockups. Design references for each screen live in
+seeded demo account - not mockups. Design references for each screen live in
 `design/figma/`.
 
 | Dashboard | Nutrition | Aqua Coach |
@@ -33,7 +33,7 @@ Also captured: [welcome](docs/screenshots/01-welcome.png), [sign-in](docs/screen
 ## Repository layout
 
 ```
-apps/web           React 18 + TypeScript + Vite + Tailwind — web + Telegram Mini App
+apps/web           React 18 + TypeScript + Vite + Tailwind - web + Telegram Mini App
 apps/android       Native Android client: Kotlin, Jetpack Compose, Room, Hilt
 apps/api           Node.js + TypeScript API implementing the /api/v1 contract (AQF-07)
 packages/shared    Shared types, zod validation schemas, error taxonomy, constants
@@ -48,7 +48,7 @@ docs/security/     Security audit findings
 design/figma/      Screen references and the Modern Aquatic Wellness design system
 design/brand/      Brand assets
 design/cards/      Collectible card masters (card.svg per fighter)
-tools/             Asset and document generators — see tools/README.md
+tools/             Asset and document generators - see tools/README.md
 ```
 
 `prompts/` and `evals/` must stay at the repository root: `apps/api/src/modules/ai/prompts.ts`
@@ -96,7 +96,7 @@ deterministic offline mock until an AI provider key is set (see
 
 `apps/android` is a native Kotlin client, not a WebView and not a port of the
 React code. It talks to the same `/api/v1` the web app does, and it is the
-surface where the offline story actually matters — a gym has no signal.
+surface where the offline story actually matters - a gym has no signal.
 
 **Full documentation: [`apps/android/README.md`](apps/android/README.md).**
 
@@ -107,14 +107,14 @@ cd apps/android
 ./gradlew ktlintCheck detekt lintDebug testDebugUnitTest          # the gates CI runs
 ```
 
-Start `npm run api` first — the emulator reaches the host API through
+Start `npm run api` first - the emulator reaches the host API through
 `10.0.2.2`.
 
 | | |
 | --- | --- |
 | Stack | Kotlin 2.3.20, Compose (BOM 2026.08.00), Navigation 3, Room 3, Hilt 2.60.1, Retrofit/OkHttp |
 | Scope | 21 screens, 25 ViewModels, 16 repositories; ~50k lines of production Kotlin, ~62k with tests |
-| DI | Hilt end to end — 14 modules, 25 `@HiltViewModel`s, 73 files injecting; constructor injection only, no service locator |
+| DI | Hilt end to end - 14 modules, 25 `@HiltViewModel`s, 73 files injecting; constructor injection only, no service locator |
 | Offline | Room as source of truth, outbox + WorkManager replay with `Idempotency-Key` |
 | Tests | 518 JVM unit tests in 63 classes, plus 55 instrumented; Android Lint clean |
 | Platform | `minSdk` 26, `targetSdk` 36, R8-minified signed release, AAB pipeline for Play |
@@ -137,7 +137,7 @@ several deliberate decisions only make sense in its light:
 - **The marketing site** (`/`, `/features`, `/how-it-works`, `/aqua-coach`,
   `/safety`, plus the legal pages) is the only cold-traffic surface. Its
   primary call to action leaves the origin for `t.me/<bot>/<app>`, carrying
-  whatever attribution brought the visitor in as a deep-link payload — the sole
+  whatever attribution brought the visitor in as a deep-link payload - the sole
   channel by which a ref code, UTM campaign or huddle invite survives the hop
   into Telegram, since `localStorage` does not cross it.
 - **The application** is the same React app, and it works completely in an
@@ -147,7 +147,7 @@ several deliberate decisions only make sense in its light:
 
 Two consequences that are easy to undo by accident:
 
-1. **`/` serves marketing in place for signed-out browser visitors** — it is
+1. **`/` serves marketing in place for signed-out browser visitors** - it is
    not a redirect to `/landing` (that path survives only as an alias). Cold
    traffic and crawlers land on the canonical URL directly. The decision lives
    in `RequireAuth`, which still redirects every *other* guarded route.
@@ -160,7 +160,7 @@ Search visibility is generated at build time by `apps/web/vite-plugins/seo.ts`:
 one real HTML file per marketing route, each with its own title, description,
 canonical, Open Graph tags, JSON-LD and a `<noscript>` summary, plus
 `robots.txt` and `sitemap.xml`. Routes come from `MARKETING_ROUTES` in
-`apps/web/src/lib/site.ts` — **a marketing page missing from that list still
+`apps/web/src/lib/site.ts` - **a marketing page missing from that list still
 renders perfectly and is simply invisible to search.**
 
 > **Hosting requirement.** The prerendered shells rely on the host resolving
@@ -168,11 +168,11 @@ renders perfectly and is simply invisible to search.**
 > Netlify, Vercel, Cloudflare Pages, S3+CloudFront and nginx `try_files` all do
 > this by default. A host configured to rewrite *everything* to `/index.html`
 > unconditionally will serve the generic shell again and silently undo the
-> per-route metadata — the app keeps working, the SEO does not.
+> per-route metadata - the app keeps working, the SEO does not.
 
 ## Architecture in one paragraph
 
-The frontend detects at bootstrap whether it is running inside Telegram (`isTMA()`): in the browser it renders the AquaZero design system directly; inside Telegram it additionally binds the client theme variables. The API is a stateless TypeScript service exposing the frozen `/api/v1` contract with JWT access tokens and single-use rotating refresh tokens (family revocation on reuse). Data is stored as documents in logical containers (`users`, `profiles`, `logs`, `plans`, `content`, `ai`, `ledger`, `audit`) behind a storage abstraction: a JSON file store by default, and Postgres when `DATABASE_URL` is set (a single `documents(container, id, doc jsonb)` table, write-through from an in-memory working set). Because each instance hydrates its own working set, the Postgres store is durable for **single-instance** deployments only — scale out requires moving reads off the local copy (AQF-04, AQF-22). All model access goes through a single AI gateway module with logical model groups (`visionPrimary`, `chatFast`, `planStructured`, `safetyCheap`, `insightBatch`); when no provider keys are configured the gateway falls back to a deterministic offline engine so every core journey works without external AI. Every model-calling endpoint enforces the admission sequence: authenticate → rate limit → tier/credit check → input guardrail → gateway → output guardrail and numeric rules → respond + telemetry (AQF-07 §4).
+The frontend detects at bootstrap whether it is running inside Telegram (`isTMA()`): in the browser it renders the AquaZero design system directly; inside Telegram it additionally binds the client theme variables. The API is a stateless TypeScript service exposing the frozen `/api/v1` contract with JWT access tokens and single-use rotating refresh tokens (family revocation on reuse). Data is stored as documents in logical containers (`users`, `profiles`, `logs`, `plans`, `content`, `ai`, `ledger`, `audit`) behind a storage abstraction: a JSON file store by default, and Postgres when `DATABASE_URL` is set (a single `documents(container, id, doc jsonb)` table, write-through from an in-memory working set). Because each instance hydrates its own working set, the Postgres store is durable for **single-instance** deployments only - scale out requires moving reads off the local copy (AQF-04, AQF-22). All model access goes through a single AI gateway module with logical model groups (`visionPrimary`, `chatFast`, `planStructured`, `safetyCheap`, `insightBatch`); when no provider keys are configured the gateway falls back to a deterministic offline engine so every core journey works without external AI. Every model-calling endpoint enforces the admission sequence: authenticate → rate limit → tier/credit check → input guardrail → gateway → output guardrail and numeric rules → respond + telemetry (AQF-07 §4).
 
 ### Safety invariants (enforced in code, tested)
 
@@ -198,7 +198,7 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | Variable | Purpose |
 | --- | --- |
 | `PORT` | API port (default 4000) |
-| `DATABASE_URL` | Postgres connection string. When set, the store switches from JSON files to Postgres; leave unset for local development. **Required in production** — see below |
+| `DATABASE_URL` | Postgres connection string. When set, the store switches from JSON files to Postgres; leave unset for local development. **Required in production** - see below |
 | `AZF_DATA_DIR` | Data directory for the local JSON store (default `apps/api/.data`; used only when `DATABASE_URL` is unset) |
 | `SERVE_WEB` | Set to `false` for an API-only deployment. By default the API also serves the built SPA from `apps/web/dist`, so one process serves the whole product on one origin |
 | `WEB_DIST_DIR` | Override where the built SPA is found |
@@ -206,6 +206,7 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | `APP_VERSION` | Build identity returned by `/health` and `/ready` |
 | `AZF_SEED_DEMO` | Set to `false` to skip demo/admin account seeding (accounts are never seeded in production) |
 | `ADMIN_PASSWORD` | Production-only: seeds the admin account with this password; without it no admin account is created |
+| `ADMIN_EMAIL` | Production: the admin account's address, required alongside `ADMIN_PASSWORD`. Use a mailbox you control: the seeder refuses any address on `aquazero.fit`, which this project does not own |
 | `EXPOSE_DEV_TOKENS` | Dev-only: echo password-reset tokens in API responses/logs when `true` (requires non-production `NODE_ENV`) |
 | `UPLOADS_DIR` | Where in-flight meal photographs are written (default `apps/api/uploads`). Point this at a persistent volume on hosts with an ephemeral filesystem, or a redeploy loses photos mid-analysis |
 | `ENABLE_LLM_SAFETY` | Override LLM second stage for input guardrails (`true`/`false`; defaults on when any AI provider key is set) |
@@ -235,9 +236,15 @@ Telegram" button on its own landing page at somebody else's bot.
 | --- | --- |
 | `VITE_TELEGRAM_BOT_USERNAME` | Bot hosting the Mini App, with or without the leading `@` (default `AquaZeroFitBot`) |
 | `VITE_TELEGRAM_MINI_APP_SHORT_NAME` | Mini App short name from BotFather's `/newapp` (default `app`). Set it to an empty string for a bot with no registered Mini App; links then fall back to `t.me/<bot>` |
-| `VITE_SITE_ORIGIN` | Public origin of the marketing site, e.g. `https://aquazero.fit`. Canonical tags, the sitemap and absolute OG image URLs are built from it — a stale value points every canonical at another domain while the site looks perfectly healthy |
+| `VITE_SITE_ORIGIN` | Public origin of the marketing site, e.g. `https://aquazerofit.com`. Canonical tags, the sitemap and absolute OG image URLs are built from it - a stale value points every canonical at another domain while the site looks perfectly healthy |
 | `VITE_API_BASE_URL` | Origin of the API when it is served from a different host to the SPA. Unset means same origin |
 | `VITE_MEDIA_BASE_URL` | Origin serving exercise media under `/uploads`. Unset means same origin |
+| `VITE_TG_ANALYTICS_TOKEN` | Telegram Mini Apps Analytics catalog token from TON Builders / @DataChief_bot. Inlined into the Mini App bundle, which is how that SDK receives it. Leave unset to skip init. Never commit it |
+| `VITE_TG_ANALYTICS_APP_NAME` | Analytics identifier that matches the token. Both must be set or the client does not call the SDK |
+
+The catalog token is not a server secret. The SDK runs in the Mini App, so
+Vite has to inline it. It is still never committed, and the browser site
+does not load the SDK.
 
 ### Security (required in production)
 
@@ -245,12 +252,12 @@ Telegram" button on its own landing page at somebody else's bot.
 | --- | --- |
 | `JWT_ACCESS_SECRET` | Access-token signing secret (**required in production**; refresh tokens are opaque randoms and need no secret) |
 | `TELEGRAM_BOT_TOKEN` | Bot token for Mini App launch-data validation *and* Stars payments (dev default `dev-bot-token`; **required in production**) |
-| `TELEGRAM_WEBHOOK_SECRET` | Shared secret Telegram echoes on every webhook delivery. **Required before coach purchases can complete** — the webhook grants entitlements and is otherwise unauthenticated, so it rejects everything while this is unset |
+| `TELEGRAM_WEBHOOK_SECRET` | Shared secret Telegram echoes on every webhook delivery. **Required before coach purchases can complete** - the webhook grants entitlements and is otherwise unauthenticated, so it rejects everything while this is unset |
 
 ### Mail (required in production)
 
 Password reset is undeliverable without a real transport, and a deployment
-without one looks healthy while every locked-out user stays locked out — so the
+without one looks healthy while every locked-out user stays locked out - so the
 API refuses to boot in production until these are set.
 
 | Variable | Purpose |
@@ -267,6 +274,8 @@ The gateway tries providers in order and falls back to a deterministic mock engi
 | Variable | Provider | Notes |
 | --- | --- | --- |
 | `GROQ_API_KEY` | Groq | https://console.groq.com/keys |
+| `GROQ_MODEL_VISIONPRIMARY` | Groq | Meal-photo model. Default `qwen/qwen3.8-27b` ([vision docs](https://console.groq.com/docs/vision)) |
+| `AI_VISION_DEADLINE_MS` | Gateway | Meal-photo deadline in ms. Default `20000`. Chat stays at `12000` |
 | `GEMINI_API_KEY` | Google Gemini | https://aistudio.google.com/apikey |
 | `OPENAI_API_KEY` | OpenAI | https://platform.openai.com/api-keys |
 | `NVIDIA_API_KEY` | NVIDIA NIM | https://build.nvidia.com/ |
@@ -284,7 +293,7 @@ as its own system message *ahead of* P-07.
 
 That ordering is the safety-relevant part. Instruction-following weakens toward
 the end of a prompt, so the rules go last and sit in the strongest position
-while the voice sits in the weaker one — if the two ever conflict, the
+while the voice sits in the weaker one - if the two ever conflict, the
 arrangement resolves it the safe way before the persona's own subordination
 clause is consulted. Everything downstream is unchanged: the grounding block is
 still untrusted data, numbers still come only from tool results, and the full
@@ -296,12 +305,12 @@ is a safety rule rather than a design preference: **XP is awarded for behaviour,
 never for outcomes.** Nothing can score a deficit, a rate of loss or a kilogram
 moved. Logging, training, hydrating, weighing in and *resting after work* earn;
 eating less does not. Every lane is capped per day and the total is capped again
-(`XP_MAX_PER_DAY`), so a frantic day cannot out-earn two ordinary ones — which
+(`XP_MAX_PER_DAY`), so a frantic day cannot out-earn two ordinary ones - which
 removes the incentive to over-log, and with it the incentive to over-eat to have
 something to log. XP is derived by folding activity, never stored, so a level
 cannot drift from the behaviour that earned it or be granted by a client.
 
-Coaches unlock by level. **Every locked coach is reachable without paying** —
+Coaches unlock by level. **Every locked coach is reachable without paying** -
 `unlock.level` is the real door and the Telegram Stars price is a shortcut past
 it. A roster whose best-written character sits behind a paywall is a slot
 machine, not a wellness product.
@@ -329,7 +338,7 @@ node tools/coaches/build-art.mjs <source-dir>
 ```
 
 Generates `apps/web/public/coaches/<id>/{portrait,avatar}.webp` from the
-character renders — ~445 KB total, against ~15 MB of raw PNGs for a screen that
+character renders - ~445 KB total, against ~15 MB of raw PNGs for a screen that
 displays them at 160 px. Optional `celebrate.webp` / `encourage.webp` variants
 are dropped in by hand. **Art is never required:** `CoachAvatar` degrades
 expression → avatar → tinted monogram, so the roster is fully usable with no
@@ -341,23 +350,23 @@ The authoritative document set lives in `docs/specs/` (AQF-01 Charter … AQF-22
 
 Alongside the specification set:
 
-- [apps/android/README.md](apps/android/README.md) — the Android client: architecture, dependency injection, testing approach, release pipeline.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the system architecture report: module boundaries, data flow and the reasoning behind the structural decisions.
-- [docs/security/SECURITY_AUDIT_REPORT.md](docs/security/SECURITY_AUDIT_REPORT.md) — the comprehensive security audit and its findings.
-- [docs/plans/ANDROID_MODULARISATION.md](docs/plans/ANDROID_MODULARISATION.md) — the measured dependency graph behind the Android layering, and the phased plan to make the compiler enforce it.
-- [docs/PLAY_STORE_RELEASE_GUIDE.md](docs/PLAY_STORE_RELEASE_GUIDE.md) — signing, versioning and the tagged-release workflow.
-- [docs/plans/](docs/plans/) — integration and migration plans, including the Vite 8.x upgrade.
-- [tools/README.md](tools/README.md) — the asset and document generators, and when you need them.
+- [apps/android/README.md](apps/android/README.md) - the Android client: architecture, dependency injection, testing approach, release pipeline.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - the system architecture report: module boundaries, data flow and the reasoning behind the structural decisions.
+- [docs/security/SECURITY_AUDIT_REPORT.md](docs/security/SECURITY_AUDIT_REPORT.md) - the comprehensive security audit and its findings.
+- [docs/plans/ANDROID_MODULARISATION.md](docs/plans/ANDROID_MODULARISATION.md) - the measured dependency graph behind the Android layering, and the phased plan to make the compiler enforce it.
+- [docs/PLAY_STORE_RELEASE_GUIDE.md](docs/PLAY_STORE_RELEASE_GUIDE.md) - signing, versioning and the tagged-release workflow.
+- [docs/plans/](docs/plans/) - integration and migration plans, including the Vite 8.x upgrade.
+- [tools/README.md](tools/README.md) - the asset and document generators, and when you need them.
 
 ## Security notes
 
-Accepted tradeoffs for the capstone deployment, reviewed and documented rather than hidden:
+Session and upload controls, as implemented. Detail and reporting are in [SECURITY.md](SECURITY.md). Please do not open a public issue for a vulnerability.
 
-- **Tokens in localStorage** — the app runs as a Telegram Mini App where cookie-based sessions are impractical; access tokens are short-lived (15 min) and refresh tokens are single-use, rotated, family-revoked on reuse, and stored server-side only as sha256 hashes.
-- **Pure-JS bcrypt at cost 10** (`bcryptjs`) — the portability floor for this capstone; a native binding and/or higher cost factor is the first hardening step for real production load.
-- **Client-declared MIME with extension-derived content type** for meal-photo uploads — uploads are size-capped, allowlisted (jpeg/png/heic), stored under unguessable UUID names, never statically served, streamed only to their authenticated owner, and deleted on confirm/failure plus a 24 h TTL sweep.
-
-To report a vulnerability, see [SECURITY.md](SECURITY.md) — please do not open a public issue.
+- **Web refresh cookie, access token in memory (FE-01).** The API sets refresh token `azf_rt` as an httpOnly cookie (`SameSite=Lax`, `Path=/api/v1/auth`, `Secure` outside local http) in `apps/api/src/modules/auth/cookies.ts`. The web client (`apps/web/src/lib/api.ts`), including the Telegram Mini App, keeps the access JWT in memory and does not write access or refresh tokens to `localStorage`. Access tokens last 15 minutes. Refresh tokens are single-use, rotated, family-revoked on reuse, and stored server-side only as SHA-256 hashes. The JSON body still carries the refresh token for non-browser clients. The Android app stores it in a Keystore-backed vault. Protected API calls use `Authorization: Bearer`. The cookie is host-only (no `Domain`). Cross-site and cross-host POST do not include it. A document on the cookie's own host can POST `/api/v1/auth/refresh` or `/api/v1/auth/logout` with it. There is no CSRF token. CORS is `credentials: false`. Inside web.telegram.org the Lax cookie is withheld; the Mini App re-authenticates with initData instead of setting SameSite=None, because None would let another site rotate or revoke the session. Launch data older than 10 minutes cannot do that refresh, so the Mini App has to be reopened.
+- **Firebase linking requires a verified email on both sides.** The token's `email_verified` and the existing account's `emailVerified` both have to be true. An email set from Telegram via `POST /me/credentials` stays unverified, in dev and in production, until a mailbox-proof flow exists. There is no email-verification token flow today. The address can still be reserved (register returns a conflict) but it cannot be taken over by a later Google sign-in. See [SECURITY.md](SECURITY.md).
+- **Stripe checkout is refused for a Telegram session.** The access token from initData auth is marked as a Telegram session, including after refresh. `POST /billing/stripe/checkout` returns 403 for that session. Card checkout stays available to password and Firebase sessions. Premium inside the Mini App is paid with Stars.
+- **bcryptjs at cost 12** on register, sign-in, and password change (`apps/api/src/modules/auth/service.ts`). Tests use cost 4. Seeded demo and admin hashes use cost 10 (`apps/api/src/data/seed.ts`).
+- **Meal-photo uploads** are size-capped and MIME-allowlisted, then re-encoded through sharp. The declared `Content-Type` is not the type check: only bytes libvips can decode are stored, EXIF is dropped, and the canonical file is a JPEG under an unguessable name. Photos are never statically served, are streamed only to their authenticated owner, and are deleted on confirm or failure plus a 24 h TTL sweep (`apps/api/src/modules/vision/router.ts`).
 
 ## Contributing
 
@@ -371,6 +380,6 @@ AquaZeroFit is free software: you can redistribute it and/or modify it under the
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [GNU Affero General Public License](LICENSE) for more details.
 
-> **Section 13 — network use.** The AGPL's defining clause: if you run a modified version of AquaZeroFit and let anyone interact with it over a network, you must offer those users the corresponding source of *your* version. Deploying a fork publicly without publishing its source is a licence violation. A "Source code" link in the running application is the customary way to satisfy this.
+> **Section 13 - network use.** The AGPL's defining clause: if you run a modified version of AquaZeroFit and let anyone interact with it over a network, you must offer those users the corresponding source of *your* version. Deploying a fork publicly without publishing its source is a licence violation. A "Source code" link in the running application is the customary way to satisfy this.
 
-Third-party dependency and dataset licences — including the CC-BY-SA exercise corpus and ODbL ingredient data, whose terms are independent of this one — are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Third-party dependency and dataset licences - including the CC-BY-SA exercise corpus and ODbL ingredient data, whose terms are independent of this one - are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -1,0 +1,156 @@
+# Cloud Run API. The public hostname is the aquazerofit Worker, which proxies
+# /api and /uploads here. This service is already live as aquazerofit-api.
+#
+# cloudbuild.yaml does not apply this file. It deploys with
+# `gcloud run deploy aquazerofit-api --image`, which keeps the running
+# service's secrets, volumes, and env. Do not `gcloud run services replace`
+# this file onto the live service: it is not a full copy of that revision.
+# The live service mounts STRIPE_* secrets and a FIREBASE_ADMIN_JSON volume
+# that are absent here, and a replace would remove them.
+#
+# Do not apply this file by hand with the IMAGE_URI placeholder still in it.
+# This file does not map a custom domain and does not read secret values.
+#
+# Single instance on purpose: the store hydrates once into memory. min and max
+# are both 1, and AZF_INSTANCE_COUNT=1 makes boot refuse anything else; on
+# Cloud Run boot also refuses it unset. cloudbuild.yaml re-applies all three
+# on every deploy, so the live service cannot drift off them.
+# CPU is always allocated so that one warm instance keeps its flush queue.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: aquazerofit-api
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/launch-stage: GA
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/startup-cpu-boost: "true"
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/cloudsql-instances: aquazerofit:australia-southeast1:azf-pg
+    spec:
+      timeoutSeconds: 300
+      containers:
+        - name: api
+          image: IMAGE_URI
+          ports:
+            - name: http1
+              containerPort: 4000
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: 4000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: APP_VERSION
+              value: APP_VERSION_SHA
+            - name: AZF_INSTANCE_COUNT
+              value: "1"
+            - name: AZF_SEED_DEMO
+              value: "false"
+            - name: CORS_ORIGINS
+              value: https://aquazerofit.com
+            - name: APP_PUBLIC_URL
+              value: https://aquazerofit.com
+            # The Worker fronts this service. It replaces X-Forwarded-For with
+            # the client address and Google's front end appends the Worker's
+            # Cloudflare egress, so with one trusted hop req.ip is that shared
+            # egress address. Rate limits do not use req.ip: they trust
+            # CF-Connecting-IP only behind ORIGIN_SHARED_SECRET
+            # (apps/api/src/platform/clientIp.ts). Leave this at 1. A 2 lets a
+            # direct run.app caller pick req.ip with a forged X-Forwarded-For
+            # whenever REQUIRE_ORIGIN_SECRET is off.
+            - name: TRUST_PROXY
+              value: "1"
+            # Refuse requests without the Worker's secret (403; /health and
+            # /ready exempt). Off until the runbook in docs/OPERATIONS.md
+            # ("Closing the run.app bypass") has been followed: the secret on
+            # both sides and every provider webhook on aquazerofit.com. On with
+            # an empty, placeholder or sub-32-character ORIGIN_SHARED_SECRET,
+            # boot is refused.
+            - name: REQUIRE_ORIGIN_SECRET
+              value: "false"
+            - name: MFA_REQUIRE_ADMIN
+              value: "true"
+            - name: MAIL_PROVIDER
+              value: resend
+            - name: PLAY_PACKAGE_NAME
+              value: fit.aquazero.app
+            - name: FORCE_HTTPS
+              value: "true"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: DATABASE_URL
+                  key: latest
+            - name: JWT_ACCESS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: JWT_ACCESS_SECRET
+                  key: latest
+            # Same value as the Worker secret of the same name. The Secret
+            # Manager id must exist before anything references it.
+            - name: ORIGIN_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ORIGIN_SHARED_SECRET
+                  key: latest
+            - name: MAIL_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: MAIL_FROM
+                  key: latest
+            - name: RESEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: RESEND_API_KEY
+                  key: latest
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: TELEGRAM_BOT_TOKEN
+                  key: latest
+            - name: TELEGRAM_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: TELEGRAM_WEBHOOK_SECRET
+                  key: latest
+            - name: TURNSTILE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: TURNSTILE_SECRET_KEY
+                  key: latest
+            - name: TURNSTILE_SITE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: TURNSTILE_SITE_KEY
+                  key: latest
+            # PLAY_SERVICE_ACCOUNT_JSON exists as a secret id but has no
+            # versions, so it is not mounted. Play billing stays off until a
+            # version is added and this env entry comes back.
+            #
+            # Firebase Admin uses Application Default Credentials (the Cloud
+            # Run service account azf-api) when no key path and no
+            # FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY
+            # trio is set. Do not mount FIREBASE_ADMIN_JSON. Retirement steps
+            # are in apps/api/src/platform/firebaseAdmin.ts.

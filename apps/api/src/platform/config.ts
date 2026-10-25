@@ -6,10 +6,30 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BELT_TIERS, resolveSupportEmail, type BeltTier } from '@aquazerofit/shared';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** apps/api/.data by default, regardless of process cwd. */
 const defaultDataDir = path.resolve(here, '..', '..', '.data');
+
+/** Positive integer, or `fallback` when the value is missing or not usable. */
+function readPositiveInt(raw: string | undefined, fallback: number): number {
+  if (!raw?.trim()) return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) return fallback;
+  return n;
+}
+
+/**
+ * Zero or a positive integer. Zero is a real setting (a cap that is off),
+ * so only a missing or unparseable value uses `fallback`.
+ */
+function readNonNegativeInt(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) return fallback;
+  return n;
+}
 
 /**
  * Environment variable declaring how many instances of this API will run.
@@ -65,12 +85,12 @@ export const config = {
   /**
    * Number of proxy hops to trust for `req.ip` / X-Forwarded-For.
    *
-   * Behind an Azure ingress (Container Apps, App Service, Front Door) Express
-   * sees the proxy's socket address for every request unless this is set, which
-   * collapses every caller into a single rate-limit bucket — the per-IP auth
-   * lane then locks out the whole platform after 10 attempts/minute. Defaults
-   * to 1 in production (trust exactly the immediate hop, so clients cannot
-   * spoof X-Forwarded-For) and 0 in dev, where there is no proxy.
+   * Rate limiting does not use `req.ip`. It trusts CF-Connecting-IP only when
+   * the Worker shared secret matches, and otherwise uses the socket address
+   * (see platform/clientIp.ts). `req.ip` is still what audit logs and the
+   * rest of the request see. Defaults to 1 in production (trust exactly the
+   * immediate hop, so clients cannot spoof X-Forwarded-For) and 0 in dev,
+   * where there is no proxy.
    */
   get trustProxy(): number {
     const raw = process.env.TRUST_PROXY?.trim();
@@ -79,6 +99,108 @@ export const config = {
       if (Number.isInteger(n) && n >= 0) return n;
     }
     return isProduction() ? 1 : 0;
+  },
+
+  /**
+   * Shared secret the Cloudflare Worker sends as `X-Origin-Shared-Secret`
+   * on requests it proxies to Cloud Run.
+   *
+   * Empty unless ORIGIN_SHARED_SECRET is set. An empty value never matches,
+   * so CF-Connecting-IP is ignored and rate limits fall back to the socket
+   * address. The value is not a default and is never committed.
+   */
+  get originSharedSecret(): string {
+    return process.env.ORIGIN_SHARED_SECRET?.trim() ?? '';
+  },
+
+  /**
+   * The value ORIGIN_SHARED_SECRET held before a rotation, accepted beside it
+   * until the Worker sends the new one.
+   *
+   * The two sides cannot change at the same instant, and with the gate on
+   * every request in between would be refused. The other escape, turning the
+   * gate off for the rotation, reopens run.app at exactly the moment a leak
+   * made rotating urgent. Empty, the default and the resting state, accepts
+   * nothing extra. Set it only for the overlap in docs/OPERATIONS.md and
+   * remove it once the Worker is switched: while it is set, the old value
+   * still opens the origin.
+   */
+  get originSharedSecretPrevious(): string {
+    return process.env.ORIGIN_SHARED_SECRET_PREVIOUS?.trim() ?? '';
+  },
+
+  /**
+   * Refuse with 403 every request that does not carry the Worker's
+   * ORIGIN_SHARED_SECRET (requireWorkerOrigin in platform/clientIp.ts).
+   *
+   * Cloud Run ingress cannot be narrowed to one Cloudflare Worker, so the
+   * *.run.app URL answers anyone who finds it, and a caller there skips
+   * everything the edge does. Only this process can say no. /health and
+   * /ready stay open: Cloud Run's probes and uptime checks dial the origin
+   * directly and cannot present the secret.
+   *
+   * OFF by default, and that default is the rollout order rather than a
+   * weakening. Switched on before both sides hold the same secret, or while a
+   * provider webhook (Telegram, Stripe, Play RTDN) is still registered on
+   * run.app instead of the public host, it refuses real users and real
+   * payments. None of those providers can add a custom header, so a webhook
+   * aimed at run.app can never pass. docs/OPERATIONS.md has the sequence. On
+   * with no secret is refused at boot (assertOriginSecretConfigured below).
+   */
+  get requireOriginSecret(): boolean {
+    const raw = process.env.REQUIRE_ORIGIN_SECRET?.trim().toLowerCase();
+    return raw === 'true' || raw === '1';
+  },
+
+  /**
+   * Auth-lane requests per minute for one client IP.
+   *
+   * 60 is one request a second. A Mini App open is a couple of /auth calls,
+   * and on a mobile carrier many subscribers share one address, so the old
+   * 10/min cap locked real people out of a launch. 60 stays far under the
+   * 300/min default lane. Password guessing against one account is still
+   * stopped by the per-email lockout (5 failures, then 15 minutes).
+   *
+   * A missing or non-positive value keeps this default. Zero must not turn
+   * the lane off.
+   */
+  get authRateLimitPerMinute(): number {
+    return readPositiveInt(process.env.AUTH_RATE_LIMIT_PER_MINUTE, 60);
+  },
+
+  /**
+   * New Telegram accounts per client IP per minute.
+   *
+   * Returning sign-ins are not counted. 5 allows a household or a double-tap
+   * on one connection and still stops a script. The old value was 3.
+   */
+  get telegramSignupPerIpPerMinute(): number {
+    return readPositiveInt(process.env.TELEGRAM_SIGNUP_PER_IP_PER_MINUTE, 5);
+  },
+
+  /**
+   * New Telegram accounts per IPv4 /24 (or IPv6 /64) per rolling day.
+   *
+   * 5/day made a carrier NAT, which puts unrelated people in one /24, fail
+   * closed after a handful of sign-ups. 2000/day is still a ceiling on a
+   * hostile subnet (about one new account a minute, sustained, across the
+   * whole block) and leaves room for a launch on shared mobile address space.
+   */
+  get telegramSignupSubnetDaily(): number {
+    return readPositiveInt(process.env.TELEGRAM_SIGNUP_SUBNET_DAILY, 2000);
+  },
+
+  /**
+   * New Telegram accounts per process per rolling day.
+   *
+   * 0, the default, disables the ceiling. The old cap was 100/day, which a
+   * real launch exceeds, and the counter lives in this process, so it was
+   * never a true global limit once more than one instance is running. Set
+   * TELEGRAM_SIGNUP_GLOBAL_DAILY to a positive integer to turn a per-instance
+   * circuit breaker back on.
+   */
+  get telegramSignupGlobalDaily(): number {
+    return readNonNegativeInt(process.env.TELEGRAM_SIGNUP_GLOBAL_DAILY, 0);
   },
 
   /**
@@ -100,8 +222,8 @@ export const config = {
   /**
    * Where meal photographs are written while a vision job is in flight.
    *
-   * Defaults to apps/api/uploads. On a host whose filesystem is ephemeral —
-   * many managed hosts reset it on every deploy — point UPLOADS_DIR at a mounted
+   * Defaults to apps/api/uploads. On a host whose filesystem is ephemeral -
+   * many managed hosts reset it on every deploy - point UPLOADS_DIR at a mounted
    * persistent volume, or in-flight photos vanish on redeploy. The blast
    * radius is deliberately small (the sweep deletes them within 24 hours
    * anyway and a missing file is tolerated everywhere it is read), but a lost
@@ -150,13 +272,29 @@ export const config = {
    * Shared secret echoed by Telegram in `X-Telegram-Bot-Api-Secret-Token` on
    * every webhook delivery (set with the `secret_token` parameter of
    * setWebhook). The webhook URL is otherwise a public, unauthenticated
-   * endpoint that grants coach entitlements — without this, anyone who guesses
+   * endpoint that grants coach entitlements - without this, anyone who guesses
    * the path can mint a `successful_payment` and take the paid roster for
    * free. Empty means the webhook refuses every request rather than trusting
    * them all, which is the correct default for an endpoint that moves money.
    */
   get telegramWebhookSecret(): string {
     return process.env.TELEGRAM_WEBHOOK_SECRET?.trim() ?? '';
+  },
+
+  /**
+   * Whole Stars charged for one 30-day Premium period inside the Mini App.
+   *
+   * There is no default. Unset, empty, zero, or anything that is not a
+   * positive safe integer means the plan page stays on "not available" and
+   * the invoice route does not call Telegram. Telegram rejects a price it
+   * will not sell; this process does not invent a cap or a fallback amount.
+   */
+  get telegramStarsPremiumPrice(): number | null {
+    const raw = process.env.TELEGRAM_STARS_PREMIUM_PRICE?.trim() ?? '';
+    if (!/^[1-9]\d*$/.test(raw)) return null;
+    const price = Number(raw);
+    if (!Number.isSafeInteger(price) || price <= 0) return null;
+    return price;
   },
 
   /**
@@ -169,7 +307,7 @@ export const config = {
   },
 
   /**
-   * Turnstile site key. Public by design — it is handed to any caller of
+   * Turnstile site key. Public by design - it is handed to any caller of
    * GET /auth/captcha.
    *
    * Served at runtime rather than baked into the web bundle as a VITE_ var on
@@ -186,8 +324,8 @@ export const config = {
    * True only when BOTH keys are present.
    *
    * Requiring both is what stops the worst configuration: a secret with no
-   * site key would have the server demand a token that the client — told
-   * `enabled: false` — never renders a widget to produce, locking every real
+   * site key would have the server demand a token that the client - told
+   * `enabled: false` - never renders a widget to produce, locking every real
    * person out of registration while looking correctly configured.
    */
   get botProtectionEnabled(): boolean {
@@ -200,7 +338,7 @@ export const config = {
    * `X-Client: android` and carrying no captcha token is let through.
    *
    * Read what that actually is before enabling it. `X-Client` is a header any
-   * caller can type, so this is not "trust the app" — it is a GLOBAL bypass of
+   * caller can type, so this is not "trust the app" - it is a GLOBAL bypass of
    * the registration and password-reset challenge, available to anyone who
    * sends four bytes. It exists for closed testing, where the tester count is
    * known and the alternative is no Android signup at all.
@@ -216,7 +354,7 @@ export const config = {
 
   /**
    * Play Integrity verification of the Android client's attestation token.
-   * Off until BOTH the flag and the package name are set — a verdict checked
+   * Off until BOTH the flag and the package name are set - a verdict checked
    * against the wrong package is not a check.
    */
   get playIntegrityEnabled(): boolean {
@@ -237,7 +375,7 @@ export const config = {
    * code between every request, which ends with the code taped to the monitor;
    * too long and the step-up stops being a step-up. Ten minutes covers a
    * realistic support task (list accounts, look one up, edit a record) in one
-   * prompt while staying inside the 15-minute access-token lifetime — the
+   * prompt while staying inside the 15-minute access-token lifetime - the
    * grant is bound to the presenting access token (see modules/mfa/service),
    * so it can never outlive that token anyway, and this only shortens it.
    *
@@ -292,7 +430,7 @@ export const config = {
 
   /**
    * Echo password-reset tokens in API responses and server logs. Requires
-   * isDev AND this flag — staging (NODE_ENV=production) must never leak tokens
+   * isDev AND this flag - staging (NODE_ENV=production) must never leak tokens
    * even when operators forget to unset dev conveniences.
    */
   get exposeDevTokens(): boolean {
@@ -311,7 +449,7 @@ export const config = {
    * `logs` container (see modules/logs/service.sweepIdempotencyRecords).
    *
    * Six hours by default, matching the other periodic sweeps in index.ts. The
-   * records carry a 24h TTL, so this is four passes per lifetime — frequent
+   * records carry a 24h TTL, so this is four passes per lifetime - frequent
    * enough that the backlog stays small, rare enough that the sweep's full
    * container scan is nowhere near a request path.
    *
@@ -327,7 +465,7 @@ export const config = {
    * setting it never chose had an opinion.
    *
    * Set it with headroom. `platform/aiBudget.ts` counts what providers report,
-   * and a call that dies mid-generation spends tokens nobody reports — so the
+   * and a call that dies mid-generation spends tokens nobody reports - so the
    * figure this compares against is a floor on real spend, not a meter.
    *
    * A negative or unparseable value falls back to "no ceiling" rather than
@@ -361,6 +499,28 @@ export const config = {
     return process.env.PLAY_RTDN_SECRET?.trim() ?? '';
   },
 
+  /**
+   * Stripe secret key. Test-mode (`sk_test_`) on staging, live on production,
+   * never the same set on both. Absent, or without STRIPE_PRICE_ID, means no
+   * Stripe checkout is offered - same asymmetry as the Play credentials.
+   */
+  get stripeSecretKey(): string {
+    return process.env.STRIPE_SECRET_KEY?.trim() ?? '';
+  },
+
+  /** The recurring Price premium is sold at. Its amount is read from Stripe. */
+  get stripePriceId(): string {
+    return process.env.STRIPE_PRICE_ID?.trim() ?? '';
+  },
+
+  /**
+   * Signing secret (`whsec_`) of the webhook endpoint. Unset means the webhook
+   * trusts nobody: it is an unauthenticated route that grants subscriptions.
+   */
+  get stripeWebhookSecret(): string {
+    return process.env.STRIPE_WEBHOOK_SECRET?.trim() ?? '';
+  },
+
   get dailyTokenBudget(): number {
     const raw = process.env.AZF_DAILY_TOKEN_BUDGET?.trim();
     if (!raw) return 0;
@@ -390,8 +550,10 @@ export const config = {
    * anything but 1.
    *
    * NaN means AZF_INSTANCE_COUNT was set to something that is not a positive
-   * integer. That is not treated as "probably one" — a guard that cannot read
+   * integer. That is not treated as "probably one" - a guard that cannot read
    * its own input has not verified anything, so it refuses.
+   *
+   * Unset reads as 1, which the guard accepts everywhere except Cloud Run.
    */
   get instanceCount(): number {
     const raw = process.env[INSTANCE_COUNT_ENV]?.trim();
@@ -407,6 +569,40 @@ export const config = {
   get appPublicUrl(): string {
     const raw = process.env.APP_PUBLIC_URL?.trim();
     return (raw || 'http://localhost:5173').replace(/\/+$/, '');
+  },
+
+  /**
+   * Mailbox named on the legal pages and in /paysupport. The rule lives in
+   * resolveSupportEmail: a blank value falls through to info@luminara.digital.
+   */
+  get supportEmail(): string {
+    return resolveSupportEmail(process.env.SUPPORT_EMAIL);
+  },
+
+  /**
+   * HTTPS URL the /start button opens as a Mini App. Falls back to
+   * appPublicUrl when TELEGRAM_MINI_APP_URL is unset or not https.
+   * The trailing slash is preserved: BotFather matches the URL exactly.
+   */
+  get telegramMiniAppUrl(): string {
+    return httpUrl(process.env.TELEGRAM_MINI_APP_URL, this.appPublicUrl, true);
+  },
+
+  /** /terms links. Each falls back to a page on the public origin. */
+  get termsUrl(): string {
+    return httpUrl(process.env.TERMS_URL, publicPath('/terms'));
+  },
+
+  get privacyUrl(): string {
+    return httpUrl(process.env.PRIVACY_URL, publicPath('/privacy'));
+  },
+
+  get refundUrl(): string {
+    return httpUrl(process.env.REFUND_URL, publicPath('/refund'));
+  },
+
+  get accountDeletionUrl(): string {
+    return httpUrl(process.env.ACCOUNT_DELETION_URL, publicPath('/account/deletion'));
   },
 
   /**
@@ -438,7 +634,74 @@ export const config = {
     const raw = process.env.ADAPTIVE_TARGETS?.trim().toLowerCase();
     return raw === 'true' || raw === '1';
   },
+
+  /**
+   * Fight Record master switch (AZF-W3-05 §4.5). Off unless set, because the
+   * feature ships dark and is released only after the Phase 0 exit. Turning it
+   * back off is also the kill switch: every surface disappears and no award is
+   * written, while the awards people already hold are kept for when it returns.
+   */
+  get fightRecordEnabled(): boolean {
+    const raw = process.env.FIGHT_RECORD_ENABLED?.trim().toLowerCase();
+    return raw === 'true' || raw === '1';
+  },
+
+  /**
+   * Share of users inside the Fight Record rollout, 0 to 100, bucketed by a
+   * stable hash of the user id so raising it only ever adds people. Unset
+   * means 100, so the master switch alone decides. Set but unparseable ("10%",
+   * "12.5") means 0: a typo in a rollout control must fail toward fewer
+   * people, never toward everyone.
+   */
+  get fightRecordRolloutPercent(): number {
+    const raw = process.env.FIGHT_RECORD_ROLLOUT_PERCENT;
+    return Math.min(100, readNonNegativeInt(raw, raw?.trim() ? 0 : 100));
+  },
+
+  /**
+   * Belt tier → Telegram custom emoji id, as JSON (printed by
+   * tools/belts/create-emoji-set.mjs). Null unless every tier has a non-empty
+   * id: a partial set would leave someone's status blank at exactly the moment
+   * they earned a belt, so the emoji status is offered all-or-nothing.
+   */
+  get telegramBeltEmojiIds(): Record<BeltTier, string> | null {
+    const raw = process.env.TELEGRAM_BELT_EMOJI_IDS?.trim();
+    if (!raw) return null;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (parsed === null || typeof parsed !== 'object') return null;
+    const ids = {} as Record<BeltTier, string>;
+    for (const tier of BELT_TIERS) {
+      const id = (parsed as Record<string, unknown>)[tier];
+      if (typeof id !== 'string' || id.trim() === '') return null;
+      ids[tier] = id.trim();
+    }
+    return ids;
+  },
 };
+
+function publicPath(path: string): string {
+  const base = config.appPublicUrl.replace(/\/+$/, '');
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+/**
+ * An absolute http(s) URL from the environment, or `fallback`.
+ * `httpsOnly` is for the Mini App button, which Telegram rejects otherwise.
+ * Fragments are allowed so an override can point at a heading.
+ */
+function httpUrl(raw: string | undefined, fallback: string, httpsOnly = false): string {
+  const value = raw?.trim() ?? '';
+  const scheme = httpsOnly ? 'https:' : 'https?:';
+  if (value.length > 0 && value.length <= 2048 && new RegExp(`^${scheme}\\/\\/\\S+$`, 'i').test(value)) {
+    return value;
+  }
+  return fallback;
+}
 
 /** True when at least one configured AI provider has a non-empty API key. */
 export function hasAnyAiProviderKey(): boolean {
@@ -475,30 +738,125 @@ function isProduction(): boolean {
  * horizontal scaling safe. Raising AZF_INSTANCE_COUNT before it lands does not
  * make the deployment scalable, it makes the data loss legal.
  *
+ * ON CLOUD RUN THE DEFAULT IS NOT ENOUGH. Cloud Run autoscales (to 100
+ * instances unless max-instances says otherwise), and cloudbuild.yaml deploys
+ * with `gcloud run deploy --image`, which keeps whatever scaling the live
+ * service already has. An unset variable there means nobody declared
+ * anything, and the default of 1 would wave through a service capped at 100.
+ * So when K_SERVICE is present (Cloud Run sets it on every revision) the
+ * variable must be set explicitly. cloudbuild.yaml sets it in the same
+ * command that pins min and max instances to 1, so the declaration and the
+ * scaling travel together.
+ *
+ * That is a declaration check, not a measurement, and its reach is narrow.
+ * The process cannot read max-instances, so a service raised by hand in the
+ * console boots with the variable still at 1. And since cloudbuild.yaml sets
+ * the variable on every deploy, what it mostly catches is a revision made some
+ * other way on a service that never had it. It stays because that case is
+ * exactly a fresh service sitting on Cloud Run's default ceiling of 100.
+ *
  * Skipped under test (the suite runs many workers in one repo and never boots
- * a serving process) and satisfied silently by the default of 1, so ordinary
- * local development never sees it.
+ * a serving process) and, off Cloud Run, satisfied silently by the default of
+ * 1, so ordinary local development never sees it.
  */
 export function assertSingleInstance(): void {
   if (config.isTest) return;
-  const declared = config.instanceCount;
-  if (declared === 1) return;
-
   const raw = process.env[INSTANCE_COUNT_ENV]?.trim() ?? '';
-  const problem = Number.isNaN(declared)
-    ? `${INSTANCE_COUNT_ENV} is set to ${JSON.stringify(raw)}, which is not a positive integer`
-    : `${INSTANCE_COUNT_ENV}=${declared} declares ${declared} concurrent instances`;
+  if (raw === '' && process.env.K_SERVICE?.trim()) {
+    throw singleInstanceRefusal(
+      `${INSTANCE_COUNT_ENV} is unset on Cloud Run, which autoscales unless max-instances is ` +
+        'pinned, so the default of 1 declares nothing',
+    );
+  }
+  const declared = config.instanceCount;
+  if (Number.isNaN(declared)) {
+    throw singleInstanceRefusal(
+      `${INSTANCE_COUNT_ENV} is set to ${JSON.stringify(raw)}, which is not a positive integer`,
+    );
+  }
+  if (declared > 1) {
+    throw singleInstanceRefusal(
+      `${INSTANCE_COUNT_ENV}=${declared} declares ${declared} concurrent instances`,
+    );
+  }
+}
 
-  throw new Error(
+/** The refusal every branch above throws: the problem, then why, then what to run instead. */
+function singleInstanceRefusal(problem: string): Error {
+  return new Error(
     `Refusing to start: ${problem}. This API is single-instance only. Each instance ` +
       'hydrates its own in-memory copy of the store at boot and never re-reads, so a write ' +
       'on one instance is invisible to the others and the last flush silently overwrites ' +
-      "the other instances' version of the same document — health logs are lost with no " +
-      'error anywhere. Run exactly one instance (managed PaaS: one dedicated machine, NOT ' +
-      'autoscale; Docker Compose: do not use --scale on the api service; Azure Container ' +
-      'Apps: min=max=1), and unset ' +
-      `${INSTANCE_COUNT_ENV} or set it to 1. Scaling out requires the async getStore() ` +
-      'refactor first, so reads go to Postgres rather than to a per-instance memory copy.',
+      "the other instances' version of the same document - health logs are lost with no " +
+      'error anywhere. Run exactly one instance (Cloud Run: --min-instances=1 ' +
+      '--max-instances=1, which cloudbuild.yaml applies on every deploy; managed PaaS: one ' +
+      'dedicated machine, NOT autoscale; Docker Compose: do not use --scale on the api service; ' +
+      `Azure Container Apps: min=max=1), and set ${INSTANCE_COUNT_ENV}=1 (it may be left ` +
+      'unset only off Cloud Run). Scaling out requires the async getStore() refactor first, ' +
+      'so reads go to Postgres rather than to a per-instance memory copy.',
+  );
+}
+
+/**
+ * Shortest origin secret the gate will run on. A floor, not a strength
+ * measure: the documented recipe (`openssl rand -hex 32`) gives 64 hex
+ * characters, so anything under half that was not made that way.
+ */
+const MIN_ORIGIN_SECRET_LENGTH = 32;
+
+/**
+ * Origin-gate guard: refuse to boot with REQUIRE_ORIGIN_SECRET on and no
+ * usable ORIGIN_SHARED_SECRET to compare against.
+ *
+ * An empty secret never matches (originSecretMatches in platform/clientIp.ts),
+ * so the gate would refuse every request - the whole site and every webhook -
+ * while /health and /ready, which are exempt, kept answering 200. The
+ * platform would read that revision as healthy and send it all the traffic.
+ * A failed deploy keeps the previous revision serving instead.
+ *
+ * A guessable secret is the opposite failure and just as quiet: the gate
+ * looks closed and admits anyone who has the value. The `replace-with-...`
+ * placeholder in .env.production.example is in a public repository, so it is
+ * refused outright, as is anything shorter than MIN_ORIGIN_SECRET_LENGTH.
+ * Neither message echoes the value.
+ *
+ * Off, nothing is judged. The secret then only steers rate-limit buckets, and
+ * a deploy must not fail over it before the operator has chosen the gate.
+ *
+ * Not skipped under test, unlike assertSingleInstance: it reads getters and
+ * only index.ts calls it, so the suite can exercise it directly.
+ */
+export function assertOriginSecretConfigured(): void {
+  if (!config.requireOriginSecret) return;
+  const secret = config.originSharedSecret;
+  if (!secret) {
+    throw new Error(
+      'Refusing to start: REQUIRE_ORIGIN_SECRET is on but ORIGIN_SHARED_SECRET is empty, so every ' +
+        'request except /health and /ready would be refused with 403 while the probes stayed green. ' +
+        'Set ORIGIN_SHARED_SECRET to the value the Worker holds (`npx wrangler secret put ' +
+        'ORIGIN_SHARED_SECRET` in cloudflare/), or unset REQUIRE_ORIGIN_SECRET.',
+    );
+  }
+  assertUnguessableOriginSecret('ORIGIN_SHARED_SECRET', secret);
+  // Optional, but a weak previous value opens the gate exactly as a weak
+  // current one would.
+  const previous = config.originSharedSecretPrevious;
+  if (previous) assertUnguessableOriginSecret('ORIGIN_SHARED_SECRET_PREVIOUS', previous);
+}
+
+function assertUnguessableOriginSecret(name: string, value: string): void {
+  let problem: string;
+  if (value.toLowerCase().startsWith('replace-with')) {
+    problem = 'is the placeholder from .env.production.example, which anyone can read';
+  } else if (value.length < MIN_ORIGIN_SECRET_LENGTH) {
+    problem = `is ${value.length} characters, under the ${MIN_ORIGIN_SECRET_LENGTH}-character floor`;
+  } else {
+    return;
+  }
+  throw new Error(
+    `Refusing to start: ${name} ${problem}, so REQUIRE_ORIGIN_SECRET would admit anyone ` +
+      'who has it. Generate one with `openssl rand -hex 32` and set it on the Worker and on ' +
+      'Cloud Run (docs/OPERATIONS.md, "Closing the run.app bypass").',
   );
 }
 
@@ -563,9 +921,9 @@ export function assertProductionSecrets(): void {
   // Bot protection is on only when BOTH Turnstile keys are present (see
   // config.botProtectionEnabled), and assertHuman returns early and does
   // nothing when it is off. So a production deployment missing either key
-  // serves POST /auth/register and POST /auth/password-reset/request — the
+  // serves POST /auth/register and POST /auth/password-reset/request - the
   // account-creation surface, where one route mints accounts and AI credits
-  // and the other mails an address the caller chose — completely unchallenged,
+  // and the other mails an address the caller chose - completely unchallenged,
   // while every response and every log line looks exactly as it does when the
   // check is working. The only previous signal was one console.warn at boot,
   // which is to say none.
@@ -581,7 +939,7 @@ export function assertProductionSecrets(): void {
       `Refusing to start in production without: ${turnstileMissing.join(', ')}. Bot protection ` +
         'is enabled only when BOTH Turnstile keys are set, so registration and password-reset ' +
         'request go out with no challenge at all without them and nothing says so at request ' +
-        'time — a distributed signup flood stays under every per-IP rate limit. One key on its ' +
+        'time - a distributed signup flood stays under every per-IP rate limit. One key on its ' +
         'own leaves protection off exactly as if neither were set, which is the usual way this ' +
         'happens. Take both from the Cloudflare dashboard (Turnstile -> your site) and set them ' +
         'together.',
@@ -591,8 +949,8 @@ export function assertProductionSecrets(): void {
   // Admin MFA is built and mounted, but with MFA_REQUIRE_ADMIN off an
   // administrator who never enrolled a second factor is audited, logged and
   // then let through anyway (see modules/mfa/middleware). The admin router
-  // reads and edits every account on the platform — every user's email,
-  // health profile, food and weight history — so an unenrolled admin means
+  // reads and edits every account on the platform - every user's email,
+  // health profile, food and weight history - so an unenrolled admin means
   // one stolen password stands between an attacker and all of it, with the
   // audit trail recording the breach rather than preventing it. The off
   // default exists only to give an existing deployment one window to enrol;
@@ -602,7 +960,7 @@ export function assertProductionSecrets(): void {
     throw new Error(
       'MFA_REQUIRE_ADMIN must be set to true in production: without it an administrator with no ' +
         'second factor enrolled is only audited, not stopped, and the admin routes expose every ' +
-        'account on the platform. Have every admin enrol an authenticator first, then set it — ' +
+        'account on the platform. Have every admin enrol an authenticator first, then set it - ' +
         'flipping it with nobody enrolled locks you out of your own system.',
     );
   }
@@ -623,7 +981,7 @@ export function assertProductionSecrets(): void {
 
 // Startup guard: importing config in a production process without real secrets
 // must crash immediately (dev fallbacks are dev-only). This covers every
-// entrypoint — the API server, the seed script, the importers — not just
+// entrypoint - the API server, the seed script, the importers - not just
 // index.ts, which also calls it explicitly.
 //
 // Skipped under test: the suite exercises production combinations by mutating

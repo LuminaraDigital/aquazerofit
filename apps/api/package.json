@@ -30,7 +30,7 @@
     "pg": "^8.13.1",
     "sharp": "^0.35.4",
     "tsx": "^4.16.2",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -41,9 +41,9 @@
     "@types/node": "^20.14.0",
     "@types/pg": "^8.11.10",
     "@types/supertest": "^6.0.2",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^4.1.12",
     "supertest": "^7.0.0",
     "typescript": "^5.5.4",
-    "vitest": "^2.0.5"
+    "vitest": "^4.1.12"
   }
 }

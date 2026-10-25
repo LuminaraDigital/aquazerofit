@@ -231,9 +231,10 @@ progressRouter.get(
       const insight = draft(usable ? modelText : fallbackNarrative, result.meta);
 
       // Real providers failed and the gateway fell back to offline templates -
-      // do not charge. Keyless mock (no providers configured) keeps degraded
-      // false and bills normally per product rules. Same stance as the chat and
-      // recommendation lanes.
+      // do not charge. The keyless mock (no providers configured) is degraded
+      // too in production ('no_provider'), so it is not charged there either;
+      // only in development and tests does it bill, where it IS the product.
+      // Same stance as the chat and recommendation lanes.
       await settleReservation(reservationId, result.meta.degraded !== true);
 
       // --- 5. Persist: this is the document the cache check above will find.

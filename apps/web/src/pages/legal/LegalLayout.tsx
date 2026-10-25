@@ -1,7 +1,7 @@
 /**
  * Shared layout and typography for the legal pages (/privacy, /terms, /support).
  *
- * Narrower measure than the marketing pages — these are read, not scanned — with
+ * Narrower measure than the marketing pages. These are read, not scanned, with
  * a contents rail, and the draft notice pinned above the first clause so nobody
  * reaches the substance without meeting it first.
  */
@@ -69,6 +69,17 @@ export function LegalPage({
                 </>
               )}
             </p>
+            {OPERATOR.supportEmail && (
+              <p className="mt-2 text-[12px] text-on-surface-variant">
+                Support:{' '}
+                <a
+                  href={`mailto:${OPERATOR.supportEmail}`}
+                  className="text-primary hover:text-secondary"
+                >
+                  {OPERATOR.supportEmail}
+                </a>
+              </p>
+            )}
           </Reveal>
         </div>
       </section>
@@ -151,18 +162,28 @@ export function List({ items }: { items: React.ReactNode[] }) {
   );
 }
 
-/** Definition table for retention periods and similar. */
-export function Table({
+/**
+ * Definition table for retention periods and similar. The first cell of each
+ * row is its header, and every row must have one cell per heading: a short
+ * row fails typecheck rather than rendering a misaligned table. Wider tables
+ * scroll inside the card at phone width, so the card takes keyboard focus.
+ */
+export function Table<const Head extends readonly string[]>({
   caption,
   head,
   rows,
 }: {
   caption: string;
-  head: [string, string];
-  rows: Array<[React.ReactNode, React.ReactNode]>;
+  head: Head;
+  rows: ReadonlyArray<{ readonly [K in keyof Head]: React.ReactNode }>;
 }) {
   return (
-    <div className="lp-card overflow-hidden">
+    <div
+      role="region"
+      aria-label={caption}
+      tabIndex={0}
+      className="lp-card overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+    >
       <table className="w-full text-left text-sm" aria-label={caption}>
         <thead>
           <tr className="border-b border-white/8">
@@ -178,7 +199,7 @@ export function Table({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => (
+          {rows.map((row: readonly React.ReactNode[], i) => (
             <tr key={i} className={i > 0 ? 'border-t border-white/5' : ''}>
               <th
                 scope="row"
@@ -186,9 +207,14 @@ export function Table({
               >
                 {row[0]}
               </th>
-              <td className="px-5 py-3 align-top text-[13px] leading-relaxed text-on-surface-variant/75">
-                {row[1]}
-              </td>
+              {row.slice(1).map((cell, j) => (
+                <td
+                  key={j}
+                  className="px-5 py-3 align-top text-[13px] leading-relaxed text-on-surface-variant/75"
+                >
+                  {cell}
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>

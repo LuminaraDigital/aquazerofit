@@ -5,13 +5,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './platform/config';
+import { requireWorkerOrigin } from './platform/clientIp';
 import { errorHandler, notFoundHandler } from './platform/errors';
 import { assertTrustProxyHeaders, enforceHttps, redirectWwwToCanonical } from './platform/https';
-import { requestLogger, metrics } from './platform/telemetry';
+import { logError, requestLogger, metrics } from './platform/telemetry';
 import { budgetSnapshot } from './platform/aiBudget';
 import { rateLimiter } from './platform/rateLimiter';
 import { getStore } from './platform/store';
 import { buildRouter } from './modules';
+import { servePrerenderedLegalPages } from './platform/legalStatic';
 
 /** Cloudflare Turnstile's script + iframe origin (see platform/botProtection.ts). */
 const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
@@ -25,8 +27,16 @@ export function createApp() {
 
   app.disable('x-powered-by');
 
-  // Transport security runs before everything else: a plaintext request should
-  // be turned away without this process parsing a body or touching the store.
+  // Origin gate ahead of everything, transport included. With
+  // REQUIRE_ORIGIN_SECRET on, a caller of the run.app URL that skipped the
+  // Worker is refused before this process redirects, parses or logs it, and
+  // before its forwarding headers, which the Worker never built, can trip the
+  // trust-proxy check below. A no-op while the switch is off.
+  app.use(requireWorkerOrigin);
+
+  // Transport security runs next, before anything that does work: a plaintext
+  // request should be turned away without this process parsing a body or
+  // touching the store.
   // The trust-proxy check sits first because enforceHttps reads `req.secure`,
   // which is only trustworthy when TRUST_PROXY matches the real topology.
   app.use(assertTrustProxyHeaders);
@@ -49,7 +59,7 @@ export function createApp() {
               // challenges.cloudflare.com serves the Turnstile widget on the
               // register and password-reset forms. Both are only requested
               // when the corresponding key is configured, but the directive
-              // must be present unconditionally — a CSP cannot be varied per
+              // must be present unconditionally - a CSP cannot be varied per
               // response without also varying the cache.
               scriptSrc: [
                 "'self'",
@@ -61,13 +71,17 @@ export function createApp() {
               fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
               imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
               // Turnstile runs its challenge inside an iframe it serves itself,
-              // so frame-src must allow the origin — but connect-src must NOT:
+              // so frame-src must allow the origin - but connect-src must NOT:
               // the widget's XHR is issued from inside that iframe, which is a
               // separate browsing context governed by Cloudflare's own policy,
               // not this one. Adding it here would widen the page's egress
               // allowance for no benefit.
               frameSrc: ["'self'", TURNSTILE_ORIGIN],
-              connectSrc: ["'self'"],
+              // tganalytics.xyz is the Telegram Mini Apps Analytics catalog
+              // endpoint. The client posts there only inside a Mini App, and
+              // only when both Vite catalog env vars are set. The header is
+              // the same on every SPA response.
+              connectSrc: ["'self'", 'https://tganalytics.xyz'],
               // Coach/exercise media is played from object URLs built in the
               // client; without this, default-src 'self' blocks blob: playback.
               mediaSrc: ["'self'", 'blob:'],
@@ -105,21 +119,24 @@ export function createApp() {
     }),
   );
   app.use(cors({ origin: config.corsOrigins, credentials: false }));
+  // Stripe signs the exact bytes it sends, so its webhook gets the raw body.
+  // express.raw marks the body as read and express.json then leaves it alone.
+  app.use(`${config.basePath}/billing/stripe/webhook`, express.raw({ type: 'application/json', limit: '1mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger);
 
   // Probes are registered BEFORE the limiter: a rate-limited liveness probe
   // 429s under load and the platform restarts a healthy container.
-  // Liveness — process is up. No dependencies, never touches the store.
+  // Liveness - process is up. No dependencies, never touches the store.
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', service: 'aquazerofit-api', version: config.version });
   });
 
-  // Readiness — safe to route traffic here: the data store has loaded AND,
+  // Readiness - safe to route traffic here: the data store has loaded AND,
   // under the Postgres backing, a live round-trip succeeds. Hydration alone
   // says the snapshot was readable at boot; the pin checks the pool still
   // answers, which is what the first routed request will need.
-  app.get('/ready', async (_req, res) => {
+  app.get('/ready', async (req, res) => {
     try {
       const store = getStore();
       // SELECT 1 against the pool when Postgres-backed; a no-op resolution
@@ -128,16 +145,17 @@ export function createApp() {
       if (typeof maybePing === 'function') await maybePing.call(store);
       res.json({ status: 'ready', service: 'aquazerofit-api', version: config.version });
     } catch (err) {
-      res.status(503).json({
-        code: 'NOT_READY',
-        message: 'Data store is not available yet.',
-        details: { reason: err instanceof Error ? err.message : 'unknown' },
-      });
+      // The cause goes to the server log only. /ready is one of the two paths
+      // the origin gate leaves open on the run.app URL, and a raw driver error
+      // names the database user, host or database to whoever asks. The 503
+      // is all a probe needs.
+      logError(err, { requestId: (req as { requestId?: string }).requestId, route: '/ready' });
+      res.status(503).json({ code: 'NOT_READY', message: 'Data store is not available yet.' });
     }
   });
 
   // Operator snapshot: the in-process counters as JSON. Registered before
-  // the limiter and unauthenticated for the same reason as /health — a
+  // the limiter and unauthenticated for the same reason as /health - a
   // platform scraper cannot present credentials, and the payload carries no
   // user data (counts and timestamps only).
   app.get('/metrics', (_req, res) => {
@@ -155,7 +173,7 @@ export function createApp() {
 
   // Committed placeholder media (exercise art etc.) lives in assets/ and is
   // safe to serve publicly. User meal photos in uploads/ are deliberately NOT
-  // statically mounted — they are private and served only through the
+  // statically mounted - they are private and served only through the
   // authenticated, ownership-checked GET /api/v1/meal-photos/:jobId/image.
   //
   // Mounted BEFORE the rate limiter on purpose. These are static, public,
@@ -163,7 +181,7 @@ export function createApp() {
   // screen asks for a whole page of exercise thumbnails at once. Behind the
   // limiter each of those spent one of the same 300/min tokens as a real API
   // call, so a user scrolling their own exercise list could rate-limit
-  // themselves out of the app — a 429 on an image, then on the next write.
+  // themselves out of the app - a 429 on an image, then on the next write.
   // Static files are not the abuse vector the limiter exists for.
   const here = path.dirname(fileURLToPath(import.meta.url));
   app.use(
@@ -194,7 +212,7 @@ export function createApp() {
     // request for /.well-known/assetlinks.json is skipped by express.static,
     // falls through to the HTML fallback below, and returns the SPA shell with
     // a 200. Android reads that, fails to parse JSON, and App Links
-    // verification fails silently — the deep link just stops opening the app,
+    // verification fails silently - the deep link just stops opening the app,
     // with nothing in any log to say why.
     //
     // Scoped to this one directory rather than setting dotfiles:'allow' on the
@@ -211,6 +229,10 @@ export function createApp() {
       }),
     );
 
+    // Before the general static handler, so a directory of prerendered HTML
+    // cannot answer /terms with a redirect onto /terms/.
+    app.use(servePrerenderedLegalPages(spaDir));
+
     app.use(
       express.static(spaDir, {
         index: false,
@@ -225,7 +247,7 @@ export function createApp() {
     );
 
     // Client-side routing: deep links like /nutrition/analysis/:id must return
-    // the shell. Only GET/HEAD, and only when the client actually wants HTML —
+    // the shell. Only GET/HEAD, and only when the client actually wants HTML -
     // an errant fetch for a missing JSON resource should get a 404, not markup.
     //
     // Pathless app.use rather than app.get('*'): Express 5 moved to

@@ -51,6 +51,8 @@ import fit.aquazero.app.feature.challenges.ChallengesScreen
 import fit.aquazero.app.feature.coach.CoachScreen
 import fit.aquazero.app.feature.coach.CoachSelectScreen
 import fit.aquazero.app.feature.dashboard.DashboardScreen
+import fit.aquazero.app.feature.fightrecord.FightRecordScreen
+import fit.aquazero.app.feature.fightrecord.SeasonCard
 import fit.aquazero.app.feature.nutrition.AnalysisResultsScreen
 import fit.aquazero.app.feature.nutrition.CaptureMealScreen
 import fit.aquazero.app.feature.nutrition.MealPlanScreen
@@ -97,7 +99,7 @@ class RootViewModel @Inject constructor(
  * The answer decides what the Home tab is. With no profile there is no
  * defensible daily target, so Home is the first-run surface that says so,
  * rather than a dashboard of rings with nothing behind them. Null means "not
- * known yet" and is held rather than guessed — flashing the wrong home for a
+ * known yet" and is held rather than guessed. Flashing the wrong home for a
  * frame is worse than a moment of spinner.
  */
 @HiltViewModel
@@ -319,6 +321,12 @@ private fun MainShell(
                                     },
                                     onOpenProgress = { switchTab(AzfTab.Progress) },
                                     onOpenCoach = { prompt -> openCoach(prompt) },
+                                    seasonCard = { modifier ->
+                                        SeasonCard(
+                                            onOpenFightRecord = { backStack.add(FightRecordKey) },
+                                            modifier = modifier,
+                                        )
+                                    },
                                 )
                             }
                         }
@@ -369,6 +377,7 @@ private fun MainShell(
                                     backStack.removeLastOrNull() // remove capture
                                     backStack.add(AnalysisResultsKey(jobId))
                                 },
+                                onOpenPlan = { backStack.add(PlanEntitlementsKey) },
                             )
                         }
                         entry<AnalysisResultsKey> { key ->
@@ -424,6 +433,7 @@ private fun MainShell(
                         entry<ChallengesKey> { key ->
                             ChallengesScreen(onBack = ::pop, initialJoinCode = key.joinCode)
                         }
+                        entry<FightRecordKey> { FightRecordScreen(onBack = ::pop) }
                         entry<SettingsKey> {
                             SettingsScreen(
                                 onBack = ::pop,
@@ -457,8 +467,8 @@ private fun MainShell(
             }
         }
 
-        // Settings is a Play compliance surface — account deletion, consents and
-        // the AGPL source link all live behind it — so it must be reachable from
+        // Settings is a Play compliance surface. Account deletion, consents and
+        // the AGPL source link all live behind it, so it must be reachable from
         // anywhere in the app, not only from one tab. The action sits in the
         // header's trailing position on the tab roots, drawn by the shell so no
         // individual tab screen has to own it. Coach is the exception: it already
@@ -500,7 +510,7 @@ private fun MainShell(
  * NavDisplay's scene decorators are deliberately absent. Their factories
  * (`rememberSceneSetupNavEntryDecorator`, and the shared-element one, which
  * also needs a `SharedTransitionScope` NavDisplay owns) are `internal` to the
- * library, so no caller can supply them — which means NavDisplay applies them
+ * library, so no caller can supply them, which means NavDisplay applies them
  * itself around whatever this list contains. Do not try to add them.
  */
 @Composable

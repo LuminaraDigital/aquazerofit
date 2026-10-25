@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { DailyNutrition, ProgressSummary, TrendPoint } from '@aquazerofit/shared';
@@ -9,13 +10,14 @@ import { Skeleton, DashboardSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { CoachCard } from '@/components/coach/CoachCard';
 import { ConsistencyCard } from '@/components/progress/ConsistencyCard';
+import { SeasonCard } from '@/components/fightRecord/SeasonCard';
 import { ConsistencyChip } from '@/components/progress/ConsistencyChip';
 import { ReadinessChip } from '@/components/progress/ReadinessChip';
 import { WeeklyInsightCard } from '@/components/progress/WeeklyInsightCard';
 import { todayWorkoutQuery, queryKeys, useProgressInsight, useReadiness } from '@/lib/queries';
+import { useTelegramMainAction } from '@/lib/useTelegramChrome';
 import { MacroBar } from './MacroBar';
 import { WaterCard } from './WaterCard';
-import { Sparkline } from './Sparkline';
 import { SuggestMealCard } from './SuggestMealCard';
 import {
   asUser,
@@ -26,6 +28,8 @@ import {
   todayLocalDate,
 } from './lib';
 
+const Sparkline = lazy(() => import('./Sparkline').then((m) => ({ default: m.Sparkline })));
+
 interface TrendsResponse {
   kcal?: TrendPoint[];
   weight?: TrendPoint[];
@@ -34,6 +38,10 @@ interface TrendsResponse {
 export default function Dashboard() {
   const navigate = useNavigate();
   const today = todayLocalDate();
+  const nativeLog = useTelegramMainAction({
+    text: 'Log a meal',
+    onClick: () => navigate('/nutrition/capture'),
+  });
 
   const dailyQuery = useQuery({
     queryKey: queryKeys.nutritionDaily(today),
@@ -284,6 +292,11 @@ export default function Dashboard() {
           />
         </section>
 
+        {/* Fight Record season and belt. Renders nothing while the feature is off. */}
+        <section className="mb-5 reveal reveal-4 empty:hidden" aria-label="Season">
+          <SeasonCard />
+        </section>
+
         {/* Weekly insight */}
         <section className="mb-5 reveal reveal-4" aria-label="Your week">
           <WeeklyInsightCard insight={insightQuery.data} loading={insightQuery.isPending} />
@@ -392,7 +405,9 @@ export default function Dashboard() {
                     <span className="text-sm text-on-surface-variant ml-1">kg</span>
                   </p>
                 )}
-                <Sparkline points={weightSeries.slice(-14)} />
+                <Suspense fallback={null}>
+                  <Sparkline points={weightSeries.slice(-14)} />
+                </Suspense>
               </>
             )}
           </GlassCard>
@@ -442,7 +457,9 @@ export default function Dashboard() {
       </main>
       )}
 
-      {/* Camera FAB: anchored to the centered content column, not the viewport */}
+      {/* Camera FAB: anchored to the centered content column, not the viewport.
+          Inside Telegram the same action sits on the native main button. */}
+      {!nativeLog && (
       <div className="fixed bottom-24 inset-x-0 z-40 flex max-w-md mx-auto justify-end pr-container-margin">
         <button
           type="button"
@@ -456,6 +473,7 @@ export default function Dashboard() {
           </span>
         </button>
       </div>
+      )}
     </div>
   );
 }

@@ -9,7 +9,7 @@
  * Rows are copied in and out so a caller mutating a returned object cannot
  * reach into the store, which is the isolation a database gives for free.
  */
-import type { ShareKindP1 } from '@aquazerofit/shared';
+import type { NudgeKind, ShareKindP1 } from '@aquazerofit/shared';
 import { ARCHIVED_SQUAD_NAME } from './types';
 import type {
   AttributionRow,
@@ -48,6 +48,7 @@ export class MemoryEngageRepo implements EngageRepo {
   private cheers: CheerRow[] = [];
   private grace: GraceRow[] = [];
   private nudges: Array<{ userId: string; localDate: string; kind: string; sentAt: string }> = [];
+  private nudgePrefs: Array<{ userId: string; kind: NudgeKind; enabled: boolean; updatedAt: string }> = [];
   private links: ShareLinkRow[] = [];
   private attributions: AttributionRow[] = [];
 
@@ -312,6 +313,16 @@ export class MemoryEngageRepo implements EngageRepo {
     return true;
   }
 
+  async nudgeSettings(userId: string): Promise<Partial<Record<NudgeKind, boolean>>> {
+    return Object.fromEntries(this.nudgePrefs.filter((p) => p.userId === userId).map((p) => [p.kind, p.enabled]));
+  }
+
+  async setNudgeSetting(userId: string, kind: NudgeKind, enabled: boolean, at: string): Promise<void> {
+    const held = this.nudgePrefs.find((p) => p.userId === userId && p.kind === kind);
+    if (held) Object.assign(held, { enabled, updatedAt: at });
+    else this.nudgePrefs.push({ userId, kind, enabled, updatedAt: at });
+  }
+
   // ----- share kit -----
 
   async shareLink(userId: string, kind: ShareKindP1, seasonNumber: number): Promise<ShareLinkRow | null> {
@@ -386,6 +397,9 @@ export class MemoryEngageRepo implements EngageRepo {
       nudges: this.nudges
         .filter((n) => n.userId === userId)
         .map(({ localDate, kind, sentAt }) => ({ localDate, kind, sentAt })),
+      nudgeSettings: this.nudgePrefs
+        .filter((p) => p.userId === userId)
+        .map(({ kind, enabled, updatedAt }) => ({ kind, enabled, updatedAt })),
       shareLinks: this.links.filter((l) => l.userId === userId).map(copy),
       attribution: attribution
         ? (({ inviteeUserId: _omit, ...rest }) => rest)(attribution)
@@ -408,6 +422,7 @@ export class MemoryEngageRepo implements EngageRepo {
     for (const cheer of this.cheers) if (cheer.fromUserId === userId) cheer.fromUserId = null;
     this.grace = this.grace.filter((g) => g.userId !== userId);
     this.nudges = this.nudges.filter((n) => n.userId !== userId);
+    this.nudgePrefs = this.nudgePrefs.filter((p) => p.userId !== userId);
     const codes = new Set(this.links.filter((l) => l.userId === userId).map((l) => l.code));
     this.links = this.links.filter((l) => l.userId !== userId);
     this.attributions = this.attributions.filter((a) => a.inviteeUserId !== userId);

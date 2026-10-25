@@ -64,10 +64,11 @@ export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
   const { isLoading: firebaseLoading, firebaseEnabled, firebaseUser } = useFirebaseAuth();
   // FE-01: the access token lives in memory, so a reload starts unauthenticated
   // even with a valid session. Wait for Firebase first when enabled, then
-  // attempt one cookie-backed refresh for Telegram / legacy sessions.
-  const [restoring, setRestoring] = useState(
-    () => !tokenStore.isAuthenticated && !firebaseLoading,
-  );
+  // attempt one cookie-backed refresh for Telegram / legacy sessions. That is
+  // pending for any unauthenticated visit, including while Firebase loads, so
+  // the render in which Firebase settles waits for the refresh instead of
+  // redirecting a session it has not tried to restore.
+  const [restoring, setRestoring] = useState(() => !tokenStore.isAuthenticated);
 
   useEffect(() => {
     if (firebaseLoading) return;

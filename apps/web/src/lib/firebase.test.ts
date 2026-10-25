@@ -65,6 +65,44 @@ describe('Firebase Web SDK Configuration and Helpers', () => {
     }
   });
 
+  it('downloads the SDK again after a failed attempt instead of failing forever', async () => {
+    // A network blip, or a deploy that replaced the hashed chunk, fails one
+    // import. Every later sign-in, refresh and boot must not inherit it.
+    vi.resetModules();
+    vi.stubEnv('MODE', 'development');
+    vi.stubEnv('VITE_FIREBASE_API_KEY', 'test-key');
+    vi.stubEnv('VITE_FIREBASE_APP_ID', 'test-app');
+    let attempts = 0;
+    vi.doMock('firebase/app', () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('Failed to fetch dynamically imported module');
+      return { initializeApp: vi.fn(() => ({})), getApps: () => [], getApp: vi.fn() };
+    });
+    vi.doMock('firebase/auth', () => ({
+      getAuth: vi.fn(() => ({})),
+      onIdTokenChanged: vi.fn(),
+      signInWithEmailAndPassword: vi.fn(),
+      createUserWithEmailAndPassword: vi.fn(),
+      sendPasswordResetEmail: vi.fn(),
+      signOut: vi.fn(),
+      updateProfile: vi.fn(),
+    }));
+    try {
+      const { loadFirebaseSdk } = await import('./firebase');
+      await expect(loadFirebaseSdk()).rejects.toThrow();
+
+      const sdk = await loadFirebaseSdk();
+
+      expect(sdk.auth).not.toBeNull();
+      expect(attempts).toBe(2);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.doUnmock('firebase/app');
+      vi.doUnmock('firebase/auth');
+      vi.resetModules();
+    }
+  });
+
   it('maps known Firebase Auth errors to friendly user-facing messages', () => {
     expect(mapFirebaseAuthError({ code: 'auth/invalid-email' })).toBe(
       'Enter a valid email address.',

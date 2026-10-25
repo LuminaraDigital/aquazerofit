@@ -67,7 +67,8 @@ function isStrictPath(path: string): boolean {
 
 /** Sending a cheer: 30 a minute per person (AZF-P1 §5.3). Reading the inbox is not limited here. */
 function isCheerSend(req: Request): boolean {
-  return req.method === 'POST' && /\/cheers\/?$/.test(req.path);
+  // Case-insensitive like Express routing: /CHEERS reaches the same handler.
+  return req.method === 'POST' && /\/cheers\/?$/i.test(req.path);
 }
 
 function isAuthPath(path: string): boolean {

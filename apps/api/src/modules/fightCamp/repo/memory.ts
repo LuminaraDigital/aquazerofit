@@ -46,6 +46,8 @@ export class MemoryEngageRepo implements EngageRepo {
   private enrolments: EnrolmentRow[] = [];
   private squads: SquadRow[] = [];
   private members: MemberRow[] = [];
+  /** `${squadId}|${userId}` of everyone an owner removed. */
+  private removals = new Set<string>();
   private cheers: CheerRow[] = [];
   private grace: GraceRow[] = [];
   private nudges: Array<{ userId: string; localDate: string; kind: string; sentAt: string }> = [];
@@ -141,6 +143,7 @@ export class MemoryEngageRepo implements EngageRepo {
     if (!squad) return { ok: false, reason: 'not_found' };
     if (squad.archivedAt !== null) return { ok: false, reason: 'archived' };
     if (this.active(member.userId, member.seasonNumber)) return { ok: false, reason: 'already_member' };
+    if (this.removals.has(`${squadId}|${member.userId}`)) return { ok: false, reason: 'removed' };
     if (this.activeIn(squadId).length >= squad.maxMembers) return { ok: false, reason: 'full' };
 
     // A member who left and comes back reuses their row (one row per squad
@@ -159,12 +162,17 @@ export class MemoryEngageRepo implements EngageRepo {
     return { ok: true, member: copy(member) };
   }
 
-  async leaveSquad(squadId: string, userId: string, at: string): Promise<boolean> {
+  async wasRemoved(squadId: string, userId: string): Promise<boolean> {
+    return this.removals.has(`${squadId}|${userId}`);
+  }
+
+  async leaveSquad(squadId: string, userId: string, at: string, opts: { removed?: boolean } = {}): Promise<boolean> {
     const member = this.members.find(
       (m) => m.squadId === squadId && m.userId === userId && m.leftAt === null,
     );
     if (!member) return false;
     member.leftAt = at;
+    if (opts.removed) this.removals.add(`${squadId}|${userId}`);
     const wasOwner = member.role === 'owner';
     member.role = 'member';
     if (wasOwner) {
@@ -429,6 +437,7 @@ export class MemoryEngageRepo implements EngageRepo {
       await this.leaveSquad(member.squadId, userId, at);
     }
     this.members = this.members.filter((m) => m.userId !== userId);
+    for (const key of [...this.removals]) if (key.endsWith(`|${userId}`)) this.removals.delete(key);
     for (const squad of this.squads) {
       if (squad.createdBy !== userId) continue;
       if (squad.archivedAt !== null) Object.assign(squad, { name: ARCHIVED_SQUAD_NAME, cornerHash: null });

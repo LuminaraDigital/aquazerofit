@@ -44,7 +44,7 @@ import {
   useShowMyNumbers,
   useSquad,
 } from '@/lib/fightCamp';
-import { isTMA, openTelegramLink, shareMessage } from '@/lib/telegram';
+import { canShareMessage, isTMA, openTelegramLink, shareMessage } from '@/lib/telegram';
 
 export default function SquadPage() {
   const camp = useFightCamp();
@@ -216,8 +216,14 @@ function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
     // Bot API 8.0: a prepared message sent to chats the user picks. Anything
     // less, or a refusal, falls through to the share link below.
     if (isTMA()) {
-      const prepared = await prepareSquadInvite(squad.id);
-      if (prepared && (await shareMessage(prepared))) return;
+      // A prepared message the client can send is the whole answer: if the
+      // person then cancels Telegram's chooser, a second share screen would
+      // only be in the way. The link is for clients that cannot do it at all.
+      const prepared = canShareMessage() ? await prepareSquadInvite(squad.id) : null;
+      if (prepared) {
+        await shareMessage(prepared);
+        return;
+      }
       const url = squadTelegramUrl(squad);
       openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
       return;

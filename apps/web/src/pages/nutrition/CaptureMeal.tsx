@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { MealType } from '@aquazerofit/shared';
 import { MEAL_PHOTO_MAX_BYTES } from '@aquazerofit/shared';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { compressPhoto } from '@/lib/compressPhoto';
 import { Chip } from '@/components/ui/Chip';
 import { useToast } from '@/components/ui/Toast';
@@ -36,6 +36,7 @@ export default function CaptureMeal() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [mealType, setMealType] = useState<MealType>(mealTypeForNow());
   const [error, setError] = useState<string | null>(null);
+  const [premiumGate, setPremiumGate] = useState(false);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -62,7 +63,15 @@ export default function CaptureMeal() {
         show('Upload succeeded but no analysis job was returned');
       }
     },
-    onError: () => show('Upload failed. Check your connection and try again'),
+    onError: (e) => {
+      if (e instanceof ApiError && e.code === 'FORBIDDEN') {
+        setPremiumGate(true);
+        setError(e.message || 'This feature is part of AquaZeroFit Premium.');
+        return;
+      }
+      setPremiumGate(false);
+      show('Upload failed. Check your connection and try again');
+    },
   });
 
   const nativePrimary = useTelegramMainAction(
@@ -81,6 +90,7 @@ export default function CaptureMeal() {
 
   const onFileChosen = async (chosen: File | undefined) => {
     setError(null);
+    setPremiumGate(false);
     if (!chosen) return;
     if (!isAcceptedFile(chosen)) {
       setError('That file type is not supported. Please use a JPEG, PNG or HEIC photo.');
@@ -218,7 +228,15 @@ export default function CaptureMeal() {
         {error && (
           <div className="px-container-margin mb-3" aria-live="assertive">
             <div className="bg-error-container/80 border border-error rounded-xl px-4 py-3 text-on-error-container text-sm">
-              {error}
+              <p>{error}</p>
+              {premiumGate && (
+                <Link
+                  to="/plan"
+                  className="mt-2 inline-flex font-bold underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  Your plan
+                </Link>
+              )}
             </div>
           </div>
         )}
@@ -274,6 +292,7 @@ export default function CaptureMeal() {
                   if (previewUrl) URL.revokeObjectURL(previewUrl);
                   setPreviewUrl(null);
                   setError(null);
+                  setPremiumGate(false);
                 }
               }}
               disabled={!file}

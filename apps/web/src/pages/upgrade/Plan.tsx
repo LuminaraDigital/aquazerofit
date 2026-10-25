@@ -56,6 +56,10 @@ const PREMIUM_LANE_COPY: Record<string, { title: string; body: string }> = {
     title: 'A coach-written weekly note',
     body: 'On premium, the narrative at the top of your weekly summary is written by the coach. On free it is written from your own numbers by the app itself. You still get the summary, and every "what changed" line in it, every week.',
   },
+  visionPrimary: {
+    title: 'Meal photo analysis',
+    body: 'Photographing a plate and having the model read it is part of Premium. Search and barcode logging stay on the free plan. A premium photo still spends meal-photo credits.',
+  },
 };
 
 function laneCopy(lane: string): { title: string; body: string } {

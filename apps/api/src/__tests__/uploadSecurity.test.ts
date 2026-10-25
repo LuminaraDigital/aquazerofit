@@ -4,10 +4,10 @@
  * Meal photos are health-adjacent personal data, so the upload path carries
  * two obligations that the rest of the vision suite does not cover:
  *
- *  1. Metadata minimisation — a phone photo's EXIF holds GPS at home-address
+ *  1. Metadata minimisation: a phone photo's EXIF holds GPS at home-address
  *     precision, the capture timestamp and the camera serial. None of it may
  *     survive onto disk next to a health record.
- *  2. Type enforcement — the mimetype on a multipart part is set by the
+ *  2. Type enforcement: the mimetype on a multipart part is set by the
  *     client, so it proves nothing. A non-image payload wearing an image
  *     mimetype must be rejected, never stored and later served as an image.
  *
@@ -20,7 +20,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MEAL_PHOTO_MAX_BYTES } from '@aquazerofit/shared';
+import { MEAL_PHOTO_MAX_BYTES, type User } from '@aquazerofit/shared';
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'azf-upload-sec-'));
 process.env.AZF_DATA_DIR = dataDir;
@@ -86,6 +86,12 @@ beforeAll(async () => {
     .send({ email: 'upload-security@example.com', password: PASSWORD });
   expect(res.status).toBe(201);
   token = res.body.accessToken as string;
+
+  // Meal photos are a premium lane. This file tests storage and type checks,
+  // not the paywall, so the account is comped the same way a paid one is.
+  const user = getStore().byId<User>('users', res.body.user.id as string);
+  expect(user).toBeTruthy();
+  getStore().upsert('users', { ...user!, tier: 'premium' });
 });
 
 afterAll(async () => {
@@ -150,7 +156,7 @@ describe('EXIF/GPS stripping on meal-photo upload', () => {
     expect(stored.includes(Buffer.from('Exif\0\0', 'binary'))).toBe(false);
   });
 
-  it('the photo itself is intact — same pixels, still a decodable JPEG', async () => {
+  it('the photo itself is intact: same pixels, still a decodable JPEG', async () => {
     const meta = await sharp(stored).metadata();
     expect(meta.format).toBe('jpeg');
     expect(meta.width).toBe(64);

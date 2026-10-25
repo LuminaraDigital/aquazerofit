@@ -28,13 +28,13 @@ enum class CameraPermission {
     /** Not asked yet in this session. */
     Unknown,
 
-    /** Granted — the viewfinder is live. */
+    /** Granted. The viewfinder is live. */
     Granted,
 
     /** Refused once; asking again is allowed and the rationale is shown. */
     Denied,
 
-    /** Refused with "don't ask again" — only Settings can undo this. */
+    /** Refused with "don't ask again". Only Settings can undo this. */
     PermanentlyDenied,
 }
 
@@ -46,7 +46,26 @@ data class CaptureBanner(
     @param:StringRes val messageRes: Int? = null,
     /** Server-authored copy, already user-facing. */
     val message: String? = null,
+    /** Meal-photo FORBIDDEN: the banner should open the plan screen. */
+    val showPlan: Boolean = false,
 )
+
+/**
+ * Upload failure copy. A premium refusal keeps the server's sentence and
+ * offers the plan screen. Every other 4xx stays on the generic retry line,
+ * with the server message when one was sent.
+ */
+internal fun captureUploadFailureBanner(code: String?, message: String?): CaptureBanner {
+    val text = message?.takeIf { it.isNotBlank() }
+    if (code == "FORBIDDEN") {
+        return CaptureBanner(
+            message = text,
+            messageRes = R.string.capture_premium_required,
+            showPlan = true,
+        )
+    }
+    return CaptureBanner(message = text, messageRes = R.string.capture_upload_failed)
+}
 
 /** A photo staged in the app-private cache, ready for the analyze CTA. */
 data class StagedPhoto(val path: String, val bytes: Long)
@@ -149,7 +168,7 @@ class CaptureMealViewModel @Inject constructor(
         }
     }
 
-    /** The shutter failed at the CameraX layer — say so, inline. */
+    /** The shutter failed at the CameraX layer. Say so, inline. */
     fun onShutterFailed() {
         _state.value = _state.value.copy(
             preparing = false,
@@ -211,10 +230,9 @@ class CaptureMealViewModel @Inject constructor(
                         _state.value = _state.value.copy(
                             uploading = false,
                             staged = null,
-                            banner = CaptureBanner(
-                                message = info.outputData
-                                    .getString(MealPhotoUploadWorker.KEY_ERROR_MESSAGE),
-                                messageRes = R.string.capture_upload_failed,
+                            banner = captureUploadFailureBanner(
+                                info.outputData.getString(MealPhotoUploadWorker.KEY_ERROR_CODE),
+                                info.outputData.getString(MealPhotoUploadWorker.KEY_ERROR_MESSAGE),
                             ),
                         )
                     }

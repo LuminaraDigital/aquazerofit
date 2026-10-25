@@ -99,17 +99,16 @@ export const CREDIT_COSTS = {
 export type CreditTask = keyof typeof CREDIT_COSTS;
 
 /**
- * The free daily allowance - and the actual paywall.
+ * The free daily allowance for lanes a free account may call.
  *
- * Ten credits is three meal-photo scans, or ten coach messages, or two AI
- * training plans. That is deliberately enough to experience every feature and
- * not enough to live on, which is the shape that converts: nothing is removed
- * from the free tier, so the app never has to take something away from
- * somebody who already had it, and the limit a user meets is one they can see
- * coming and fix.
+ * Ten credits is ten coach messages, five meal suggestions, or two AI
+ * training plans. Meal photographs are not part of this allowance:
+ * visionPrimary is premium, and a free account is refused before a credit
+ * is reserved. Coach chat stays on this meter.
  *
  * It was 50, which at three scans a day is a fortnight of AI for every signup
- * on an unfunded product, and gave a paying user nothing to buy.
+ * on an unfunded product, and gave a paying user nothing to buy. Photos have
+ * since moved to premium; the grant still caps the free coach.
  */
 export const FREE_TIER_DAILY_CREDITS = 10;
 

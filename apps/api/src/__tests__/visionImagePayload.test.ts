@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import sharp from 'sharp';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { User } from '@aquazerofit/shared';
 import type { WireContentPart } from '../modules/ai/gateway';
 import { loadPrompt } from '../modules/ai/prompts';
 import {
@@ -57,6 +58,10 @@ beforeAll(async () => {
     .send({ email: 'vision-image@example.com', password: 'CorrectHorse9Battery' });
   expect(reg.status).toBe(201);
   token = reg.body.accessToken as string;
+  // The upload is a premium lane. This file tests the provider payload.
+  const user = getStore().byId<User>('users', reg.body.user.id as string);
+  expect(user).toBeTruthy();
+  getStore().upsert('users', { ...user!, tier: 'premium' });
 });
 
 afterAll(async () => {

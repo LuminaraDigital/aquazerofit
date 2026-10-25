@@ -116,6 +116,33 @@ describe('export and erasure', () => {
   });
 });
 
+describe('the deletion sweep', () => {
+  // logEvent is silent under test, so this pins the behaviour that matters:
+  // the sweep survives the failure and the account is still there to retry.
+  it('survives a failed Fight Camp erasure and leaves the account whole for the next sweep', async () => {
+    const { setEngageRepoForTests } = await import('../modules/fightCamp/repo');
+    const { MemoryEngageRepo } = await import('../modules/fightCamp/repo/memory');
+    const { sweepExpiredDeletions } = await import('../modules/me/service');
+    const { getStore } = await import('../platform/store');
+    const jay = await h.register('Jay');
+    const user = getStore().byId<{ id: string; deletionRequestedAt?: string }>('users', jay.userId)!;
+    getStore().upsert('users', { ...user, deletionRequestedAt: '2000-01-01T00:00:00.000Z' });
+
+    const failing = new MemoryEngageRepo();
+    failing.eraseUser = async () => {
+      throw new Error('connection terminated');
+    };
+    setEngageRepoForTests(failing);
+    try {
+      expect(await sweepExpiredDeletions()).toBe(0);
+    } finally {
+      setEngageRepoForTests(new MemoryEngageRepo());
+    }
+    expect(getStore().byId('users', jay.userId)).toBeDefined();
+    expect(getStore().byId('profiles', `profile-${jay.userId}`)).toBeDefined();
+  });
+});
+
 describe('environment documentation', () => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
   const names = [

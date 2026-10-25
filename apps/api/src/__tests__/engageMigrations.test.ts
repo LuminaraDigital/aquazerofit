@@ -6,9 +6,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
   MIGRATIONS_DIR,
+  checksumOf,
   loadMigrations,
   runMigrations,
   splitStatements,
@@ -95,6 +96,45 @@ describe('runMigrations', () => {
       );
       expect(rows).toEqual([]);
     } finally {
+      await lite.close();
+    }
+  });
+
+  it('runs no DDL and takes no lock when the schema is already current', async () => {
+    const lite = new PGlite();
+    try {
+      const db = liteDatabase(lite);
+      await runMigrations(db);
+      const statements: string[] = [];
+      const watched = {
+        query: (text: string, values?: unknown[]) => {
+          statements.push(text);
+          return db.query(text, values);
+        },
+        transaction: db.transaction,
+      } as typeof db;
+      expect(await runMigrations(watched)).toEqual([]);
+      expect(statements.join('\n')).not.toMatch(/CREATE|advisory/i);
+    } finally {
+      await lite.close();
+    }
+  });
+
+  it('records a checksum per migration and warns when a shipped one is edited', async () => {
+    const lite = new PGlite();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const db = liteDatabase(lite);
+      const original = [{ version: 1, name: 'a', sql: 'CREATE TABLE engage.a (x int);' }];
+      await runMigrations(db, original);
+      const { rows } = await db.query<{ checksum: string }>('SELECT checksum FROM engage.schema_migrations');
+      expect(rows[0]!.checksum).toBe(checksumOf(original[0]!));
+      expect(warn).not.toHaveBeenCalled();
+      await runMigrations(db, [{ ...original[0]!, sql: 'CREATE TABLE engage.a (x bigint);' }]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('changed after they were applied'));
+      expect(checksumOf({ sql: 'a;\r\nb;' })).toBe(checksumOf({ sql: 'a;\nb;' }));
+    } finally {
+      warn.mockRestore();
       await lite.close();
     }
   });

@@ -13,6 +13,7 @@ import type {
 } from '@aquazerofit/shared';
 import { unlinkSync } from 'node:fs';
 import { AppError } from '../../platform/errors';
+import { logEvent } from '../../platform/telemetry';
 import { config } from '../../platform/config';
 import { getStore, newId, type ContainerName } from '../../platform/store';
 import { revokeAllForUser, sha256Hex } from '../../platform/auth';
@@ -386,7 +387,13 @@ function scrubGrowthIdentifiers<T extends { id: string }>(doc: T): T {
 export async function purgeUser(userId: string): Promise<void> {
   const store = getStore();
 
-  // Firebase first, then local data. removeFirebaseIdentity revokes refresh
+  // Fight Camp's tables first. Its erasure is safe to repeat and runs while
+  // the account can still sign in, so a database error here throws before
+  // anything irreversible: the account is left whole and the next sweep (or
+  // the user) retries the purge.
+  await engageRepo().eraseUser(userId, new Date().toISOString());
+
+  // Firebase next, then local data. removeFirebaseIdentity revokes refresh
   // tokens and deletes the Auth user. auth/user-not-found is success. Any
   // other Firebase error is logged as firebase_account_delete_failed and
   // thrown here, before the writes below, so the local account is not left
@@ -400,10 +407,6 @@ export async function purgeUser(userId: string): Promise<void> {
   if (firebaseUid) {
     await removeFirebaseIdentity(firebaseUid);
   }
-
-  // Fight Camp's tables next, for the same reason: a database error here
-  // throws before any document is touched, so a retry finds the account whole.
-  await engageRepo().eraseUser(userId, new Date().toISOString());
 
   // Meal photo files on disk belong to the user's vision jobs. Remove them
   // before the job docs go (missing files are tolerated: best-effort cleanup).
@@ -477,10 +480,17 @@ export async function sweepExpiredDeletions(now = new Date()): Promise<number> {
   for (const user of expired) {
     try {
       await purgeUser(user.id);
-    } catch {
-      // removeFirebaseIdentity already logged firebase_account_delete_failed
-      // and left this account in place. Keep going so one identity outage
-      // does not stall every other elapsed grace period.
+    } catch (err) {
+      // The account is left in place (both steps that can throw run before
+      // any local write) and retried on the next sweep. Firebase failures
+      // were already logged as firebase_account_delete_failed; anything else,
+      // a Fight Camp database error included, is logged here, so an account
+      // past its grace period never stays unpurged in silence. Keep going so
+      // one outage does not stall every other elapsed grace period.
+      logEvent('deletion_sweep_purge_failed', {
+        userHash: sha256Hex(user.id).slice(0, 16),
+        error: err instanceof Error ? err.name : 'unknown',
+      });
       continue;
     }
     // Audit the sweep purge itself. The subject is already erased, so the

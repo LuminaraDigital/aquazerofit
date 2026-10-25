@@ -116,9 +116,18 @@ export type JoinSquadOutcome =
 
 export type InsertShareLinkOutcome = 'inserted' | 'exists' | 'code_taken';
 
+/**
+ * Where the previous page ended. Both fields, because several cheers can
+ * share one instant: a timestamp alone would skip all but the first of them.
+ */
+export interface CheerCursor {
+  createdAt: string;
+  id: string;
+}
+
 export interface CheerPage {
-  /** Only cheers created strictly before this instant (exclusive cursor). */
-  before?: string;
+  /** Only cheers strictly after this one in newest-first order. */
+  before?: CheerCursor;
   /** Only cheers created at or after this instant. */
   since: string;
   limit: number;
@@ -206,9 +215,14 @@ export interface EngageRepo {
    * leave every squad (ownership passes on), delete enrolments, memberships,
    * grace, nudges, share links and their own attribution; null them as the
    * sender of cheers and as a squad's creator; delete cheers sent to them.
+   * A squad they named that nobody is left in loses its name and its group
+   * binding too: the name is free text they typed.
    */
   eraseUser(userId: string, at: string): Promise<void>;
 }
+
+/** What an erased creator's archived squad is called from then on. */
+export const ARCHIVED_SQUAD_NAME = 'Archived squad';
 
 /**
  * Every table in the engage schema and what export and erasure do with it.
@@ -219,7 +233,11 @@ export interface EngageRepo {
 export const ENGAGE_TABLE_PRIVACY = {
   schema_migrations: { userData: false },
   season_enrolments: { userData: true, exportedAs: 'enrolments', erasure: 'delete' },
-  squads: { userData: true, exportedAs: 'squadsCreated', erasure: 'null created_by' },
+  squads: {
+    userData: true,
+    exportedAs: 'squadsCreated',
+    erasure: 'null created_by; rename and unbind archived squads they created',
+  },
   squad_members: { userData: true, exportedAs: 'memberships', erasure: 'leave, then delete' },
   cheers: {
     userData: true,

@@ -14,6 +14,7 @@
  */
 import type { ShareKindP1 } from '@aquazerofit/shared';
 import { isUniqueViolation, type SqlDatabase, type SqlRunner } from '../../../platform/sql';
+import { ARCHIVED_SQUAD_NAME } from './types';
 import type {
   AttributionRow,
   CheerPage,
@@ -128,7 +129,7 @@ async function activeIn(tx: SqlRunner, squadId: string): Promise<MemberRow[]> {
   const { rows } = await tx.query(
     `SELECT ${MEMBER_COLUMNS} FROM engage.squad_members
      WHERE squad_id = $1 AND left_at IS NULL
-     ORDER BY joined_at, member_ref`,
+     ORDER BY joined_at, member_ref COLLATE "C"`,
     [squadId],
   );
   return rows.map(toMember);
@@ -341,11 +342,17 @@ export class PgEngageRepo implements EngageRepo {
   // ----- cheers -----
 
   async insertCheer(row: CheerRow): Promise<boolean> {
+    // Targeted at the one-a-day index for this kind of sender, so any other
+    // conflict (an id collision) raises instead of reading as "sent today".
+    const oneADay =
+      row.fromKind === 'member'
+        ? `(from_user_id, to_user_id, local_date) WHERE from_kind = 'member'`
+        : `(to_user_id, local_date) WHERE from_kind = 'coach'`;
     const { rows } = await this.db.query(
       `INSERT INTO engage.cheers
          (id, from_kind, from_user_id, coach_id, to_user_id, squad_id, cheer, local_date, created_at, seen_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       ON CONFLICT DO NOTHING RETURNING id`,
+       ON CONFLICT ${oneADay} DO NOTHING RETURNING id`,
       [
         row.id,
         row.fromKind,
@@ -365,9 +372,12 @@ export class PgEngageRepo implements EngageRepo {
   async cheersTo(userId: string, page: CheerPage): Promise<CheerRow[]> {
     const { rows } = await this.db.query(
       `SELECT ${CHEER_COLUMNS} FROM engage.cheers
-       WHERE to_user_id = $1 AND created_at >= $2 AND ($3::timestamptz IS NULL OR created_at < $3)
-       ORDER BY created_at DESC, id DESC LIMIT $4`,
-      [userId, page.since, page.before ?? null, page.limit],
+       WHERE to_user_id = $1 AND created_at >= $2
+         AND ($3::timestamptz IS NULL
+              OR created_at < $3
+              OR (created_at = $3 AND id COLLATE "C" < $4 COLLATE "C"))
+       ORDER BY created_at DESC, id COLLATE "C" DESC LIMIT $5`,
+      [userId, page.since, page.before?.createdAt ?? null, page.before?.id ?? '', page.limit],
     );
     return rows.map(toCheer);
   }
@@ -424,7 +434,8 @@ export class PgEngageRepo implements EngageRepo {
 
   async graceEntries(userId: string): Promise<GraceRow[]> {
     const { rows } = await this.db.query(
-      `SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger WHERE user_id = $1 ORDER BY created_at, id`,
+      `SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger
+       WHERE user_id = $1 ORDER BY created_at, id COLLATE "C"`,
       [userId],
     );
     return rows.map(toGrace);
@@ -433,9 +444,13 @@ export class PgEngageRepo implements EngageRepo {
   async addGrace(rows: readonly GraceRow[]): Promise<number> {
     let added = 0;
     for (const row of rows) {
+      const once =
+        row.entry === 'earned'
+          ? `(user_id, season_number, milestone) WHERE entry = 'earned'`
+          : `(user_id, local_date) WHERE entry = 'applied'`;
       const result = await this.db.query(
         `INSERT INTO engage.grace_ledger (id, user_id, entry, season_number, local_date, milestone, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING RETURNING id`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT ${once} DO NOTHING RETURNING id`,
         [row.id, row.userId, row.entry, row.seasonNumber, row.localDate, row.milestone, row.createdAt],
       );
       added += result.rows.length;
@@ -519,7 +534,7 @@ export class PgEngageRepo implements EngageRepo {
         q(`SELECT ${SQUAD_COLUMNS} FROM engage.squads WHERE created_by = $1`),
         q(`SELECT ${CHEER_COLUMNS} FROM engage.cheers WHERE from_user_id = $1`),
         q(`SELECT ${CHEER_COLUMNS} FROM engage.cheers WHERE to_user_id = $1`),
-        q(`SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger WHERE user_id = $1 ORDER BY created_at, id`),
+        q(`SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger WHERE user_id = $1 ORDER BY created_at, id COLLATE "C"`),
         q(`SELECT local_date::text AS local_date, kind, sent_at FROM engage.nudge_log WHERE user_id = $1`),
         q(`SELECT ${LINK_COLUMNS} FROM engage.share_links WHERE user_id = $1`),
         q(`SELECT share_code, squad_id, surface, created_at FROM engage.referral_attributions
@@ -574,13 +589,18 @@ export class PgEngageRepo implements EngageRepo {
 
   async eraseUser(userId: string, at: string): Promise<void> {
     await this.db.transaction(async (tx) => {
+      // Squad order is fixed so two erasures sharing squads lock them in the
+      // same order and cannot deadlock.
       const { rows } = await tx.query<{ squad_id: string }>(
-        'SELECT squad_id FROM engage.squad_members WHERE user_id = $1 AND left_at IS NULL',
+        `SELECT squad_id FROM engage.squad_members
+         WHERE user_id = $1 AND left_at IS NULL ORDER BY squad_id COLLATE "C"`,
         [userId],
       );
       for (const row of rows) await leaveWithin(tx, row.squad_id, userId, at);
       const statements = [
         'DELETE FROM engage.squad_members WHERE user_id = $1',
+        `UPDATE engage.squads SET name = '${ARCHIVED_SQUAD_NAME}', tg_chat_instance_hash = NULL
+         WHERE created_by = $1 AND archived_at IS NOT NULL`,
         'UPDATE engage.squads SET created_by = NULL WHERE created_by = $1',
         'DELETE FROM engage.season_enrolments WHERE user_id = $1',
         'DELETE FROM engage.cheers WHERE to_user_id = $1',

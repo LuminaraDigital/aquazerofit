@@ -209,7 +209,7 @@ The `.env` file is gitignored and must never be committed. The API loads it auto
 | `ADMIN_EMAIL` | Production: the admin account's address, required alongside `ADMIN_PASSWORD`. Use a mailbox you control: the seeder refuses any address on `aquazero.fit`, which this project does not own |
 | `EXPOSE_DEV_TOKENS` | Dev-only: echo password-reset tokens in API responses/logs when `true` (requires non-production `NODE_ENV`) |
 | `UPLOADS_DIR` | Where in-flight meal photographs are written (default `apps/api/uploads`). Point this at a persistent volume on hosts with an ephemeral filesystem, or a redeploy loses photos mid-analysis |
-| `ENABLE_LLM_SAFETY` | Override LLM second stage for input guardrails (`true`/`false`; defaults on when any AI provider key is set) |
+| `ENABLE_LLM_SAFETY` | Override LLM second stage for input guardrails (`true`/`false`; defaults on when any AI provider is configured: a key, or `OLLAMA_BASE_URL`) |
 | `CORS_ORIGINS` | Comma-separated allowed CORS origins |
 
 ### Production database (`DATABASE_URL`)

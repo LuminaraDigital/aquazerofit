@@ -7,6 +7,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BELT_TIERS, resolveSupportEmail, type BeltTier } from '@aquazerofit/shared';
+import { anyProviderConfigured } from '../modules/ai/providerChain';
 // Imports config back; bootGuards.ts says why that cycle is safe.
 import { assertProductionSecrets } from './bootGuards';
 
@@ -618,15 +619,18 @@ export const config = {
 
   /**
    * Optional LLM second stage for input guardrails (P-09 safetyCheap lane).
-   * Defaults ON when any real AI provider key is configured, OFF when keyless
-   * so offline demo mode stays regex-only with zero extra latency. Set
-   * ENABLE_LLM_SAFETY=true|false to override explicitly.
+   * Defaults ON when any AI provider is configured (a key, or OLLAMA_BASE_URL
+   * for a self-hosted Ollama), OFF otherwise so offline demo mode stays
+   * regex-only with zero extra latency. "Configured" is the gateway's own
+   * answer (anyProviderConfigured), so this cannot disagree with whether the
+   * safety lane would reach a model. Set ENABLE_LLM_SAFETY=true|false to
+   * override explicitly.
    */
   get enableLlmSafety(): boolean {
     const override = process.env.ENABLE_LLM_SAFETY?.trim().toLowerCase();
     if (override === 'true' || override === '1') return true;
     if (override === 'false' || override === '0') return false;
-    return hasAnyAiProviderKey();
+    return anyProviderConfigured();
   },
 
   /**
@@ -704,12 +708,6 @@ function httpUrl(raw: string | undefined, fallback: string, httpsOnly = false): 
     return value;
   }
   return fallback;
-}
-
-/** True when at least one configured AI provider has a non-empty API key. */
-export function hasAnyAiProviderKey(): boolean {
-  const keyEnvs = ['GROQ_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'NVIDIA_API_KEY'] as const;
-  return keyEnvs.some((k) => Boolean(process.env[k]?.trim()));
 }
 
 function isProduction(): boolean {

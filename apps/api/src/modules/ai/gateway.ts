@@ -43,9 +43,9 @@ import { budgetExhausted, recordSuppressed } from '../../platform/aiBudget';
 import { promptVersionFor, type PromptId } from './prompts';
 import {
   PROVIDERS,
+  anyProviderConfigured,
   callProvider,
   estimateTokens,
-  isConfigured,
   modelFor,
   openProviderStream,
   sleep,
@@ -211,13 +211,13 @@ export function offlineVerdict(state: {
  * every answer reads fluently - and the only symptom is that no model is
  * answering anyone, so without this line nobody finds out.
  *
- * Asks isConfigured, the same question the chain walk asks, so a
+ * Asks anyProviderConfigured, the same question the chain walk asks, so a
  * self-hosted Ollama named by OLLAMA_BASE_URL is not reported missing.
  * Called once, from index.ts.
  */
 export function warnIfNoAiProviderConfigured(): void {
   if (!config.isProduction) return;
-  if (PROVIDERS.some(isConfigured)) return;
+  if (anyProviderConfigured()) return;
   // eslint-disable-next-line no-console
   console.warn(
     JSON.stringify({

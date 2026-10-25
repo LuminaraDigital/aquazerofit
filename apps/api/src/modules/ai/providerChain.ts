@@ -115,13 +115,19 @@ export const PROVIDERS: ProviderDef[] = [
  * OLLAMA_BASE_URL is as real as a keyed API. A key-optional provider with
  * neither is the opportunistic localhost probe and does not count.
  *
- * The single answer for the chain walk and the boot warning, so what gets
- * retried, what marks a fallback degraded and what the warning calls
- * "configured" cannot drift apart.
+ * The single answer for the chain walk, the boot warning and the LLM-safety
+ * default, so what gets retried, what marks a fallback degraded, what the
+ * warning calls "configured" and whether the safety lane turns on cannot
+ * drift apart.
  */
 export function isConfigured(provider: ProviderDef): boolean {
   if (process.env[provider.keyEnv]) return true;
   return !!provider.keyOptional && !!provider.baseUrlEnv && !!process.env[provider.baseUrlEnv]?.trim();
+}
+
+/** Is any provider a configured dependency? (isConfigured over PROVIDERS.) */
+export function anyProviderConfigured(): boolean {
+  return PROVIDERS.some(isConfigured);
 }
 
 export function modelFor(provider: ProviderDef, task: ModelGroup): string {

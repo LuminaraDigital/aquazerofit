@@ -58,11 +58,19 @@ RUN npm run typecheck --workspace packages/shared \
 # Same-origin SPA. Built here so the runtime image serves apps/web/dist.
 # Host dist is dockerignored. Empty Firebase build-args leave web auth off
 # and the SPA uses POST /auth/login. Do not bake a web API key into this file.
+# Empty catalog analytics args skip init. Pass both as build-args only after
+# the operator creates them in TON Builders. Do not bake a token into this file.
 COPY apps/web apps/web
+ARG VITE_SITE_ORIGIN=
 ARG VITE_FIREBASE_API_KEY=
 ARG VITE_FIREBASE_APP_ID=
-ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
-    VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
+ARG VITE_TG_ANALYTICS_TOKEN=
+ARG VITE_TG_ANALYTICS_APP_NAME=
+ENV VITE_SITE_ORIGIN=$VITE_SITE_ORIGIN \
+    VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
+    VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID \
+    VITE_TG_ANALYTICS_TOKEN=$VITE_TG_ANALYTICS_TOKEN \
+    VITE_TG_ANALYTICS_APP_NAME=$VITE_TG_ANALYTICS_APP_NAME
 RUN npm run build --workspace apps/web
 
 # Writable runtime paths, plus the workspace node_modules directories.

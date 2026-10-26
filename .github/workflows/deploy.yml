@@ -47,6 +47,9 @@ jobs:
         run: npm run eval
 
       - name: Build
+        env:
+          VITE_TG_ANALYTICS_TOKEN: ${{ secrets.VITE_TG_ANALYTICS_TOKEN }}
+          VITE_TG_ANALYTICS_APP_NAME: ${{ vars.VITE_TG_ANALYTICS_APP_NAME }}
         run: npm run build
 
       - name: Smoke (local artifacts)

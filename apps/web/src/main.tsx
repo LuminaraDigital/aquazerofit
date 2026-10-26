@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './lib/AuthProvider';
 import { ensureTelegram, getTelegramStartParam, looksLikeTelegramLaunch } from './lib/telegram';
+import { initTelegramAnalytics } from './lib/telegramAnalytics';
 import { decodePayload } from './lib/telegramLink';
 import { adoptAttribution, captureAttributionFromUrl, getAttribution } from './lib/attribution';
 import { trackGrowth } from './lib/growth';
@@ -45,7 +46,7 @@ function captureTelegramAttribution(): void {
     hasUtm: Boolean(attr.utmSource),
     hasChallenge: Boolean(attr.challengeCode),
     /* Distinguishes "arrived from our own landing page" from "found the bot
-       some other way" — the numerator of the web → Telegram conversion rate. */
+       some other way". The numerator of the web to Telegram conversion rate. */
     fromDeepLink: Object.keys(decoded).length > 0,
   });
 }
@@ -68,20 +69,26 @@ function mount(): void {
  * Two bootstraps, because the two surfaces have opposite priorities.
  *
  * On the web, nothing may delay first paint and telegram.org must not be
- * contacted at all — so the app mounts synchronously, exactly as before.
+ * contacted at all, so the app mounts synchronously, exactly as before.
  *
  * Inside Telegram the SDK has to be present before the first render, because
  * `isTMA()` decides which front door the router opens and a Mini App user who
  * renders one frame of the marketing page has already had a bad launch. So
- * that path waits — bounded by the SDK's own timeout, after which it mounts
+ * that path waits, bounded by the SDK's own timeout, after which it mounts
  * regardless and degrades to the ordinary web sign-in rather than to a
- * permanent spinner.
+ * permanent spinner. Catalog analytics init is on that same path, after the
+ * launch is confirmed and before mount, and only when the Vite catalog env
+ * is set. A missing token or an init that rejects does not block the shell.
  */
 if (looksLikeTelegramLaunch()) {
   void ensureTelegram()
-    .then((inTelegram) => {
-      if (inTelegram) captureTelegramAttribution();
-      else captureWebAttribution();
+    .then(async (inTelegram) => {
+      if (inTelegram) {
+        await initTelegramAnalytics();
+        captureTelegramAttribution();
+      } else {
+        captureWebAttribution();
+      }
     })
     .catch(() => captureWebAttribution())
     .finally(mount);

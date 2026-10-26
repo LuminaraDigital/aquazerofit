@@ -117,15 +117,32 @@ function stubStripe(body: unknown, status = 200) {
   );
 }
 
-/** Stripe answers by path: the first key the request path contains wins. */
-function stubStripeRoutes(routes: Record<string, unknown>) {
-  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-    const { pathname } = new URL(String(input));
-    const key = Object.keys(routes).find((k) => pathname.includes(k));
-    return new Response(JSON.stringify(key ? routes[key] : { error: { message: 'No such route' } }), {
-      status: key ? 200 : 404,
+/**
+ * Stripe answers by method and path, so a test pins which calls were made and
+ * in what order. An unrouted call answers 500, which fails any assertion that
+ * depended on it rather than passing by accident.
+ */
+function routeStripe(routes: Record<string, unknown>) {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const key = `${init?.method ?? 'GET'} ${new URL(String(input)).pathname}`;
+    const found = key in routes;
+    return new Response(JSON.stringify(found ? routes[key] : { error: { message: `unrouted: ${key}` } }), {
+      status: found ? 200 : 500,
       headers: { 'Content-Type': 'application/json' },
     });
+  });
+}
+
+const callsOf = (spy: ReturnType<typeof routeStripe>) =>
+  spy.mock.calls.map(([url, init]) => `${init?.method ?? 'GET'} ${new URL(String(url)).pathname}`);
+
+function grantStripe(uid: string, sub: string) {
+  grantPremium({
+    userId: uid,
+    source: 'stripe',
+    externalId: `stripe:in_${crypto.randomUUID()}`,
+    providerRef: sub,
+    premiumUntil: new Date(Date.now() + 30 * 86_400_000).toISOString(),
   });
 }
 
@@ -698,16 +715,16 @@ describe('POST /billing/stripe/checkout', () => {
       event('invoice.paid', invoice({ id: 'in_past_due', sub: 'sub_past_due', uid: userId, end: nowS() - GRACE_S - 3600 })),
     );
     expect(effectiveTier(userDoc())).toBe('free');
-    const stripe = stubStripeRoutes({
-      '/v1/subscriptions/sub_past_due': { id: 'sub_past_due', object: 'subscription', status: 'past_due' },
-      '/v1/checkout/sessions': { id: 'cs_second', url: 'https://checkout.stripe.com/c/pay/cs_second' },
+    const stripe = routeStripe({
+      'GET /v1/subscriptions/sub_past_due': { id: 'sub_past_due', object: 'subscription', status: 'past_due' },
+      'POST /v1/checkout/sessions': { id: 'cs_second', url: 'https://checkout.stripe.com/c/pay/cs_second' },
     });
 
     const res = await request(app).post(`${base}/billing/stripe/checkout`).set(auth());
 
     expect(res.status).toBe(409);
     expect(res.body.code).toBe('CONFLICT');
-    expect(stripe.mock.calls.map(([url]) => new URL(String(url)).pathname)).not.toContain('/v1/checkout/sessions');
+    expect(callsOf(stripe)).toEqual(['GET /v1/subscriptions/sub_past_due']);
   });
 
   it('opens checkout once the earlier subscription has ended, whether or not its deletion arrived', async () => {
@@ -715,17 +732,16 @@ describe('POST /billing/stripe/checkout', () => {
     await deliver(event('invoice.paid', invoice({ id: 'in_ended', sub: 'sub_ended', uid: userId, end: lapsed })));
     await deliver(event('invoice.paid', invoice({ id: 'in_deleted', sub: 'sub_deleted', uid: userId, end: lapsed })));
     await deliver(event('customer.subscription.deleted', subscription('sub_deleted', userId)));
-    const stripe = stubStripeRoutes({
-      '/v1/subscriptions/sub_ended': { id: 'sub_ended', object: 'subscription', status: 'canceled' },
-      '/v1/checkout/sessions': { id: 'cs_again', url: 'https://checkout.stripe.com/c/pay/cs_again' },
+    const stripe = routeStripe({
+      'GET /v1/subscriptions/sub_ended': { id: 'sub_ended', object: 'subscription', status: 'canceled' },
+      'POST /v1/checkout/sessions': { id: 'cs_again', url: 'https://checkout.stripe.com/c/pay/cs_again' },
     });
 
     const res = await request(app).post(`${base}/billing/stripe/checkout`).set(auth());
 
     expect(res.status).toBe(200);
-    const asked = stripe.mock.calls.map(([url]) => new URL(String(url)).pathname);
-    expect(asked).not.toContain('/v1/subscriptions/sub_deleted');
-    expect(asked).toContain('/v1/checkout/sessions');
+    // sub_deleted has a recorded deletion, so Stripe is not asked about it.
+    expect(callsOf(stripe)).toEqual(['GET /v1/subscriptions/sub_ended', 'POST /v1/checkout/sessions']);
   });
 });
 
@@ -828,5 +844,119 @@ describe('GET /billing/config', () => {
     const res = await request(app).get(`${base}/billing/config`);
 
     expect(res.body.stripe).toEqual({ available: false, price: null });
+  });
+});
+
+describe('POST /billing/stripe/portal', () => {
+  it('requires a signed-in account', async () => {
+    const res = await request(app).post(`${base}/billing/stripe/portal`);
+    expect(res.status).toBe(401);
+  });
+
+  it('answers 404 without calling Stripe for an account that never subscribed through it', async () => {
+    const fresh = await register('stripe-portal-none@example.com');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const res = await request(app)
+      .post(`${base}/billing/stripe/portal`)
+      .set({ Authorization: `Bearer ${fresh.accessToken}` });
+
+    expect(res.status).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("opens Stripe's billing portal for the customer behind the latest Stripe subscription", async () => {
+    const subscriber = await register('stripe-portal@example.com');
+    grantStripe(subscriber.user.id, 'sub_portal_old');
+    grantStripe(subscriber.user.id, 'sub_portal_new');
+    const stripe = routeStripe({
+      'GET /v1/subscriptions/sub_portal_new': { id: 'sub_portal_new', customer: 'cus_portal' },
+      'POST /v1/billing_portal/sessions': { url: 'https://billing.stripe.com/p/session/test_1' },
+    });
+
+    const res = await request(app)
+      .post(`${base}/billing/stripe/portal`)
+      .set({ Authorization: `Bearer ${subscriber.accessToken}` });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ url: 'https://billing.stripe.com/p/session/test_1' });
+    expect(callsOf(stripe)).toEqual(['GET /v1/subscriptions/sub_portal_new', 'POST /v1/billing_portal/sessions']);
+    const sent = new URLSearchParams(String(stripe.mock.calls[1]![1]?.body));
+    expect(sent.get('customer')).toBe('cus_portal');
+    // From APP_PUBLIC_URL, never from the request.
+    expect(sent.get('return_url')).toBe('https://staging.aquazerofit.test/plan');
+  });
+});
+
+describe('GET /me/entitlements billingSource', () => {
+  it('names the rail behind the latest entitlement, so the plan page knows where it is managed', async () => {
+    const fresh = await register('stripe-source@example.com');
+    const read = () =>
+      request(app).get(`${base}/me/entitlements`).set({ Authorization: `Bearer ${fresh.accessToken}` });
+
+    expect((await read()).body.billingSource).toBeNull();
+    grantStripe(fresh.user.id, 'sub_source');
+    expect((await read()).body.billingSource).toBe('stripe');
+  });
+});
+
+/*
+ * Erasing an account must not leave Stripe billing a person who no longer has
+ * one. The cancellation runs before the purge, because the purge anonymises the
+ * ledger that names the subscription — and it never blocks the erasure: a
+ * Stripe outage is logged for follow-up, not a reason to keep someone's data.
+ */
+describe('account deletion with a Stripe subscription', () => {
+  async function deleteAccount(email: string, sub?: string) {
+    const doomed = await register(email);
+    if (sub) grantStripe(doomed.user.id, sub);
+    const del = () =>
+      request(app).delete(`${base}/me`).set({ Authorization: `Bearer ${doomed.accessToken}` });
+    expect((await del()).body.purged).toBe(false);
+    return { id: doomed.user.id, confirm: del };
+  }
+
+  it('cancels a live subscription, then erases the account', async () => {
+    const doomed = await deleteAccount('stripe-delete-live@example.com', 'sub_doomed');
+    const stripe = routeStripe({
+      'GET /v1/subscriptions/sub_doomed': { id: 'sub_doomed', status: 'active', customer: 'cus_doomed' },
+      'DELETE /v1/subscriptions/sub_doomed': { id: 'sub_doomed', status: 'canceled' },
+    });
+
+    const res = await doomed.confirm();
+
+    expect(res.status).toBe(200);
+    expect(res.body.purged).toBe(true);
+    expect(callsOf(stripe)).toEqual(['GET /v1/subscriptions/sub_doomed', 'DELETE /v1/subscriptions/sub_doomed']);
+    expect(getStore().byId<User>('users', doomed.id)).toBeUndefined();
+  });
+
+  it('does not cancel a subscription Stripe already holds as cancelled', async () => {
+    const doomed = await deleteAccount('stripe-delete-ended@example.com', 'sub_ended');
+    const stripe = routeStripe({
+      'GET /v1/subscriptions/sub_ended': { id: 'sub_ended', status: 'canceled', customer: 'cus_ended' },
+    });
+
+    expect((await doomed.confirm()).body.purged).toBe(true);
+    expect(callsOf(stripe)).toEqual(['GET /v1/subscriptions/sub_ended']);
+  });
+
+  it('still erases the account when Stripe cannot be reached', async () => {
+    const doomed = await deleteAccount('stripe-delete-outage@example.com', 'sub_outage');
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
+
+    const res = await doomed.confirm();
+
+    expect(res.status).toBe(200);
+    expect(res.body.purged).toBe(true);
+    expect(getStore().byId<User>('users', doomed.id)).toBeUndefined();
+  });
+
+  it('never calls Stripe for an account that has no Stripe subscription', async () => {
+    const doomed = await deleteAccount('stripe-delete-none@example.com');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    expect((await doomed.confirm()).body.purged).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

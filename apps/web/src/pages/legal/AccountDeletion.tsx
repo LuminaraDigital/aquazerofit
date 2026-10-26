@@ -145,6 +145,12 @@ export default function AccountDeletionPage() {
           Every session is revoked at the same time, so the account cannot be signed into again from
           a device that was still holding a token.
         </P>
+        <P>
+          A premium subscription bought on the web is cancelled with Stripe at the moment of
+          erasure, before anything else is removed, so it does not renew. A subscription bought
+          through Google Play is billed by Google, and deleting the account does not cancel it:
+          cancel it in the Play Store.
+        </P>
       </Section>
 
       <Section id="retained" index={6} heading="What is kept, and why">

@@ -37,12 +37,29 @@ import Dashboard from './dashboard/Dashboard';
 import FightRecordPage from './fightRecord/FightRecord';
 import NotificationSettings from './settings/NotificationSettings';
 
+const PINNED = new Date('2026-11-18T10:00:00.000Z');
+
+/**
+ * The two day forms lib/format renders in the runner's own locale ("Wednesday
+ * 18 November" on one machine, "Wednesday, November 18" on another). They are
+ * R1a copy that Fight Camp does not touch, so they become a marker and the
+ * snapshot reads the same on every machine.
+ */
+const LOCAL_DAY_FORMS: Intl.DateTimeFormatOptions[] = [
+  { weekday: 'long', day: 'numeric', month: 'long' },
+  { weekday: 'short', day: 'numeric', month: 'short' },
+];
+
+function localeFree(html: string): string {
+  return LOCAL_DAY_FORMS.reduce((out, form) => out.split(PINNED.toLocaleDateString(undefined, form)).join('{local day}'), html);
+}
+
 beforeAll(async () => {
   // The dashboard's chart is lazy: load it first, so a busy machine cannot
   // snapshot the page before it arrives.
   await import('./dashboard/Sparkline');
   vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(new Date('2026-11-18T10:00:00.000Z'));
+  vi.setSystemTime(PINNED);
   mocks.api.mockImplementation(async (route: string) => {
     if (route === '/fight-record') return recorded.fightRecordOn;
     if (route === '/progress/summary') return recorded.progressSummary;
@@ -78,7 +95,7 @@ async function settled(node: ReactNode, at: string): Promise<string> {
     previous = html;
   }
   // One tag per line, so a failure reads as a diff of the elements that changed.
-  return `${previous.replace(/:r[0-9a-z]+:/g, ':r:').replace(/></g, '>\n<')}\n`;
+  return `${localeFree(previous).replace(/:r[0-9a-z]+:/g, ':r:').replace(/></g, '>\n<')}\n`;
 }
 
 describe('every Fight Camp flag off', () => {

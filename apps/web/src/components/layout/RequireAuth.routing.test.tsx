@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   // settles to false and the guard renders unauthenticated.
   restoreSession: vi.fn(async () => false),
   isTMA: vi.fn(() => false),
+  startParam: null as string | null,
   useProfile: vi.fn(() => ({
     data: { id: 'p1' },
     isLoading: false,
@@ -30,7 +31,10 @@ vi.mock('../../lib/api', () => ({
   tokenStore: mocks.tokenStore,
   restoreSession: mocks.restoreSession,
 }));
-vi.mock('../../lib/telegram', () => ({ isTMA: mocks.isTMA }));
+vi.mock('../../lib/telegram', () => ({
+  isTMA: mocks.isTMA,
+  getTelegramStartParam: () => mocks.startParam,
+}));
 vi.mock('../../lib/queries', () => ({ useProfile: mocks.useProfile }));
 vi.mock('../../lib/AuthProvider', () => ({
   useFirebaseAuth: () => ({
@@ -55,6 +59,7 @@ function renderAt(path: string) {
         <Route element={<RequireAuth publicIndex={<p>marketing landing</p>} />}>
           <Route path="/" element={<p>app home</p>} />
           <Route path="/settings" element={<p>app settings</p>} />
+          <Route path="/plan" element={<p>plan page</p>} />
         </Route>
         <Route path="/welcome" element={<p>mini app welcome</p>} />
       </Routes>
@@ -64,6 +69,7 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   mocks.tokenStore.isAuthenticated = false;
+  mocks.startParam = null;
   mocks.isTMA.mockReturnValue(false);
 });
 
@@ -73,7 +79,7 @@ afterEach(() => {
 });
 
 describe('RequireAuth front door', () => {
-  it('serves the marketing page in place at / — no redirect for cold traffic', async () => {
+  it('serves the marketing page in place at / with no redirect for cold traffic', async () => {
     renderAt('/');
 
     // Session restore (restoreSession) settles first, then the marketing page.
@@ -96,10 +102,26 @@ describe('RequireAuth front door', () => {
     expect(screen.queryByText('marketing landing')).toBeNull();
   });
 
+  it('opens /plan when a signed-in Mini App launch used startapp=plan', async () => {
+    mocks.tokenStore.isAuthenticated = true;
+    mocks.startParam = 'plan';
+    renderAt('/');
+
+    await waitFor(() => expect(screen.getByText('plan page')).toBeTruthy());
+  });
+
+  it('opens /plan when a signed-in Mini App launch used startapp=upgrade', async () => {
+    mocks.tokenStore.isAuthenticated = true;
+    mocks.startParam = 'upgrade';
+    renderAt('/');
+
+    await waitFor(() => expect(screen.getByText('plan page')).toBeTruthy());
+  });
+
   it('still redirects a guarded route rather than rendering marketing under its URL', async () => {
     renderAt('/settings');
 
-    // Redirected to `/`, which then renders marketing — one hop, and the
+    // Redirected to `/`, which then renders marketing. One hop, and the
     // address bar never claims /settings is a marketing page.
     await waitFor(() => expect(screen.getByText('marketing landing')).toBeTruthy());
     expect(screen.queryByText('app settings')).toBeNull();

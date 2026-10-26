@@ -546,3 +546,42 @@ describe('boot warning for a production deployment with no AI provider', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+/*
+ * The LLM second stage of the input guardrails defaults on exactly when the
+ * gateway has a provider to send it to. It used to ask its own question, which
+ * ignored Ollama, so a deployment running only a self-hosted Ollama got the
+ * regex stage alone while the boot warning called it configured.
+ */
+describe('LLM safety default', () => {
+  const savedOverride = process.env.ENABLE_LLM_SAFETY;
+
+  beforeEach(() => {
+    delete process.env.ENABLE_LLM_SAFETY;
+  });
+
+  afterEach(() => {
+    if (savedOverride === undefined) delete process.env.ENABLE_LLM_SAFETY;
+    else process.env.ENABLE_LLM_SAFETY = savedOverride;
+  });
+
+  it('is off with no provider configured', () => {
+    expect(config.enableLlmSafety).toBe(false);
+  });
+
+  it('is on when a provider key is configured', () => {
+    process.env.GROQ_API_KEY = 'test-key';
+    expect(config.enableLlmSafety).toBe(true);
+  });
+
+  it('is on for a self-hosted Ollama named by its base URL', () => {
+    process.env.OLLAMA_BASE_URL = 'http://ollama.internal:11434/v1';
+    expect(config.enableLlmSafety).toBe(true);
+  });
+
+  it('still yields to an explicit ENABLE_LLM_SAFETY', () => {
+    process.env.OLLAMA_BASE_URL = 'http://ollama.internal:11434/v1';
+    process.env.ENABLE_LLM_SAFETY = 'false';
+    expect(config.enableLlmSafety).toBe(false);
+  });
+});

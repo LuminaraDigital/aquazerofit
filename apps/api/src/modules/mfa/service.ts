@@ -52,7 +52,7 @@ const RECOVERY_CODE_BYTES = 10;
  * to remember.
  *
  * In memory, like that login lockout, and for the same reason: this API is
- * single-instance by construction (config.assertSingleInstance) and a restart
+ * single-instance by construction (bootGuards.assertSingleInstance) and a restart
  * clearing the counter costs an attacker a five-guess head start, not the lane.
  */
 const MAX_FAILURES = 5;

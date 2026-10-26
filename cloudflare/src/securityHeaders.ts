@@ -19,6 +19,9 @@
  *   VITE_API_BASE_URL at that host is not blocked.
  * - challenges.cloudflare.com on connect-src as well as script-src and
  *   frame-src. Turnstile's api.js then fetches the challenge from that host.
+ * - tganalytics.xyz, where Telegram Mini Apps Analytics posts catalog
+ *   events. The client calls it only inside a Mini App with both Vite
+ *   catalog env vars set. CSP cannot vary per launch.
  *
  * Stripe Checkout and the return from it are top-level navigations
  * (window.location.assign to Stripe's hosted page, then back to /plan).
@@ -70,6 +73,7 @@ export const CONNECT_SRC = [
   'https://*.googletagmanager.com',
   'https://www.google.com',
   'https://www.gstatic.com',
+  'https://tganalytics.xyz',
 ] as const;
 
 /** Main-thread WebGL only. No dedicated worker and no blob: worker. */

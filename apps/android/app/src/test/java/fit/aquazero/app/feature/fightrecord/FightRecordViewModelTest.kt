@@ -81,6 +81,30 @@ class FightRecordViewModelTest {
     }
 
     @Test
+    fun `a log that reaches the server refetches even while an earlier rejected log sits in the outbox`() =
+        runTest(dispatcher) {
+            api.envelope = FightRecordEnvelopeDto(
+                fightRecordStatus(activeDays = 11, tier = BeltTier.WHITE, next = BeltRungDto(BeltTier.BLUE, 12)),
+            )
+            val viewModel = open()
+            advanceUntilIdle()
+
+            // A weigh-in the server rejected stays FAILED in the outbox for the session.
+            val rejected = outbox.enqueueCreate(OutboxEntityTypes.WEIGHT_LOG, "wt1", "{}", "k1")
+            outbox.markFailed(rejected, errorCode = "VALIDATION_FAILED")
+            val water = outbox.enqueueCreate(OutboxEntityTypes.WATER_LOG, "w1", "{}", "k2")
+            advanceUntilIdle()
+
+            api.envelope = FightRecordEnvelopeDto(fightRecordStatus(activeDays = 12, tier = BeltTier.BLUE))
+            val callsBeforeSync = api.calls
+            outbox.markSynced(water)
+            advanceUntilIdle()
+
+            assertEquals(callsBeforeSync + 1, api.calls)
+            assertEquals(BeltTier.BLUE, (viewModel.uiState.value as FightRecordUiState.Ready).record.current.tier)
+        }
+
+    @Test
     fun `a populated answer is ready`() = runTest(dispatcher) {
         val viewModel = open()
         advanceUntilIdle()

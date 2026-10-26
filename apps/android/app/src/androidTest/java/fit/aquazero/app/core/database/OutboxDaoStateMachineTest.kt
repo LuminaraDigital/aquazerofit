@@ -193,6 +193,21 @@ class OutboxDaoStateMachineTest {
     }
 
     @Test
+    fun liveCountEmitsQueuedAndInFlightButNotFailedOrSynced() = runTest {
+        val a = dao.insert(op(localId = "l1", key = "k1"))
+        val b = dao.insert(op(localId = "l2", key = "k2"))
+        dao.transition(b, OutboxState.QUEUED, OutboxState.IN_FLIGHT, nowMs = 1L)
+        assertEquals(2, dao.liveCount().first())
+
+        // A rejected op will never run again, so it no longer holds the queue open.
+        dao.finish(a, OutboxState.FAILED, errorCode = "VALIDATION_FAILED")
+        assertEquals(1, dao.liveCount().first())
+
+        dao.finish(b, OutboxState.SYNCED, errorCode = null)
+        assertEquals(0, dao.liveCount().first())
+    }
+
+    @Test
     fun inStatesReturnsQueuedAndInFlightInEnqueueOrder() = runTest {
         val a = dao.insert(op(localId = "l1", key = "k1"))
         dao.insert(op(localId = "l2", key = "k2"))

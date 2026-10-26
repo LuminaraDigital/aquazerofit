@@ -65,6 +65,10 @@ internal class FakeOutboxDao : OutboxDao {
     override suspend fun pendingCountOnce(): Int =
         rows.value.count { it.state != OutboxState.SYNCED }
 
+    override fun liveCount(): Flow<Int> = rows.map { list ->
+        list.count { it.state == OutboxState.QUEUED || it.state == OutboxState.IN_FLIGHT }
+    }
+
     override suspend fun transition(id: Long, from: OutboxState, to: OutboxState, nowMs: Long): Int {
         var moved = 0
         rows.value = rows.value.map {

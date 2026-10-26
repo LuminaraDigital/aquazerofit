@@ -45,6 +45,7 @@ import {
   PROVIDERS,
   anyProviderConfigured,
   callProvider,
+  classify,
   estimateTokens,
   modelFor,
   openProviderStream,
@@ -144,7 +145,13 @@ export function withImageParts(messages: GatewayMessage[], images: string[] | un
  * `no_provider`: production with no configured provider at all, so no model
  * was ever going to answer.
  */
-export type DegradedReason = 'provider_failure' | 'deadline_exceeded' | 'budget_exhausted' | 'no_provider';
+export type DegradedReason =
+  | 'provider_failure'
+  | 'deadline_exceeded'
+  | 'budget_exhausted'
+  | 'no_provider'
+  /** A provider stream broke after its first token; the text is what arrived. */
+  | 'stream_interrupted';
 
 /**
  * Additive extension of AiMetadata. Optional so existing callers (and the eval
@@ -445,16 +452,43 @@ export async function* stream(
   const call = prepare(task, messages, opts);
   const { result, offline } = yield* route(call, false, async function* (provider, budgetMs) {
     const started = Date.now();
-    let text = '';
-    for await (const token of openProviderStream(provider, task, call.providerMessages, opts, budgetMs)) {
-      text += token;
-      opts.onToken?.(token);
-      yield token;
-    }
     const model = modelFor(provider, task);
+    let text = '';
+    let interrupted = false;
+    const tokens = openProviderStream(provider, task, call.providerMessages, opts, budgetMs);
+    for (;;) {
+      let step: IteratorResult<string, void>;
+      try {
+        step = await tokens.next();
+      } catch (err) {
+        // Before the first token the chain may still retry or fall back. After
+        // it, the caller has shown part of an answer that cannot be taken
+        // back, and anything else would stream a second answer after it. What
+        // streamed is the answer, degraded so it is never billed. The usual
+        // cause is the deadline cutting off a long generation, which says
+        // nothing about the provider's health, so the chain records a success.
+        if (text === '') throw err;
+        interrupted = true;
+        logAiCall({
+          provider: provider.name,
+          model,
+          promptVersion: call.promptVersion,
+          latencyMs: Date.now() - started,
+          tokens: { prompt: call.promptTokens },
+          task: `${task}:streamInterrupted:${classify(err).message.slice(0, 80)}`,
+        });
+        break;
+      }
+      if (step.done) break;
+      text += step.value;
+      opts.onToken?.(step.value);
+      yield step.value;
+    }
     const answer = providerAnswer(call, { provider: provider.name, model, started, text, tokens: estimateTokens(text) });
     opts.onComplete?.(text);
-    return answer;
+    return interrupted
+      ? { ...answer, meta: { ...answer.meta, degraded: true, degradedReason: 'stream_interrupted' } }
+      : answer;
   });
   if (offline) {
     // The offline engine's answer, streamed word by word so it reads the same

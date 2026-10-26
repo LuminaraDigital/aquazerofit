@@ -8,7 +8,7 @@
  * still runs it. That cycle is safe because the one call made while the two
  * modules are loading is that one, and it runs after `config` exists.
  */
-import { INSTANCE_COUNT_ENV, config } from './config';
+import { INSTANCE_COUNT_ENV, config, originGateSetting } from './config';
 
 /**
  * Single-instance guard: refuse to boot when the deployment declares more than
@@ -105,6 +105,10 @@ const MIN_ORIGIN_SECRET_LENGTH = 32;
  * Origin-gate guard: refuse to boot with REQUIRE_ORIGIN_SECRET on and no
  * usable ORIGIN_SHARED_SECRET to compare against.
  *
+ * Or with REQUIRE_ORIGIN_SECRET set to anything but true/1/false/0. "yes" or
+ * "on" reads as switched on to whoever wrote it; taking it as off would leave
+ * run.app open while the operator believes it is closed.
+ *
  * An empty secret never matches (originSecretMatches in platform/clientIp.ts),
  * so the gate would refuse every request - the whole site and every webhook -
  * while /health and /ready, which are exempt, kept answering 200. The
@@ -115,18 +119,24 @@ const MIN_ORIGIN_SECRET_LENGTH = 32;
  * looks closed and admits anyone who has the value. The `replace-with-...`
  * placeholder in .env.production.example is in a public repository, so it is
  * refused outright, as is anything shorter than MIN_ORIGIN_SECRET_LENGTH.
- * Neither message echoes the value.
- *
- * Off, nothing is judged. The secret then only steers rate-limit buckets, and
- * a deploy must not fail over it before the operator has chosen the gate.
+ * Neither message echoes the value. That holds with the gate off too: the
+ * secret still decides whose CF-Connecting-IP is believed (clientIp.ts), and
+ * so which address every rate limit and signup cap counts.
  *
  * Not skipped under test, unlike assertSingleInstance: it reads getters and
  * only index.ts calls it, so the suite can exercise it directly.
  */
 export function assertOriginSecretConfigured(): void {
-  if (!config.requireOriginSecret) return;
+  const setting = originGateSetting();
+  if (setting === 'unrecognised') {
+    throw new Error(
+      `Refusing to start: REQUIRE_ORIGIN_SECRET is "${process.env.REQUIRE_ORIGIN_SECRET?.trim()}", ` +
+        'which is neither on nor off. Use true or 1 to refuse direct traffic, false or 0 (or unset it) ' +
+        'to allow it.',
+    );
+  }
   const secret = config.originSharedSecret;
-  if (!secret) {
+  if (setting === 'on' && !secret) {
     throw new Error(
       'Refusing to start: REQUIRE_ORIGIN_SECRET is on but ORIGIN_SHARED_SECRET is empty, so every ' +
         'request except /health and /ready would be refused with 403 while the probes stayed green. ' +
@@ -134,9 +144,9 @@ export function assertOriginSecretConfigured(): void {
         'ORIGIN_SHARED_SECRET` in cloudflare/), or unset REQUIRE_ORIGIN_SECRET.',
     );
   }
-  assertUnguessableOriginSecret('ORIGIN_SHARED_SECRET', secret);
-  // Optional, but a weak previous value opens the gate exactly as a weak
-  // current one would.
+  if (secret) assertUnguessableOriginSecret('ORIGIN_SHARED_SECRET', secret);
+  // Optional, but a weak previous value is accepted exactly as a weak current
+  // one would be.
   const previous = config.originSharedSecretPrevious;
   if (previous) assertUnguessableOriginSecret('ORIGIN_SHARED_SECRET_PREVIOUS', previous);
 }
@@ -151,9 +161,9 @@ function assertUnguessableOriginSecret(name: string, value: string): void {
     return;
   }
   throw new Error(
-    `Refusing to start: ${name} ${problem}, so REQUIRE_ORIGIN_SECRET would admit anyone ` +
-      'who has it. Generate one with `openssl rand -hex 32` and set it on the Worker and on ' +
-      'Cloud Run (docs/OPERATIONS.md, "Closing the run.app bypass").',
+    `Refusing to start: ${name} ${problem}, so anyone who has it passes as the Worker. ` +
+      'Generate one with `openssl rand -hex 32` and set it on the Worker and on Cloud Run ' +
+      '(docs/OPERATIONS.md, "Closing the run.app bypass"), or unset it.',
   );
 }
 

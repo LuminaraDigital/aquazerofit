@@ -68,8 +68,10 @@ describe('no billing path writes grace', () => {
   );
 
   it('keeps the ledger writer the only file that opens the grace ledger', () => {
+    // The repository adapters implement withGraceLedger; they are not callers.
+    const adapters = path.join(srcDir, 'modules', 'fightCamp', 'repo') + path.sep;
     const callers = [...reachable(path.join(srcDir, 'app.ts'))].filter(
-      (f) => !f.includes(`${path.sep}repo${path.sep}`) && /\.withGraceLedger\(/.test(fs.readFileSync(f, 'utf8')),
+      (f) => !f.startsWith(adapters) && /\.withGraceLedger\(/.test(fs.readFileSync(f, 'utf8')),
     );
     expect(callers).toEqual([GRACE_WRITER]);
   });

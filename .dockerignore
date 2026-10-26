@@ -6,6 +6,8 @@
 .env
 .env.*
 !.env.example
+!.env.staging.example
+!.env.production.example
 
 # Dependencies - installed fresh by npm ci inside the image
 node_modules

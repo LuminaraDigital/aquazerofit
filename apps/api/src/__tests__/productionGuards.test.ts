@@ -17,7 +17,8 @@
  * to defeat. Every test restores the original environment.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { config, assertProductionSecrets } from '../platform/config';
+import { assertProductionSecrets } from '../platform/bootGuards';
+import { config } from '../platform/config';
 
 const KEYS = [
   'NODE_ENV',

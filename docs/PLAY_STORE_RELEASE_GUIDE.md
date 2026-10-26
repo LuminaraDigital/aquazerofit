@@ -490,7 +490,7 @@ See `.env.example` for the full variable list and comments.
 
 ### D. Other production boot requirements
 
-`assertProductionSecrets()` in `apps/api/src/platform/config.ts` also requires:
+`assertProductionSecrets()` in `apps/api/src/platform/bootGuards.ts` also requires:
 
 | Variable | Purpose |
 | :--- | :--- |

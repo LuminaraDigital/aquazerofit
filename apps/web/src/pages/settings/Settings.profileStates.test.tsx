@@ -1,20 +1,20 @@
 // @vitest-environment jsdom
 /**
- * REGRESSION GUARD — Settings used to early-return an error page whenever the
+ * REGRESSION GUARD: Settings used to early-return an error page whenever the
  * profile was falsy. Since the onboarding gate was removed, "signed in with no
  * wellness profile" is a supported state, so that early return turned a normal
- * account into an error screen — and because it returned before the rest of
- * the page, it also took sign-out, the consent switches, data export and
- * account deletion with it.
+ * account into an error screen. Because it returned before the rest of the
+ * page, it also took sign-out, the consent switches, data export and account
+ * deletion with it.
  *
  * Those four are not UX niceties: they are how a user leaves the product and
  * exercises their data rights, and none of them depend on knowing the user's
- * height. This file pins that they render in all three states — profile
- * loaded, profile legitimately absent, and request failed — and that only the
+ * height. This file pins that they render in all three states (profile
+ * loaded, profile legitimately absent, and request failed) and that only the
  * last one is presented as a failure.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const mocks = vi.hoisted(() => ({
@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   profile: {
     /** 'loaded' | 'absent' | 'failed' */
     state: 'loaded' as 'loaded' | 'absent' | 'failed',
+    tier: 'free' as 'free' | 'premium',
     data: {
       userId: 'u1',
       weightKg: 70,
@@ -58,6 +59,9 @@ vi.mock('../../lib/queries', () => ({
     isLoading: false,
     isError: mocks.profile.state === 'failed',
     refetch: mocks.refetch,
+  }),
+  useEntitlements: () => ({
+    data: { tier: mocks.profile.tier },
   }),
   useConsents: () => ({
     data: {
@@ -99,12 +103,34 @@ function expectAccountControlsPresent(): void {
 
 beforeEach(() => {
   mocks.profile.state = 'loaded';
+  mocks.profile.tier = 'free';
   Element.prototype.scrollIntoView = vi.fn() as unknown as Element['scrollIntoView'];
 });
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+});
+
+describe('plan entry for a free account', () => {
+  it('opens /plan from Your plan', () => {
+    render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <Routes>
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/plan" element={<p>plan page</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('link', { name: /your plan/i }));
+    expect(screen.getByText('plan page')).toBeTruthy();
+  });
+
+  it('omits the row once the account is premium', () => {
+    mocks.profile.tier = 'premium';
+    renderSettings();
+    expect(screen.queryByRole('link', { name: /your plan/i })).toBeNull();
+  });
 });
 
 describe('profile loaded', () => {

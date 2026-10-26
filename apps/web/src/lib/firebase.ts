@@ -104,6 +104,10 @@ export function getFirebaseAuth(): Auth | null {
 /**
  * Load the Firebase SDK. Resolves to a null auth when Firebase is disabled,
  * without importing the packages.
+ *
+ * A failed load (a network blip, or a deploy that replaced the hashed chunk)
+ * rejects this call and is then forgotten, so the next caller downloads
+ * again instead of inheriting the failure until a reload.
  */
 export function loadFirebaseSdk(): Promise<FirebaseSdk> {
   if (!isFirebaseAuthEnabled()) return Promise.resolve(emptySdk());
@@ -129,7 +133,10 @@ export function loadFirebaseSdk(): Promise<FirebaseSdk> {
       signOut: authMod.signOut,
       updateProfile: authMod.updateProfile,
     };
-  })();
+  })().catch((err: unknown) => {
+    loading = null;
+    throw err;
+  });
   return loading;
 }
 

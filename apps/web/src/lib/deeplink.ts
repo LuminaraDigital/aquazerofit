@@ -4,7 +4,7 @@
  * and path-based deep linking for AquaZeroFit.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { getTelegramStartParam } from '@/lib/telegram';
 
 export interface DeepLinkResult {
@@ -90,6 +90,16 @@ export class DeepLinkRouter {
       navigate('/nutrition/meal-plan');
       return true;
     });
+
+    // Stars Premium smoke and the in-app upgrade screen.
+    // startapp=plan and startapp=upgrade both land on /plan. The page itself
+    // decides what a free or premium account can buy.
+    const openPlan: DeepLinkHandler = (_res, navigate) => {
+      navigate('/plan');
+      return true;
+    };
+    this.register('plan', openPlan);
+    this.register('upgrade', openPlan);
   }
 
   /**
@@ -224,7 +234,12 @@ export function handleDeepLink(input?: string, navigate?: (path: string) => void
  * React hook to process deep links on component mount / app start.
  */
 export function useDeepLinkRouter(navigate: (path: string) => void): void {
+  // One shot per mount. Telegram keeps start_param for the whole Mini App
+  // session, and a later re-render would otherwise send the user to /plan again.
+  const routed = useRef(false);
   useEffect(() => {
+    if (routed.current) return;
+    routed.current = true;
     handleDeepLink(undefined, navigate);
   }, [navigate]);
 }

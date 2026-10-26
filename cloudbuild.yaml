@@ -20,6 +20,9 @@ substitutions:
   _REGION: australia-southeast1
   _AR_REPO: api
   _IMAGE: aquazerofit-api
+  _VITE_SITE_ORIGIN: https://aquazerofit.com
+  _VITE_TG_ANALYTICS_TOKEN: ''
+  _VITE_TG_ANALYTICS_APP_NAME: ''
 
 steps:
   - id: build
@@ -28,6 +31,12 @@ steps:
       - build
       - -f
       - apps/api/Dockerfile
+      - --build-arg
+      - VITE_SITE_ORIGIN=${_VITE_SITE_ORIGIN}
+      - --build-arg
+      - VITE_TG_ANALYTICS_TOKEN=${_VITE_TG_ANALYTICS_TOKEN}
+      - --build-arg
+      - VITE_TG_ANALYTICS_APP_NAME=${_VITE_TG_ANALYTICS_APP_NAME}
       - -t
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE}:$COMMIT_SHA
       - .

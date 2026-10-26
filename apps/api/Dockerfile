@@ -50,6 +50,8 @@ COPY apps/api apps/api
 COPY .gcloudignore cloudbuild.yaml .env.example .env.staging.example .env.production.example ./
 # The kill report builder, which the metrics test imports.
 COPY tools/engage tools/engage
+# The bundle crypto scan, whose patterns an API test checks.
+COPY scripts/scan-bundle-crypto.mjs scripts/scan-bundle-crypto.mjs
 COPY deploy/cloudrun/service.yaml deploy/cloudrun/service.yaml
 
 # Gate the image on a green API build before the slower web compile.

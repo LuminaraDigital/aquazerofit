@@ -16,7 +16,7 @@ import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app';
 import { ORIGIN_SHARED_SECRET_HEADER, resetOriginRefusalLog } from '../platform/clientIp';
-import { assertOriginSecretConfigured } from '../platform/config';
+import { assertOriginSecretConfigured } from '../platform/bootGuards';
 import { getStore } from '../platform/store';
 import { bindIsolatedDataDir, createIsolatedDataDir } from './helpers/integrationIsolation';
 

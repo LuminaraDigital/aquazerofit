@@ -60,7 +60,7 @@ None of the deploy surfaces expresses an instance count the process can read —
 | `1` | Boots normally. |
 | anything else (`2`, `0`, `auto`, …) | **Boot refused** with an error naming the data-loss risk. A value that is not a positive integer is refused too: a guard that cannot read its own input has verified nothing. |
 
-Enforced by `assertSingleInstance()` in `apps/api/src/platform/config.ts`, called from `apps/api/src/index.ts` before the store initialises. Skipped under test.
+Enforced by `assertSingleInstance()` in `apps/api/src/platform/bootGuards.ts`, called from `apps/api/src/index.ts` before the store initialises. Skipped under test.
 
 Per platform:
 
@@ -75,7 +75,7 @@ Raising `AZF_INSTANCE_COUNT` does not make the deployment scalable; it makes the
 
 ## Closing the run.app bypass (`REQUIRE_ORIGIN_SECRET`)
 
-Cloud Run ingress is `all` and cannot be limited to the Worker, so `https://aquazerofit-api-592686987043.australia-southeast1.run.app` answers anyone and skips the edge. With `REQUIRE_ORIGIN_SECRET=true` the API refuses, with `403 {"code":"FORBIDDEN"}`, every request whose `X-Origin-Shared-Secret` does not match `ORIGIN_SHARED_SECRET`. `/health` and `/ready` are exempt for Cloud Run's probes. The switch is off by default, and boot is refused if it is on while `ORIGIN_SHARED_SECRET` is empty, still a `replace-with-...` placeholder, or under 32 characters (`requireWorkerOrigin` in `apps/api/src/platform/clientIp.ts`, `assertOriginSecretConfigured` in `platform/config.ts`).
+Cloud Run ingress is `all` and cannot be limited to the Worker, so `https://aquazerofit-api-592686987043.australia-southeast1.run.app` answers anyone and skips the edge. With `REQUIRE_ORIGIN_SECRET=true` the API refuses, with `403 {"code":"FORBIDDEN"}`, every request whose `X-Origin-Shared-Secret` does not match `ORIGIN_SHARED_SECRET`. `/health` and `/ready` are exempt for Cloud Run's probes. The switch is off by default, and boot is refused if it is on while `ORIGIN_SHARED_SECRET` is empty, still a `replace-with-...` placeholder, or under 32 characters (`requireWorkerOrigin` in `apps/api/src/platform/clientIp.ts`, `assertOriginSecretConfigured` in `platform/bootGuards.ts`).
 
 Refusals write at most one line a minute: `kind:"security"`, `event:"origin_secret_rejected"`, `refusedSinceLastLog`, and the `reason` and `path` of the request that tripped it. `secret_missing` is a direct caller. `secret_mismatch` on real traffic means the Worker and Cloud Run hold different values.
 

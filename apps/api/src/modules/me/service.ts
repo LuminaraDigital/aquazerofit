@@ -488,6 +488,18 @@ export async function sweepExpiredDeletions(now = new Date()): Promise<number> {
 
 // ----- telegram link -----
 
+/**
+ * Refuse another way in to a Firebase account whose address no verified token
+ * has proved. Whoever created that identity never showed they hold the
+ * mailbox, so a password or Telegram link added now would belong to them, not
+ * to the owner who later proves the address.
+ */
+export function assertFirebaseEmailProved(user: User): void {
+  if (user.firebaseUid && user.emailVerified !== true) {
+    throw new AppError('AUTH_EMAIL_UNVERIFIED', 'Verify your email first');
+  }
+}
+
 export function linkTelegram(
   userId: string,
   tgId: number,
@@ -497,6 +509,7 @@ export function linkTelegram(
   const store = getStore();
   const user = store.byId<User>('users', userId);
   if (!user) throw new AppError('NOT_FOUND', 'Account not found');
+  assertFirebaseEmailProved(user);
   const existing = store.findOne<User>(
     'users',
     (d) => (d as User).tgId === tgId && d.id !== userId,

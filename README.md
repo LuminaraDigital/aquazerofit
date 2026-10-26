@@ -239,6 +239,12 @@ Telegram" button on its own landing page at somebody else's bot.
 | `VITE_SITE_ORIGIN` | Public origin of the marketing site, e.g. `https://aquazerofit.com`. Canonical tags, the sitemap and absolute OG image URLs are built from it - a stale value points every canonical at another domain while the site looks perfectly healthy |
 | `VITE_API_BASE_URL` | Origin of the API when it is served from a different host to the SPA. Unset means same origin |
 | `VITE_MEDIA_BASE_URL` | Origin serving exercise media under `/uploads`. Unset means same origin |
+| `VITE_TG_ANALYTICS_TOKEN` | Telegram Mini Apps Analytics catalog token from TON Builders / @DataChief_bot. Inlined into the Mini App bundle, which is how that SDK receives it. Leave unset to skip init. Never commit it |
+| `VITE_TG_ANALYTICS_APP_NAME` | Analytics identifier that matches the token. Both must be set or the client does not call the SDK |
+
+The catalog token is not a server secret. The SDK runs in the Mini App, so
+Vite has to inline it. It is still never committed, and the browser site
+does not load the SDK.
 
 ### Security (required in production)
 

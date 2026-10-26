@@ -12,6 +12,7 @@ import {
   useAuthActions,
   useConsents,
   useMe,
+  useEntitlements,
   useProfile,
   useUpdateConsents,
   useUpdateMe,
@@ -46,6 +47,7 @@ export default function Settings() {
   const toast = useToast();
   const { logout } = useAuthActions();
   const { data: profile, isLoading, isError, refetch } = useProfile();
+  const { data: entitlements } = useEntitlements();
   const { data: consents } = useConsents();
   // Identity comes from GET /me; the localStorage snapshot only seeds the
   // first paint (placeholderData inside useMe).
@@ -248,6 +250,39 @@ export default function Settings() {
             {user?.createdAt ? `Member since ${formatMonthYear(user.createdAt)}` : user?.email ?? ''}
           </p>
         </section>
+
+        {/*
+          Free accounts open /plan from Profile. Empty Progress leaves out the
+          weekly insight card, so this row is the path a Stars smoke can tap
+          on every launch. It stays while the tier is free or still unknown,
+          and drops once the account is premium.
+        */}
+        {entitlements?.tier !== 'premium' && (
+          <section>
+            <Link
+              to="/plan"
+              className="glass-card flex items-center justify-between p-4 hover:bg-surface-container-high transition-colors group focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span
+                  className="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors"
+                  aria-hidden="true"
+                >
+                  workspace_premium
+                </span>
+                <div className="min-w-0">
+                  <span className="block text-base">Your plan</span>
+                  <span className="block text-xs text-on-surface-variant">
+                    Premium and credits
+                  </span>
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-on-surface-variant" aria-hidden="true">
+                chevron_right
+              </span>
+            </Link>
+          </section>
+        )}
 
         {/* Wellness disclaimer */}
         <section>

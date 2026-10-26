@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * REGRESSION GUARD — first-run friction and target honesty.
+ * REGRESSION GUARD: first-run friction and target honesty.
  *
  * Two failure modes are guarded here, and they pull against each other.
  *
@@ -9,8 +9,8 @@
  *    session people do not come back from, so an account with no profile must
  *    now land inside the product.
  *
- * 2. The obvious way to make that happen — a stand-in calorie target so the
- *    dashboard renders — would be worse than the friction it removes. Targets
+ * 2. The obvious way to make that happen, a stand-in calorie target so the
+ *    dashboard renders, would be worse than the friction it removes. Targets
  *    are derived from real measurements and clamped to a safety floor; a
  *    typical-looking number captioned "your target" is a health claim about
  *    somebody the system has never measured. Surfaces that exist to compare
@@ -56,6 +56,7 @@ vi.mock('../../lib/api', () => ({
 vi.mock('../../lib/telegram', () => ({
   isTMA: () => false,
   getTelegramInitData: () => undefined,
+  getTelegramStartParam: () => null,
   haptic: vi.fn(),
 }));
 
@@ -94,7 +95,7 @@ const { default: App } = await import('../../App');
 // Setup and FirstRun are the lazy routes this suite renders for real (the
 // essentials form at /setup, the first-run home at / and /onboarding). Pre-warm
 // both modules: under full-suite parallel load a cold transform can exceed
-// findBy*'s 1s timeout, leaving the Suspense spinner on screen — a flake, not
+// findBy*'s 1s timeout, leaving the Suspense spinner on screen. That is a flake, not
 // a regression.
 await Promise.all([import('./Setup'), import('./FirstRun')]);
 
@@ -172,7 +173,7 @@ describe('an account with no wellness profile', () => {
     expect(screen.getByRole('radiogroup', { name: /sex/i })).toBeDefined();
     expect(screen.getByRole('radiogroup', { name: /^goal$/i })).toBeDefined();
     expect(screen.getByRole('radiogroup', { name: /typical activity/i })).toBeDefined();
-    // Deferred to Settings — asking for them here is what made the old flow long.
+    // Deferred to Settings. Asking for them here is what made the old flow long.
     expect(screen.queryByText(/equipment at home/i)).toBeNull();
     expect(screen.queryByText(/dietary preferences/i)).toBeNull();
     // Consent is still explicit and still opt-in.

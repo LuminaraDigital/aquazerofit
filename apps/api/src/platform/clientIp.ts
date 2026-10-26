@@ -94,7 +94,39 @@ function warnIfSecretUnset(req: Request): void {
   );
 }
 
-/** Address the rate limiter and the Telegram new-account caps key on. */
+/** The eight groups of an IPv6 address, or null when it is not one this can read. */
+function ipv6Groups(address: string): number[] | null {
+  const halves = address.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+  const groups = [...head, ...Array<string>(halves.length === 2 ? missing : 0).fill('0'), ...tail];
+  if (!groups.every((group) => /^[0-9a-f]{1,4}$/.test(group))) return null;
+  return groups.map((group) => parseInt(group, 16));
+}
+
+/**
+ * The unit one client controls, which is what a per-client limit has to
+ * count. An IPv4 address is one host. An IPv6 subscriber is normally handed a
+ * whole /64 and can use any address in it, so a bucket per IPv6 address is a
+ * fresh bucket per request for anyone who rotates; the /64 is keyed instead,
+ * in one spelling however the address was written. An IPv4 address in mapped
+ * form (`::ffff:a.b.c.d`, how Node reports IPv4 peers on a dual-stack socket)
+ * is that IPv4 address, not a member of the `::` /64. Anything unreadable is
+ * returned as given.
+ */
+export function clientNetworkKey(ip: string): string {
+  const address = ip.trim().toLowerCase().replace(/%.*$/, '');
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(address);
+  if (mapped) return mapped[1]!;
+  const groups = address.includes(':') ? ipv6Groups(address) : null;
+  if (!groups) return address;
+  return `${groups.slice(0, 4).map((group) => group.toString(16)).join(':')}::/64`;
+}
+
+/** Address the rate limiter and the Telegram new-account caps key on; both pass it through clientNetworkKey. */
 export function clientIpForRateLimit(req: Request): string {
   const presented = singleHeader(req.headers[ORIGIN_SHARED_SECRET_HEADER]);
   const cfIp = plausibleClientIp(singleHeader(req.headers[CF_CONNECTING_IP_HEADER]));

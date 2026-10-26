@@ -17,7 +17,7 @@ import {
   signAccess,
   type SessionChannel,
 } from '../../platform/auth';
-import { credentialsId, toPublicUser, type CredentialsDoc } from '../me/service';
+import { assertFirebaseEmailProved, credentialsId, toPublicUser, type CredentialsDoc } from '../me/service';
 import { validateTelegramInitData, type TelegramUser } from './telegram';
 import { sendPasswordResetEmail } from './emails';
 import bcrypt from 'bcryptjs';
@@ -461,6 +461,7 @@ export async function setCredentials(
   const store = getStore();
   const user = store.byId<User>('users', userId);
   if (!user || !isUserDoc(user)) throw new AppError('NOT_FOUND', 'Account not found');
+  assertFirebaseEmailProved(user);
 
   if (store.byId<CredentialsDoc>('users', credentialsId(userId))) {
     throw new AppError(

@@ -31,15 +31,22 @@ Config: `cloudflare/wrangler.jsonc`.
 - Custom domains: `aquazerofit.com` and `www.aquazerofit.com`
 - `workers_dev`: left on so the `*.workers.dev` host can be smoked before DNS
 
-Build the SPA with the public origin set and the API base unset, so the
-browser calls same-origin `/api/v1` and canonical URLs use this domain:
+Build the SPA with the public origin set (plus the Telegram Mini Apps Analytics
+pair once provisioned in TON Builders / `@DataChief_bot` per
+`https://docs.tganalytics.xyz/`) and the API base unset, so the browser calls
+same-origin `/api/v1` and canonical URLs use this domain:
 
 ```bash
-VITE_SITE_ORIGIN=https://aquazerofit.com npm run build --workspace apps/web
+VITE_SITE_ORIGIN=https://aquazerofit.com \
+VITE_TG_ANALYTICS_TOKEN=<token-from-tganalytics> \
+VITE_TG_ANALYTICS_APP_NAME=<app-name-from-tganalytics> \
+npm run build --workspace apps/web
 ```
 
 Leave `VITE_API_BASE_URL` and `VITE_MEDIA_BASE_URL` unset. Leave the Firebase
-web build-args unset. Sign-in stays `POST /auth/login`.
+web build-args unset. Sign-in stays `POST /auth/login`. If either
+`VITE_TG_ANALYTICS_TOKEN` or `VITE_TG_ANALYTICS_APP_NAME` is omitted, the Mini
+App skips catalog analytics initialization cleanly.
 
 From `cloudflare/`:
 

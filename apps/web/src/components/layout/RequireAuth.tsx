@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { WellnessProfile } from '@aquazerofit/shared';
 import { restoreSession, tokenStore } from '../../lib/api';
 import { useFirebaseAuth } from '../../lib/AuthProvider';
 import { isTMA } from '../../lib/telegram';
+import { useDeepLinkRouter } from '../../lib/deeplink';
 import { useProfile } from '../../lib/queries';
 import { AuthGateSkeleton } from '../ui/Skeleton';
 import { ErrorState } from '../ui/ErrorState';
@@ -31,6 +32,27 @@ const ProfileGateContext = createContext<ProfileGate>({
  */
 export function useProfileGate(): ProfileGate {
   return useContext(ProfileGateContext);
+}
+
+/**
+ * Apply a Telegram `startapp` / web `?startapp=` launch once the account is
+ * signed in.
+ *
+ * The router used to run only inside Nutrition. A Mini App cold start opens
+ * Home, so `startapp=plan` never reached a handler. It waits until sign-in
+ * finishes: Telegram auto-login then replaces the location with `/`, and the
+ * launch navigation has to happen after that replacement.
+ */
+function DeepLinkListener() {
+  const navigate = useNavigate();
+  const open = useCallback(
+    (path: string) => {
+      navigate(path, { replace: true });
+    },
+    [navigate],
+  );
+  useDeepLinkRouter(open);
+  return null;
 }
 
 /**
@@ -106,18 +128,28 @@ export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
     );
   }
 
-  if (isLoading) return <AuthGateSkeleton />;
+  if (isLoading) {
+    return (
+      <>
+        <DeepLinkListener />
+        <AuthGateSkeleton />
+      </>
+    );
+  }
 
   if (isError) {
     return (
-      <div className="max-w-md mx-auto min-h-screen flex items-center px-container-margin">
-        <div className="w-full">
-          <ErrorState
-            message="We could not load your profile."
-            retry={() => void refetch()}
-          />
+      <>
+        <DeepLinkListener />
+        <div className="max-w-md mx-auto min-h-screen flex items-center px-container-margin">
+          <div className="w-full">
+            <ErrorState
+              message="We could not load your profile."
+              retry={() => void refetch()}
+            />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -130,6 +162,7 @@ export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
       }}
     >
       <ToastProvider>
+        <DeepLinkListener />
         <Outlet />
       </ToastProvider>
     </ProfileGateContext.Provider>

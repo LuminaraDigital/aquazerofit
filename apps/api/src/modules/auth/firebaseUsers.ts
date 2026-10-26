@@ -29,14 +29,26 @@
  * An identity already linked by firebaseUid loads that user even when this
  * token's email is unverified. The uid binding is the identity. This path
  * does not read a role from the token (there is none) and sets emailVerified
- * only when the token reports the email verified.
+ * only when the token reports the stored address itself verified.
+ *
+ * While that address is unproved the account cannot gain a password or a
+ * Telegram link (assertFirebaseEmailProved), and the first verified token
+ * drops any it gained before that rule existed: the identity's creator never
+ * showed they hold the mailbox, and the proving owner must not inherit their
+ * ways in.
+ *
+ * No address on UNOWNED_EMAIL_DOMAIN links or provisions. Nobody here receives
+ * that domain's mail, so a verified flag on it says nothing about who holds
+ * the account it names, and legacy rows (an admin among them) still sit there.
  */
 import type { User } from '@aquazerofit/shared';
 import { containsProfanity } from '@aquazerofit/shared';
+import { revokeAllForUser } from '../../platform/auth';
 import { AppError } from '../../platform/errors';
 import { config } from '../../platform/config';
+import { isUnownedEmailDomain } from '../../platform/mailer';
 import { getStore, newId } from '../../platform/store';
-import { toPublicUser } from '../me/service';
+import { credentialsId, toPublicUser } from '../me/service';
 import { auditAuthEvent, findUserByEmail, hashIdentifier } from './service';
 
 export interface FirebaseIdentity {
@@ -62,6 +74,15 @@ function findUserByFirebaseUid(uid: string): User | undefined {
   );
 }
 
+/** Strip the password, Telegram link and sessions an unproved account gained. */
+function dropAccessAddedBeforeProof(user: User, ip?: string): User {
+  const droppedPassword = getStore().delete('users', credentialsId(user.id));
+  const droppedTelegram = typeof user.tgId === 'number';
+  revokeAllForUser(user.id);
+  auditAuthEvent(user.id, 'firebase.email.proved', { droppedPassword, droppedTelegram }, ip);
+  return { ...user, tgId: undefined, tgUsername: undefined };
+}
+
 /**
  * Resolve or create the local User for a Firebase identity.
  * Links by email only when the token and the existing account both have a
@@ -71,6 +92,7 @@ function findUserByFirebaseUid(uid: string): User | undefined {
  */
 export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string): User {
   const store = getStore();
+  const email = identity.email?.trim().toLowerCase();
   const existingByUid = findUserByFirebaseUid(identity.uid);
   if (existingByUid) {
     let user = existingByUid;
@@ -79,15 +101,29 @@ export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string):
       store.upsert('users', user);
       auditAuthEvent(user.id, 'deletion.cancelled', undefined, ip);
     }
-    if (identity.emailVerified && !user.emailVerified) {
-      user = { ...user, emailVerified: true };
+    // A verified token proves the address it carries, which Firebase lets the
+    // identity change. Only proof of the stored address verifies it.
+    if (identity.emailVerified && !user.emailVerified && email === user.email.trim().toLowerCase()) {
+      user = dropAccessAddedBeforeProof({ ...user, emailVerified: true }, ip);
       store.upsert('users', user);
     }
     auditAuthEvent(user.id, 'firebase.session', undefined, ip);
     return user;
   }
 
-  const email = identity.email?.trim().toLowerCase();
+  if (email && isUnownedEmailDomain(email)) {
+    auditAuthEvent(
+      findUserByEmail(email)?.id ?? 'unknown',
+      'firebase.link.rejected',
+      {
+        reason: 'unowned_domain',
+        emailHash: hashIdentifier(email),
+        firebaseUidHash: hashIdentifier(identity.uid),
+      },
+      ip,
+    );
+    throw new AppError('FORBIDDEN', 'This email address cannot be used to sign in');
+  }
   if (email) {
     const byEmail = findUserByEmail(email);
     if (byEmail) {

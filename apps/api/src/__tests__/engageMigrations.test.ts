@@ -17,6 +17,10 @@ import {
 import { ENGAGE_TABLE_PRIVACY } from '../modules/fightCamp/repo/types';
 import { pgliteSql as liteDatabase } from './helpers/engageDatabases';
 
+// Each case boots PGlite, a WebAssembly Postgres: about a second on a laptop
+// and five or more on a shared CI runner, past Vitest's 5 s default.
+vi.setConfig({ testTimeout: 30_000 });
+
 const scratch: string[] = [];
 afterAll(() => {
   for (const dir of scratch) fs.rmSync(dir, { recursive: true, force: true });

@@ -21,7 +21,6 @@ import { rescaleItem } from './nutritionMath';
 import { CircularMacroRing } from '@/components/ui/CircularMacroRing';
 import { AquaCalendarPicker, type DayStatus } from '@/components/ui/AquaCalendarPicker';
 import { AquaStatusline } from '@/components/ui/AquaStatusline';
-import { useDeepLinkRouter } from '@/lib/deeplink';
 import { queryKeys } from '@/lib/queries';
 import {
   insertPendingMealLog,
@@ -49,8 +48,6 @@ export default function Nutrition() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { show } = useToast();
-
-  useDeepLinkRouter(navigate);
 
   const today = todayLocalDate();
   const [date, setDate] = useState(today);

@@ -48,6 +48,7 @@ test('script-src and connect-src match Telegram, Turnstile, Firebase, and the AP
     'https://firebaseinstallations.googleapis.com',
     'https://www.googleapis.com',
     'https://www.google-analytics.com',
+    'https://tganalytics.xyz',
   ]) {
     assert.ok(connect.includes(source), `connect-src missing ${source}`);
   }

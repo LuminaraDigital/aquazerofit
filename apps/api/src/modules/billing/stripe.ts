@@ -16,8 +16,10 @@
  * What each event does to the entitlement:
  *
  *  - `invoice.paid` grants through the end of the period the invoice paid
- *    for. It fires for the first payment and for every renewal, so it is the
- *    one grant path; keyed on the invoice id, so redelivery settles once.
+ *    for, plus RENEWAL_GRACE_S. It fires for the first payment and for every
+ *    renewal, so it is the one grant path; keyed on the invoice id, so
+ *    redelivery settles once. An invoice paid before its subscription's
+ *    recorded deletion grants nothing, whenever it arrives.
  *  - `customer.subscription.deleted` ends premium now. Cancelling "at period
  *    end" does not fire it until that end, so paid time is never taken away.
  *  - `charge.refunded` (in full), and a chargeback reported by
@@ -36,11 +38,21 @@ import { AppError } from '../../platform/errors';
 import { config } from '../../platform/config';
 import { secureEquals } from '../../platform/auth';
 import { logEvent } from '../../platform/telemetry';
-import { grantPremium, revokePremiumOnce } from './entitlements';
+import { entitlementHistory, grantPremium, revokePremiumOnce } from './entitlements';
 import { fetchWithTimeout } from './play';
 
 const STRIPE_API = 'https://api.stripe.com/v1';
 export const STRIPE_API_VERSION = '2025-11-17.clover';
+/**
+ * How long a paid period outlives its end. Stripe raises the renewal invoice
+ * at the period end and charges it about an hour later, and a card that needs
+ * 3D Secure or a retry takes days. A subscription that ends sends
+ * `customer.subscription.deleted`, which still retires the period at once, so
+ * this only covers a renewal still being collected.
+ */
+const RENEWAL_GRACE_S = 3 * 86_400;
+/** Subscription statuses after which Stripe never charges again. */
+const ENDED_SUBSCRIPTION_STATUSES = new Set(['canceled', 'incomplete_expired']);
 /** Stripe's own libraries default to five minutes; a replay older than that is refused. */
 const SIGNATURE_TOLERANCE_S = 300;
 const PRICE_TTL_MS = 10 * 60_000;
@@ -50,6 +62,8 @@ const PRICE_FAILURE_TTL_MS = 60_000;
 interface StripeInvoice {
   id: string;
   status: string | null;
+  /** Unix seconds; `paid_at` is when Stripe collected the payment, not when we heard. */
+  status_transitions?: { paid_at?: number | null } | null;
   billing_reason?: string | null;
   parent?: {
     subscription_details?: { subscription?: string; metadata?: Record<string, string> | null } | null;
@@ -190,14 +204,64 @@ function grantFromInvoice(userId: string, invoice: StripeInvoice): void {
     logEvent('stripe_invoice_without_period', { invoice: invoice.id });
     return;
   }
+  const subscription = invoice.parent?.subscription_details?.subscription;
+  if (subscription && paidBeforeDeletion(userId, subscription, invoice)) {
+    logEvent('stripe_invoice_after_deletion', { invoice: invoice.id });
+    return;
+  }
   grantPremium({
     userId,
     source: 'stripe',
     externalId: `stripe:${invoice.id}`,
-    providerRef: invoice.parent?.subscription_details?.subscription,
-    premiumUntil: new Date(end * 1000).toISOString(),
+    providerRef: subscription,
+    premiumUntil: new Date((end + RENEWAL_GRACE_S) * 1000).toISOString(),
     reason: `stripe:${invoice.billing_reason ?? 'invoice'}`,
   });
+}
+
+/**
+ * True when this subscription's deletion is already recorded and the invoice
+ * was paid before it: a delivery that lost the race with the deletion (Stripe
+ * retries a failed one for days), whose period the deletion already ended.
+ * Stripe never restarts a deleted subscription, so an invoice paid after the
+ * deletion is a customer settling an overdue bill, and that still grants. A
+ * paid invoice always carries `paid_at` at the pinned version; one without it
+ * cannot show it came later, so it is treated as earlier.
+ */
+function paidBeforeDeletion(userId: string, subscription: string, invoice: StripeInvoice): boolean {
+  const deletion = entitlementHistory(userId).find((g) => g.externalId === `stripe:deleted:${subscription}`);
+  if (!deletion) return false;
+  const paidAt = invoice.status_transitions?.paid_at;
+  return !paidAt || paidAt * 1000 <= Date.parse(deletion.createdAt);
+}
+
+/**
+ * A subscription this account bought through Checkout that Stripe may still
+ * charge, or null.
+ *
+ * Asked of Stripe rather than read from the ledger alone: a missed or late
+ * deletion would otherwise stop the account ever subscribing again. Only
+ * subscriptions the ledger has granted from and has no deletion for are looked
+ * up, so a first purchase makes no extra call.
+ */
+export async function liveSubscriptionOf(userId: string): Promise<string | null> {
+  const history = entitlementHistory(userId);
+  const deleted = (ref: string) => history.some((g) => g.externalId === `stripe:deleted:${ref}`);
+  const candidates = new Set(
+    history.flatMap((g) =>
+      g.source === 'stripe' && g.action === 'grant' && g.providerRef && !deleted(g.providerRef) ? [g.providerRef] : [],
+    ),
+  );
+  for (const id of candidates) {
+    try {
+      const sub = await stripeApi<{ status?: string }>(`/subscriptions/${encodeURIComponent(id)}`);
+      if (sub.status && !ENDED_SUBSCRIPTION_STATUSES.has(sub.status)) return id;
+    } catch (err) {
+      // One Stripe does not know (a test-mode id after a switch to live keys) will never be charged.
+      if (!(err instanceof AppError && err.code === 'PURCHASE_INVALID')) throw err;
+    }
+  }
+  return null;
 }
 
 /**

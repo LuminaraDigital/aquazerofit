@@ -33,6 +33,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ApiError } from '@/lib/api';
 import {
   queryKeys,
   useBillingConfig,
@@ -254,7 +255,10 @@ function SubscribeCard({ price }: { price: StripePrice }) {
         </PrimaryButton>
         {checkout.isError && (
           <p role="alert" className="text-sm text-error">
-            We could not open checkout. Nothing was charged. Try again in a moment.
+            {/* A refusal (already premium, or a subscription still open) will not clear on retry. */}
+            {checkout.error instanceof ApiError && checkout.error.code === 'CONFLICT'
+              ? checkout.error.message
+              : 'We could not open checkout. Nothing was charged. Try again in a moment.'}
           </p>
         )}
       </GlassCard>

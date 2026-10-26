@@ -19,12 +19,15 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS, MAX_BANKED_CREDITS } from '@aquazerofit/shared';
+import { ApiError } from '@/lib/api';
 import type { BillingConfig, Entitlements } from '@/lib/queries';
 
 const mocks = vi.hoisted(() => ({
   useEntitlements: vi.fn(),
   useBillingConfig: vi.fn(),
   startCheckout: vi.fn(),
+  // Overrides for the Stripe checkout mutation's state; idle unless a case says otherwise.
+  stripeCheckoutState: vi.fn((): Record<string, unknown> => ({})),
   startStars: vi.fn(() => Promise.resolve({ invoiceLink: 'https://t.me/invoice/test', stars: 417 })),
   // The sync hook's state for the session in the URL; idle unless a case says otherwise.
   syncCheckout: vi.fn(
@@ -43,7 +46,13 @@ vi.mock('@/lib/queries', () => ({
   queryKeys: { entitlements: ['entitlements'] },
   useEntitlements: mocks.useEntitlements,
   useBillingConfig: mocks.useBillingConfig,
-  useStartStripeCheckout: () => ({ mutate: mocks.startCheckout, isPending: false, isError: false }),
+  useStartStripeCheckout: () => ({
+    mutate: mocks.startCheckout,
+    isPending: false,
+    isError: false,
+    error: null,
+    ...mocks.stripeCheckoutState(),
+  }),
   useStripeCheckoutSync: mocks.syncCheckout,
   useStartStarsSubscription: () => ({
     mutateAsync: mocks.startStars,
@@ -110,6 +119,7 @@ afterEach(() => {
   mocks.openStarsInvoice.mockResolvedValue('cancelled');
   mocks.syncCheckout.mockReset();
   mocks.syncCheckout.mockImplementation(() => ({ isError: false, isSuccess: false }));
+  mocks.stripeCheckoutState.mockReturnValue({});
 });
 
 describe('plan page  -  free tier', () => {
@@ -245,6 +255,30 @@ describe('plan page  -  Stripe checkout', () => {
 
     fireEvent.click(subscribe);
     expect(mocks.startCheckout).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the server's reason when checkout is refused, rather than asking for a retry that cannot work", () => {
+    mocks.stripeCheckoutState.mockReturnValue({
+      isError: true,
+      error: new ApiError(409, {
+        code: 'CONFLICT',
+        message: 'This account already has a card subscription. Contact Support to update or cancel it.',
+      }),
+    });
+    renderWith({ data: FREE }, STRIPE);
+
+    expect(screen.getByText(/already has a card subscription/i)).toBeTruthy();
+    expect(screen.queryByText(/try again in a moment/i)).toBeNull();
+  });
+
+  it('keeps the retry wording for a checkout that failed for any other reason', () => {
+    mocks.stripeCheckoutState.mockReturnValue({
+      isError: true,
+      error: new ApiError(503, { code: 'PAYMENT_UNAVAILABLE', message: 'Could not reach Stripe.' }),
+    });
+    renderWith({ data: FREE }, STRIPE);
+
+    expect(screen.getByText(/could not open checkout\. nothing was charged/i)).toBeTruthy();
   });
 
   it('keeps Stripe out of the Telegram Mini App, where Telegram requires Stars', () => {

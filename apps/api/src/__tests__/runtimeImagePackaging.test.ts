@@ -108,6 +108,14 @@ describe('cloud run packaging', () => {
     expect(cloudbuild).toContain('_AR_REPO: api');
     expect(cloudbuild).toContain('_IMAGE: aquazerofit-api');
     expect(cloudbuild).toContain('${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE}:$COMMIT_SHA');
+    expect(cloudbuildCommands).toContain('VITE_SITE_ORIGIN=${_VITE_SITE_ORIGIN}');
+    expect(cloudbuildCommands).toContain('VITE_TG_ANALYTICS_TOKEN=${_VITE_TG_ANALYTICS_TOKEN}');
+    expect(cloudbuildCommands).toContain('VITE_TG_ANALYTICS_APP_NAME=${_VITE_TG_ANALYTICS_APP_NAME}');
+
+    const dockerfile = fs.readFileSync(path.join(repoRoot, 'apps/api/Dockerfile'), 'utf8');
+    expect(dockerfile).toContain('ARG VITE_SITE_ORIGIN=');
+    expect(dockerfile).toContain('ARG VITE_TG_ANALYTICS_TOKEN=');
+    expect(dockerfile).toContain('ARG VITE_TG_ANALYTICS_APP_NAME=');
     // --image alone keeps whatever scaling the live service has. The store is
     // single-instance only, so every deploy pins it and declares it to the
     // boot guard, which refuses an unset AZF_INSTANCE_COUNT on Cloud Run.

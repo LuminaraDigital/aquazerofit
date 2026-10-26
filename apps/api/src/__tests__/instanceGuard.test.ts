@@ -1,5 +1,5 @@
 /**
- * Single-instance boot guard (platform/config.assertSingleInstance).
+ * Single-instance boot guard (platform/bootGuards.assertSingleInstance).
  *
  * pgStore.ts has always documented that this store is not multi-instance safe:
  * every instance hydrates its own copy, never re-reads, and the last flush
@@ -19,7 +19,8 @@
  * markers for the duration and restores them afterwards.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { INSTANCE_COUNT_ENV, assertSingleInstance, config } from '../platform/config';
+import { assertSingleInstance } from '../platform/bootGuards';
+import { INSTANCE_COUNT_ENV, config } from '../platform/config';
 
 const KEYS = [INSTANCE_COUNT_ENV, 'NODE_ENV', 'VITEST', 'K_SERVICE'] as const;
 const ORIGINAL = Object.fromEntries(KEYS.map((k) => [k, process.env[k]])) as Record<

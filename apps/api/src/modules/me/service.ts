@@ -26,6 +26,7 @@ import {
 import { removeUserFromChallenges } from '../challenges/service';
 import { clearEmojiStatusOnErasure } from '../fightRecord/emojiStatus';
 import { effectiveTier } from '../billing/entitlements';
+import { cancelStripeSubscriptions } from '../billing/stripe';
 import { addDays } from '../../platform/dates';
 import type { TrendPoint } from '@aquazerofit/shared';
 import { mealLogsForDate, weightLogsInRange } from '../logs/service';
@@ -375,6 +376,10 @@ function scrubGrowthIdentifiers<T extends { id: string }>(doc: T): T {
 }
 
 export async function purgeUser(userId: string): Promise<void> {
+  // First, while the ledger still names the subscription: an erased account
+  // must not go on being billed. Logs rather than throws if Stripe is down.
+  await cancelStripeSubscriptions(userId);
+
   const store = getStore();
 
   // Firebase first, then local data. removeFirebaseIdentity revokes refresh
@@ -488,6 +493,18 @@ export async function sweepExpiredDeletions(now = new Date()): Promise<number> {
 
 // ----- telegram link -----
 
+/**
+ * Refuse another way in to a Firebase account whose address no verified token
+ * has proved. Whoever created that identity never showed they hold the
+ * mailbox, so a password or Telegram link added now would belong to them, not
+ * to the owner who later proves the address.
+ */
+export function assertFirebaseEmailProved(user: User): void {
+  if (user.firebaseUid && user.emailVerified !== true) {
+    throw new AppError('AUTH_EMAIL_UNVERIFIED', 'Verify your email first');
+  }
+}
+
 export function linkTelegram(
   userId: string,
   tgId: number,
@@ -497,6 +514,7 @@ export function linkTelegram(
   const store = getStore();
   const user = store.byId<User>('users', userId);
   if (!user) throw new AppError('NOT_FOUND', 'Account not found');
+  assertFirebaseEmailProved(user);
   const existing = store.findOne<User>(
     'users',
     (d) => (d as User).tgId === tgId && d.id !== userId,

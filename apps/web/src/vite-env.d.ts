@@ -37,6 +37,17 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_MESSAGING_SENDER_ID?: string;
   readonly VITE_FIREBASE_APP_ID?: string;
   readonly VITE_FIREBASE_MEASUREMENT_ID?: string;
+  /**
+   * Telegram Mini Apps Analytics catalog token from TON Builders /
+   * @DataChief_bot. Vite inlines it into the Mini App bundle. Leave unset
+   * to skip init. Never commit a real token.
+   */
+  readonly VITE_TG_ANALYTICS_TOKEN?: string;
+  /**
+   * Analytics identifier registered with the catalog token. Must match the
+   * appName passed to @telegram-apps/analytics. Leave unset to skip init.
+   */
+  readonly VITE_TG_ANALYTICS_APP_NAME?: string;
 }
 
 interface ImportMeta {

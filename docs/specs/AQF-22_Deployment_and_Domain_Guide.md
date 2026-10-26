@@ -171,7 +171,7 @@ No deployment surface expresses an instance count that the process can read: a m
 | `1` | Boots normally |
 | anything else (`2`, `0`, `auto`, ...) | **Boot refused**, with an error naming the data-loss risk |
 
-Enforced by `assertSingleInstance()` in `apps/api/src/platform/config.ts`, called before the store initialises. Set the value **and** pin the host to a single instance: the guard catches an environment that lies, not a dashboard that quietly scales out while the environment still says `1`. `docs/OPERATIONS.md` § Scaling is the authority on this and on what it would take to lift the restriction.
+Enforced by `assertSingleInstance()` in `apps/api/src/platform/bootGuards.ts`, called before the store initialises. Set the value **and** pin the host to a single instance: the guard catches an environment that lies, not a dashboard that quietly scales out while the environment still says `1`. `docs/OPERATIONS.md` § Scaling is the authority on this and on what it would take to lift the restriction.
 
 ### Step 6: What the host must provide
 

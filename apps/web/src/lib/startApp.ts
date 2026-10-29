@@ -44,8 +44,9 @@ export function useFightCampStartApp(): void {
     const share = shareCodeIn(startParam);
     if (share) {
       adoptAttribution({ ref: `sh_${share}` });
-      // A beacon: the API answers 204 for the Mini App and records the open.
-      void fetch(`${API_BASE}/share/r/${share}?surface=tma`).catch(() => undefined);
+      // A beacon: the API answers 204 for the Mini App and records the open,
+      // once per code per session so a reload is not a second visit.
+      if (firstLaunchWith(share)) void fetch(`${API_BASE}/share/r/${share}?surface=tma`).catch(() => undefined);
       return;
     }
     const path = fightCampStartPath(startParam);
@@ -54,6 +55,17 @@ export function useFightCampStartApp(): void {
 }
 
 const CLAIMED_KEY = 'azf_share_claim_v1';
+const BEACON_KEY = 'azf_share_beacon_v1';
+
+function firstLaunchWith(code: string): boolean {
+  try {
+    if (sessionStorage.getItem(BEACON_KEY) === code) return false;
+    sessionStorage.setItem(BEACON_KEY, code);
+  } catch {
+    // No storage: count it; one extra open is the safe error.
+  }
+  return true;
+}
 
 /**
  * Credit a new, signed-in account to the Share Kit link it arrived through.

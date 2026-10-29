@@ -17,6 +17,7 @@ import { iso, isoOrNull, isUniqueViolation, type SqlDatabase, type SqlRunner } f
 import { ARCHIVED_SQUAD_NAME } from './types';
 import { PgGiftStore } from './gifts';
 import type {
+  ArmRow,
   AttributionRow,
   CheerPage,
   CheerRow,
@@ -474,12 +475,8 @@ export class PgEngageRepo implements EngageRepo {
 
   // ----- experiments -----
 
-  async assignArm(
-    userId: string,
-    experiment: 'early_cheers',
-    arm: ExperimentArm,
-    at: string,
-  ): Promise<{ arm: ExperimentArm; recorded: boolean }> {
+  async assignArm(row: ArmRow): Promise<{ arm: ExperimentArm; recorded: boolean }> {
+    const { userId, experiment, arm } = row;
     // Read first: after the first read of week one this is the only query. A
     // lost insert race reads the winner's row, committed once DO NOTHING returns.
     const held = async () =>
@@ -492,9 +489,9 @@ export class PgEngageRepo implements EngageRepo {
     const before = await held();
     if (before) return { arm: before, recorded: false };
     const { rows } = await this.db.query(
-      `INSERT INTO engage.experiment_arms (user_id, experiment, arm, assigned_at) VALUES ($1, $2, $3, $4)
+      `INSERT INTO engage.experiment_arms (user_id, experiment, arm, day_zero, assigned_at) VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (user_id, experiment) DO NOTHING RETURNING user_id`,
-      [userId, experiment, arm, at],
+      [userId, experiment, arm, row.dayZero, row.assignedAt],
     );
     if (rows.length > 0) return { arm, recorded: true };
     return { arm: (await held()) ?? arm, recorded: false };
@@ -652,12 +649,12 @@ export class PgEngageRepo implements EngageRepo {
     return rows.map((r) => r.user_id);
   }
 
-  async armsOf(experiment: 'early_cheers'): Promise<Array<{ userId: string; arm: ExperimentArm }>> {
-    const { rows } = await this.db.query<{ user_id: string; arm: ExperimentArm }>(
-      'SELECT user_id, arm FROM engage.experiment_arms WHERE experiment = $1',
+  async armsOf(experiment: 'early_cheers'): Promise<Array<Pick<ArmRow, 'userId' | 'arm' | 'dayZero'>>> {
+    const { rows } = await this.db.query<{ user_id: string; arm: ExperimentArm; day_zero: string }>(
+      'SELECT user_id, arm, day_zero::text AS day_zero FROM engage.experiment_arms WHERE experiment = $1',
       [experiment],
     );
-    return rows.map((r) => ({ userId: r.user_id, arm: r.arm }));
+    return rows.map((r) => ({ userId: r.user_id, arm: r.arm, dayZero: r.day_zero }));
   }
 
   async graceAppliedIn(seasonNumber: number): Promise<number> {
@@ -695,7 +692,7 @@ export class PgEngageRepo implements EngageRepo {
         q(`SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger WHERE user_id = $1 ORDER BY seq`),
         q(`SELECT local_date::text AS local_date, kind, sent_at FROM engage.nudge_log WHERE user_id = $1`),
         q(`SELECT kind, enabled, updated_at FROM engage.nudge_settings WHERE user_id = $1`),
-        q(`SELECT experiment, arm, assigned_at FROM engage.experiment_arms WHERE user_id = $1`),
+        q(`SELECT experiment, arm, day_zero::text AS day_zero, assigned_at FROM engage.experiment_arms WHERE user_id = $1`),
         q(`SELECT ${LINK_COLUMNS} FROM engage.share_links WHERE user_id = $1`),
         q(`SELECT share_code, squad_id, surface, created_at FROM engage.referral_attributions
            WHERE invitee_user_id = $1`),
@@ -741,8 +738,9 @@ export class PgEngageRepo implements EngageRepo {
         updatedAt: iso(r.updated_at),
       })),
       experiments: arms.map((r) => ({
-        experiment: String(r.experiment),
+        experiment: r.experiment as ArmRow['experiment'],
         arm: r.arm as ExperimentArm,
+        dayZero: String(r.day_zero),
         assignedAt: iso(r.assigned_at),
       })),
       shareLinks: links.map(toLink),

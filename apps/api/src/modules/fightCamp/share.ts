@@ -19,7 +19,7 @@ import { seasonFor, type ShareKindP1, type ShareLinkView, type ShareSummary, typ
 import { config } from '../../platform/config';
 import { getStore } from '../../platform/store';
 import { getProfile } from '../me/service';
-import { logEvent } from '../../platform/telemetry';
+import { logError, logEvent } from '../../platform/telemetry';
 import { fcEnabled } from './flags';
 import { engageRepo, type ShareLinkRow, type Surface } from './repo';
 import { adultMembers, displayNameOf } from './squads';
@@ -62,13 +62,32 @@ export async function shareLinkFor(
   throw new Error('Could not issue a share code');
 }
 
-/** A link was opened. Returns where to send the visitor; never fails. */
-export async function landOn(code: string, surface: Surface): Promise<string> {
+/**
+ * Link-preview fetchers (the chat apps unfurling a posted link) and other
+ * crawlers. They open a link every time it is posted, which would count as
+ * visits nobody made and drag share-to-install down.
+ */
+const PREVIEW_AGENT = /bot\b|crawl|spider|preview|facebookexternalhit|embedly|slack|whatsapp|discord|skype|curl|wget|python-requests|headless/i;
+
+export function isPreviewAgent(userAgent: string | undefined): boolean {
+  return !userAgent || PREVIEW_AGENT.test(userAgent);
+}
+
+/**
+ * A link was opened. Returns where to send the visitor. `count` is false for
+ * a preview fetcher: it still gets the redirect, it is just not a visit. The
+ * counter is best effort and never costs the visitor their ref.
+ */
+export async function landOn(code: string, surface: Surface, count = true): Promise<string> {
   const home = `${config.appPublicUrl}/`;
   const link = await engageRepo().shareLinkByCode(code);
   if (!link) return home;
-  await engageRepo().recordLanding(new Date().toISOString().slice(0, 10), link.kind, surface);
-  logEvent('share_link_landed', { kind: link.kind, surface });
+  if (count) {
+    await engageRepo()
+      .recordLanding(new Date().toISOString().slice(0, 10), link.kind, surface)
+      .catch((err: unknown) => logError(err, { route: 'share.landing' }));
+    logEvent('share_link_landed', { kind: link.kind, surface });
+  }
   return `${home}?ref=sh_${link.code}`;
 }
 

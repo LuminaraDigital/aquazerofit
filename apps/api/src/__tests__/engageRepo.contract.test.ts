@@ -434,11 +434,16 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
   describe('experiments', () => {
     it('records a person\u2019s arm once and hands that arm to every later call', async () => {
       const userId = uid('u');
-      expect(await repo.assignArm(userId, 'early_cheers', 'treatment', at(0))).toEqual({ arm: 'treatment', recorded: true });
-      expect(await repo.assignArm(userId, 'early_cheers', 'holdout', at(1))).toEqual({ arm: 'treatment', recorded: false });
+      const row = { userId, experiment: 'early_cheers' as const, dayZero: '2026-10-21' };
+      expect(await repo.assignArm({ ...row, arm: 'treatment', assignedAt: at(0) })).toEqual({ arm: 'treatment', recorded: true });
+      expect(await repo.assignArm({ ...row, arm: 'holdout', dayZero: '2026-10-22', assignedAt: at(1) })).toEqual({
+        arm: 'treatment',
+        recorded: false,
+      });
       expect((await repo.exportUser(userId)).experiments).toEqual([
-        { experiment: 'early_cheers', arm: 'treatment', assignedAt: at(0) },
+        { experiment: 'early_cheers', arm: 'treatment', dayZero: '2026-10-21', assignedAt: at(0) },
       ]);
+      expect(await repo.armsOf('early_cheers')).toContainEqual({ userId, arm: 'treatment', dayZero: '2026-10-21' });
     });
   });
 
@@ -495,8 +500,8 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       expect(await repo.enrolledUsers(9)).toContain(a);
 
       const t = uid('arm');
-      await repo.assignArm(t, 'early_cheers', 'treatment', at(0));
-      expect(await repo.armsOf('early_cheers')).toContainEqual({ userId: t, arm: 'treatment' });
+      await repo.assignArm({ userId: t, experiment: 'early_cheers', arm: 'treatment', dayZero: '2026-10-20', assignedAt: at(0) });
+      expect(await repo.armsOf('early_cheers')).toContainEqual({ userId: t, arm: 'treatment', dayZero: '2026-10-20' });
 
       const g = uid('grace');
       await repo.withGraceLedger(g, (l) =>
@@ -614,7 +619,7 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       await repo.withGraceLedger(owner, (ledger) => ledger.append([graceRow(owner)]));
       await repo.claimNudge(owner, '2026-10-20', 'cheer', at(0));
       await repo.setNudgeSetting(owner, 'cheer', false, at(0));
-      await repo.assignArm(owner, 'early_cheers', 'holdout', at(0));
+      await repo.assignArm({ userId: owner, experiment: 'early_cheers', arm: 'holdout', dayZero: '2026-10-20', assignedAt: at(0) });
       const code = `Ef${String(++seq).padStart(6, '0')}`;
       await repo.insertShareLink({ code, userId: owner, kind: 'belt', seasonNumber: 1, createdAt: at(0) });
       const invitee = uid('invitee');

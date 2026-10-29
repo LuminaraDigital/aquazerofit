@@ -174,7 +174,7 @@ setInterval(runReservationSweep, 6 * 3600 * 1000).unref();
 // hang nobody enjoys diagnosing, so the guard is stated rather than assumed.
 if (!config.isTest) {
   setInterval(runIdempotencySweep, config.idempotencySweepIntervalMs).unref();
-  startReminderScheduler();
+  if (config.reminderDeliveryEnabled) startReminderScheduler();
 }
 
 const server = app.listen(config.port, () => {

@@ -420,6 +420,19 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       expect(await repo.claimNudge(userId, '2026-10-21', 'cheer', at(2))).toBe(true);
     });
 
+    it('claims each reminder slot once per user per local day, and prunes past days', async () => {
+      const userId = uid('u');
+      expect(await repo.claimReminder(userId, '2026-10-20', 'meals', at(0))).toBe(true);
+      expect(await repo.claimReminder(userId, '2026-10-20', 'meals', at(1))).toBe(false);
+      expect(await repo.claimReminder(userId, '2026-10-20', 'water@11:00', at(2))).toBe(true);
+      expect(await repo.claimReminder(userId, '2026-10-21', 'meals', at(3))).toBe(true);
+      expect(await repo.claimReminder(uid('other'), '2026-10-20', 'meals', at(4))).toBe(true);
+      await repo.pruneReminders('2026-10-21');
+      expect((await repo.exportUser(userId)).reminders).toEqual([
+        { localDate: '2026-10-21', slot: 'meals', claimedAt: at(3) },
+      ]);
+    });
+
     it('stores a switched-off kind, and on again, per user', async () => {
       const userId = uid('u');
       expect(await repo.nudgeSettings(userId)).toEqual({});
@@ -619,6 +632,7 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       await repo.withGraceLedger(owner, (ledger) => ledger.append([graceRow(owner)]));
       await repo.claimNudge(owner, '2026-10-20', 'cheer', at(0));
       await repo.setNudgeSetting(owner, 'cheer', false, at(0));
+      await repo.claimReminder(owner, '2026-10-20', 'meals', at(0));
       await repo.assignArm({ userId: owner, experiment: 'early_cheers', arm: 'holdout', dayZero: '2026-10-20', assignedAt: at(0) });
       const code = `Ef${String(++seq).padStart(6, '0')}`;
       await repo.insertShareLink({ code, userId: owner, kind: 'belt', seasonNumber: 1, createdAt: at(0) });
@@ -638,6 +652,7 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
         grace: [],
         nudges: [],
         nudgeSettings: [],
+        reminders: [],
         experiments: [],
         shareLinks: [],
         attribution: null,

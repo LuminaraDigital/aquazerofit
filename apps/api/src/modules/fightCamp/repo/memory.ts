@@ -56,6 +56,7 @@ export class MemoryEngageRepo implements EngageRepo {
   private grace: GraceRow[] = [];
   private nudges: Array<{ userId: string; localDate: string; kind: string; sentAt: string }> = [];
   private nudgePrefs: Array<{ userId: string; kind: NudgeKind; enabled: boolean; updatedAt: string }> = [];
+  private reminders: Array<{ userId: string; localDate: string; slot: string; claimedAt: string }> = [];
   private arms: ArmRow[] = [];
   private links: ShareLinkRow[] = [];
   private attributions: AttributionRow[] = [];
@@ -340,6 +341,16 @@ export class MemoryEngageRepo implements EngageRepo {
     return true;
   }
 
+  async claimReminder(userId: string, localDate: string, slot: string, at: string): Promise<boolean> {
+    if (this.reminders.some((r) => r.userId === userId && r.localDate === localDate && r.slot === slot)) return false;
+    this.reminders.push({ userId, localDate, slot, claimedAt: at });
+    return true;
+  }
+
+  async pruneReminders(beforeLocalDate: string): Promise<void> {
+    this.reminders = this.reminders.filter((r) => r.localDate >= beforeLocalDate);
+  }
+
   async nudgeSettings(userId: string): Promise<Partial<Record<NudgeKind, boolean>>> {
     return Object.fromEntries(this.nudgePrefs.filter((p) => p.userId === userId).map((p) => [p.kind, p.enabled]));
   }
@@ -476,6 +487,9 @@ export class MemoryEngageRepo implements EngageRepo {
       nudgeSettings: this.nudgePrefs
         .filter((p) => p.userId === userId)
         .map(({ kind, enabled, updatedAt }) => ({ kind, enabled, updatedAt })),
+      reminders: this.reminders
+        .filter((r) => r.userId === userId)
+        .map(({ localDate, slot, claimedAt }) => ({ localDate, slot, claimedAt })),
       experiments: this.arms
         .filter((a) => a.userId === userId)
         .map(({ userId: _omit, ...rest }) => rest),
@@ -504,6 +518,7 @@ export class MemoryEngageRepo implements EngageRepo {
     this.grace = this.grace.filter((g) => g.userId !== userId);
     this.nudges = this.nudges.filter((n) => n.userId !== userId);
     this.nudgePrefs = this.nudgePrefs.filter((p) => p.userId !== userId);
+    this.reminders = this.reminders.filter((r) => r.userId !== userId);
     this.arms = this.arms.filter((a) => a.userId !== userId);
     const codes = new Set(this.links.filter((l) => l.userId === userId).map((l) => l.code));
     this.links = this.links.filter((l) => l.userId !== userId);

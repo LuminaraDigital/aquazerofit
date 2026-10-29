@@ -353,20 +353,25 @@ export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
  * What the Telegram reminders send and when (PUT /me/reminder-prefs). The
  * master `reminders` consent still decides whether anything sends at all.
  * `timezone` is the device's own zone, sent on every save, so "08:30" means
- * 08:30 where the person is now.
+ * 08:30 where the person is now. Water has no time of its own: it goes out
+ * twice a day at WATER_REMINDER_TIMES.
  */
 export const reminderPrefsSchema = z.object({
   meals: z.object({ enabled: z.boolean(), time: hhmmSchema }),
-  water: z.object({ enabled: z.boolean(), frequency: z.enum(['1h', '2h', '4h']) }),
+  water: z.object({ enabled: z.boolean() }),
   workout: z.object({ enabled: z.boolean(), time: hhmmSchema }),
   weighIn: z.object({ enabled: z.boolean(), day: z.enum(WEEKDAYS) }),
   timezone: timezoneSchema.optional(),
 });
 export type ReminderPrefs = z.infer<typeof reminderPrefsSchema>;
 
+/** Local times of the two daily water reminders, and of the weekly weigh-in. */
+export const WATER_REMINDER_TIMES = ['11:00', '15:00'] as const;
+export const WEIGH_IN_REMINDER_TIME = '09:00';
+
 export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
   meals: { enabled: true, time: '08:30' },
-  water: { enabled: true, frequency: '2h' },
+  water: { enabled: true },
   workout: { enabled: true, time: '17:00' },
   weighIn: { enabled: false, day: 'Monday' },
 };

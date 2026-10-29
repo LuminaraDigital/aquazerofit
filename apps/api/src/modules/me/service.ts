@@ -27,6 +27,7 @@ import {
 import { removeUserFromChallenges } from '../challenges/service';
 import { clearEmojiStatusOnErasure } from '../fightRecord/emojiStatus';
 import { engageRepo } from '../fightCamp/repo';
+import { savedReminderPrefs } from '../reminders/prefs';
 import { effectiveTier } from '../billing/entitlements';
 import { cancelStripeSubscriptions } from '../billing/stripe';
 import { addDays } from '../../platform/dates';
@@ -307,7 +308,7 @@ export async function exportUserData(userId: string): Promise<Record<string, unk
   };
   // Present once saved, like Fight Camp below: an account that never set
   // reminder times exports exactly what it did before they existed.
-  const reminderPrefs = store.byId('users', `remprefs-${userId}`);
+  const reminderPrefs = savedReminderPrefs(userId);
   if (reminderPrefs) bundle.reminderPrefs = reminderPrefs;
   for (const container of USER_SCOPED_CONTAINERS) {
     bundle[container] = store.where<{ id: string; userId?: string }>(

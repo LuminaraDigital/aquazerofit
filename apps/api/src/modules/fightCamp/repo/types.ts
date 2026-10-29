@@ -169,6 +169,7 @@ export interface EngageExport extends GiftExport {
   grace: GraceRow[];
   nudges: Array<{ localDate: string; kind: string; sentAt: string }>;
   nudgeSettings: Array<{ kind: NudgeKind; enabled: boolean; updatedAt: string }>;
+  reminders: Array<{ localDate: string; slot: string; claimedAt: string }>;
   experiments: Array<Omit<ArmRow, 'userId'>>;
   shareLinks: ShareLinkRow[];
   attribution: Omit<AttributionRow, 'inviteeUserId'> | null;
@@ -249,6 +250,12 @@ export interface EngageRepo {
   nudgeSettings(userId: string): Promise<Partial<Record<NudgeKind, boolean>>>;
   setNudgeSetting(userId: string, kind: NudgeKind, enabled: boolean, at: string): Promise<void>;
 
+  // ----- reminders (Settings > Notifications) -----
+  /** Claim one reminder slot for a local date. False when already claimed, by any instance. */
+  claimReminder(userId: string, localDate: string, slot: string, at: string): Promise<boolean>;
+  /** Drop claims for local dates before `localDate`; they no longer guard anything. */
+  pruneReminders(beforeLocalDate: string): Promise<void>;
+
   // ----- share kit -----
   shareLink(userId: string, kind: ShareKindP1, seasonNumber: number): Promise<ShareLinkRow | null>;
   insertShareLink(row: ShareLinkRow): Promise<InsertShareLinkOutcome>;
@@ -312,6 +319,7 @@ export const ENGAGE_TABLE_PRIVACY = {
   grace_ledger: { userData: true, exportedAs: 'grace', erasure: 'delete' },
   nudge_log: { userData: true, exportedAs: 'nudges', erasure: 'delete' },
   nudge_settings: { userData: true, exportedAs: 'nudgeSettings', erasure: 'delete' },
+  reminder_log: { userData: true, exportedAs: 'reminders', erasure: 'delete' },
   experiment_arms: { userData: true, exportedAs: 'experiments', erasure: 'delete' },
   share_landings: { userData: false },
   share_links: { userData: true, exportedAs: 'shareLinks', erasure: 'delete' },

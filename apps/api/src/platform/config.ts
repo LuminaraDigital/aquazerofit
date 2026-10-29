@@ -591,6 +591,15 @@ export const config = {
     return httpUrl(process.env.TELEGRAM_MINI_APP_URL, this.appPublicUrl, true);
   },
 
+  /**
+   * Kill switch for Telegram reminder delivery (modules/reminders). On unless
+   * REMINDER_DELIVERY is `off`, so stopping a misbehaving scheduler is an env
+   * change and a restart rather than a rollback.
+   */
+  get reminderDeliveryEnabled(): boolean {
+    return process.env.REMINDER_DELIVERY?.trim().toLowerCase() !== 'off';
+  },
+
   /** /terms links. Each falls back to a page on the public origin. */
   get termsUrl(): string {
     return httpUrl(process.env.TERMS_URL, publicPath('/terms'));

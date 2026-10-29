@@ -6,13 +6,25 @@
  * is sent; the per-category toggles and times (PUT /me/reminder-prefs) decide
  * what and when. The bot delivers them as Telegram messages.
  *
- * Every save carries the device's timezone, which is how the server knows
- * when 08:30 is for this person. Choices made before the server kept them sit
- * in localStorage and are carried over once, on the first visit after.
+ * The server's copy is read once and then this screen owns the choices: saves
+ * run one after another with the whole set, so the last edit is what the
+ * server keeps, and a reply arriving late can never undo a newer edit. Every
+ * save carries the device's timezone, which is how the server knows when
+ * 08:30 is for this person. Nothing is sent until the server holds a saved
+ * set, so the first visit saves what it shows (carrying over choices this
+ * device kept in localStorage before the server did, forgotten only once
+ * that save succeeds), and a visit from a new timezone saves the new zone.
  */
-import { useEffect, useState } from 'react';
-import { DEFAULT_REMINDER_PREFS, WEEKDAYS, type ReminderPrefs } from '@aquazerofit/shared';
-import { useConsents, useReminderPrefs, useSaveReminderPrefs, useUpdateConsents } from '../../lib/queries';
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  DEFAULT_REMINDER_PREFS,
+  WATER_REMINDER_TIMES,
+  WEEKDAYS,
+  WEIGH_IN_REMINDER_TIME,
+  type ReminderPrefs,
+} from '@aquazerofit/shared';
+import { useConsents, useMe, useReminderPrefs, useSaveReminderPrefs, useUpdateConsents } from '../../lib/queries';
 import { haptic } from '../../lib/telegram';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { BottomNav } from '../../components/ui/BottomNav';
@@ -30,9 +42,11 @@ function legacyPrefs(): ReminderPrefs | null {
     const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ReminderPrefs>;
+    // Only the switches and times: the old water frequency has no server
+    // meaning, and a stored value of the wrong type would fail validation.
     return {
       meals: { ...DEFAULT_REMINDER_PREFS.meals, ...parsed.meals },
-      water: { ...DEFAULT_REMINDER_PREFS.water, ...parsed.water },
+      water: { enabled: parsed.water?.enabled ?? DEFAULT_REMINDER_PREFS.water.enabled },
       workout: { ...DEFAULT_REMINDER_PREFS.workout, ...parsed.workout },
       weighIn: { ...DEFAULT_REMINDER_PREFS.weighIn, ...parsed.weighIn },
     };
@@ -63,29 +77,36 @@ export default function NotificationSettings() {
   const updateConsents = useUpdateConsents();
   const saved = useReminderPrefs();
   const saveReminderPrefs = useSaveReminderPrefs();
-  const [prefs, setPrefs] = useState<ReminderPrefs>(() => legacyPrefs() ?? DEFAULT_REMINDER_PREFS);
+  const telegramLinked = useMe().data?.telegramLinked;
+  /** Null until the server has answered; from then on this screen owns the choices. */
+  const [prefs, setPrefs] = useState<ReminderPrefs | null>(null);
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
 
   const masterOn = consents?.reminders ?? false;
 
-  function persist(next: ReminderPrefs) {
-    saveReminderPrefs.mutate(
-      { ...next, timezone: deviceTimeZone() },
-      { onError: () => toast.error('Could not save your reminder times. Try again.') },
+  /** Queue a save of the whole set; resolves whether it reached the server. */
+  function persist(next: ReminderPrefs): Promise<boolean> {
+    const run = saveQueue.current.then(() =>
+      saveReminderPrefs.mutateAsync({ ...next, timezone: deviceTimeZone() }).then(
+        () => true,
+        () => {
+          toast.error('Could not save your reminder times. Try again.');
+          return false;
+        },
+      ),
     );
+    saveQueue.current = run;
+    return run;
   }
 
   useEffect(() => {
-    if (!saved.isSuccess) return;
-    if (saved.data) {
-      setPrefs(saved.data);
-      return;
-    }
+    if (prefs || !saved.isSuccess) return;
     const legacy = legacyPrefs();
-    if (legacy) {
-      persist(legacy);
-      forgetLegacyPrefs();
-    }
-    // Only the server's answer should re-run this, not a new `persist` each render.
+    const initial = saved.data ?? legacy ?? DEFAULT_REMINDER_PREFS;
+    setPrefs(initial);
+    const needsSave = !saved.data || saved.data.timezone !== deviceTimeZone();
+    void (needsSave ? persist(initial) : Promise.resolve(true)).then((ok) => ok && forgetLegacyPrefs());
+    // Runs once, on the server's first answer; `persist` is a fresh closure each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saved.isSuccess, saved.data]);
 
@@ -93,10 +114,11 @@ export default function NotificationSettings() {
     key: K,
     patch: Partial<ReminderPrefs[K]>,
   ) {
+    if (!prefs) return;
     haptic('selection');
     const next = { ...prefs, [key]: { ...prefs[key], ...patch } };
     setPrefs(next);
-    persist(next);
+    void persist(next);
   }
 
   async function toggleMaster(value: boolean) {
@@ -108,8 +130,8 @@ export default function NotificationSettings() {
         anonymisedAnalytics: consents.anonymisedAnalytics,
         reminders: value,
       });
-      // Turning reminders on is the moment the server needs a timezone.
-      if (value) persist(prefs);
+      // Turning reminders on is the moment the server needs a current timezone.
+      if (value && prefs) void persist(prefs);
       haptic('success');
       toast.success(value ? 'Reminders enabled.' : 'Reminders disabled.');
     } catch {
@@ -128,10 +150,25 @@ export default function NotificationSettings() {
             info
           </span>
           <p className="text-sm text-on-surface-variant text-pretty">
-            Reminders arrive as Telegram messages from the AquaZeroFit bot, at these times where you
-            are. At most four a day, two of them water, and never between 9 pm and 8 am.
+            Reminders arrive as Telegram messages from the AquaZeroFit bot, at these times wherever
+            you are. Each comes once a day, water twice, and nothing is sent between 9 pm and 8 am.
           </p>
         </div>
+
+        {telegramLinked === false && (
+          <div className="glass-card mb-6 flex items-start gap-3 border border-outline-variant/40 p-4" role="note">
+            <span className="material-symbols-outlined text-on-surface-variant shrink-0" aria-hidden="true">
+              link_off
+            </span>
+            <p className="text-sm text-on-surface-variant text-pretty">
+              This account isn’t linked to Telegram yet, so reminders have nowhere to go.{' '}
+              <Link to="/settings" className="text-primary underline underline-offset-2">
+                Link Telegram in Settings
+              </Link>{' '}
+              to receive them.
+            </p>
+          </div>
+        )}
 
         <section className="mb-6">
           <h2 className="font-heading font-semibold uppercase tracking-wider text-xl text-primary mb-2">
@@ -173,7 +210,30 @@ export default function NotificationSettings() {
 
         <CheerMessagesSetting masterOn={masterOn} />
 
-        {/* Granular cards */}
+        {/* Granular cards: only once the server's copy is in, so an edit can never overwrite it with defaults */}
+        {!prefs ? (
+          saved.isError ? (
+            <div className="glass-card p-card-padding flex items-center justify-between gap-3" role="alert">
+              <p className="text-sm text-on-surface-variant">Could not load your reminder times.</p>
+              <button
+                type="button"
+                onClick={() => void saved.refetch()}
+                className="min-h-[44px] px-4 rounded-lg bg-surface-container-low text-primary font-semibold focus-visible:ring-2 focus-visible:ring-primary/50"
+              >
+                Try again
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4" aria-busy="true">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="glass-card p-card-padding space-y-2">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-3 w-56" />
+                </div>
+              ))}
+            </div>
+          )
+        ) : (
         <div className={`flex flex-col gap-4 ${masterOn ? '' : 'opacity-50'}`}>
           {/* Meal reminders */}
           <div className="glass-card p-card-padding flex flex-col gap-4">
@@ -205,13 +265,13 @@ export default function NotificationSettings() {
               >
                 Next alert
               </label>
-              <input
+              <TimeField
                 id="meal-time"
-                type="time"
+                label="Meal reminder time"
                 value={prefs.meals.time}
                 disabled={!masterOn || !prefs.meals.enabled}
-                onChange={(e) => e.target.value && update('meals', { time: e.target.value })}
-                className="bg-surface-container-low text-primary font-body font-bold border-none rounded-lg p-2 focus:ring-2 focus:ring-primary/50 cursor-pointer disabled:cursor-not-allowed"
+                onCommit={(time) => update('meals', { time })}
+                className="text-primary focus:ring-primary/50"
               />
             </div>
           </div>
@@ -240,23 +300,10 @@ export default function NotificationSettings() {
               />
             </div>
             <div className="flex items-center justify-between pt-2 border-t border-outline-variant/30">
-              <label
-                htmlFor="water-frequency"
-                className="text-sm font-medium text-on-surface-variant uppercase"
-              >
-                Frequency
-              </label>
-              <select
-                id="water-frequency"
-                value={prefs.water.frequency}
-                disabled={!masterOn || !prefs.water.enabled}
-                onChange={(e) => update('water', { frequency: e.target.value as '1h' | '2h' | '4h' })}
-                className="bg-surface-container-low text-secondary font-body font-bold border-none rounded-lg p-2 focus:ring-2 focus:ring-secondary/50 cursor-pointer disabled:cursor-not-allowed"
-              >
-                <option value="1h">Every 1 hour</option>
-                <option value="2h">Every 2 hours</option>
-                <option value="4h">Every 4 hours</option>
-              </select>
+              <span className="text-sm font-medium text-on-surface-variant uppercase">Times</span>
+              <span className="text-secondary font-body font-bold p-2 tabular-nums">
+                {WATER_REMINDER_TIMES.join(' and ')}
+              </span>
             </div>
           </div>
 
@@ -290,13 +337,13 @@ export default function NotificationSettings() {
               >
                 Session start
               </label>
-              <input
+              <TimeField
                 id="workout-time"
-                type="time"
+                label="Workout reminder time"
                 value={prefs.workout.time}
                 disabled={!masterOn || !prefs.workout.enabled}
-                onChange={(e) => e.target.value && update('workout', { time: e.target.value })}
-                className="bg-surface-container-low text-tertiary font-body font-bold border-none rounded-lg p-2 focus:ring-2 focus:ring-tertiary/50 cursor-pointer disabled:cursor-not-allowed"
+                onCommit={(time) => update('workout', { time })}
+                className="text-tertiary focus:ring-tertiary/50"
               />
             </div>
           </div>
@@ -329,7 +376,7 @@ export default function NotificationSettings() {
                 htmlFor="weighin-day"
                 className="text-sm font-medium text-on-surface-variant uppercase"
               >
-                Day
+                Day, at {WEIGH_IN_REMINDER_TIME}
               </label>
               <select
                 id="weighin-day"
@@ -347,6 +394,7 @@ export default function NotificationSettings() {
             </div>
           </div>
         </div>
+        )}
 
         <p className="mt-6 text-xs text-on-surface-variant text-center px-4">
           Your reminder choices are saved to your account and follow you to any device.
@@ -355,6 +403,44 @@ export default function NotificationSettings() {
 
       <BottomNav />
     </div>
+  );
+}
+
+/**
+ * A time input that keeps what is being typed to itself and commits only a
+ * complete HH:MM. A segment cleared mid-edit reads as '', which is neither
+ * saved nor allowed to snap the field back to the old value.
+ */
+function TimeField({
+  id,
+  label,
+  value,
+  disabled,
+  onCommit,
+  className,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  disabled: boolean;
+  onCommit: (time: string) => void;
+  className: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <input
+      id={id}
+      type="time"
+      aria-label={label}
+      value={draft}
+      disabled={disabled}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        if (/^\d{2}:\d{2}$/.test(e.target.value) && e.target.value !== value) onCommit(e.target.value);
+      }}
+      className={`bg-surface-container-low font-body font-bold border-none rounded-lg p-2 focus:ring-2 cursor-pointer disabled:cursor-not-allowed tabular-nums ${className}`}
+    />
   );
 }
 

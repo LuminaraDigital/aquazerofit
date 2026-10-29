@@ -37,7 +37,8 @@ import { starsAlreadyRefunded } from '../payments/stars';
 import { createStarsInvoiceLink, refundStarPayment } from '../payments/telegramBot';
 import { fcEnabled } from './flags';
 import { engageRepo, type GiftRow } from './repo';
-import { adultMembers, displayNameOf, telegramSafe } from './squads';
+import { adultMembers } from './squads';
+import { FORMER_MATE, displayNameOf, telegramSafe } from './people';
 
 const DAY_MS = 86_400_000;
 /** A gift link left unpaid this long is declined at checkout, like the other Stars invoices. */
@@ -289,7 +290,7 @@ export async function giftingStatus(userId: string, now: Date = new Date()): Pro
     stars,
     received:
       latest?.grantedAt
-        ? { fromName: latest.gifterUserId ? displayNameOf(latest.gifterUserId) : 'A former squad mate', grantedAt: latest.grantedAt }
+        ? { fromName: latest.gifterUserId ? displayNameOf(latest.gifterUserId) : FORMER_MATE, grantedAt: latest.grantedAt }
         : null,
   };
 }

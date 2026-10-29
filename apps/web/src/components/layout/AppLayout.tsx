@@ -20,7 +20,7 @@ const DesktopAmbient = lazy(() =>
 export function AppLayout() {
   const { pathname } = useLocation();
   // Inside the signed-in layout, so this only ever runs for an account.
-  useClaimShareAttribution(true);
+  useClaimShareAttribution();
   return (
     <>
       <Suspense fallback={null}>

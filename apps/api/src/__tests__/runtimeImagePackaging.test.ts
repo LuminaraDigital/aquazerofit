@@ -54,11 +54,13 @@ describe('runtime import smoke', () => {
     expect(result.stdout).toContain('zod resolved');
   });
 
+  // A child process walks the whole entry graph; in a full parallel run on a
+  // busy machine that takes longer than the default 5 s.
   it('resolves the API entry graph from this checkout', () => {
     const result = runSmoke(repoRoot);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain('zod resolved');
-  });
+  }, 30_000);
 });
 
 describe('cloud run packaging', () => {

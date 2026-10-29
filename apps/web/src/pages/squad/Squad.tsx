@@ -28,6 +28,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { useToast } from '@/components/ui/Toast';
 import { BeltBadge } from '@/components/fightRecord/BeltBadge';
+import { CheerButton } from '@/components/fightCamp/Cheers';
 import { BottomSheet } from '@/pages/training/BottomSheet';
 import { formatDate } from '@/lib/format';
 import { beltName, useFightCamp } from '@/lib/fightRecord';
@@ -71,7 +72,7 @@ export default function SquadPage() {
   } else if (!available) {
     return <Navigate to="/" replace />;
   } else {
-    body = squad.data ? <Member squad={squad.data} /> : <NoSquad />;
+    body = squad.data ? <Member squad={squad.data} canCheer={Boolean(camp.data?.cheers)} /> : <NoSquad />;
   }
 
   return (
@@ -205,7 +206,7 @@ export function ConsentSheet({
 
 // ---------- in a squad ----------
 
-function Member({ squad }: { squad: SquadView }) {
+function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
   const toast = useToast();
   const [leaving, setLeaving] = useState(false);
   const leave = useLeaveSquad();
@@ -261,7 +262,7 @@ function Member({ squad }: { squad: SquadView }) {
         )}
       </GlassCard>
 
-      <WeekBoard squad={squad} />
+      <WeekBoard squad={squad} canCheer={canCheer} />
       <ShowMyNumbers squad={squad} />
       {squad.me.role === 'owner' && <OwnerTools squad={squad} />}
 
@@ -364,7 +365,7 @@ function OwnerTools({ squad }: { squad: SquadView }) {
   );
 }
 
-function MemberRow({ member, rank }: { member: SquadMemberView; rank: number | null }) {
+function MemberRow({ member, rank, canCheer }: { member: SquadMemberView; rank: number | null; canCheer: boolean }) {
   return (
     <li className="flex min-h-[44px] items-center gap-3">
       <span className="w-6 text-center text-sm font-semibold tabular-nums text-on-surface-variant">
@@ -384,11 +385,12 @@ function MemberRow({ member, rank }: { member: SquadMemberView; rank: number | n
       <span className="shrink-0 text-sm tabular-nums text-on-surface">
         {member.weekActiveDays === null ? 'Hidden' : `${member.weekActiveDays} of 7`}
       </span>
+      {canCheer && !member.isMe && <CheerButton member={member} />}
     </li>
   );
 }
 
-function WeekBoard({ squad }: { squad: SquadView }) {
+function WeekBoard({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
   const { ranked, warmingUp, hidden } = squadBoard(squad.members);
   return (
     <GlassCard className="p-5">
@@ -399,7 +401,7 @@ function WeekBoard({ squad }: { squad: SquadView }) {
       {ranked.length > 0 && (
         <ol className="mt-3 space-y-2" aria-label="Showed up this week">
           {ranked.map(({ member, rank }) => (
-            <MemberRow key={member.ref} member={member} rank={rank} />
+            <MemberRow key={member.ref} member={member} rank={rank} canCheer={canCheer} />
           ))}
         </ol>
       )}
@@ -410,7 +412,7 @@ function WeekBoard({ squad }: { squad: SquadView }) {
           </h3>
           <ul className="mt-2 space-y-2">
             {warmingUp.map((member) => (
-              <MemberRow key={member.ref} member={member} rank={null} />
+              <MemberRow key={member.ref} member={member} rank={null} canCheer={canCheer} />
             ))}
           </ul>
         </>
@@ -422,7 +424,7 @@ function WeekBoard({ squad }: { squad: SquadView }) {
           </h3>
           <ul className="mt-2 space-y-2">
             {hidden.map((member) => (
-              <MemberRow key={member.ref} member={member} rank={null} />
+              <MemberRow key={member.ref} member={member} rank={null} canCheer={canCheer} />
             ))}
           </ul>
         </>

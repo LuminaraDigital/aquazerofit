@@ -118,6 +118,24 @@ export const squadCornerInputSchema = z.discriminatedUnion('action', [
 ]);
 export type SquadCornerInput = z.infer<typeof squadCornerInputSchema>;
 
+/** One tap, one of five fixed cheers. There is no free text to moderate. */
+export const sendCheerInputSchema = z.object({
+  to: memberRefSchema,
+  cheer: z.enum(CHEER_KINDS),
+});
+export type SendCheerInput = z.infer<typeof sendCheerInputSchema>;
+
+export const CHEERS_SEEN_MAX_IDS = 50;
+export const cheersSeenInputSchema = z.object({
+  ids: z.array(z.string().min(1).max(64)).max(CHEERS_SEEN_MAX_IDS),
+});
+
+/** Bot message kinds a person can switch off one by one (US-D3 AC2). */
+export const NUDGE_KINDS = ['cheer'] as const;
+export type NudgeKind = (typeof NUDGE_KINDS)[number];
+export const nudgeSettingsInputSchema = z.object({ cheer: z.boolean() });
+export type NudgeSettings = z.infer<typeof nudgeSettingsInputSchema>;
+
 // ---------- copy ----------
 
 /**
@@ -207,6 +225,8 @@ export interface SquadMemberView {
   beltTier: BeltTier | null;
   /** Active days this week, 0 to 7, or null when the member keeps them hidden. */
   weekActiveDays: number | null;
+  /** Whether the viewer has cheered this member today. False while cheers are off. */
+  cheeredToday: boolean;
 }
 
 export interface SquadView {
@@ -245,6 +265,17 @@ export type SquadCornerState = 'none' | 'joinable' | 'full' | 'member';
 export interface SquadCornerView {
   state: SquadCornerState;
   squad: SquadPeekView | null;
+}
+
+/** A cheer in the inbox. A coach's is always labelled automated (US-D2 AC2). */
+export interface CheerView {
+  id: string;
+  from:
+    | { kind: 'member'; displayName: string }
+    | { kind: 'coach'; coachName: string; automated: true };
+  cheer: CheerKind;
+  createdAt: string;
+  seen: boolean;
 }
 
 export interface SquadBoardRow {
@@ -343,4 +374,6 @@ export interface FightCampStatus {
    * `current: null` with the create and join actions available.
    */
   squads: { current: { id: string; name: string } | null } | null;
+  /** FC_CHEERS, for adults only: how many cheers are waiting to be seen. */
+  cheers: { unseen: number } | null;
 }

@@ -20,7 +20,7 @@
  * and the database in agreement, and makes "now" a decision made once per
  * request rather than once per statement.
  */
-import type { CheerKind, EnrolSource, ShareKindP1 } from '@aquazerofit/shared';
+import type { CheerKind, EnrolSource, NudgeKind, ShareKindP1 } from '@aquazerofit/shared';
 
 export interface EnrolmentRow {
   userId: string;
@@ -155,6 +155,7 @@ export interface EngageExport {
   cheersReceived: Array<Pick<CheerRow, 'id' | 'fromKind' | 'coachId' | 'cheer' | 'localDate' | 'createdAt' | 'seenAt'>>;
   grace: GraceRow[];
   nudges: Array<{ localDate: string; kind: string; sentAt: string }>;
+  nudgeSettings: Array<{ kind: NudgeKind; enabled: boolean; updatedAt: string }>;
   shareLinks: ShareLinkRow[];
   attribution: Omit<AttributionRow, 'inviteeUserId'> | null;
 }
@@ -215,6 +216,9 @@ export interface EngageRepo {
   // ----- nudges -----
   /** Claim the user's one nudge for a local date. False when already claimed. */
   claimNudge(userId: string, localDate: string, kind: string, at: string): Promise<boolean>;
+  /** Kinds the user switched off or back on; a kind with no row is on. */
+  nudgeSettings(userId: string): Promise<Partial<Record<NudgeKind, boolean>>>;
+  setNudgeSetting(userId: string, kind: NudgeKind, enabled: boolean, at: string): Promise<void>;
 
   // ----- share kit -----
   shareLink(userId: string, kind: ShareKindP1, seasonNumber: number): Promise<ShareLinkRow | null>;
@@ -263,6 +267,7 @@ export const ENGAGE_TABLE_PRIVACY = {
   },
   grace_ledger: { userData: true, exportedAs: 'grace', erasure: 'delete' },
   nudge_log: { userData: true, exportedAs: 'nudges', erasure: 'delete' },
+  nudge_settings: { userData: true, exportedAs: 'nudgeSettings', erasure: 'delete' },
   share_links: { userData: true, exportedAs: 'shareLinks', erasure: 'delete' },
   referral_attributions: { userData: true, exportedAs: 'attribution', erasure: 'delete' },
 } as const satisfies Record<

@@ -57,6 +57,7 @@ const CoachSelect = lazy(() => import('./pages/coach/CoachSelect'));
 const Challenges = lazy(() => import('./pages/challenges/Challenges'));
 const FightRecord = lazy(() => import('./pages/fightRecord/FightRecord'));
 const Squad = lazy(() => import('./pages/squad/Squad'));
+const Recap = lazy(() => import('./pages/fightRecord/Recap'));
 /* Public squad invite landing: shows what the invite is before sign-in. */
 const SquadJoin = lazy(() => import('./pages/squad/SquadJoin'));
 /* Public Share Kit link: hands the browser to the API's landing redirect. */
@@ -182,6 +183,7 @@ export default function App() {
           <Route path="/challenges" element={<Challenges />} />
           <Route path="/fight-record" element={<FightRecord />} />
           <Route path="/squad" element={<Squad />} />
+          <Route path="/fight-record/recap/:seasonNumber" element={<Recap />} />
           {/* Character select renders its own header and nav, like /settings. */}
           <Route path="/coach/select" element={<CoachSelect />} />
           {/* Renders its own header and nav, so it sits outside AppLayout -

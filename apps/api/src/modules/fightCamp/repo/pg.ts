@@ -138,7 +138,13 @@ async function activeIn(tx: SqlRunner, squadId: string): Promise<MemberRow[]> {
 }
 
 /** Leave inside an open transaction; shared by leaveSquad and eraseUser. */
-async function leaveWithin(tx: SqlRunner, squadId: string, userId: string, at: string): Promise<boolean> {
+async function leaveWithin(
+  tx: SqlRunner,
+  squadId: string,
+  userId: string,
+  at: string,
+  removed = false,
+): Promise<boolean> {
   // Locked first so a join or a second leave cannot interleave with the
   // ownership hand-over below.
   await lockSquad(tx, squadId);
@@ -148,9 +154,10 @@ async function leaveWithin(tx: SqlRunner, squadId: string, userId: string, at: s
   );
   if (rows.length === 0) return false;
   await tx.query(
-    `UPDATE engage.squad_members SET left_at = $3, role = 'member'
+    `UPDATE engage.squad_members
+     SET left_at = $3, role = 'member', removed_at = CASE WHEN $4 THEN $3::timestamptz ELSE removed_at END
      WHERE squad_id = $1 AND user_id = $2 AND left_at IS NULL`,
-    [squadId, userId, at],
+    [squadId, userId, at, removed],
   );
   const remaining = await activeIn(tx, squadId);
   if (rows[0]!.role === 'owner' && remaining[0]) {
@@ -292,6 +299,11 @@ export class PgEngageRepo implements EngageRepo {
           [member.userId, member.seasonNumber],
         );
         if (held.rows.length > 0) return { ok: false, reason: 'already_member' };
+        const removed = await tx.query(
+          'SELECT 1 FROM engage.squad_members WHERE squad_id = $1 AND user_id = $2 AND removed_at IS NOT NULL',
+          [squadId, member.userId],
+        );
+        if (removed.rows.length > 0) return { ok: false, reason: 'removed' };
         if ((await activeIn(tx, squadId)).length >= squad.maxMembers) return { ok: false, reason: 'full' };
         const { rows } = await tx.query(
           `INSERT INTO engage.squad_members (${MEMBER_COLUMNS})
@@ -320,8 +332,16 @@ export class PgEngageRepo implements EngageRepo {
     }
   }
 
-  async leaveSquad(squadId: string, userId: string, at: string): Promise<boolean> {
-    return this.db.transaction((tx) => leaveWithin(tx, squadId, userId, at));
+  async leaveSquad(squadId: string, userId: string, at: string, opts: { removed?: boolean } = {}): Promise<boolean> {
+    return this.db.transaction((tx) => leaveWithin(tx, squadId, userId, at, opts.removed === true));
+  }
+
+  async wasRemoved(squadId: string, userId: string): Promise<boolean> {
+    const { rows } = await this.db.query(
+      'SELECT 1 FROM engage.squad_members WHERE squad_id = $1 AND user_id = $2 AND removed_at IS NOT NULL',
+      [squadId, userId],
+    );
+    return rows.length > 0;
   }
 
   async setShowStats(squadId: string, userId: string, showStats: boolean): Promise<MemberRow | null> {

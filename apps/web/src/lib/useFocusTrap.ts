@@ -6,6 +6,12 @@ const FOCUSABLE =
 /**
  * Traps Tab inside `containerRef` while `active`, restores focus on teardown,
  * and calls `onEscape` when Escape is pressed.
+ *
+ * `onEscape` is read through a ref rather than listed as a dependency. Most
+ * callers pass an inline arrow, which is a new function on every render; as
+ * a dependency it re-ran the trap on each keystroke in a field inside the
+ * dialog, pulling focus back to the first control (and closing a phone's
+ * keyboard) after a single character.
  */
 export function useFocusTrap(
   active: boolean,
@@ -13,6 +19,8 @@ export function useFocusTrap(
   onEscape: () => void,
 ): void {
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const escape = useRef(onEscape);
+  escape.current = onEscape;
 
   useEffect(() => {
     if (!active) return;
@@ -30,7 +38,7 @@ export function useFocusTrap(
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onEscape();
+        escape.current();
         return;
       }
       if (e.key !== 'Tab' || !panel) return;
@@ -56,5 +64,5 @@ export function useFocusTrap(
       window.removeEventListener('keydown', onKey);
       previouslyFocused.current?.focus();
     };
-  }, [active, containerRef, onEscape]);
+  }, [active, containerRef]);
 }

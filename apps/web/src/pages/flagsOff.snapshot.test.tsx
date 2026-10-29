@@ -8,6 +8,9 @@
  * output), against the API's own responses from those commits
  * (apps/api/src/__tests__/__snapshots__/flagsOff.api.json):
  * no `fightCamp` block, so every Fight Camp addition must render nothing.
+ * notification-settings was re-recorded once since, when reminder delivery
+ * shipped: its "coming soon" banner and device-only footer were the only two
+ * lines that changed, and neither is Fight Camp's.
  * React's generated ids are the only thing normalised, since a component
  * added anywhere in the tree renumbers them without changing the page.
  *

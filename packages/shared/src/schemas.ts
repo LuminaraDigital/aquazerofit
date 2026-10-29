@@ -343,6 +343,34 @@ export const consentsSchema = z.object({
   reminders: z.boolean(),
 });
 
+// ---------- reminder preferences ----------
+
+const hhmmSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24-hour)');
+
+export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
+
+/**
+ * What the Telegram reminders send and when (PUT /me/reminder-prefs). The
+ * master `reminders` consent still decides whether anything sends at all.
+ * `timezone` is the device's own zone, sent on every save, so "08:30" means
+ * 08:30 where the person is now.
+ */
+export const reminderPrefsSchema = z.object({
+  meals: z.object({ enabled: z.boolean(), time: hhmmSchema }),
+  water: z.object({ enabled: z.boolean(), frequency: z.enum(['1h', '2h', '4h']) }),
+  workout: z.object({ enabled: z.boolean(), time: hhmmSchema }),
+  weighIn: z.object({ enabled: z.boolean(), day: z.enum(WEEKDAYS) }),
+  timezone: timezoneSchema.optional(),
+});
+export type ReminderPrefs = z.infer<typeof reminderPrefsSchema>;
+
+export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
+  meals: { enabled: true, time: '08:30' },
+  water: { enabled: true, frequency: '2h' },
+  workout: { enabled: true, time: '17:00' },
+  weighIn: { enabled: false, day: 'Monday' },
+};
+
 // ---------- query helpers ----------
 
 export const dateQuerySchema = z.object({

@@ -9,6 +9,7 @@ import {
   consentsSchema,
   profileSchema,
   linkTelegramSchema,
+  reminderPrefsSchema,
   setCredentialsSchema,
   updateIdentitySchema,
   type User,
@@ -22,6 +23,7 @@ import { getStore } from '../../platform/store';
 import { setCredentials } from '../auth/service';
 import { validateTelegramInitData } from '../auth/telegram';
 import { memoryRouter } from '../memory/router';
+import { savedReminderPrefs, saveReminderPrefs } from '../reminders/prefs';
 import { effectiveTier } from '../billing/entitlements';
 import {
   exportUserData,
@@ -127,6 +129,18 @@ meRouter.get('/consents', (req, res) => {
 meRouter.put('/consents', (req, res) => {
   const input = consentsSchema.parse(req.body);
   res.json({ consents: saveConsents(userIdOf(req), input) });
+});
+
+// What the Telegram reminders send and when. `null` until the first save, so
+// the Mini App can carry over choices it kept on the device before this
+// endpoint existed. The `reminders` consent above still decides if at all.
+meRouter.get('/reminder-prefs', (req, res) => {
+  res.json({ reminderPrefs: savedReminderPrefs(userIdOf(req)) });
+});
+
+meRouter.put('/reminder-prefs', (req, res) => {
+  const input = reminderPrefsSchema.parse(req.body);
+  res.json({ reminderPrefs: saveReminderPrefs(userIdOf(req), input) });
 });
 
 meRouter.get(

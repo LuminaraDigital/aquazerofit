@@ -304,6 +304,10 @@ export async function exportUserData(userId: string): Promise<Record<string, unk
     user,
     consents: getConsents(userId),
   };
+  // Present once saved, like Fight Camp below: an account that never set
+  // reminder times exports exactly what it did before they existed.
+  const reminderPrefs = store.byId('users', `remprefs-${userId}`);
+  if (reminderPrefs) bundle.reminderPrefs = reminderPrefs;
   for (const container of USER_SCOPED_CONTAINERS) {
     bundle[container] = store.where<{ id: string; userId?: string }>(
       container,

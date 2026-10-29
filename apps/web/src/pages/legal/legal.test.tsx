@@ -24,7 +24,7 @@ import {
 } from '@aquazerofit/shared';
 
 const mocks = vi.hoisted(() => ({ isTMA: vi.fn(() => false) }));
-vi.mock('../../lib/telegram', () => ({ isTMA: mocks.isTMA }));
+vi.mock('../../lib/telegram', () => ({ isTMA: mocks.isTMA, getTelegramStartParam: () => null }));
 
 import PrivacyPage from './Privacy';
 import GooglePlayPrivacyPage from './GooglePlayPrivacy';

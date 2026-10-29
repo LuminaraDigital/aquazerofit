@@ -58,7 +58,9 @@ on the items in PRD §8.
 
 ## Dependencies on other open work
 
-| Needs | Why |
+Both have merged into `staging`, and this stack sits on top of them:
+
+| Was waiting on | Now |
 |---|---|
-| PR #69 (`fix/retention-signup-day`), or any change that stores `users.timezone` | Bot nudges send only to people with a stored timezone (quiet hours cannot be judged otherwise), and the cheer day uses it. On this branch nothing stores it except `PATCH /me` with an explicit zone, which no client sends, so nudges stay silent until #69 lands. Failing silent is the intended direction |
-| PR #71 (`fix/ipv6-rate-limit-prefix`) | Buckets IPv6 by /64. Both touch `platform/rateLimiter.ts`; the second to merge rebases. Until then the peek, share and cheer lanes key IPv6 per address |
+| #69 (`fix/retention-signup-day`), which stores `users.timezone` | Merged. Bot nudges, which need a stored timezone to respect quiet hours, can send once `FC_CHEERS_ENABLED` is on; the cheer day uses it too |
+| #71 (`fix/ipv6-rate-limit-prefix`) | Merged. The peek, share and cheer rate lanes bucket IPv6 by /64 like every other lane |

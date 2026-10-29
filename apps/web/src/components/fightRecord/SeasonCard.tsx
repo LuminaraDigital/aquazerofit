@@ -78,13 +78,33 @@ export function SeasonCard() {
           <p className="text-xs tabular-nums text-on-surface-variant">
             {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left in the season
           </p>
-          <button
-            type="button"
-            onClick={() => navigate('/fight-record')}
-            className="rounded-lg px-2 py-1 text-sm font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-          >
-            Fight Record
-          </button>
+          {camp?.squads ? (
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => navigate('/squad')}
+                className="min-h-[44px] rounded-lg px-2 py-1 text-sm font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                {camp.squads.current ? 'Squad' : 'Find a squad'}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/fight-record')}
+                className="min-h-[44px] rounded-lg px-2 py-1 text-sm font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                Fight Record
+              </button>
+            </div>
+          ) : (
+            // Exactly the R1a markup while squads are off for the account.
+            <button
+              type="button"
+              onClick={() => navigate('/fight-record')}
+              className="rounded-lg px-2 py-1 text-sm font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              Fight Record
+            </button>
+          )}
         </div>
       </GlassCard>
       <BeltCelebration record={record} />

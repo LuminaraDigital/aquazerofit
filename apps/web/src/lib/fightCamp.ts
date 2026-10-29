@@ -6,11 +6,18 @@
  * ./fightRecord), so every write here refreshes that one cache entry rather
  * than keeping a second copy of the same state.
  */
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { EnrolSource, EnrolmentView } from '@aquazerofit/shared';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import type {
+  EnrolSource,
+  EnrolmentView,
+  SquadMemberView,
+  SquadPeekView,
+  SquadView,
+} from '@aquazerofit/shared';
 import { api } from './api';
 import { unwrap } from './envelopes';
 import { fightRecordKey, type FightRecordEnvelope } from './fightRecord';
+import { telegramStartAppUrl } from './telegramLink';
 
 export function useEnrol() {
   const qc = useQueryClient();
@@ -36,4 +43,93 @@ export function useEnrol() {
       ),
     onSettled: () => void qc.invalidateQueries({ queryKey: fightRecordKey }),
   });
+}
+
+// ---------- squads ----------
+
+/**
+ * Under ['progress'] like the Fight Record key, so a log anywhere refreshes
+ * the weekly board without new wiring.
+ */
+export const squadKey = ['progress', 'squad'] as const;
+
+/** Null while the caller has no squad this season. */
+export function useSquad(enabled = true): UseQueryResult<SquadView | null> {
+  return useQuery({
+    queryKey: squadKey,
+    queryFn: async () => unwrap<SquadView>(await api<unknown>('/squads/current'), 'squad'),
+    enabled,
+  });
+}
+
+/** The public invite preview. Null for a code that matches no live squad. */
+export async function peekSquad(code: string): Promise<SquadPeekView | null> {
+  const body = await api<{ squad: SquadPeekView | null }>(
+    `/squads/peek/${encodeURIComponent(code)}`,
+    { auth: false },
+  );
+  return body?.squad ?? null;
+}
+
+function useSquadWrite<TInput>(write: (input: TInput) => Promise<SquadView | null>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: write,
+    onSuccess: (squad) => qc.setQueryData(squadKey, squad),
+    onSettled: () => void qc.invalidateQueries({ queryKey: fightRecordKey }),
+  });
+}
+
+/** Both writes send `consent: true`: the server refuses them without it. */
+export function useCreateSquad() {
+  return useSquadWrite(async (name: string) =>
+    unwrap<SquadView>(await api<unknown>('/squads', { method: 'POST', body: { name, consent: true } }), 'squad'),
+  );
+}
+
+export function useJoinSquad() {
+  return useSquadWrite(async ({ code, via }: { code: string; via: 'code' | 'link' }) =>
+    unwrap<SquadView>(
+      await api<unknown>('/squads/join', { method: 'POST', query: { via }, body: { code, consent: true } }),
+      'squad',
+    ),
+  );
+}
+
+export function useLeaveSquad() {
+  return useSquadWrite(async (squadId: string) => {
+    await api<void>(`/squads/${encodeURIComponent(squadId)}/leave`, { method: 'POST' });
+    return null;
+  });
+}
+
+export function useShowMyNumbers(squadId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (showStats: boolean) =>
+      unwrap<SquadMemberView>(
+        await api<unknown>(`/squads/${encodeURIComponent(squadId)}/me`, {
+          method: 'PATCH',
+          body: { showStats },
+        }),
+        'member',
+      ),
+    onSuccess: (member, showStats) => {
+      if (!member) return;
+      qc.setQueryData<SquadView | null>(squadKey, (squad) =>
+        squad
+          ? {
+              ...squad,
+              me: { ...squad.me, showStats },
+              members: squad.members.map((m) => (m.ref === member.ref ? member : m)),
+            }
+          : squad,
+      );
+    },
+  });
+}
+
+/** t.me/<bot>/<app>?startapp=sq_<code>: opens the Mini App on the invite. */
+export function squadTelegramUrl(squad: Pick<SquadView, 'tgStartParam'>): string {
+  return telegramStartAppUrl(squad.tgStartParam);
 }

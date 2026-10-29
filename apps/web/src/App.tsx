@@ -55,6 +55,9 @@ const Coach = lazy(() => import('./pages/coach/Coach'));
 const CoachSelect = lazy(() => import('./pages/coach/CoachSelect'));
 const Challenges = lazy(() => import('./pages/challenges/Challenges'));
 const FightRecord = lazy(() => import('./pages/fightRecord/FightRecord'));
+const Squad = lazy(() => import('./pages/squad/Squad'));
+/* Public squad invite landing: shows what the invite is before sign-in. */
+const SquadJoin = lazy(() => import('./pages/squad/SquadJoin'));
 
 const PlanPage = lazy(() => import('./pages/upgrade/Plan'));
 
@@ -117,6 +120,7 @@ export default function App() {
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/sign-in" element={<SignIn />} />
         <Route path="/mobile/captcha" element={<MobileCaptchaPage />} />
+        <Route path="/s/:code" element={<SquadJoin />} />
 
         {/* `publicIndex` makes `/` the marketing front door for signed-out web
             visitors while leaving it the app's home for everyone else - see
@@ -166,6 +170,7 @@ export default function App() {
           <Route path="/progress/log-weight" element={<LogWeight />} />
           <Route path="/challenges" element={<Challenges />} />
           <Route path="/fight-record" element={<FightRecord />} />
+          <Route path="/squad" element={<Squad />} />
           {/* Character select renders its own header and nav, like /settings. */}
           <Route path="/coach/select" element={<CoachSelect />} />
           {/* Renders its own header and nav, so it sits outside AppLayout -

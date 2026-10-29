@@ -182,10 +182,30 @@ describe('runReminderTick', () => {
     saveReminderPrefs(noConsent.userId, prefs({ meals: { enabled: true, time: '10:00' } }));
     saveReminderPrefs(noZone.userId, { ...prefs({ meals: { enabled: true, time: '10:00' } }), timezone: undefined });
     saveReminderPrefs(night.userId, prefs({ meals: { enabled: true, time: '07:30' } }));
-    for (const hhmm of ['07:30', '07:59', '10:00']) await runReminderTick(at(hhmm));
+    // 08:00 to 08:14 is inside the 07:30 slot's window but outside quiet hours: still silent.
+    for (const hhmm of ['07:30', '07:59', '08:00', '08:10', '10:00']) await runReminderTick(at(hhmm));
     expect([unsaved, noConsent, noZone, night].flatMap((p) => to(p.tgId))).toEqual([]);
     // Reading the consent must not create one for someone who never chose.
     expect(getStore().byId('users', consentId(noConsent.userId))).toBeUndefined();
+  });
+
+  it('keeps going past a person whose claim throws', async () => {
+    const broken = await linked();
+    const fine = await linked();
+    for (const p of [broken, fine]) saveReminderPrefs(p.userId, prefs({ meals: { enabled: true, time: '10:00' } }));
+    const repo = engageRepo();
+    const claim = repo.claimReminder.bind(repo);
+    const spy = vi.spyOn(repo, 'claimReminder').mockImplementation(async (userId, ...rest) => {
+      if (userId === broken.userId) throw new Error('connection reset');
+      return claim(userId, ...rest);
+    });
+    try {
+      await runReminderTick(at('10:00'));
+    } finally {
+      spy.mockRestore();
+    }
+    expect(to(broken.tgId)).toEqual([]);
+    expect(to(fine.tgId)).toHaveLength(1);
   });
 
   it('does not retry a failed send inside the window', async () => {

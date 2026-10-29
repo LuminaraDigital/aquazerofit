@@ -61,7 +61,11 @@ const minutesOf = (hhmm: string): number => {
   return (h ?? 0) * 60 + (m ?? 0);
 };
 
-/** The reminders whose send window is open at this local time. The claim decides what actually sends. */
+/**
+ * The reminders whose send window is open at this local time. A slot set
+ * inside quiet hours never opens, rather than going out late at 08:00. The
+ * claim decides what actually sends.
+ */
 export function dueReminders(prefs: ReminderPrefs, minutes: number, weekday: string): DueReminder[] {
   const slots: Array<DueReminder & { time: string }> = [];
   if (prefs.meals.enabled) slots.push({ kind: 'meals', key: 'meals', time: prefs.meals.time });
@@ -73,6 +77,7 @@ export function dueReminders(prefs: ReminderPrefs, minutes: number, weekday: str
     for (const time of WATER_REMINDER_TIMES) slots.push({ kind: 'water', key: `water@${time}`, time });
   }
   return slots
+    .filter(({ time }) => !inQuietHours(Math.floor(minutesOf(time) / 60)))
     .filter(({ time }) => minutes >= minutesOf(time) && minutes < minutesOf(time) + SEND_WINDOW_MIN)
     .map(({ kind, key }) => ({ kind, key }));
 }
@@ -147,24 +152,38 @@ export async function runReminderTick(now: Date = new Date()): Promise<number> {
   // single slot has thousands of people in it; past that, late sends fall
   // out of the window and a small concurrency pool is the next step.
   for (const person of people) {
-    const prefs = savedReminderPrefs(person.id);
-    if (!prefs) continue;
-    const timeZone = prefs.timezone ?? person.timezone;
-    const clock = timeZone ? localClock(timeZone, now) : null;
-    if (!clock || inQuietHours(Math.floor(clock.minutes / 60))) continue;
-    for (const due of dueReminders(prefs, clock.minutes, clock.weekday)) {
-      if (!stillWanted(person.id)) break;
-      if (!(await repo.claimReminder(person.id, clock.localDate, due.key, now.toISOString()))) continue;
-      const result = await sendBotMessage(person.tgId!, TEXT[due.kind], {
-        parseMode: 'plain',
-        buttons: [{ text: 'Open AquaZeroFit', webAppUrl: config.telegramMiniAppUrl }],
-      });
-      logEvent(result.ok ? 'reminder_sent' : 'reminder_failed', { kind: due.kind });
-      if (result.ok) sent += 1;
+    try {
+      sent += await remindPerson(person, now);
+    } catch (err) {
+      // A database blip or a malformed document skips this person for this
+      // tick; the next tick is still inside the window.
+      logEvent('reminder_failed', { kind: 'tick' });
+      console.error('[reminders] person skipped', err);
     }
   }
   // Claims only guard their own day; two days' slack covers zones ahead of UTC.
   if (now.getUTCMinutes() === 0) await repo.pruneReminders(addDays(now.toISOString().slice(0, 10), -2));
+  return sent;
+}
+
+/** Send this person's due reminders. Resolves how many went out. */
+async function remindPerson(person: User, now: Date): Promise<number> {
+  const prefs = savedReminderPrefs(person.id);
+  if (!prefs) return 0;
+  const timeZone = prefs.timezone ?? person.timezone;
+  const clock = timeZone ? localClock(timeZone, now) : null;
+  if (!clock || inQuietHours(Math.floor(clock.minutes / 60))) return 0;
+  let sent = 0;
+  for (const due of dueReminders(prefs, clock.minutes, clock.weekday)) {
+    if (!stillWanted(person.id)) break;
+    if (!(await engageRepo().claimReminder(person.id, clock.localDate, due.key, now.toISOString()))) continue;
+    const result = await sendBotMessage(person.tgId!, TEXT[due.kind], {
+      parseMode: 'plain',
+      buttons: [{ text: 'Open AquaZeroFit', webAppUrl: config.telegramMiniAppUrl }],
+    });
+    logEvent(result.ok ? 'reminder_sent' : 'reminder_failed', { kind: due.kind });
+    if (result.ok) sent += 1;
+  }
   return sent;
 }
 

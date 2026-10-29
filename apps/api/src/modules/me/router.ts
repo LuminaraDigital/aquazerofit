@@ -24,7 +24,7 @@ import { setCredentials } from '../auth/service';
 import { validateTelegramInitData } from '../auth/telegram';
 import { memoryRouter } from '../memory/router';
 import { savedReminderPrefs, saveReminderPrefs } from '../reminders/prefs';
-import { effectiveTier } from '../billing/entitlements';
+import { effectiveTier, entitlementHistory } from '../billing/entitlements';
 import {
   exportUserData,
   getConsents,
@@ -84,6 +84,9 @@ meRouter.get(
       maxBankedCredits: maxBankedCreditsFor(tier),
       costs: CREDIT_COSTS,
       premiumLanes: PREMIUM_LANES,
+      // Which rail the latest entitlement came from, so the plan page offers
+      // Stripe's billing portal only to the people Stripe is billing.
+      billingSource: entitlementHistory(userId)[0]?.source ?? null,
     });
   }),
 );

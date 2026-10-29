@@ -84,12 +84,13 @@ function isJwtLike(token: string): boolean {
   return parts.every((part) => part.length > 0 && base64url.test(part));
 }
 
+/** A miss when the SDK will not load too, so the cookie and Telegram paths still run. */
 async function tryFirebaseRefresh(): Promise<boolean> {
   if (!isFirebaseAuthEnabled()) return false;
-  const sdk = await loadFirebaseSdk();
-  const user = sdk.auth?.currentUser;
-  if (!user) return false;
   try {
+    const sdk = await loadFirebaseSdk();
+    const user = sdk.auth?.currentUser;
+    if (!user) return false;
     const token = await user.getIdToken(true);
     tokenStore.set({ accessToken: token });
     return true;

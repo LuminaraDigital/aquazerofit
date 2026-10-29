@@ -60,6 +60,11 @@ export interface Entitlements {
   maxBankedCredits?: number;
   costs: Record<CreditTask, number>;
   premiumLanes: ModelGroup[];
+  /**
+   * The rail behind the latest entitlement; 'stripe' means the subscription is
+   * managed in Stripe's billing portal. Optional for APIs from before it.
+   */
+  billingSource?: 'play' | 'stripe' | 'stars' | 'admin' | null;
 }
 
 export const queryKeys = {
@@ -237,6 +242,18 @@ export function useBillingConfig(): UseQueryResult<BillingConfig> {
 export function useStartStripeCheckout() {
   return useMutation({
     mutationFn: () => api<{ url: string }>('/billing/stripe/checkout', { method: 'POST' }),
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+}
+
+/**
+ * POST /billing/stripe/portal, then leave for Stripe's billing portal, which
+ * returns to /plan. A mutation is safe here, unlike the sync below: it fires
+ * from a click, never from an effect.
+ */
+export function useOpenStripePortal() {
+  return useMutation({
+    mutationFn: () => api<{ url: string }>('/billing/stripe/portal', { method: 'POST' }),
     onSuccess: ({ url }) => window.location.assign(url),
   });
 }

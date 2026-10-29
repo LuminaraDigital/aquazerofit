@@ -1,0 +1,745 @@
+{
+  "fightRecordOff": {
+    "fightRecord": null
+  },
+  "fightRecordOn": {
+    "fightRecord": {
+      "current": {
+        "season": {
+          "id": "season-1",
+          "number": 1,
+          "name": "Fight Camp",
+          "startsOn": "2026-10-19",
+          "endsOn": "2026-12-13"
+        },
+        "activeDays": 25,
+        "daysLeft": 26,
+        "tier": "purple",
+        "next": {
+          "tier": "brown",
+          "activeDays": 36
+        }
+      },
+      "ladder": [
+        {
+          "tier": "white",
+          "activeDays": 3
+        },
+        {
+          "tier": "blue",
+          "activeDays": 12
+        },
+        {
+          "tier": "purple",
+          "activeDays": 24
+        },
+        {
+          "tier": "brown",
+          "activeDays": 36
+        },
+        {
+          "tier": "black",
+          "activeDays": 48
+        }
+      ],
+      "belts": [
+        {
+          "id": "s1-purple",
+          "seasonNumber": 1,
+          "seasonName": "Fight Camp",
+          "tier": "purple",
+          "awardedAt": "2026-11-18T10:00:00.000Z"
+        }
+      ],
+      "celebrate": {
+        "id": "s1-purple",
+        "seasonNumber": 1,
+        "seasonName": "Fight Camp",
+        "tier": "purple",
+        "awardedAt": "2026-11-18T10:00:00.000Z"
+      },
+      "adult": true,
+      "emojiStatus": {
+        "available": false,
+        "enabled": false
+      }
+    }
+  },
+  "progressSummary": {
+    "currentWeightKg": null,
+    "startWeightKg": null,
+    "targetWeightKg": null,
+    "weightSeries": [],
+    "streakDays": 2,
+    "consistency": {
+      "currentDays": 8,
+      "bestDays": 10,
+      "activeDays": 22,
+      "windowDays": 28,
+      "graceRemaining": 0,
+      "state": "steady",
+      "lastActiveDate": "2026-11-18"
+    },
+    "workoutsCompleted": 0,
+    "totalKcalBurned": 0,
+    "achievements": [
+      {
+        "definition": {
+          "id": "ach-first-meal",
+          "type": "achievementDefinition",
+          "name": "First Bite",
+          "description": "Log your very first meal.",
+          "icon": "restaurant",
+          "rule": {
+            "kind": "firstAction",
+            "action": "mealLog"
+          }
+        },
+        "earnedAt": "2026-10-19T12:00:00.000Z"
+      },
+      {
+        "definition": {
+          "id": "ach-first-weighin",
+          "type": "achievementDefinition",
+          "name": "On the Record",
+          "description": "Record your first weigh-in.",
+          "icon": "monitor_weight",
+          "rule": {
+            "kind": "firstAction",
+            "action": "weightLog"
+          }
+        },
+        "earnedAt": null
+      },
+      {
+        "definition": {
+          "id": "ach-first-workout",
+          "type": "achievementDefinition",
+          "name": "Off the Couch",
+          "description": "Complete your first workout.",
+          "icon": "fitness_center",
+          "rule": {
+            "kind": "firstAction",
+            "action": "workout"
+          }
+        },
+        "earnedAt": null
+      },
+      {
+        "definition": {
+          "id": "ach-meals-50",
+          "type": "achievementDefinition",
+          "name": "Kitchen Regular",
+          "description": "Log 50 meals in total.",
+          "icon": "menu_book",
+          "rule": {
+            "kind": "mealsLogged",
+            "count": 50
+          }
+        },
+        "earnedAt": null
+      },
+      {
+        "definition": {
+          "id": "ach-profile-complete",
+          "type": "achievementDefinition",
+          "name": "Dialled In",
+          "description": "Complete your wellness profile.",
+          "icon": "badge",
+          "rule": {
+            "kind": "firstAction",
+            "action": "profile"
+          }
+        },
+        "earnedAt": "2026-11-18T10:00:00.000Z"
+      },
+      {
+        "definition": {
+          "id": "ach-streak-3",
+          "type": "achievementDefinition",
+          "name": "Warming Up",
+          "description": "Keep a 3-day logging streak.",
+          "icon": "local_fire_department",
+          "rule": {
+            "kind": "streak",
+            "days": 3
+          }
+        },
+        "earnedAt": "2026-11-18T00:00:00.000Z"
+      },
+      {
+        "definition": {
+          "id": "ach-streak-30",
+          "type": "achievementDefinition",
+          "name": "Habit Formed",
+          "description": "Keep a 30-day logging streak.",
+          "icon": "military_tech",
+          "rule": {
+            "kind": "streak",
+            "days": 30
+          }
+        },
+        "earnedAt": null
+      },
+      {
+        "definition": {
+          "id": "ach-streak-7",
+          "type": "achievementDefinition",
+          "name": "One Week Wonder",
+          "description": "Keep a 7-day logging streak.",
+          "icon": "whatshot",
+          "rule": {
+            "kind": "streak",
+            "days": 7
+          }
+        },
+        "earnedAt": "2026-11-18T00:00:00.000Z"
+      },
+      {
+        "definition": {
+          "id": "ach-weightloss-1",
+          "type": "achievementDefinition",
+          "name": "First Kilo Down",
+          "description": "Lose your first kilogram.",
+          "icon": "trending_down",
+          "rule": {
+            "kind": "weightLoss",
+            "kg": 1
+          }
+        },
+        "earnedAt": null
+      },
+      {
+        "definition": {
+          "id": "ach-weightloss-5",
+          "type": "achievementDefinition",
+          "name": "Five Down",
+          "description": "Lose five kilograms in total.",
+          "icon": "emoji_events",
+          "rule": {
+            "kind": "weightLoss",
+            "kg": 5
+          }
+        },
+        "earnedAt": null
+      },
+      {
+        "definition": {
+          "id": "ach-workouts-10",
+          "type": "achievementDefinition",
+          "name": "Ten Strong",
+          "description": "Complete 10 workouts.",
+          "icon": "exercise",
+          "rule": {
+            "kind": "workoutsCompleted",
+            "count": 10
+          }
+        },
+        "earnedAt": null
+      }
+    ]
+  },
+  "progression": {
+    "experience": {
+      "totalXp": 750,
+      "level": 5,
+      "rank": {
+        "id": "prospect",
+        "name": "Prospect",
+        "minLevel": 5
+      },
+      "levelStartXp": 750,
+      "nextLevelXp": 1125,
+      "levelProgress": 0,
+      "earnedToday": 30,
+      "todayBreakdown": [
+        {
+          "kind": "activeDay",
+          "label": "Showed up",
+          "points": 20
+        },
+        {
+          "kind": "mealLog",
+          "label": "Meals logged",
+          "points": 10
+        }
+      ],
+      "dailyCapReached": false
+    },
+    "activeCoachId": "akin",
+    "bondXp": 750,
+    "bondLevel": 4,
+    "reactions": [
+      {
+        "coachId": "akin",
+        "kind": "rankUp",
+        "text": "Prospect. You climbed there logging ordinary days. That's the whole trick, and most people never find it.",
+        "expression": "celebrate"
+      },
+      {
+        "coachId": "akin",
+        "kind": "achievement",
+        "text": "One Week Wonder — logged and yours. I'm properly pleased about this one.",
+        "expression": "celebrate"
+      },
+      {
+        "coachId": "akin",
+        "kind": "achievement",
+        "text": "Warming Up — logged and yours. I'm properly pleased about this one.",
+        "expression": "celebrate"
+      }
+    ]
+  },
+  "exported": {
+    "exportedAt": "2026-11-18T10:00:00.000Z",
+    "user": {
+      "id": "<user>",
+      "email": "flags-off@example.com",
+      "emailVerified": true,
+      "role": "user",
+      "tier": "free",
+      "displayName": "Rizal Noor",
+      "createdAt": "2026-11-18T10:00:00.000Z",
+      "deletionRequestedAt": null,
+      "timezone": "UTC"
+    },
+    "consents": {
+      "id": "consent-<user>",
+      "type": "consent",
+      "userId": "<user>",
+      "wellnessDataProcessing": false,
+      "aiPersonalisation": false,
+      "anonymisedAnalytics": false,
+      "reminders": false,
+      "updatedAt": "2026-11-18T10:00:00.000Z"
+    },
+    "profiles": [
+      {
+        "id": "profile-<user>",
+        "type": "wellnessProfile",
+        "userId": "<user>",
+        "age": 30
+      },
+      {
+        "type": "coachState",
+        "id": "coachState:<user>",
+        "userId": "<user>",
+        "activeCoachId": "akin",
+        "baselineXp": 0,
+        "accrued": {},
+        "purchased": [],
+        "seenLevel": 1,
+        "seenRankId": "rookie",
+        "seenAchievementIds": [],
+        "selectedAt": "2026-11-18T10:00:00.000Z",
+        "updatedAt": "2026-11-18T10:00:00.000Z",
+        "pendingDelivery": {
+          "level": 5,
+          "rankId": "prospect",
+          "achievementIds": [
+            "ach-streak-7",
+            "ach-streak-3"
+          ]
+        }
+      }
+    ],
+    "logs": [
+      {
+        "id": "ml-flags-off-0",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-19",
+        "loggedAt": "2026-10-19T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-1",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-20",
+        "loggedAt": "2026-10-20T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-2",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-21",
+        "loggedAt": "2026-10-21T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-4",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-23",
+        "loggedAt": "2026-10-23T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-5",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-24",
+        "loggedAt": "2026-10-24T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-6",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-25",
+        "loggedAt": "2026-10-25T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-7",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-26",
+        "loggedAt": "2026-10-26T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-9",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-28",
+        "loggedAt": "2026-10-28T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-10",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-29",
+        "loggedAt": "2026-10-29T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-11",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-30",
+        "loggedAt": "2026-10-30T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-12",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-10-31",
+        "loggedAt": "2026-10-31T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-13",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-01",
+        "loggedAt": "2026-11-01T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-15",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-03",
+        "loggedAt": "2026-11-03T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-17",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-05",
+        "loggedAt": "2026-11-05T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-18",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-06",
+        "loggedAt": "2026-11-06T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-19",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-07",
+        "loggedAt": "2026-11-07T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-20",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-08",
+        "loggedAt": "2026-11-08T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-22",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-10",
+        "loggedAt": "2026-11-10T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-23",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-11",
+        "loggedAt": "2026-11-11T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-24",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-12",
+        "loggedAt": "2026-11-12T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-25",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-13",
+        "loggedAt": "2026-11-13T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-26",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-14",
+        "loggedAt": "2026-11-14T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-27",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-15",
+        "loggedAt": "2026-11-15T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-29",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-17",
+        "loggedAt": "2026-11-17T12:00:00.000Z"
+      },
+      {
+        "id": "ml-flags-off-30",
+        "userId": "<user>",
+        "type": "mealLog",
+        "mealType": "lunch",
+        "items": [],
+        "totalKcal": 640,
+        "totalProteinG": 30,
+        "totalCarbsG": 70,
+        "totalFatG": 20,
+        "source": "manual",
+        "localDate": "2026-11-18",
+        "loggedAt": "2026-11-18T12:00:00.000Z"
+      },
+      {
+        "id": "belt-<user>-s1-white",
+        "type": "beltAward",
+        "userId": "<user>",
+        "seasonId": "season-1",
+        "seasonNumber": 1,
+        "tier": "white",
+        "activeDays": 3,
+        "awardedAt": "2026-11-18T10:00:00.000Z"
+      },
+      {
+        "id": "belt-<user>-s1-blue",
+        "type": "beltAward",
+        "userId": "<user>",
+        "seasonId": "season-1",
+        "seasonNumber": 1,
+        "tier": "blue",
+        "activeDays": 12,
+        "awardedAt": "2026-11-18T10:00:00.000Z"
+      },
+      {
+        "id": "belt-<user>-s1-purple",
+        "type": "beltAward",
+        "userId": "<user>",
+        "seasonId": "season-1",
+        "seasonNumber": 1,
+        "tier": "purple",
+        "activeDays": 24,
+        "awardedAt": "2026-11-18T10:00:00.000Z"
+      }
+    ],
+    "plans": [],
+    "ai": [],
+    "ledger": [],
+    "audit": [
+      {
+        "id": "aud_<id>",
+        "userId": "<user>",
+        "type": "authEvent",
+        "action": "register",
+        "detail": {
+          "emailHash": "<secret>"
+        },
+        "ip": "::ffff:127.0.0.1",
+        "createdAt": "2026-11-18T10:00:00.000Z"
+      }
+    ]
+  }
+}

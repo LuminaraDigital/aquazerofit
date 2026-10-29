@@ -27,6 +27,7 @@ import { enrol } from './enrolment';
 import { requireFeature, requireFeatureSwitch } from './flags';
 import { prepareSquadInvite, squadCorner } from './corner';
 import { cheerInbox, decodeCursor, markCheersSeen, sendCheer } from './cheers';
+import { syncEarlyCheers } from './earlyCheers';
 import { engageRepo } from './repo';
 import { syncGrace } from './grace';
 import {
@@ -197,7 +198,10 @@ cheersRouter.post(
 cheersRouter.get(
   '/',
   asyncHandler(async (req, res) => {
-    res.json(await cheerInbox(userIdOf(req), decodeCursor(req.query.cursor), todayFor(req)));
+    const userId = userIdOf(req);
+    const today = todayFor(req);
+    await syncEarlyCheers(userId, today);
+    res.json(await cheerInbox(userId, decodeCursor(req.query.cursor), today));
   }),
 );
 

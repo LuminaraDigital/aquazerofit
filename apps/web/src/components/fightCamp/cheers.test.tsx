@@ -32,6 +32,7 @@ const RIZAL: SquadMemberView = {
   beltTier: 'white',
   weekActiveDays: null,
   cheeredToday: false,
+  welcome: false,
 };
 
 describe('CheerButton', () => {
@@ -55,6 +56,40 @@ describe('CheerButton', () => {
     renderWithClient(<CheerButton member={{ ...RIZAL, cheeredToday: true }} />);
     expect(screen.getByText('Sent today')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Cheer Rizal' })).toBeNull();
+  });
+});
+
+describe('the just-joined prompt', () => {
+  it('offers one cheer for a new squad mate, and is gone once sent', async () => {
+    const { default: SquadPage } = await import('@/pages/squad/Squad');
+    const squad = {
+      id: 'sqd-1',
+      name: 'Corner Crew',
+      seasonNumber: 3,
+      inviteCode: 'SQD-ABC2345678',
+      inviteUrl: 'https://aquazerofit.com/s/SQD-ABC2345678',
+      tgStartParam: 'sq_SQD-ABC2345678',
+      isCorner: false,
+      weekStart: '2027-03-15',
+      members: [
+        { ...RIZAL, ref: 'm_aaaaaaaaaaaa', displayName: 'Mia', isMe: true, role: 'owner' as const },
+        { ...RIZAL, welcome: true },
+      ],
+      me: { ref: 'm_aaaaaaaaaaaa', showStats: false, role: 'owner' as const },
+    };
+    mocks.api.mockImplementation(async (path: string) => {
+      if (path === '/fight-record') {
+        return { fightRecord: recordWith(), fightCamp: campWith({ squads: { current: { id: 'sqd-1', name: 'Corner Crew' } }, cheers: { unseen: 0 } }) };
+      }
+      if (path === '/squads/current') return { squad };
+      if (path === '/cheers') return { cheer: { id: 'c1', cheer: 'clap', createdAt: '' } };
+      return null;
+    });
+    renderWithClient(<SquadPage />);
+    expect(await screen.findByText('just joined. Send a cheer?', { exact: false })).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cheer Rizal' })[0]!);
+    fireEvent.click(await screen.findByRole('button', { name: 'Send clap cheer to Rizal' }));
+    await waitFor(() => expect(screen.queryByText('just joined. Send a cheer?', { exact: false })).toBeNull());
   });
 });
 

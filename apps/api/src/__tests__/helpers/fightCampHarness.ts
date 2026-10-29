@@ -23,6 +23,8 @@ export interface FightCampHarness {
   app: Express;
   base: string;
   register(displayName: string, opts?: { age?: number | null; timezone?: string }): Promise<Person>;
+  /** The same person with an access token minted now: for tests that move a pinned clock by days. */
+  refresh(person: Person, timezone?: string): Promise<Person>;
   setAge(userId: string, age: number | null): void;
   /** A meal log on each date: the cheapest way to make a day active. */
   seedActive(userId: string, dates: readonly string[]): void;
@@ -58,10 +60,16 @@ export async function fightCampHarness(label: string): Promise<FightCampHarness>
     getStore().upsert('profiles', { ...(existing ?? { id, type: 'wellnessProfile', userId }), age });
   }
 
+  const { signAccess } = await import('../../platform/auth');
+
   return {
     app,
     base,
     setAge,
+    async refresh(person, timezone = 'UTC') {
+      const token = signAccess({ id: person.userId, role: 'user', tier: 'free', premiumUntil: null });
+      return { ...person, token, auth: () => ({ Authorization: `Bearer ${token}`, 'X-Timezone': timezone }) };
+    },
     async register(displayName, opts = {}) {
       emailSeq += 1;
       const res = await request(app)

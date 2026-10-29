@@ -47,6 +47,9 @@ design/
 content/
 evals/
 tools/
+# The kill report builder: the API metrics test imports it at image build.
+!tools/engage/
+!tools/engage/**
 # prompts/ is NOT excluded: the API loads the P-*.md prompt files at boot.
 
 # Reports and planning artifacts. prompts/*.md must survive: loadPrompt reads

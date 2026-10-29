@@ -31,6 +31,7 @@ import type {
   MemberRow,
   ShareLinkRow,
   SquadRow,
+  Surface,
 } from './types';
 
 type Row = Record<string, unknown>;
@@ -593,6 +594,74 @@ export class PgEngageRepo implements EngageRepo {
       [userId],
     );
     return rows.map((r) => r.invitee_user_id);
+  }
+
+  // ----- metrics -----
+
+  async recordLanding(day: string, kind: ShareKindP1, surface: Surface): Promise<void> {
+    await this.db.query(
+      `INSERT INTO engage.share_landings (day, kind, surface, opens) VALUES ($1, $2, $3, 1)
+       ON CONFLICT (day, kind, surface) DO UPDATE SET opens = engage.share_landings.opens + 1`,
+      [day, kind, surface],
+    );
+  }
+
+  async landingsSince(day: string): Promise<number> {
+    const { rows } = await this.db.query<{ n: number }>(
+      'SELECT COALESCE(SUM(opens), 0)::int AS n FROM engage.share_landings WHERE day >= $1',
+      [day],
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
+
+  async shareAttributionsSince(since: string): Promise<number> {
+    const { rows } = await this.db.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM engage.referral_attributions
+       WHERE share_code IS NOT NULL AND created_at >= $1`,
+      [since],
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
+
+  async squadFirstJoins(): Promise<Array<{ userId: string; joinedAt: string }>> {
+    const { rows } = await this.db.query<{ user_id: string; joined_at: unknown }>(
+      'SELECT user_id, MIN(joined_at) AS joined_at FROM engage.squad_members GROUP BY user_id',
+    );
+    return rows.map((r) => ({ userId: r.user_id, joinedAt: iso(r.joined_at) }));
+  }
+
+  async enrolledUsers(seasonNumber: number): Promise<string[]> {
+    const { rows } = await this.db.query<{ user_id: string }>(
+      'SELECT user_id FROM engage.season_enrolments WHERE season_number = $1',
+      [seasonNumber],
+    );
+    return rows.map((r) => r.user_id);
+  }
+
+  async armsOf(experiment: 'early_cheers'): Promise<Array<{ userId: string; arm: ExperimentArm }>> {
+    const { rows } = await this.db.query<{ user_id: string; arm: ExperimentArm }>(
+      'SELECT user_id, arm FROM engage.experiment_arms WHERE experiment = $1',
+      [experiment],
+    );
+    return rows.map((r) => ({ userId: r.user_id, arm: r.arm }));
+  }
+
+  async graceAppliedIn(seasonNumber: number): Promise<number> {
+    const { rows } = await this.db.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM engage.grace_ledger WHERE entry = 'applied' AND season_number = $1`,
+      [seasonNumber],
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
+
+  async cheersPerSender(from: string, to: string): Promise<number[]> {
+    const { rows } = await this.db.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM engage.cheers
+       WHERE from_kind = 'member' AND from_user_id IS NOT NULL AND local_date BETWEEN $1 AND $2
+       GROUP BY from_user_id`,
+      [from, to],
+    );
+    return rows.map((r) => Number(r.n));
   }
 
   // ----- privacy -----

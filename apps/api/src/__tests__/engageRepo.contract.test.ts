@@ -474,6 +474,43 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
     });
   });
 
+  describe('metrics', () => {
+    it('counts landings by day without keeping a code or a person', async () => {
+      const before = await repo.landingsSince('2027-01-01');
+      await repo.recordLanding('2027-01-02', 'belt', 'web');
+      await repo.recordLanding('2027-01-02', 'belt', 'web');
+      await repo.recordLanding('2027-01-03', 'week', 'tma');
+      await repo.recordLanding('2026-12-31', 'week', 'tma');
+      expect((await repo.landingsSince('2027-01-01')) - before).toBe(3);
+    });
+
+    it('reads first joins, enrolled users, arms, bridges and cheers per sender', async () => {
+      const { squad, owner } = await seedSquad(repo, { seasonNumber: 7 });
+      const joins = await repo.squadFirstJoins();
+      expect(joins.find((j) => j.userId === owner)).toEqual({ userId: owner, joinedAt: at(0) });
+
+      const a = uid('enrol');
+      await repo.enrol({ userId: a, seasonNumber: 9, source: 'dashboard', enrolledAt: at(0) });
+      expect(await repo.enrolledUsers(9)).toContain(a);
+
+      const t = uid('arm');
+      await repo.assignArm(t, 'early_cheers', 'treatment', at(0));
+      expect(await repo.armsOf('early_cheers')).toContainEqual({ userId: t, arm: 'treatment' });
+
+      const g = uid('grace');
+      await repo.withGraceLedger(g, (l) =>
+        l.append([graceRow(g, { entry: 'applied', milestone: null, seasonNumber: 11, localDate: '2027-05-01' })]),
+      );
+      expect(await repo.graceAppliedIn(11)).toBe(1);
+
+      const sender = uid('sender');
+      await repo.insertCheer(cheerRow({ fromUserId: sender, localDate: '2027-06-01', squadId: squad.id }));
+      await repo.insertCheer(cheerRow({ fromUserId: sender, localDate: '2027-06-02' }));
+      await repo.insertCheer(cheerRow({ fromKind: 'coach', fromUserId: null, coachId: 'akin', localDate: '2027-06-02' }));
+      expect((await repo.cheersPerSender('2027-06-01', '2027-06-30')).sort()).toContain(2);
+    });
+  });
+
   describe('privacy', () => {
     it('exports what the user holds without naming anyone else', async () => {
       const { squad, owner } = await seedSquad(repo, { name: 'Export Crew' });

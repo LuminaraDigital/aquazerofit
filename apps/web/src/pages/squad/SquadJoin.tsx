@@ -15,8 +15,8 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { ApiError, restoreSession, tokenStore } from '@/lib/api';
-import { peekSquad, squadErrorMessage, useJoinSquad } from '@/lib/fightCamp';
+import { restoreSession, tokenStore } from '@/lib/api';
+import { errorReason, peekSquad, squadErrorMessage, useJoinSquad } from '@/lib/fightCamp';
 
 /** null until the cookie-backed session restore has answered. */
 function useSignedIn(): boolean | null {
@@ -100,7 +100,7 @@ function JoinAction({ code }: { code: string }) {
   const navigate = useNavigate();
   const signedIn = useSignedIn();
   const join = useJoinSquad();
-  const [error, setError] = useState<{ message: string; alreadyIn: boolean } | null>(null);
+  const [error, setError] = useState<{ message: string; reason: string | null } | null>(null);
 
   if (signedIn === null) return <Skeleton className="mt-5 h-[52px] w-full" />;
 
@@ -126,12 +126,7 @@ function JoinAction({ code }: { code: string }) {
             {
               onSuccess: () => navigate('/squad', { replace: true }),
               onError: (e) =>
-                setError({
-                  message: squadErrorMessage(e, 'That did not work. Try again.'),
-                  alreadyIn:
-                    e instanceof ApiError &&
-                    (e.body?.details as { reason?: string } | undefined)?.reason === 'squad_already_member',
-                }),
+                setError({ message: squadErrorMessage(e, 'That did not work. Try again.'), reason: errorReason(e) }),
             },
           )
         }
@@ -141,9 +136,17 @@ function JoinAction({ code }: { code: string }) {
       {error && (
         <p role="alert" className="text-sm text-on-surface">
           {error.message}{' '}
-          {error.alreadyIn && (
+          {error.reason === 'squad_already_member' && (
             <Link to="/squad" className="font-semibold text-primary underline-offset-4 hover:underline">
               Go to my squad
+            </Link>
+          )}
+          {error.reason === 'squad_age_unknown' && (
+            <Link
+              to={`/setup?next=${encodeURIComponent(`/s/${code}`)}`}
+              className="font-semibold text-primary underline-offset-4 hover:underline"
+            >
+              Add my essentials
             </Link>
           )}
         </p>

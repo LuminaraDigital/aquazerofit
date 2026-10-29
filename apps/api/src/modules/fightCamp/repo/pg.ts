@@ -23,6 +23,7 @@ import type {
   EngageExport,
   EngageRepo,
   EnrolmentRow,
+  GraceLedger,
   GraceRow,
   InsertShareLinkOutcome,
   JoinSquadOutcome,
@@ -433,29 +434,33 @@ export class PgEngageRepo implements EngageRepo {
   // ----- Cut Man grace -----
 
   async graceEntries(userId: string): Promise<GraceRow[]> {
-    const { rows } = await this.db.query(
-      `SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger
-       WHERE user_id = $1 ORDER BY created_at, id COLLATE "C"`,
-      [userId],
-    );
-    return rows.map(toGrace);
+    return graceEntriesWithin(this.db, userId);
   }
 
-  async addGrace(rows: readonly GraceRow[]): Promise<number> {
-    let added = 0;
-    for (const row of rows) {
-      const once =
-        row.entry === 'earned'
-          ? `(user_id, season_number, milestone) WHERE entry = 'earned'`
-          : `(user_id, local_date) WHERE entry = 'applied'`;
-      const result = await this.db.query(
-        `INSERT INTO engage.grace_ledger (id, user_id, entry, season_number, local_date, milestone, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT ${once} DO NOTHING RETURNING id`,
-        [row.id, row.userId, row.entry, row.seasonNumber, row.localDate, row.milestone, row.createdAt],
-      );
-      added += result.rows.length;
-    }
-    return added;
+  async withGraceLedger<T>(userId: string, fn: (ledger: GraceLedger) => Promise<T>): Promise<T> {
+    return this.db.transaction(async (tx) => {
+      // Transaction-scoped: released by COMMIT or ROLLBACK on this connection.
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`engage.grace:${userId}`]);
+      return fn({
+        entries: () => graceEntriesWithin(tx, userId),
+        append: async (rows) => {
+          let added = 0;
+          for (const row of rows) {
+            const once =
+              row.entry === 'earned'
+                ? `(user_id, season_number, milestone) WHERE entry = 'earned'`
+                : `(user_id, local_date) WHERE entry = 'applied'`;
+            const result = await tx.query(
+              `INSERT INTO engage.grace_ledger (id, user_id, entry, season_number, local_date, milestone, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT ${once} DO NOTHING RETURNING id`,
+              [row.id, row.userId, row.entry, row.seasonNumber, row.localDate, row.milestone, row.createdAt],
+            );
+            added += result.rows.length;
+          }
+          return added;
+        },
+      });
+    });
   }
 
   // ----- nudges -----
@@ -534,7 +539,7 @@ export class PgEngageRepo implements EngageRepo {
         q(`SELECT ${SQUAD_COLUMNS} FROM engage.squads WHERE created_by = $1`),
         q(`SELECT ${CHEER_COLUMNS} FROM engage.cheers WHERE from_user_id = $1`),
         q(`SELECT ${CHEER_COLUMNS} FROM engage.cheers WHERE to_user_id = $1`),
-        q(`SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger WHERE user_id = $1 ORDER BY created_at, id COLLATE "C"`),
+        q(`SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger WHERE user_id = $1 ORDER BY seq`),
         q(`SELECT local_date::text AS local_date, kind, sent_at FROM engage.nudge_log WHERE user_id = $1`),
         q(`SELECT ${LINK_COLUMNS} FROM engage.share_links WHERE user_id = $1`),
         q(`SELECT share_code, squad_id, surface, created_at FROM engage.referral_attributions
@@ -615,6 +620,14 @@ export class PgEngageRepo implements EngageRepo {
       for (const statement of statements) await tx.query(statement, [userId]);
     });
   }
+}
+
+async function graceEntriesWithin(db: SqlRunner, userId: string): Promise<GraceRow[]> {
+  const { rows } = await db.query(
+    `SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger WHERE user_id = $1 ORDER BY seq`,
+    [userId],
+  );
+  return rows.map(toGrace);
 }
 
 async function insertMember(tx: SqlRunner, member: MemberRow): Promise<void> {

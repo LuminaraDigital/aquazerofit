@@ -119,7 +119,47 @@ export function seasonTheme(seasonNumber: number): SeasonTheme {
  */
 export type EnrolPrompt = 'primary' | 'secondary';
 
+// ---------- Cut Man grace ----------
+
+/** Cut Man days a season's active days have earned: one per seven. */
+export function graceEarned(activeDaysInSeason: number): number {
+  return Math.floor(Math.max(0, activeDaysInSeason) / GRACE_EARN_EVERY_ACTIVE_DAYS);
+}
+
+/** Active days still to log this season before the next Cut Man day, 1 to 7. */
+export function nextGraceInActiveDays(activeDaysInSeason: number): number {
+  return GRACE_EARN_EVERY_ACTIVE_DAYS - (Math.max(0, activeDaysInSeason) % GRACE_EARN_EVERY_ACTIVE_DAYS);
+}
+
+/**
+ * The bank, folded over the ledger in the order it was written. The cap
+ * applies at each earn, so a day earned with two already banked is simply
+ * not kept: `min(2, earned - applied)` would instead let a long run bank
+ * days invisibly and spend them later, which is a store of value, not a cap.
+ */
+export function graceBank(entries: Iterable<{ entry: 'earned' | 'applied' }>): number {
+  let bank = 0;
+  for (const { entry } of entries) {
+    bank = entry === 'earned' ? Math.min(GRACE_BANK_MAX, bank + 1) : Math.max(0, bank - 1);
+  }
+  return bank;
+}
+
 // ---------- responses ----------
+
+export interface GraceView {
+  /** Cut Man days in the bank now, 0 to GRACE_BANK_MAX. */
+  banked: number;
+  /** Active days this season until the next one is earned, 1 to 7. */
+  nextEarnInActiveDays: number;
+  /** The most recent day Cut Man stepped in, or null. */
+  lastApplied: string | null;
+  /**
+   * A banked day is holding the run open over a gap nothing has been logged
+   * after yet. It is spent only if the person comes back.
+   */
+  standingBy: boolean;
+}
 
 export interface EnrolmentView {
   seasonNumber: number;
@@ -137,4 +177,6 @@ export interface FightCampStatus {
   theme: SeasonTheme;
   /** FC_ENROL. */
   enrolment: { enrolled: boolean; prompt: EnrolPrompt } | null;
+  /** FC_GRACE. */
+  grace: GraceView | null;
 }

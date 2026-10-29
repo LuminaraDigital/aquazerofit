@@ -9,7 +9,7 @@
  *
  * Off for the account (flag, rollout or age): sent home, like /fight-record.
  */
-import { useState, type FormEvent } from 'react';
+import { type FormEvent, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   SQUAD_CONSENT_TEXT,
@@ -40,7 +40,6 @@ import {
   squadErrorMessage,
   squadTelegramUrl,
   useCreateSquad,
-  useFirstName,
   useJoinSquad,
   useLeaveSquad,
   useRemoveMember,
@@ -214,9 +213,21 @@ function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
   const toast = useToast();
   const [leaving, setLeaving] = useState(false);
   const shareKit = Boolean(useFightCamp().data?.shareKit);
-  const firstName = useFirstName();
   const [kit, setKit] = useState<'week' | 'squad_invite' | null>(null);
   const myWeek = squad.members.find((m) => m.isMe)?.weekActiveDays ?? 0;
+  const full = squad.members.length >= SQUAD_MAX_MEMBERS;
+  const kitCard = useMemo(
+    () =>
+      kit && {
+        kind: kit,
+        season: seasonByNumber(squad.seasonNumber),
+        accent: seasonTheme(squad.seasonNumber).accent,
+        belt: null,
+        weekActiveDays: myWeek,
+        squadName: squad.name,
+      },
+    [kit, squad.seasonNumber, squad.name, myWeek],
+  );
   const leave = useLeaveSquad();
 
   const invite = async () => {
@@ -262,7 +273,7 @@ function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
         <p className="mt-0.5 text-xs tabular-nums text-on-surface-variant">
           Season {squad.seasonNumber} · {squad.members.length} of {SQUAD_MAX_MEMBERS} members
         </p>
-        {squad.members.length < SQUAD_MAX_MEMBERS && (
+        {!full && (
           <div className="mt-4 space-y-3">
             <PrimaryButton onClick={() => void invite()}>Invite to squad</PrimaryButton>
             <button
@@ -289,25 +300,18 @@ function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
           ))}
       <WeekBoard squad={squad} canCheer={canCheer} />
       {shareKit && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className={full ? '' : 'grid grid-cols-2 gap-3'}>
           <SecondaryButton onClick={() => setKit('week')}>Share my week</SecondaryButton>
-          <SecondaryButton onClick={() => setKit('squad_invite')}>Share invite card</SecondaryButton>
+          {/* A full squad has no room: an invite card would only turn people away. */}
+          {!full && <SecondaryButton onClick={() => setKit('squad_invite')}>Share invite card</SecondaryButton>}
         </div>
       )}
-      {kit && (
+      {kitCard && (
         <ShareKitSheet
           open
           onClose={() => setKit(null)}
-          firstName={firstName}
           accentId={seasonTheme(squad.seasonNumber).accentId}
-          card={{
-            kind: kit,
-            season: seasonByNumber(squad.seasonNumber),
-            accent: seasonTheme(squad.seasonNumber).accent,
-            belt: null,
-            weekActiveDays: myWeek,
-            squadName: squad.name,
-          }}
+          card={kitCard}
           link={kit === 'squad_invite' ? { url: squad.inviteUrl, tgStartParam: squad.tgStartParam } : undefined}
         />
       )}

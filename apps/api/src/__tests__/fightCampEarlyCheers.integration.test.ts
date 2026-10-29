@@ -12,7 +12,7 @@ import { fightCampHarness, type FightCampHarness, type Person } from './helpers/
 const { addDays } = await import('../platform/dates');
 const { getStore } = await import('../platform/store');
 const { engageRepo } = await import('../modules/fightCamp/repo');
-const { earlyCheersBucket } = await import('../modules/fightCamp/earlyCheers');
+const { earlyCheersArm, earlyCheersBucket } = await import('../modules/fightCamp/earlyCheers');
 const { rolloutBucket } = await import('../modules/fightRecord/service');
 
 let h: FightCampHarness;
@@ -48,13 +48,27 @@ async function newcomer(activeOffsets: number[], today: number, opts: { age?: nu
   return h.refresh(first);
 }
 
+/** A newcomer whose bucket is above 0, so some share puts them in the holdout. */
+async function holdoutCapable(activeOffsets: number[], today: number): Promise<Person> {
+  for (;;) {
+    const person = await newcomer(activeOffsets, today);
+    if (earlyCheersBucket(person.userId) > 0) return person;
+  }
+}
+
+/** Move the clock to `day` and read the inbox there, as a returning visit would. */
+async function visit(person: Person, day: number) {
+  pin(day);
+  return inbox(await h.refresh(person));
+}
+
 describe('the treatment arm', () => {
   it('gets a coach cheer on each of the first three active days of week one, labelled automated', async () => {
     h.enable('cheers');
     process.env.FC_EARLY_CHEERS_PERCENT = '100';
-    const mia = await newcomer([0, 2, 3, 5], 6);
-    const res = await inbox(mia);
-    expect(res.status).toBe(200);
+    const mia = await newcomer([0, 2, 3, 5], 0);
+    for (const day of [0, 2, 3, 5, 6]) expect((await visit(mia, day)).status).toBe(200);
+    const res = await visit(mia, 6);
     expect(res.body.cheers).toHaveLength(3);
     for (const cheer of res.body.cheers) {
       expect(cheer.from).toEqual({ kind: 'coach', coachName: 'Akin Celsus', automated: true });
@@ -75,24 +89,76 @@ describe('the treatment arm', () => {
     expect(await engageRepo().coachCheersTo(mia.userId)).toHaveLength(3);
   });
 
-  it('cheers only days already shown up, as they happen', async () => {
+  it('cheers a day shown up on that day or the next visit, and does not backfill a late first one', async () => {
     h.enable('cheers');
     process.env.FC_EARLY_CHEERS_PERCENT = '100';
     const jay = await newcomer([0], 1);
     expect((await record(jay)).body.fightCamp.cheers).toEqual({ unseen: 1 });
     expect(await engageRepo().coachCheersTo(jay.userId)).toHaveLength(1);
+
+    const late = await newcomer([0, 1, 2], 5);
+    expect((await inbox(late)).body.cheers).toEqual([]);
+  });
+
+  it('never sends a fourth, even when an earlier day stops counting', async () => {
+    h.enable('cheers');
+    process.env.FC_EARLY_CHEERS_PERCENT = '100';
+    const kim = await newcomer([0, 1, 2, 3], 0);
+    for (const day of [0, 1, 2]) await visit(kim, day);
+    expect(await engageRepo().coachCheersTo(kim.userId)).toHaveLength(3);
+    getStore().delete('logs', `ml-${kim.userId}-${addDays(START, 0)}`);
+    await visit(kim, 3);
+    expect(await engageRepo().coachCheersTo(kim.userId)).toHaveLength(3);
+  });
+
+  it('keeps the arm on record when the share changes', async () => {
+    h.enable('cheers');
+    process.env.FC_EARLY_CHEERS_PERCENT = '100';
+    const lee = await holdoutCapable([0, 1], 0);
+    await visit(lee, 0);
+    process.env.FC_EARLY_CHEERS_PERCENT = String(earlyCheersBucket(lee.userId));
+    expect(earlyCheersArm(lee.userId)).toBe('holdout');
+    await visit(lee, 1);
+    expect(await engageRepo().coachCheersTo(lee.userId)).toHaveLength(2);
+  });
+
+  it('counts the first day in the calendar of the read, not in UTC', async () => {
+    h.enable('cheers');
+    process.env.FC_EARLY_CHEERS_PERCENT = '100';
+    // 02:00 UTC is the evening before in Los Angeles: their first day is START.
+    vi.setSystemTime(new Date(`${addDays(START, 1)}T02:00:00.000Z`));
+    const sam = await h.register('Sam', { timezone: 'America/Los_Angeles' });
+    h.seedActive(sam.userId, [START]);
+    expect((await inbox(sam)).body.cheers).toHaveLength(1);
+    expect((await engageRepo().coachCheersTo(sam.userId)).map((c) => c.localDate)).toEqual([START]);
   });
 });
 
 describe('the holdout and everyone else', () => {
   it('records the holdout arm and sends no coach cheers', async () => {
     h.enable('cheers');
-    process.env.FC_EARLY_CHEERS_PERCENT = '0';
-    const grace = await newcomer([0, 1, 2], 3);
+    process.env.FC_EARLY_CHEERS_PERCENT = '100';
+    const grace = await holdoutCapable([0, 1, 2], 3);
+    process.env.FC_EARLY_CHEERS_PERCENT = String(earlyCheersBucket(grace.userId));
     expect((await inbox(grace)).body.cheers).toEqual([]);
     expect((await engageRepo().exportUser(grace.userId)).experiments).toEqual([
       expect.objectContaining({ arm: 'holdout' }),
     ]);
+  });
+
+  it('runs nothing at a share of 0: no arm, no cheer, even for an arm on record', async () => {
+    h.enable('cheers');
+    process.env.FC_EARLY_CHEERS_PERCENT = '0';
+    const off = await newcomer([0, 1, 2], 2);
+    expect((await inbox(off)).body.cheers).toEqual([]);
+    expect((await engageRepo().exportUser(off.userId)).experiments).toEqual([]);
+
+    process.env.FC_EARLY_CHEERS_PERCENT = '100';
+    const on = await newcomer([0, 1], 0);
+    await visit(on, 0);
+    process.env.FC_EARLY_CHEERS_PERCENT = '0';
+    await visit(on, 1);
+    expect(await engageRepo().coachCheersTo(on.userId)).toHaveLength(1);
   });
 
   it('does nothing after week one, and nothing for a minor', async () => {

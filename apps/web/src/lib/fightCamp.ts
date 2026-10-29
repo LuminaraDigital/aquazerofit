@@ -25,12 +25,15 @@ import type {
   SeasonRecap,
   ShareKindP1,
   ShareLinkView,
+  ShareSummary,
   SquadPeekView,
   SquadView,
 } from '@aquazerofit/shared';
 import { api, ApiError } from './api';
 import { unwrap } from './envelopes';
 import { fightRecordKey, type FightRecordEnvelope } from './fightRecord';
+import { claimStoredShareAttribution } from './startApp';
+import { isTMA } from './telegram';
 import { telegramStartAppUrl } from './telegramLink';
 
 export function useEnrol() {
@@ -107,12 +110,19 @@ export function useCreateSquad() {
 }
 
 export function useJoinSquad() {
-  return useSquadWrite(async ({ code, via }: { code: string; via: 'code' | 'link' }) =>
-    unwrap<SquadView>(
-      await api<unknown>('/squads/join', { method: 'POST', query: { via }, body: { code, consent: true } }),
+  return useSquadWrite(async ({ code, via }: { code: string; via: 'code' | 'link' }) => {
+    // A share link that brought them to this invite came first, so it is
+    // credited before the join writes its own squad attribution.
+    if (via === 'link') await claimStoredShareAttribution();
+    return unwrap<SquadView>(
+      await api<unknown>('/squads/join', {
+        method: 'POST',
+        query: { via, surface: isTMA() ? 'tma' : 'web' },
+        body: { code, consent: true },
+      }),
       'squad',
-    ),
-  );
+    );
+  });
 }
 
 /** Owner only: a fresh invite code; links with the old one stop working. */
@@ -278,18 +288,6 @@ export function useSetNudgeSettings() {
 
 // ---------- Share Kit ----------
 
-/**
- * The person's first name, for a card they choose to sign. Same cache entry
- * and raw shape as the dashboard's GET /me, so it costs no extra request.
- */
-export function useFirstName(): string | null {
-  const me = useQuery({ queryKey: ['me', 'user'], queryFn: () => api<unknown>('/me') }).data as
-    | { displayName?: string; user?: { displayName?: string } }
-    | undefined;
-  const name = (me?.user?.displayName ?? me?.displayName ?? '').trim().split(/\s+/)[0];
-  return name ? name : null;
-}
-
 /** The person's reusable link for a card kind this season. */
 export function useShareLink(kind: ShareKindP1, enabled: boolean) {
   return useQuery({
@@ -298,6 +296,15 @@ export function useShareLink(kind: ShareKindP1, enabled: boolean) {
       unwrap<ShareLinkView>(await api<unknown>('/share/links', { method: 'POST', body: { kind } }), 'shareLink'),
     enabled,
     staleTime: Infinity,
+  });
+}
+
+/** How many people joined from the person's cards (US-F3 AC3). */
+export function useShareSummary(enabled: boolean) {
+  return useQuery({
+    queryKey: ['fightCamp', 'shareSummary'],
+    queryFn: async () => unwrap<ShareSummary>(await api<unknown>('/share/summary'), 'summary'),
+    enabled,
   });
 }
 

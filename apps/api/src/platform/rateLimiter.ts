@@ -82,11 +82,13 @@ function isAuthPath(path: string): boolean {
  * the only other route that reads a stored document unauthenticated.
  */
 function isAnonymousWritePath(path: string): boolean {
+  // Express routes match case-insensitively, so the lane must too.
+  const p = path.toLowerCase();
   return (
-    path.includes('/analytics/events') ||
-    path.includes('/challenges/peek') ||
-    path.includes('/squads/peek') ||
-    path.includes('/share/r/')
+    p.includes('/analytics/events') ||
+    p.includes('/challenges/peek') ||
+    p.includes('/squads/peek') ||
+    p.includes('/share/r/')
   );
 }
 

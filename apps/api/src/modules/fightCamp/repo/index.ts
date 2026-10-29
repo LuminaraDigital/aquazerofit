@@ -43,3 +43,4 @@ export function setEngageRepoForTests(next: EngageRepo | null): void {
 }
 
 export type * from './types';
+export type * from './gifts';

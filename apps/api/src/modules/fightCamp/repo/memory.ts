@@ -11,6 +11,7 @@
  */
 import type { NudgeKind, ShareKindP1 } from '@aquazerofit/shared';
 import type { Surface } from './types';
+import { MemoryGiftStore } from './gifts';
 import { ARCHIVED_SQUAD_NAME } from './types';
 import type {
   AttributionRow,
@@ -44,6 +45,7 @@ const newestFirst = (a: CheerRow, b: CheerRow): number =>
   byCodePoint(b.createdAt, a.createdAt) || byCodePoint(b.id, a.id);
 
 export class MemoryEngageRepo implements EngageRepo {
+  readonly gifts = new MemoryGiftStore();
   private enrolments: EnrolmentRow[] = [];
   private squads: SquadRow[] = [];
   private members: MemberRow[] = [];
@@ -485,6 +487,7 @@ export class MemoryEngageRepo implements EngageRepo {
       attribution: attribution
         ? (({ inviteeUserId: _omit, ...rest }) => rest)(attribution)
         : null,
+      ...(await this.gifts.exportFor(userId)),
     };
   }
 
@@ -512,5 +515,6 @@ export class MemoryEngageRepo implements EngageRepo {
     for (const attribution of this.attributions) {
       if (attribution.shareCode !== null && codes.has(attribution.shareCode)) attribution.shareCode = null;
     }
+    await this.gifts.erase(userId);
   }
 }

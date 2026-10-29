@@ -13,8 +13,9 @@
  *    rethrown, because swallowing an unknown constraint would hide a bug.
  */
 import type { NudgeKind, ShareKindP1 } from '@aquazerofit/shared';
-import { isUniqueViolation, type SqlDatabase, type SqlRunner } from '../../../platform/sql';
+import { iso, isoOrNull, isUniqueViolation, type SqlDatabase, type SqlRunner } from '../../../platform/sql';
 import { ARCHIVED_SQUAD_NAME } from './types';
+import { PgGiftStore } from './gifts';
 import type {
   AttributionRow,
   CheerPage,
@@ -35,14 +36,6 @@ import type {
 } from './types';
 
 type Row = Record<string, unknown>;
-
-function iso(value: unknown): string {
-  return value instanceof Date ? value.toISOString() : new Date(String(value)).toISOString();
-}
-
-function isoOrNull(value: unknown): string | null {
-  return value === null || value === undefined ? null : iso(value);
-}
 
 function constraintOf(err: unknown): string {
   const name = (err as { constraint?: unknown } | null)?.constraint;
@@ -177,7 +170,11 @@ async function leaveWithin(
 }
 
 export class PgEngageRepo implements EngageRepo {
-  constructor(private readonly db: SqlDatabase) {}
+  readonly gifts: PgGiftStore;
+
+  constructor(private readonly db: SqlDatabase) {
+    this.gifts = new PgGiftStore(db);
+  }
 
   // ----- enrolment -----
 
@@ -757,6 +754,7 @@ export class PgEngageRepo implements EngageRepo {
             createdAt: iso(attribution[0].created_at),
           }
         : null,
+      ...(await this.gifts.exportFor(userId)),
     };
   }
 
@@ -788,6 +786,7 @@ export class PgEngageRepo implements EngageRepo {
         'DELETE FROM engage.referral_attributions WHERE invitee_user_id = $1',
       ];
       for (const statement of statements) await tx.query(statement, [userId]);
+      await this.gifts.erase(userId, tx);
     });
   }
 }

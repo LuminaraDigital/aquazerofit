@@ -32,7 +32,7 @@
  */
 import { Router } from 'express';
 import { z } from 'zod';
-import { coachById, starsPriceOf } from '@aquazerofit/shared';
+import { GIFT_PAYLOAD_PREFIX, coachById, starsPriceOf } from '@aquazerofit/shared';
 import { config } from '../../platform/config';
 import { secureEquals } from '../../platform/auth';
 import { asyncHandler } from '../../platform/errors';
@@ -45,6 +45,7 @@ import {
   completeSubscriptionPayment,
   premiumCheckoutAccepts,
 } from './starsSubscription';
+import { completeGiftPayment, giftCheckoutAccepts } from '../fightCamp/gifts';
 
 export const telegramWebhookRouter = Router();
 
@@ -66,6 +67,7 @@ const telegramUpdateSchema = z.object({
   pre_checkout_query: z
     .object({
       id: z.string().min(1).max(256),
+      from: telegramUserSchema.optional(),
       currency: z.string().min(1).max(16),
       total_amount: z.number().int(),
       invoice_payload: z.string().max(1024),
@@ -130,7 +132,30 @@ function answerFailureReason(error: string): string {
   return 'rejected';
 }
 
+async function handleGiftPreCheckout(query: NonNullable<TelegramUpdate['pre_checkout_query']>): Promise<void> {
+  let accepted = false;
+  try {
+    accepted = await giftCheckoutAccepts({ ...query, payerTelegramId: query.from?.id });
+  } catch {
+    // Unable to re-validate is a decline: nothing is charged.
+    logEvent('gift_precheckout_failed', { reason: 'storage' });
+  }
+  const answered = await answerPreCheckoutQuery(
+    query.id,
+    accepted,
+    accepted ? undefined : 'This gift is no longer available.',
+  );
+  if (!answered.ok) {
+    logEvent('stars_precheckout_answer_failed', { accepted, reason: answerFailureReason(answered.error) });
+  }
+  if (!accepted) logEvent('stars_precheckout_declined', { reason: 'gift_unavailable' });
+}
+
 async function handlePreCheckout(query: NonNullable<TelegramUpdate['pre_checkout_query']>): Promise<void> {
+  if (query.invoice_payload.startsWith(GIFT_PAYLOAD_PREFIX)) {
+    await handleGiftPreCheckout(query);
+    return;
+  }
   if (query.invoice_payload.startsWith(PREMIUM_PAYLOAD_PREFIX)) {
     const priceOk = premiumCheckoutAccepts(query);
     const answered = await answerPreCheckoutQuery(
@@ -220,6 +245,28 @@ telegramWebhookRouter.post(
       }
 
       const payment = update.message?.successful_payment;
+      if (payment?.invoice_payload.startsWith(GIFT_PAYLOAD_PREFIX)) {
+        // Gifts settle in Postgres, which can fail for a moment. Unlike a
+        // malformed update, that is worth Telegram's retry, so a storage
+        // fault answers 503 and a redelivery finishes the grant once.
+        try {
+          const outcome = await completeGiftPayment({
+            invoicePayload: payment.invoice_payload,
+            totalAmount: payment.total_amount,
+            currency: payment.currency,
+            telegramPaymentChargeId: payment.telegram_payment_charge_id,
+            payerTelegramId: update.message?.from?.id,
+          });
+          if (outcome.status === 'rejected' || outcome.status === 'failed') {
+            logEvent('gift_payment_not_granted', { status: outcome.status });
+          }
+          res.status(200).json({ ok: true });
+        } catch {
+          logEvent('gift_payment_deferred', { reason: 'storage' });
+          res.status(503).json({ ok: false });
+        }
+        return;
+      }
       if (payment) {
         if (payment.invoice_payload.startsWith(PREMIUM_PAYLOAD_PREFIX)) {
           const outcome = completeSubscriptionPayment({

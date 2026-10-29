@@ -75,3 +75,12 @@ export const UNIQUE_VIOLATION = '23505';
 export function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: unknown } | null)?.code === UNIQUE_VIOLATION;
 }
+
+/** A timestamp column as an ISO instant, whichever form the driver returned. */
+export function iso(value: unknown): string {
+  return value instanceof Date ? value.toISOString() : new Date(String(value)).toISOString();
+}
+
+export function isoOrNull(value: unknown): string | null {
+  return value === null || value === undefined ? null : iso(value);
+}

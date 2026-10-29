@@ -19,6 +19,7 @@ import {
 } from '../billing/entitlements';
 import { refundStarsPurchase } from '../payments/stars';
 import { refundStarsSubscription } from '../payments/starsSubscription';
+import { refundGift } from '../fightCamp/gifts';
 import { todayFor } from '../../platform/dates';
 import { retentionReport } from './retention';
 import { engageMetrics } from '../fightCamp/metrics';
@@ -291,15 +292,18 @@ adminRouter.post(
       actorId: req.user!.id,
       telegramUserId: input.telegramUserId,
     };
-    let outcome: { userId: string; status: string; coachId?: string };
-    try {
-      outcome = await refundStarsPurchase(refundInput);
-    } catch (err) {
-      // A charge is either a coach purchase or a subscription payment.
-      // The subscription path runs only when the coach ledger has no row.
-      if (!(err instanceof AppError) || err.code !== 'NOT_FOUND') throw err;
-      outcome = await refundStarsSubscription(refundInput);
+    // A charge is a coach purchase, a subscription payment or a Fight Camp
+    // gift. Each is asked in turn, and the next only when the last has no row.
+    let outcome: { userId: string | null; status: string; coachId?: string } | undefined;
+    for (const refund of [refundStarsPurchase, refundStarsSubscription, refundGift]) {
+      try {
+        outcome = await refund(refundInput);
+        break;
+      } catch (err) {
+        if (!(err instanceof AppError) || err.code !== 'NOT_FOUND') throw err;
+      }
     }
+    if (!outcome) throw new AppError('NOT_FOUND', 'No Stars payment matches that charge.');
     auditDataAccess(req.user!.id, 'admin.stars.refund', {
       userId: outcome.userId,
       coachId: outcome.coachId ?? null,

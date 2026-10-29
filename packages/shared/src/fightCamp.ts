@@ -125,6 +125,16 @@ export const sendCheerInputSchema = z.object({
 });
 export type SendCheerInput = z.infer<typeof sendCheerInputSchema>;
 
+// ---------- gifts (Epic G, optional) ----------
+
+/** A gift is always exactly this many days of Premium: no tiers, no odds. */
+export const GIFT_PREMIUM_DAYS = 7;
+/** Every gift invoice payload starts with this; the rest is a random id. */
+export const GIFT_PAYLOAD_PREFIX = 'gift:';
+
+export const createGiftInvoiceInputSchema = z.object({ to: memberRefSchema });
+export type CreateGiftInvoiceInput = z.infer<typeof createGiftInvoiceInputSchema>;
+
 export const CHEERS_SEEN_MAX_IDS = 50;
 export const cheersSeenInputSchema = z.object({
   ids: z.array(z.string().min(1).max(64)).max(CHEERS_SEEN_MAX_IDS),
@@ -469,12 +479,20 @@ export interface FightCampStatus {
   squads: { current: { id: string; name: string } | null } | null;
   /** FC_CHEERS, for adults only: how many cheers are waiting to be seen. */
   cheers: { unseen: number } | null;
-  /** FC_SHARE_KIT, for adults only: how many people joined from this person's cards. */
-  /** `firstName` is what a card may print if the person turns it on; null when there is none to show. */
+  /**
+   * FC_SHARE_KIT, for adults only. `firstName` is what a card may print if the
+   * person turns it on; null when there is none to show.
+   */
   shareKit: { firstName: string | null } | null;
   /**
    * FC_ENROL: the season just ended has a recap ready, offered for its first
    * 14 days to anyone who showed up in it at least once.
    */
   recap: { seasonNumber: number; seasonName: string } | null;
+  /**
+   * FC_GIFTING with a price set, for an adult. Paying also needs a
+   * Telegram-linked account and a client that can open a Stars invoice.
+   * `received` is the newest gift granted to them in the last week.
+   */
+  gifting: { stars: number; received: { fromName: string; grantedAt: string } | null } | null;
 }

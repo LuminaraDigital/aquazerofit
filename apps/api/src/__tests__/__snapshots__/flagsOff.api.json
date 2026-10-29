@@ -300,7 +300,8 @@
       "tier": "free",
       "displayName": "Rizal Noor",
       "createdAt": "2026-11-18T10:00:00.000Z",
-      "deletionRequestedAt": null
+      "deletionRequestedAt": null,
+      "timezone": "UTC"
     },
     "consents": {
       "id": "consent-<user>",

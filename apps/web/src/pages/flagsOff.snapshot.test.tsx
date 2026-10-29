@@ -3,9 +3,9 @@
  * With every Fight Camp flag off, the screens Fight Camp extends render
  * exactly what they rendered before it existed (AZF-P1 §10.2 DoD).
  *
- * The snapshot files were recorded by running this same file on the commits
- * Fight Camp was built on, 6a80efd and then origin/staging at 1732a90 (same
- * output), against the API's own responses from those commits
+ * The snapshot files were recorded by running this same file on staging at
+ * 325b561, the commit this stack sits on, and before that on 6a80efd and
+ * 1732a90 (same output), against the API's own responses from that commit
  * (apps/api/src/__tests__/__snapshots__/flagsOff.api.json):
  * no `fightCamp` block, so every Fight Camp addition must render nothing.
  * React's generated ids are the only thing normalised, since a component

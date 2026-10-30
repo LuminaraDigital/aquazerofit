@@ -540,6 +540,19 @@ export class PgEngageRepo implements EngageRepo {
     return rows.length > 0;
   }
 
+  async claimReminder(userId: string, localDate: string, slot: string, at: string): Promise<boolean> {
+    const { rows } = await this.db.query(
+      `INSERT INTO engage.reminder_log (user_id, local_date, slot, claimed_at) VALUES ($1, $2, $3, $4)
+       ON CONFLICT DO NOTHING RETURNING user_id`,
+      [userId, localDate, slot, at],
+    );
+    return rows.length > 0;
+  }
+
+  async pruneReminders(beforeLocalDate: string): Promise<void> {
+    await this.db.query('DELETE FROM engage.reminder_log WHERE local_date < $1', [beforeLocalDate]);
+  }
+
   async nudgeSettings(userId: string): Promise<Partial<Record<NudgeKind, boolean>>> {
     const { rows } = await this.db.query<{ kind: NudgeKind; enabled: boolean }>(
       'SELECT kind, enabled FROM engage.nudge_settings WHERE user_id = $1',
@@ -679,7 +692,7 @@ export class PgEngageRepo implements EngageRepo {
 
   async exportUser(userId: string): Promise<EngageExport> {
     const q = (text: string) => this.db.query(text, [userId]).then((r) => r.rows);
-    const [enrolments, memberships, squads, sent, received, grace, nudges, nudgePrefs, arms, links, attribution] =
+    const [enrolments, memberships, squads, sent, received, grace, nudges, nudgePrefs, reminders, arms, links, attribution] =
       await Promise.all([
         q(`SELECT ${ENROLMENT_COLUMNS} FROM engage.season_enrolments WHERE user_id = $1`),
         q(`SELECT m.squad_id, m.user_id, m.member_ref, m.season_number, m.role, m.show_stats,
@@ -692,6 +705,7 @@ export class PgEngageRepo implements EngageRepo {
         q(`SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger WHERE user_id = $1 ORDER BY seq`),
         q(`SELECT local_date::text AS local_date, kind, sent_at FROM engage.nudge_log WHERE user_id = $1`),
         q(`SELECT kind, enabled, updated_at FROM engage.nudge_settings WHERE user_id = $1`),
+        q(`SELECT local_date::text AS local_date, slot, claimed_at FROM engage.reminder_log WHERE user_id = $1`),
         q(`SELECT experiment, arm, day_zero::text AS day_zero, assigned_at FROM engage.experiment_arms WHERE user_id = $1`),
         q(`SELECT ${LINK_COLUMNS} FROM engage.share_links WHERE user_id = $1`),
         q(`SELECT share_code, squad_id, surface, created_at FROM engage.referral_attributions
@@ -737,6 +751,11 @@ export class PgEngageRepo implements EngageRepo {
         enabled: Boolean(r.enabled),
         updatedAt: iso(r.updated_at),
       })),
+      reminders: reminders.map((r) => ({
+        localDate: String(r.local_date),
+        slot: String(r.slot),
+        claimedAt: iso(r.claimed_at),
+      })),
       experiments: arms.map((r) => ({
         experiment: r.experiment as ArmRow['experiment'],
         arm: r.arm as ExperimentArm,
@@ -777,6 +796,7 @@ export class PgEngageRepo implements EngageRepo {
         'DELETE FROM engage.grace_ledger WHERE user_id = $1',
         'DELETE FROM engage.nudge_log WHERE user_id = $1',
         'DELETE FROM engage.nudge_settings WHERE user_id = $1',
+        'DELETE FROM engage.reminder_log WHERE user_id = $1',
         'DELETE FROM engage.experiment_arms WHERE user_id = $1',
         // Referral rows that pointed at these links keep the invitee and lose
         // the code (ON DELETE SET NULL), so the inviter is unlinkable.

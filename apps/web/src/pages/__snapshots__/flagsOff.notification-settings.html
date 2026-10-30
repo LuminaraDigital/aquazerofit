@@ -14,7 +14,7 @@
 <main class="pt-6 px-container-margin">
 <div class="glass-card mb-6 flex items-start gap-3 border border-primary/20 p-4" role="status">
 <span class="material-symbols-outlined text-primary shrink-0" aria-hidden="true">info</span>
-<p class="text-sm text-on-surface-variant">Reminder delivery is coming soon. Your preferences are saved now and will apply automatically once notifications launch.</p>
+<p class="text-sm text-on-surface-variant text-pretty">Reminders arrive as Telegram messages from the AquaZeroFit bot, at these times wherever you are. Each comes once a day, water twice, and nothing is sent between 9 pm and 8 am.</p>
 </div>
 <section class="mb-6">
 <h2 class="font-heading font-semibold uppercase tracking-wider text-xl text-primary mb-2">Preferences</h2>
@@ -27,101 +27,33 @@
 </div>
 </div>
 </div>
-<div class="flex flex-col gap-4 opacity-50">
-<div class="glass-card p-card-padding flex flex-col gap-4">
-<div class="flex items-center justify-between gap-3">
-<div class="flex items-center gap-4 min-w-0">
-<div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0" aria-hidden="true">
-<span class="material-symbols-outlined">restaurant</span>
+<div class="flex flex-col gap-4" aria-busy="true">
+<div class="glass-card p-card-padding space-y-2">
+<div aria-hidden="true" class="shimmer rounded-lg h-5 w-40">
 </div>
-<div class="min-w-0">
-<h3 class="font-heading font-semibold text-lg text-on-surface">Meal reminders</h3>
+<div aria-hidden="true" class="shimmer rounded-lg h-3 w-56">
 </div>
 </div>
-<button type="button" role="switch" aria-checked="true" aria-label="Meal reminders" disabled="" class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed bg-secondary">
-<span aria-hidden="true" class="inline-block h-5 w-5 rounded-full bg-on-surface shadow transition-transform translate-x-[22px]">
-</span>
-</button>
+<div class="glass-card p-card-padding space-y-2">
+<div aria-hidden="true" class="shimmer rounded-lg h-5 w-40">
 </div>
-<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
-<label for="meal-time" class="text-sm font-medium text-on-surface-variant uppercase">Next alert</label>
-<input id="meal-time" type="time" disabled="" class="bg-surface-container-low text-primary font-body font-bold border-none rounded-lg p-2 focus:ring-2 focus:ring-primary/50 cursor-pointer disabled:cursor-not-allowed" value="08:30">
+<div aria-hidden="true" class="shimmer rounded-lg h-3 w-56">
 </div>
 </div>
-<div class="glass-card p-card-padding flex flex-col gap-4">
-<div class="flex items-center justify-between gap-3">
-<div class="flex items-center gap-4 min-w-0">
-<div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center text-secondary shrink-0" aria-hidden="true">
-<span class="material-symbols-outlined">water_drop</span>
+<div class="glass-card p-card-padding space-y-2">
+<div aria-hidden="true" class="shimmer rounded-lg h-5 w-40">
 </div>
-<div class="min-w-0">
-<h3 class="font-heading font-semibold text-lg text-on-surface">Water reminders</h3>
+<div aria-hidden="true" class="shimmer rounded-lg h-3 w-56">
 </div>
 </div>
-<button type="button" role="switch" aria-checked="true" aria-label="Water reminders" disabled="" class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed bg-secondary">
-<span aria-hidden="true" class="inline-block h-5 w-5 rounded-full bg-on-surface shadow transition-transform translate-x-[22px]">
-</span>
-</button>
+<div class="glass-card p-card-padding space-y-2">
+<div aria-hidden="true" class="shimmer rounded-lg h-5 w-40">
 </div>
-<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
-<label for="water-frequency" class="text-sm font-medium text-on-surface-variant uppercase">Frequency</label>
-<select id="water-frequency" disabled="" class="bg-surface-container-low text-secondary font-body font-bold border-none rounded-lg p-2 focus:ring-2 focus:ring-secondary/50 cursor-pointer disabled:cursor-not-allowed">
-<option value="1h">Every 1 hour</option>
-<option value="2h">Every 2 hours</option>
-<option value="4h">Every 4 hours</option>
-</select>
-</div>
-</div>
-<div class="glass-card p-card-padding flex flex-col gap-4">
-<div class="flex items-center justify-between gap-3">
-<div class="flex items-center gap-4 min-w-0">
-<div class="w-12 h-12 rounded-full bg-tertiary/10 flex items-center justify-center text-tertiary shrink-0" aria-hidden="true">
-<span class="material-symbols-outlined">fitness_center</span>
-</div>
-<div class="min-w-0">
-<h3 class="font-heading font-semibold text-lg text-on-surface">Workout time</h3>
-</div>
-</div>
-<button type="button" role="switch" aria-checked="true" aria-label="Workout time" disabled="" class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed bg-secondary">
-<span aria-hidden="true" class="inline-block h-5 w-5 rounded-full bg-on-surface shadow transition-transform translate-x-[22px]">
-</span>
-</button>
-</div>
-<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
-<label for="workout-time" class="text-sm font-medium text-on-surface-variant uppercase">Session start</label>
-<input id="workout-time" type="time" disabled="" class="bg-surface-container-low text-tertiary font-body font-bold border-none rounded-lg p-2 focus:ring-2 focus:ring-tertiary/50 cursor-pointer disabled:cursor-not-allowed" value="17:00">
-</div>
-</div>
-<div class="glass-card p-card-padding flex flex-col gap-4">
-<div class="flex items-center justify-between gap-3">
-<div class="flex items-center gap-4 min-w-0">
-<div class="w-12 h-12 rounded-full bg-primary-container/10 flex items-center justify-center text-primary-container shrink-0" aria-hidden="true">
-<span class="material-symbols-outlined">monitoring</span>
-</div>
-<div class="min-w-0">
-<h3 class="font-heading font-semibold text-lg text-on-surface">Weekly weigh-in</h3>
-</div>
-</div>
-<button type="button" role="switch" aria-checked="false" aria-label="Weekly weigh-in" disabled="" class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed bg-surface-container-highest">
-<span aria-hidden="true" class="inline-block h-5 w-5 rounded-full bg-on-surface shadow transition-transform translate-x-[2px]">
-</span>
-</button>
-</div>
-<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
-<label for="weighin-day" class="text-sm font-medium text-on-surface-variant uppercase">Day</label>
-<select id="weighin-day" disabled="" class="bg-surface-container-low text-primary-container font-body font-bold border-none rounded-lg p-2 focus:ring-2 focus:ring-primary/50 cursor-pointer disabled:cursor-not-allowed">
-<option value="Monday">Monday</option>
-<option value="Tuesday">Tuesday</option>
-<option value="Wednesday">Wednesday</option>
-<option value="Thursday">Thursday</option>
-<option value="Friday">Friday</option>
-<option value="Saturday">Saturday</option>
-<option value="Sunday">Sunday</option>
-</select>
+<div aria-hidden="true" class="shimmer rounded-lg h-3 w-56">
 </div>
 </div>
 </div>
-<p class="mt-6 text-xs text-on-surface-variant text-center px-4">Reminder times and per-category choices are stored on this device only. The master switch is saved to your account consents.</p>
+<p class="mt-6 text-xs text-on-surface-variant text-center px-4">Your reminder choices are saved to your account and follow you to any device.</p>
 </main>
 <nav aria-label="Main navigation" class="fixed bottom-0 inset-x-0 z-50">
 <div class="mx-auto max-w-md flex justify-around items-stretch glass-blur border-t border-outline-variant/30" style="padding-bottom: var(--azf-nav-safe-bottom, env(safe-area-inset-bottom, 0px)); padding-left: var(--azf-nav-safe-left, 0px); padding-right: var(--azf-nav-safe-right, 0px);">

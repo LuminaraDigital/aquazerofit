@@ -26,6 +26,7 @@ import type {
   ProgressionStatus,
   PublicUser,
   ReadinessAssessment,
+  ReminderPrefs,
   UserMemory,
   UserTier,
   WellnessProfile,
@@ -72,6 +73,7 @@ export const queryKeys = {
   profile: ['profile'] as const,
   targets: ['targets'] as const,
   consents: ['consents'] as const,
+  reminderPrefs: ['reminderPrefs'] as const,
   memory: ['memory'] as const,
   nutritionDaily: (date: string) => ['nutrition', 'daily', date] as const,
   nutritionTrends: (range: TrendRange) => ['nutrition', 'trends', range] as const,
@@ -320,6 +322,24 @@ export function useUpdateConsents() {
       reminders: boolean;
     }) => api<ConsentState>('/me/consents', { method: 'PUT', body: input }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['consents'] }),
+  });
+}
+
+/** GET /me/reminder-prefs: what the Telegram reminders send and when; null until first saved. */
+export function useReminderPrefs(): UseQueryResult<ReminderPrefs | null> {
+  return useQuery({
+    queryKey: queryKeys.reminderPrefs,
+    queryFn: async () =>
+      unwrap<ReminderPrefs>(await orNull(() => api<unknown>('/me/reminder-prefs')), 'reminderPrefs'),
+    enabled: tokenStore.isAuthenticated,
+  });
+}
+
+export function useSaveReminderPrefs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReminderPrefs) => api<unknown>('/me/reminder-prefs', { method: 'PUT', body: input }),
+    onSuccess: (data) => qc.setQueryData(queryKeys.reminderPrefs, unwrap<ReminderPrefs>(data, 'reminderPrefs')),
   });
 }
 

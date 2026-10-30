@@ -25,6 +25,7 @@ import { sweepIdempotencyRecords } from './modules/logs/service';
 import { recoverStuckVisionJobs, sweepVisionArtifacts } from './modules/vision/router';
 import { sweepGrowthEvents } from './modules/analytics/router';
 import { creditLedger } from './modules/ai/creditLedger';
+import { startReminderScheduler } from './modules/reminders/scheduler';
 import { warnIfNoAiProviderConfigured } from './modules/ai/gateway';
 
 // Fail fast: never boot a production process on dev fallback secrets.
@@ -173,6 +174,7 @@ setInterval(runReservationSweep, 6 * 3600 * 1000).unref();
 // hang nobody enjoys diagnosing, so the guard is stated rather than assumed.
 if (!config.isTest) {
   setInterval(runIdempotencySweep, config.idempotencySweepIntervalMs).unref();
+  if (config.reminderDeliveryEnabled) startReminderScheduler();
 }
 
 const server = app.listen(config.port, () => {

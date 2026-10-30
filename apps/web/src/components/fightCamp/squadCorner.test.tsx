@@ -94,6 +94,10 @@ describe('SquadCornerSheet', () => {
     // Typed one character at a time, as a person would: the field must keep
     // focus between keystrokes (the sheet's focus trap once stole it back).
     const field = screen.getByLabelText('Squad name') as HTMLInputElement;
+    // The focus trap places initial focus in an effect after the dialog
+    // renders; let it land first, or under load it lands after field.focus()
+    // and the assertion below sees the trap's choice rather than a steal.
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
     field.focus();
     let typed = '';
     for (const ch of 'Gym Crew') {

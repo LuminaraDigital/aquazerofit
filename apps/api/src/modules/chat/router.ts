@@ -31,15 +31,22 @@ import { assertLaneAllowed } from '../ai/tierPolicy';
 import { systemMessagesFor } from '../ai/persona';
 import { activeCoachFor } from '../coaches/service';
 import { todayFor } from '../../platform/dates';
+import { getStore } from '../../platform/store';
 import { asyncHandler, deleteDoc, getUser, newId, nowIso, readProfile, sleep, upsertDoc, whereDocs, byIdDoc } from '../ai/util';
 import { hasConsent } from '../me/service';
 // Deliberate team-boundary exception, and the point of the feature: chat-native
 // logging must produce the SAME meal-log row as the food tab, written by the
 // same function. A second write path here would be a second place for totals,
 // idempotency and the source field to drift.
-import { createMealLog } from '../logs/service';
+import { createMealLog, createWaterLog, upsertWeightLog } from '../logs/service';
 import { extractMemoryFromTurn } from '../memory/extraction';
 import { getRememberedPortionGrams, rememberPortionCorrection } from '../memory/service';
+import {
+  actionNoteFor,
+  CHAT_ACTION_DRAFT_TYPE,
+  parseCoachAction,
+  type ChatActionDraft,
+} from './actions';
 import { buildHistoryMessages } from './history';
 import {
   applyRememberedPortions,
@@ -299,11 +306,38 @@ chatRouter.post(
       // rules still come last and still win. See `ai/persona.ts` for why that
       // ordering is the safety-relevant part rather than a stylistic one.
       const coach = activeCoachFor(user.id);
+
+      // Code reads the sentence and the user confirms the card. The note only
+      // keeps the reply consistent with what is on screen, so it is only sent
+      // to a client that says it can show the card.
+      const coachAction = req.body?.actionCards === true ? parseCoachAction(content) : null;
+      if (coachAction) {
+        const actionDraft: ChatActionDraft = {
+          id: newId('cad'),
+          userId: user.id,
+          type: CHAT_ACTION_DRAFT_TYPE,
+          sessionId,
+          action: coachAction,
+          sourceText: content,
+          localDate,
+          status: 'proposed',
+          loggedId: null,
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        };
+        await upsertDoc('ai', actionDraft);
+      }
+
       // --- Stream the reply using real SSE from provider (AI-02)
       let fullText = '';
       const streamResult = await stream(
         'chatFast',
-        [...systemMessagesFor(coach), ...history, { role: 'user', content }],
+        [
+          ...systemMessagesFor(coach),
+          ...(coachAction ? [{ role: 'system' as const, content: actionNoteFor(coachAction) }] : []),
+          ...history,
+          { role: 'user', content },
+        ],
         {
           context: context as unknown as Record<string, unknown>,
           promptId: 'P-07',
@@ -465,6 +499,60 @@ chatRouter.post(
 // rejecting a wrong proposal never costs less than accepting a right one —
 // billing must not put a thumb on the scale of the safety gate.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Coach actions (see ./actions): the same propose → confirm shape as meal
+// drafts. Confirm and dismiss are synchronous on purpose: with no await between
+// the status check and the write, two taps cannot both log.
+// ---------------------------------------------------------------------------
+
+function ownedActionDraft(userId: string, draftId: string): ChatActionDraft {
+  const draft = getStore().byId<ChatActionDraft>('ai', draftId);
+  if (!draft || draft.type !== CHAT_ACTION_DRAFT_TYPE || draft.userId !== userId) {
+    throw new AppError('NOT_FOUND', 'Proposal not found.');
+  }
+  if (draft.status !== 'proposed') {
+    throw new AppError('CONFLICT', `This proposal is already ${draft.status}.`, {
+      status: draft.status,
+      loggedId: draft.loggedId,
+    });
+  }
+  return draft;
+}
+
+chatRouter.get(
+  '/action-drafts',
+  asyncHandler(async (req, res) => {
+    const user = getUser(req);
+    const drafts = getStore().where<ChatActionDraft>(
+      'ai',
+      (d) => d.userId === user.id && d.type === CHAT_ACTION_DRAFT_TYPE && d.status === 'proposed',
+    );
+    drafts.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+    res.json({ drafts: drafts.slice(0, 5) });
+  }),
+);
+
+chatRouter.post('/action-drafts/:id/confirm', (req, res) => {
+  const user = getUser(req);
+  const draft = ownedActionDraft(user.id, req.params.id as string);
+  const { action, localDate } = draft;
+  const loggedId =
+    action.kind === 'logWater'
+      ? createWaterLog(user.id, { amountMl: action.amountMl, localDate }).log.id
+      : upsertWeightLog(user.id, { weightKg: action.weightKg, localDate }).id;
+  const confirmed: ChatActionDraft = { ...draft, status: 'confirmed', loggedId, updatedAt: nowIso() };
+  getStore().upsert('ai', confirmed);
+  res.json({ draft: confirmed });
+});
+
+chatRouter.post('/action-drafts/:id/dismiss', (req, res) => {
+  const user = getUser(req);
+  const draft = ownedActionDraft(user.id, req.params.id as string);
+  const dismissed: ChatActionDraft = { ...draft, status: 'dismissed', updatedAt: nowIso() };
+  getStore().upsert('ai', dismissed);
+  res.json({ draft: dismissed });
+});
 
 const mealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
 

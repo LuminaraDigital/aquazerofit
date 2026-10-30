@@ -276,7 +276,7 @@ export async function streamChat(
         ...(access ? { Authorization: `Bearer ${access}` } : {}),
         'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, actionCards: true }),
       signal,
     });
   };

@@ -38,8 +38,9 @@ import { BottomSheet } from '@/pages/training/BottomSheet';
 import { AquaMascot } from '@/components/brand/AquaMascot';
 import { CoachAvatar } from '@/components/coach/CoachAvatar';
 import { AkinStage } from '@/components/brand/AkinStage';
+import { CoachActionCard } from './CoachActionCard';
 import { MealDraftCard } from './MealDraftCard';
-import type { ChatMealDraft, ConfirmSelection } from './mealDraft';
+import type { ChatActionDraft, ChatMealDraft, ConfirmSelection } from './mealDraft';
 
 const SUGGESTED_PROMPTS = [
   'What should I eat tonight?',
@@ -271,10 +272,33 @@ export default function Coach() {
     if (latest) setDraft(latest);
   }, [pendingDrafts.data, draft]);
 
+  // ---- pending coach actions ----
+  const pendingActions = useQuery({
+    queryKey: ['chat', 'action-drafts'],
+    queryFn: () => api<{ drafts: ChatActionDraft[] }>('/chat/action-drafts'),
+  });
+  const actionDrafts = pendingActions.data?.drafts ?? [];
+
+  const settleAction = useMutation({
+    mutationFn: ({ id, verb }: { id: string; verb: 'confirm' | 'dismiss' }) =>
+      api<{ draft: ChatActionDraft }>(`/chat/action-drafts/${id}/${verb}`, { method: 'POST' }),
+    onSuccess: async (_data, { verb }) => {
+      if (verb === 'confirm') {
+        toast.success('Logged.');
+        // The dashboard and progress read the same rows this just wrote.
+        void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.progress });
+      }
+    },
+    onError: (e) =>
+      toast.error(e instanceof ApiError ? e.message : 'Could not update that. Please try again.'),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['chat', 'action-drafts'] }),
+  });
+
   // ---- scroll to latest ----
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages.length, streamText, pendingUser, frames.length, draft]);
+  }, [messages.length, streamText, pendingUser, frames.length, draft, actionDrafts.length]);
 
   // ---- send / stream ----
   const send = useCallback(
@@ -294,6 +318,7 @@ export default function Coach() {
         setLiveNote(`${coachName} has replied`);
         await queryClient.invalidateQueries({ queryKey: ['chat', 'messages', sessionId] });
         void queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] });
+        void queryClient.invalidateQueries({ queryKey: ['chat', 'action-drafts'] });
       } catch (e) {
         const message =
           e instanceof ApiError
@@ -662,6 +687,19 @@ export default function Coach() {
             />
           </div>
         )}
+
+        {!streaming &&
+          actionDrafts.map((d) => (
+            <div key={d.id} className="flex max-w-[95%] flex-col gap-2 self-start">
+              <AssistantByline coach={activeCoach} />
+              <CoachActionCard
+                draft={d}
+                pending={settleAction.isPending}
+                onConfirm={() => settleAction.mutate({ id: d.id, verb: 'confirm' })}
+                onDismiss={() => settleAction.mutate({ id: d.id, verb: 'dismiss' })}
+              />
+            </div>
+          ))}
 
         {proposeMeal.isPending && (
           <div className="flex max-w-[90%] flex-col gap-2 self-start">

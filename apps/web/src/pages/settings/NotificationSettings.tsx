@@ -301,7 +301,9 @@ export default function NotificationSettings() {
             </div>
             <div className="flex items-center justify-between pt-2 border-t border-outline-variant/30">
               <span className="text-sm font-medium text-on-surface-variant uppercase">Times</span>
-              <span className="text-secondary font-body font-bold p-2 tabular-nums">
+              <span
+                className={`text-secondary font-body font-bold p-2 tabular-nums ${prefs.water.enabled ? '' : 'opacity-40'}`}
+              >
                 {WATER_REMINDER_TIMES.join(' and ')}
               </span>
             </div>

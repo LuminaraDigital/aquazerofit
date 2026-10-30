@@ -17,7 +17,7 @@ import { requireAuth } from '../../platform/auth';
 import { localeOf } from '../../platform/locale';
 import { AppError } from '../../platform/errors';
 import { chatMessageSchema, localDateSchema, WELLNESS_DISCLAIMER, portionCorrectionWorthRemembering } from '@aquazerofit/shared';
-import type { Allergen, ChatMessage, ChatSession, Food, MealLogItem, MealType, User } from '@aquazerofit/shared';
+import type { Allergen, ChatMessage, ChatSession, MealLogItem, MealType, User } from '@aquazerofit/shared';
 import { complete, stream, type GatewayResult } from '../ai/gateway';
 import {
   preAsync,
@@ -31,28 +31,27 @@ import { assertLaneAllowed } from '../ai/tierPolicy';
 import { systemMessagesFor } from '../ai/persona';
 import { activeCoachFor } from '../coaches/service';
 import { todayFor } from '../../platform/dates';
-import { getStore } from '../../platform/store';
-import { asyncHandler, deleteDoc, getUser, newId, nowIso, readProfile, sleep, upsertDoc, whereDocs, byIdDoc } from '../ai/util';
+import { asyncHandler, deleteDoc, getUser, newId, nowIso, sleep, upsertDoc, whereDocs, byIdDoc } from '../ai/util';
 import { hasConsent } from '../me/service';
 // Deliberate team-boundary exception, and the point of the feature: chat-native
 // logging must produce the SAME meal-log row as the food tab, written by the
 // same function. A second write path here would be a second place for totals,
 // idempotency and the source field to drift.
-import { createMealLog, createWaterLog, upsertWeightLog } from '../logs/service';
+import { createMealLog } from '../logs/service';
 import { extractMemoryFromTurn } from '../memory/extraction';
-import { getRememberedPortionGrams, rememberPortionCorrection } from '../memory/service';
+import { rememberPortionCorrection } from '../memory/service';
 import {
-  actionNoteFor,
-  CHAT_ACTION_DRAFT_TYPE,
-  parseCoachAction,
-  type ChatActionDraft,
-} from './actions';
+  assembleMealDraft,
+  confirmActionDraft,
+  dismissActionDraft,
+  dismissSessionDrafts,
+  listActionDrafts,
+  loadFoodCorpus,
+  proposeCoachAction,
+} from './actionDrafts';
 import { buildHistoryMessages } from './history';
 import {
-  applyRememberedPortions,
-  buildDraftItems,
   CHAT_MEAL_DRAFT_TYPE,
-  draftNotes,
   MAX_DRAFT_ITEMS,
   MAX_ITEM_GRAMS,
   MAX_SOURCE_TEXT_LENGTH,
@@ -173,6 +172,7 @@ chatRouter.delete(
       await deleteDoc('ai', message.id);
     }
     await deleteDoc('ai', sessionId);
+    dismissSessionDrafts(user.id, sessionId);
     res.status(204).end();
   }),
 );
@@ -281,9 +281,8 @@ chatRouter.post(
       // --- Ground the model in real user data via tools — but ONLY with the
       // user's explicit aiPersonalisation consent. Without it, no profile or
       // log data enters model context and the coach answers generically.
-      const localDate = typeof req.body?.localDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.localDate)
-        ? (req.body.localDate as string)
-        : todayFor(req);
+      const requestedDate = localDateSchema.safeParse(req.body?.localDate);
+      const localDate = requestedDate.success ? requestedDate.data : todayFor(req);
       const consented = hasConsent(user.id, 'aiPersonalisation');
       // Display name is identity, not wellness data — but greeting by name is
       // still personalisation, so it flows only with the same consent.
@@ -310,23 +309,13 @@ chatRouter.post(
       // Code reads the sentence and the user confirms the card. The note only
       // keeps the reply consistent with what is on screen, so it is only sent
       // to a client that says it can show the card.
-      const coachAction = req.body?.actionCards === true ? parseCoachAction(content) : null;
-      if (coachAction) {
-        const actionDraft: ChatActionDraft = {
-          id: newId('cad'),
-          userId: user.id,
-          type: CHAT_ACTION_DRAFT_TYPE,
-          sessionId,
-          action: coachAction,
-          sourceText: content,
-          localDate,
-          status: 'proposed',
-          loggedId: null,
-          createdAt: nowIso(),
-          updatedAt: nowIso(),
-        };
-        await upsertDoc('ai', actionDraft);
-      }
+      const actionNote = parsed.data.actionCards
+        ? await proposeCoachAction(user.id, sessionId, content, localDate).catch((err: unknown) => {
+            // Optional on top of the reply: a failure here must not cost the turn.
+            console.error('[chat] coach action failed', err);
+            return null;
+          })
+        : null;
 
       // --- Stream the reply using real SSE from provider (AI-02)
       let fullText = '';
@@ -334,7 +323,7 @@ chatRouter.post(
         'chatFast',
         [
           ...systemMessagesFor(coach),
-          ...(coachAction ? [{ role: 'system' as const, content: actionNoteFor(coachAction) }] : []),
+          ...(actionNote ? [{ role: 'system' as const, content: actionNote }] : []),
           ...history,
           { role: 'user', content },
         ],
@@ -501,57 +490,22 @@ chatRouter.post(
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Coach actions (see ./actions): the same propose → confirm shape as meal
-// drafts. Confirm and dismiss are synchronous on purpose: with no await between
-// the status check and the write, two taps cannot both log.
+// Coach actions: see ./actionDrafts
 // ---------------------------------------------------------------------------
 
-function ownedActionDraft(userId: string, draftId: string): ChatActionDraft {
-  const draft = getStore().byId<ChatActionDraft>('ai', draftId);
-  if (!draft || draft.type !== CHAT_ACTION_DRAFT_TYPE || draft.userId !== userId) {
-    throw new AppError('NOT_FOUND', 'Proposal not found.');
-  }
-  if (draft.status !== 'proposed') {
-    throw new AppError('CONFLICT', `This proposal is already ${draft.status}.`, {
-      status: draft.status,
-      loggedId: draft.loggedId,
-    });
-  }
-  return draft;
-}
+chatRouter.get('/action-drafts', (req, res) => {
+  res.json({ drafts: listActionDrafts(getUser(req).id) });
+});
 
-chatRouter.get(
-  '/action-drafts',
+chatRouter.post(
+  '/action-drafts/:id/confirm',
   asyncHandler(async (req, res) => {
-    const user = getUser(req);
-    const drafts = getStore().where<ChatActionDraft>(
-      'ai',
-      (d) => d.userId === user.id && d.type === CHAT_ACTION_DRAFT_TYPE && d.status === 'proposed',
-    );
-    drafts.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
-    res.json({ drafts: drafts.slice(0, 5) });
+    res.json({ draft: await confirmActionDraft(getUser(req), req.params.id as string, todayFor(req)) });
   }),
 );
 
-chatRouter.post('/action-drafts/:id/confirm', (req, res) => {
-  const user = getUser(req);
-  const draft = ownedActionDraft(user.id, req.params.id as string);
-  const { action, localDate } = draft;
-  const loggedId =
-    action.kind === 'logWater'
-      ? createWaterLog(user.id, { amountMl: action.amountMl, localDate }).log.id
-      : upsertWeightLog(user.id, { weightKg: action.weightKg, localDate }).id;
-  const confirmed: ChatActionDraft = { ...draft, status: 'confirmed', loggedId, updatedAt: nowIso() };
-  getStore().upsert('ai', confirmed);
-  res.json({ draft: confirmed });
-});
-
 chatRouter.post('/action-drafts/:id/dismiss', (req, res) => {
-  const user = getUser(req);
-  const draft = ownedActionDraft(user.id, req.params.id as string);
-  const dismissed: ChatActionDraft = { ...draft, status: 'dismissed', updatedAt: nowIso() };
-  getStore().upsert('ai', dismissed);
-  res.json({ draft: dismissed });
+  res.json({ draft: dismissActionDraft(getUser(req).id, req.params.id as string) });
 });
 
 const mealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
@@ -583,24 +537,12 @@ const confirmMealDraftSchema = z.object({
 /** Meal type when neither the client nor the model committed to one. */
 const DEFAULT_MEAL_TYPE: MealType = 'snack';
 
-async function loadFoodCorpus(): Promise<Food[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return whereDocs<Food>('content', (d: any) => d?.type === 'food');
-}
-
 async function loadOwnedDraft(userId: string, draftId: string): Promise<ChatMealDraft> {
   const draft = await byIdDoc<ChatMealDraft>('ai', draftId);
   if (!draft || draft.type !== CHAT_MEAL_DRAFT_TYPE || draft.userId !== userId) {
     throw new AppError('NOT_FOUND', 'Meal draft not found.');
   }
   return draft;
-}
-
-/** Declared allergies, or none when the user has not consented to us reading them. */
-async function allergiesFor(userId: string): Promise<{ allergies: Allergen[]; consented: boolean }> {
-  if (!hasConsent(userId, 'wellnessDataProcessing')) return { allergies: [], consented: false };
-  const profile = await readProfile(userId);
-  return { allergies: profile?.allergies ?? [], consented: true };
 }
 
 chatRouter.post(
@@ -665,41 +607,21 @@ chatRouter.post(
         }
       }
 
-      const { allergies, consented } = await allergiesFor(user.id);
-      const foods = await loadFoodCorpus();
-      const items = applyRememberedPortions(
-        buildDraftItems(candidates, foods, allergies),
-        foods,
-        (foodId) => getRememberedPortionGrams(user.id, foodId),
-      );
-      const allergyCheck: ChatMealDraft['allergyCheck'] = consented ? 'applied' : 'skippedNoConsent';
-
-      const draft: ChatMealDraft = {
-        id: newId('cmd'),
+      const draft = await assembleMealDraft({
         userId: user.id,
-        type: CHAT_MEAL_DRAFT_TYPE,
         sessionId,
-        sourceText: text,
-        mealType: requestedMealType ?? modelMealType ?? DEFAULT_MEAL_TYPE,
+        text,
         localDate,
-        // An empty draft is still persisted: it is the evaluation signal that
-        // tells us which sentences P-12 cannot read, and it is what the client
-        // renders instead of silently doing nothing.
-        status: items.length > 0 ? 'proposed' : 'empty',
-        items,
-        notes: draftNotes(items, allergyCheck),
-        allergyCheck,
+        mealType: requestedMealType ?? modelMealType ?? DEFAULT_MEAL_TYPE,
+        candidates,
         ai: result.meta,
-        loggedMealId: null,
-        createdAt: nowIso(),
-        updatedAt: nowIso(),
-      };
+      });
       await upsertDoc('ai', draft);
 
       // Offline-template output after real providers failed is not a model
       // answer the user should pay for; neither is a proposal with nothing in
       // it. Same stance as the chat, recommendation and vision lanes.
-      await settleReservation(reservationId, !(result.meta.degraded || items.length === 0));
+      await settleReservation(reservationId, !(result.meta.degraded || draft.items.length === 0));
 
       res.status(201).json({ draft });
     } catch (err) {

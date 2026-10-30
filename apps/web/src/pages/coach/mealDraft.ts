@@ -75,14 +75,3 @@ export function describePortion(match: ChatMealMatch): string {
   if (match.servingLabel) return `standard serving: ${match.servingLabel}`;
   return 'assumed portion';
 }
-
-export type CoachAction =
-  | { kind: 'logWater'; amountMl: number }
-  | { kind: 'logWeight'; weightKg: number };
-
-export interface ChatActionDraft {
-  id: string;
-  action: CoachAction;
-  localDate: string;
-  status: 'proposed' | 'confirmed' | 'dismissed';
-}

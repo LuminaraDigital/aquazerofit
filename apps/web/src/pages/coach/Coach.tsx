@@ -17,7 +17,7 @@ import {
 } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ChatMessage, ChatSession, ChatToolCall, MealType } from '@aquazerofit/shared';
+import type { ChatActionDraft, ChatMessage, ChatSession, ChatToolCall, MealType } from '@aquazerofit/shared';
 import { AQUA_CHARACTER, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
 import { api, ApiError, streamChat } from '@/lib/api';
 import { asList } from '@/lib/envelopes';
@@ -25,7 +25,7 @@ import { todayLocalDate } from '@/lib/format';
 import { useDraftPersistence } from '@/lib/useDraftPersistence';
 import { useTelegramUnsavedEdits } from '@/lib/useTelegramChrome';
 import { trackFirstValueMeal } from '@/lib/retention';
-import { queryKeys, useCoachRoster, type CoachCardData } from '@/lib/queries';
+import { queryKeys, useCoachRoster, useConsents, useMe, useUpdateConsents, type CoachCardData } from '@/lib/queries';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Chip } from '@/components/ui/Chip';
@@ -39,8 +39,20 @@ import { AquaMascot } from '@/components/brand/AquaMascot';
 import { CoachAvatar } from '@/components/coach/CoachAvatar';
 import { AkinStage } from '@/components/brand/AkinStage';
 import { CoachActionCard } from './CoachActionCard';
+import { CoachConsentCard } from './CoachConsentCard';
 import { MealDraftCard } from './MealDraftCard';
-import type { ChatActionDraft, ChatMealDraft, ConfirmSelection } from './mealDraft';
+import type { ChatMealDraft, ConfirmSelection } from './mealDraft';
+
+/** Per account: "Not now" on a shared phone must not answer for someone else. */
+const consentDeclinedKey = (userId: string) => `coach:consentDeclined:${userId}`;
+
+function readConsentDeclined(userId: string): boolean {
+  try {
+    return window.localStorage.getItem(consentDeclinedKey(userId)) === '1';
+  } catch {
+    return false;
+  }
+}
 
 const SUGGESTED_PROMPTS = [
   'What should I eat tonight?',
@@ -272,6 +284,18 @@ export default function Coach() {
     if (latest) setDraft(latest);
   }, [pendingDrafts.data, draft]);
 
+  // The list is cached, so it has to lose the draft too: clearing only local
+  // state let the effect above put a logged meal straight back on screen.
+  const forgetDraft = useCallback(
+    (draftId: string | undefined) => {
+      queryClient.setQueryData<{ drafts: ChatMealDraft[] }>(['chat', 'meal-drafts'], (cached) =>
+        cached ? { drafts: cached.drafts.filter((d) => d.id !== draftId) } : cached,
+      );
+      setDraft(null);
+    },
+    [queryClient],
+  );
+
   // ---- pending coach actions ----
   const pendingActions = useQuery({
     queryKey: ['chat', 'action-drafts'],
@@ -284,16 +308,36 @@ export default function Coach() {
       api<{ draft: ChatActionDraft }>(`/chat/action-drafts/${id}/${verb}`, { method: 'POST' }),
     onSuccess: async (_data, { verb }) => {
       if (verb === 'confirm') {
-        toast.success('Logged.');
+        toast.success('Done.');
         // The dashboard and progress read the same rows this just wrote.
         void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
         void queryClient.invalidateQueries({ queryKey: queryKeys.progress });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workoutToday });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.plan });
+        void queryClient.invalidateQueries({ queryKey: ['weight'] });
       }
     },
     onError: (e) =>
       toast.error(e instanceof ApiError ? e.message : 'Could not update that. Please try again.'),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ['chat', 'action-drafts'] }),
   });
+
+  // ---- personalisation consent ----
+  const consents = useConsents().data;
+  const updateConsents = useUpdateConsents();
+  const userId = useMe().data?.id;
+  const [declinedNow, setDeclinedNow] = useState(false);
+  const showConsent =
+    userId !== undefined && consents?.aiPersonalisation === false && !declinedNow && !readConsentDeclined(userId);
+
+  const declineConsent = useCallback(() => {
+    setDeclinedNow(true);
+    try {
+      if (userId) window.localStorage.setItem(consentDeclinedKey(userId), '1');
+    } catch {
+      // Storage denied: the card returns next visit, which is harmless.
+    }
+  }, [userId]);
 
   // ---- scroll to latest ----
   useEffect(() => {
@@ -318,7 +362,6 @@ export default function Coach() {
         setLiveNote(`${coachName} has replied`);
         await queryClient.invalidateQueries({ queryKey: ['chat', 'messages', sessionId] });
         void queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] });
-        void queryClient.invalidateQueries({ queryKey: ['chat', 'action-drafts'] });
       } catch (e) {
         const message =
           e instanceof ApiError
@@ -339,6 +382,9 @@ export default function Coach() {
         setStreaming(false);
         setStreamText('');
         setPendingUser(null);
+        // A proposal survives a failed reply, so these refresh either way.
+        void queryClient.invalidateQueries({ queryKey: ['chat', 'action-drafts'] });
+        void queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
       }
     },
     [sessionId, streaming, queryClient, coachName, clearComposerDraft],
@@ -374,7 +420,7 @@ export default function Coach() {
         body: { ...payload, localDate: localToday() },
       }),
     onSuccess: async (data) => {
-      setDraft(null);
+      forgetDraft(draft?.id);
       trackFirstValueMeal('coach_confirm');
       toast.success(`Logged ${Math.round(data.mealLog.totalKcal)} kcal`);
       await queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
@@ -390,8 +436,8 @@ export default function Coach() {
   const dismissDraft = useMutation({
     mutationFn: (draftId: string) =>
       api<void>(`/chat/meal-drafts/${draftId}/dismiss`, { method: 'POST' }),
-    onSettled: () => {
-      setDraft(null);
+    onSettled: (_data, _error, draftId) => {
+      forgetDraft(draftId);
       void queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
     },
   });
@@ -403,6 +449,9 @@ export default function Coach() {
       setClearOpen(false);
       setFrames([]);
       setMenuFor(null);
+      forgetDraft(draft?.id);
+      void queryClient.invalidateQueries({ queryKey: ['chat', 'action-drafts'] });
+      void queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
       queryClient.removeQueries({ queryKey: ['chat', 'messages'] });
       queryClient.setQueryData(['chat', 'sessions'], []);
       // reuse the bootstrap path to open a fresh session immediately
@@ -688,13 +737,29 @@ export default function Coach() {
           </div>
         )}
 
+        {showConsent && (
+          <div className="flex max-w-[95%] flex-col gap-2 self-start">
+            <CoachConsentCard
+              coachName={coachName}
+              pending={updateConsents.isPending}
+              onAllow={() =>
+                updateConsents.mutate(
+                  { ...consents, aiPersonalisation: true },
+                  { onError: () => toast.error('Could not update consent.') },
+                )
+              }
+              onDecline={declineConsent}
+            />
+          </div>
+        )}
+
         {!streaming &&
           actionDrafts.map((d) => (
             <div key={d.id} className="flex max-w-[95%] flex-col gap-2 self-start">
               <AssistantByline coach={activeCoach} />
               <CoachActionCard
                 draft={d}
-                pending={settleAction.isPending}
+                pending={settleAction.isPending && settleAction.variables?.id === d.id}
                 onConfirm={() => settleAction.mutate({ id: d.id, verb: 'confirm' })}
                 onDismiss={() => settleAction.mutate({ id: d.id, verb: 'dismiss' })}
               />

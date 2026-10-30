@@ -87,8 +87,8 @@ beforeAll(async () => {
   expect(res.status).toBe(201);
   token = res.body.accessToken as string;
 
-  // Meal photos are a premium lane. This file tests storage and type checks,
-  // not the paywall, so the account is comped the same way a paid one is.
+  // This file tests storage and type checks, not the credit meter, so the
+  // account is comped for enough credits to upload repeatedly.
   const user = getStore().byId<User>('users', res.body.user.id as string);
   expect(user).toBeTruthy();
   getStore().upsert('users', { ...user!, tier: 'premium' });

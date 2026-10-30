@@ -97,7 +97,12 @@ export default function Settings() {
   }
 
   async function toggleConsent(
-    key: 'wellnessDataProcessing' | 'aiPersonalisation' | 'anonymisedAnalytics' | 'reminders',
+    key:
+      | 'wellnessDataProcessing'
+      | 'aiPersonalisation'
+      | 'anonymisedAnalytics'
+      | 'reminders'
+      | 'foodPhotoTraining',
     value: boolean,
   ) {
     if (!consents) return;
@@ -413,6 +418,12 @@ export default function Settings() {
                     label: 'Anonymised analytics',
                     body: 'Help improve the product.',
                     checked: consents.anonymisedAnalytics,
+                  },
+                  {
+                    key: 'foodPhotoTraining',
+                    label: 'Food photo training',
+                    body: 'Keep your confirmed meal photos for up to 2 years to improve food recognition. Optional. Turning this off deletes them.',
+                    checked: consents.foodPhotoTraining === true,
                   },
                   {
                     key: 'reminders',

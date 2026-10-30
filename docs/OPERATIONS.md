@@ -328,3 +328,15 @@ curl -s http://localhost:4000/health
 curl -s http://localhost:4000/ready
 curl -s http://localhost:4000/metrics
 ```
+
+## Food photo training storage
+
+Photographs kept under the `foodPhotoTraining` consent are written to `food-photo-samples` inside `UPLOADS_DIR`. `deploy/cloudrun/service.yaml` sets no `UPLOADS_DIR` and no volume, and the container filesystem does not survive a new revision, so confirm the live service has a persistent volume before relying on this data. Without one, every deploy destroys the images and leaves only their label documents.
+
+The `aquazerofit-uploads` bucket can be mounted on the running service. Deploys keep existing volumes and env:
+
+```bash
+gcloud run services update aquazerofit-api --region australia-southeast1 --add-volume name=uploads,type=cloud-storage,bucket=aquazerofit-uploads --add-volume-mount volume=uploads,mount-path=/data/uploads --update-env-vars UPLOADS_DIR=/data/uploads
+```
+
+Before the consent ships in a store release, update the Photos row of the Play Data safety form to match `docs/play-store/DECLARATIONS.md`.

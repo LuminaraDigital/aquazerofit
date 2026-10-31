@@ -5,7 +5,8 @@
  * messages array the gateway puts on the wire.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { complete, withContextMessage, type GatewayMessage } from '../modules/ai/gateway';
+import { complete, type GatewayMessage } from '../modules/ai/gateway';
+import { withContextMessage } from '../modules/ai/untrustedContext';
 
 const PROVIDER_ENV = ['GROQ_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'NVIDIA_API_KEY', 'OLLAMA_API_KEY'];
 const saved = new Map<string, string | undefined>();

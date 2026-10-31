@@ -60,6 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     let unsub = () => {};
     let cancelled = false;
+    // An SDK that will not load settles loading as signed out of Firebase, so
+    // the guard can still restore a cookie or Telegram session.
+    const settle = () => {
+      if (!cancelled) setIsLoading(false);
+    };
     void loadFirebaseSdk().then((sdk) => {
       if (cancelled) return;
       if (!sdk.auth) {
@@ -84,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         })();
       });
-    });
+    }, settle);
     return () => {
       cancelled = true;
       unsub();

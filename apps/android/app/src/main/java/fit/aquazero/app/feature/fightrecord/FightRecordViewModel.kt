@@ -67,8 +67,11 @@ class FightRecordViewModel @Inject constructor(
 
     init {
         // drop(1): the count as it stands on subscribe is not a drain, and the
-        // resume refresh already covers opening.
-        outboxRepository.pendingCount
+        // resume refresh already covers opening. The live count leaves FAILED
+        // ops out, so one rejected log cannot stop every later drain from
+        // refreshing; an op that fails also ends a drain, which costs one
+        // unneeded fetch rather than a missed one.
+        outboxRepository.liveCount
             .distinctUntilChanged()
             .drop(1)
             .filter { it == 0 }

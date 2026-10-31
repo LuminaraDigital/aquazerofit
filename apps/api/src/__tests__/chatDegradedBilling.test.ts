@@ -108,6 +108,63 @@ it('releases the chat reservation when meta.degraded is true', async () => {
   expect(CREDIT_COSTS.chatTurn).toBe(1);
 });
 
+it('keeps an answer cut off mid-stream as it stood, unbilled, with nothing appended', async () => {
+  // The provider starts answering, then the connection drops (or the chat
+  // deadline aborts a long generation). Part of the answer has already gone
+  // to the user; the provider's next attempt would succeed and, before this,
+  // was streamed after it and billed as a whole answer.
+  resetProviderCircuits();
+  const encoder = new TextEncoder();
+  let streams = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: { body: string }) => {
+      if ((JSON.parse(init.body) as { stream?: boolean }).stream !== true) {
+        return { ok: false, status: 503, headers: { get: (): null => null } };
+      }
+      streams += 1;
+      const frames = (streams === 1 ? ['Half ', 'an answer'] : ['A second answer.']).map(
+        (content) => `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`,
+      );
+      const breaks = streams === 1;
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (): null => null },
+        body: new ReadableStream<Uint8Array>({
+          pull(controller) {
+            const next = frames.shift();
+            if (next !== undefined) controller.enqueue(encoder.encode(next));
+            else if (breaks) controller.error(new Error('terminated'));
+            else controller.close();
+          },
+        }),
+      };
+    }),
+  );
+  await creditLedger.grantDailyIfNeeded(userId);
+  const before = await creditLedger.balance(userId);
+
+  const res = await request(app)
+    .post(`${base}/chat/sessions/${sessionId}/messages`)
+    .set(auth())
+    .send({ content: 'Plan my training for the week.' });
+
+  expect(res.status).toBe(200);
+  expect(res.text).not.toContain('A second answer.');
+  expect(await creditLedger.balance(userId)).toBe(before);
+  const replies = getStore()
+    .where(
+      'ai',
+      (d) =>
+        (d as { type?: string }).type === 'chatMessage' &&
+        (d as { userId?: string }).userId === userId &&
+        (d as { role?: string }).role === 'assistant',
+    )
+    .sort((a, b) => String((a as { createdAt?: string }).createdAt).localeCompare(String((b as { createdAt?: string }).createdAt)));
+  expect((replies.at(-1) as { content?: string }).content).toBe('Half an answer');
+});
+
 it('records the real provider on the persisted message, not "unknown"', async () => {
   // The same discarded return value carried provider/model provenance. Every
   // stored assistant message on this lane recorded 'unknown', which made the

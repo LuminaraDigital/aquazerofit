@@ -25,6 +25,8 @@ const mocks = vi.hoisted(() => ({
     isError: false,
     refetch: vi.fn(),
   })),
+  // Firebase disabled unless a case turns it on.
+  firebase: { isLoading: false, firebaseEnabled: false },
 }));
 
 vi.mock('../../lib/api', () => ({
@@ -38,8 +40,7 @@ vi.mock('../../lib/telegram', () => ({
 vi.mock('../../lib/queries', () => ({ useProfile: mocks.useProfile }));
 vi.mock('../../lib/AuthProvider', () => ({
   useFirebaseAuth: () => ({
-    isLoading: false,
-    firebaseEnabled: false,
+    ...mocks.firebase,
     firebaseUser: null,
     idToken: null,
     signInEmail: vi.fn(),
@@ -52,8 +53,8 @@ vi.mock('../../lib/AuthProvider', () => ({
 
 import { RequireAuth } from './RequireAuth';
 
-function renderAt(path: string) {
-  return render(
+function app(path: string) {
+  return (
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route element={<RequireAuth publicIndex={<p>marketing landing</p>} />}>
@@ -63,14 +64,20 @@ function renderAt(path: string) {
         </Route>
         <Route path="/welcome" element={<p>mini app welcome</p>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderAt(path: string) {
+  return render(app(path));
 }
 
 beforeEach(() => {
   mocks.tokenStore.isAuthenticated = false;
   mocks.startParam = null;
   mocks.isTMA.mockReturnValue(false);
+  mocks.firebase.isLoading = false;
+  mocks.firebase.firebaseEnabled = false;
 });
 
 afterEach(() => {
@@ -125,5 +132,27 @@ describe('RequireAuth front door', () => {
     // address bar never claims /settings is a marketing page.
     await waitFor(() => expect(screen.getByText('marketing landing')).toBeTruthy());
     expect(screen.queryByText('app settings')).toBeNull();
+  });
+
+  /*
+   * With Firebase on, the guard first waits for it. A Telegram or cookie
+   * session is restored only after that, and the guard must hold until it is,
+   * not redirect in the render where Firebase finishes.
+   */
+  it('restores a cookie session once Firebase settles, before deciding the visitor is signed out', async () => {
+    mocks.firebase.isLoading = true;
+    mocks.firebase.firebaseEnabled = true;
+    mocks.restoreSession.mockImplementationOnce(async () => {
+      mocks.tokenStore.isAuthenticated = true;
+      return true;
+    });
+    const view = renderAt('/settings');
+    expect(screen.queryByText('app settings')).toBeNull();
+
+    mocks.firebase.isLoading = false;
+    view.rerender(app('/settings'));
+
+    await waitFor(() => expect(screen.getByText('app settings')).toBeTruthy());
+    expect(screen.queryByText('marketing landing')).toBeNull();
   });
 });

@@ -144,7 +144,9 @@ export interface GrantOutcome {
  * A revoke names what it retires:
  *
  *  - `revokesExternalId` retires that one charge. A Stars refund uses this so
- *    a still-running Stripe or Play period stays.
+ *    a still-running Stripe or Play period stays. It applies whichever order
+ *    the two arrive in: an `externalId` names one settled payment, so a grant
+ *    for it delivered after its refund is still that refunded payment.
  *  - `providerRef` and no `revokesExternalId` retires that subscription. A
  *    later payment on the same reference (a Play restart) is a new grant and
  *    counts again.
@@ -163,11 +165,11 @@ export function activePremiumUntil(userId: string): string | null {
     .sort((a, b) => a.grant.createdAt.localeCompare(b.grant.createdAt) || a.index - b.index);
 
   let accountWipe = -1;
-  const externalWipe = new Map<string, number>();
+  const retiredCharges = new Set<string>();
   const providerWipe = new Map<string, number>();
   ordered.forEach(({ grant }, pos) => {
     if (grant.action !== 'revoke') return;
-    if (grant.revokesExternalId) externalWipe.set(grant.revokesExternalId, pos);
+    if (grant.revokesExternalId) retiredCharges.add(grant.revokesExternalId);
     else if (grant.providerRef) providerWipe.set(grant.providerRef, pos);
     else accountWipe = pos;
   });
@@ -176,8 +178,7 @@ export function activePremiumUntil(userId: string): string | null {
   ordered.forEach(({ grant }, pos) => {
     if (grant.action === 'revoke') return;
     if (pos < accountWipe) return;
-    const chargeWipe = externalWipe.get(grant.externalId);
-    if (chargeWipe !== undefined && pos < chargeWipe) return;
+    if (retiredCharges.has(grant.externalId)) return;
     const subscriptionRef = grant.providerRef ?? grant.externalId;
     const subscriptionWipe = providerWipe.get(subscriptionRef);
     if (subscriptionWipe !== undefined && pos < subscriptionWipe) return;
@@ -228,8 +229,12 @@ export function grantPremium(input: GrantInput): GrantOutcome {
     createdAt: new Date().toISOString(),
   };
   store.upsert('ledger', grant);
-  const accountUntil = activePremiumUntil(user.id) ?? ownUntil;
-  store.upsert('ledger', { ...grant, premiumUntil: accountUntil });
+  // Null when the fold retires this grant on arrival (its charge was refunded
+  // before it was delivered): the account keeps whatever else stands, possibly
+  // nothing, and the row records "until now" the way a revoke does.
+  const accountUntil = activePremiumUntil(user.id);
+  const becameUntil = accountUntil ?? grant.createdAt;
+  store.upsert('ledger', { ...grant, premiumUntil: becameUntil });
   store.upsert('users', { ...user, premiumUntil: accountUntil });
 
   logEvent('entitlement_granted', {
@@ -237,7 +242,7 @@ export function grantPremium(input: GrantInput): GrantOutcome {
     source: input.source,
     premiumUntil: accountUntil,
   });
-  return { status: 'granted', premiumUntil: accountUntil };
+  return { status: 'granted', premiumUntil: becameUntil };
 }
 
 /**

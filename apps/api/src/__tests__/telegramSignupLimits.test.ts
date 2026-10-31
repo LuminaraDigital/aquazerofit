@@ -107,6 +107,20 @@ describe('telegram new-account enforcement', () => {
     expect(codeOf(() => telegramAuth(initDataFor(720004), '203.0.114.12'))).toBeNull();
   });
 
+  it('counts every address in an IPv6 /64 as one network, however it is written', () => {
+    process.env.TELEGRAM_SIGNUP_SUBNET_DAILY = '2';
+    expect(codeOf(() => telegramAuth(initDataFor(750001), '2001:db8::a'))).toBeNull();
+    expect(codeOf(() => telegramAuth(initDataFor(750002), '2001:db8::b'))).toBeNull();
+    expect(codeOf(() => telegramAuth(initDataFor(750003), '2001:0db8:0000:0000::c'))).toBe('RATE_LIMITED');
+    expect(codeOf(() => telegramAuth(initDataFor(750004), '2001:db8:0:1::a'))).toBeNull();
+  });
+
+  it('applies the per-address minute cap to the whole IPv6 /64', () => {
+    process.env.TELEGRAM_SIGNUP_PER_IP_PER_MINUTE = '1';
+    expect(codeOf(() => telegramAuth(initDataFor(760001), '2001:db8:5::1'))).toBeNull();
+    expect(codeOf(() => telegramAuth(initDataFor(760002), '2001:db8:5::2'))).toBe('RATE_LIMITED');
+  });
+
   it('does not apply a global daily ceiling unless one is configured', () => {
     for (let i = 0; i < 6; i += 1) {
       expect(codeOf(() => telegramAuth(initDataFor(730000 + i), `198.51.${i}.10`))).toBeNull();

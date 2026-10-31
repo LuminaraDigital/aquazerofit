@@ -65,7 +65,7 @@ describe('GET /me/entitlements', () => {
     expect(res.body.tier).toBe('free');
     expect(res.body.dailyCredits).toBe(FREE_TIER_DAILY_CREDITS);
     expect(res.body.costs).toEqual(CREDIT_COSTS);
-    expect(res.body.premiumLanes).toEqual(['insightBatch', 'visionPrimary']);
+    expect(res.body.premiumLanes).toEqual(['insightBatch']);
   });
 
   it('is idempotent: repeated reads do not stack daily grants', async () => {

@@ -35,7 +35,7 @@ Encrypted in transit **Yes** · account creation **Username and password** only
 | Other info (age, sex, timezone) | ✓ | ✓ | Optional | App functionality, Personalisation |
 | Purchase history | ✓ | — | Optional | App functionality, Account management |
 | Other in-app messages | ✓ | ✓ | Optional | App functionality, Personalisation |
-| Photos | ✓ | — | Optional | App functionality |
+| Photos | ✓ | — | Optional | App functionality, Analytics (food photo training, opt-in) |
 | Health info | ✓ | ✓ | Optional | App functionality, Personalisation |
 | Fitness info | ✓ | ✓ | Optional | App functionality, Personalisation |
 | Crash logs | ✓ | ✓ | Optional | Analytics |

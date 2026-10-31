@@ -59,10 +59,6 @@ const PREMIUM_LANE_COPY: Record<string, { title: string; body: string }> = {
     title: 'A coach-written weekly note',
     body: 'On premium, the narrative at the top of your weekly summary is written by the coach. On free it is written from your own numbers by the app itself. You still get the summary, and every "what changed" line in it, every week.',
   },
-  visionPrimary: {
-    title: 'Meal photo analysis',
-    body: 'Photographing a plate and having the model read it is part of Premium. Search and barcode logging stay on the free plan. A premium photo still spends meal-photo credits.',
-  },
 };
 
 function laneCopy(lane: string): { title: string; body: string } {
@@ -475,7 +471,7 @@ export default function Plan() {
               <LaneList lanes={lanes} premium={premium} />
               <p className="mt-3 px-2 text-xs leading-relaxed text-on-surface-variant">
                 {lanes.length === 1
-                  ? 'That is the whole difference today.'
+                  ? 'Beyond more daily credits, that is the whole difference today.'
                   : 'That is the difference today.'}{' '}
                 Your targets, your logging, your training plans, the coach chat and every number in
                 your weekly summary work the same way on both plans.

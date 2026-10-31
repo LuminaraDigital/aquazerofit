@@ -79,6 +79,7 @@ data class ConsentStateDto(
     val aiPersonalisation: Boolean,
     val anonymisedAnalytics: Boolean,
     val reminders: Boolean,
+    val foodPhotoTraining: Boolean = false,
     val updatedAt: String,
 )
 
@@ -89,6 +90,7 @@ data class ConsentUpdateRequest(
     val aiPersonalisation: Boolean,
     val anonymisedAnalytics: Boolean,
     val reminders: Boolean,
+    val foodPhotoTraining: Boolean,
 )
 
 /** Response of `GET /me/entitlements`. */

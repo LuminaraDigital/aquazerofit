@@ -16,10 +16,10 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * Migration readiness: what Room compiles today must still be schema v1.
+ * Migration readiness: what Room compiles today must still be schema v2.
  *
- * The database is at version 1 with no `Migration` objects and no destructive
- * fallback, which makes the *next* schema change the dangerous one. Adding a
+ * The database has no destructive fallback, which makes the *next* schema
+ * change the dangerous one. Adding a
  * column to an entity without bumping `version` and writing a migration
  * produces a green build and a green JVM suite; the failure arrives on the
  * device of a user who already has `azf.db`, as an
@@ -28,12 +28,12 @@ import java.io.File
  *
  * So this test opens the database Room actually generates and compares it
  * against the schema checked in at
- * `app/schemas/fit.aquazero.app.core.database.AzfDatabase/1.json`.
+ * `app/schemas/fit.aquazero.app.core.database.AzfDatabase/2.json`.
  *
  * The expected values below are transcribed from that file rather than read
  * from it, because the schema JSON is a build input and is not packaged into
  * the APK. **When this test fails, that is the whole point**: either restore
- * the v1 schema, or bump `@Database(version = 2)`, write the migration, keep
+ * the v2 schema, or bump `@Database(version = 3)`, write the migration, keep
  * the pending `outbox` rows intact, and update the constants here to the newly
  * exported schema. What must not happen is the constants being "fixed" without
  * a migration existing.
@@ -63,7 +63,7 @@ class SchemaMigrationReadinessTest {
     }
 
     @Test
-    fun compiledSchemaStillMatchesTheExportedVersionOne() = runTest {
+    fun compiledSchemaStillMatchesTheExportedVersionTwo() = runTest {
         materialize()
 
         openReadOnly().use { raw ->
@@ -134,15 +134,15 @@ class SchemaMigrationReadinessTest {
         }
 
     private companion object {
-        /** `database.version` in 1.json. */
-        const val EXPECTED_VERSION = 1
+        /** `database.version` in 2.json. */
+        const val EXPECTED_VERSION = 2
 
         /**
-         * `database.identityHash` in 1.json. Room derives it from every table,
+         * `database.identityHash` in 2.json. Room derives it from every table,
          * column, type, index and foreign key, and checks it on every open of
          * an existing file — so this one string is the whole contract.
          */
-        const val EXPECTED_IDENTITY_HASH = "66de195e84b358d5f0c5b28e7fbb6067"
+        const val EXPECTED_IDENTITY_HASH = "0f208c3894aaa58bf7d9ea518d4dca24"
 
         /** The 23 entities declared on [AzfDatabase], sorted. */
         val EXPECTED_TABLES = listOf(

@@ -27,7 +27,7 @@ function readPositiveInt(raw: string | undefined, fallback: number): number {
  * Zero or a positive integer. Zero is a real setting (a cap that is off),
  * so only a missing or unparseable value uses `fallback`.
  */
-function readNonNegativeInt(raw: string | undefined, fallback: number): number {
+export function readNonNegativeInt(raw: string | undefined, fallback: number): number {
   if (raw === undefined || raw.trim() === '') return fallback;
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 0) return fallback;

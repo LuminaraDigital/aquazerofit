@@ -45,9 +45,9 @@ COPY tsconfig.base.json ./
 COPY prompts prompts
 COPY packages/shared packages/shared
 COPY apps/api apps/api
-# Packaging tests read these from the repo root. The runtime stage does not
-# copy them; it copies source explicitly below.
-COPY .gcloudignore cloudbuild.yaml ./
+# Packaging and documentation tests read these from the repo root. The
+# runtime stage does not copy them; it copies source explicitly below.
+COPY .gcloudignore cloudbuild.yaml .env.example .env.staging.example .env.production.example ./
 COPY deploy/cloudrun/service.yaml deploy/cloudrun/service.yaml
 
 # Gate the image on a green API build before the slower web compile.

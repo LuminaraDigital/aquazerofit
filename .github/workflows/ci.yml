@@ -19,6 +19,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # A real Postgres for the engage contract suite. PGlite already runs the
+    # same cases in-process on every machine; this adds the server build the
+    # API actually talks to (row locks across connections, the pg driver).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engage_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      ENGAGE_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/engage_test
+
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 

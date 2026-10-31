@@ -21,6 +21,10 @@ Tagged releases are `v1.0.0`, `v1.1.0`, `v1.2.0` and `v1.3.0`. Anything after
 
 ### Added
 
+- Fight Camp (AZF-P1), shipped dark behind `FIGHT_RECORD_ENABLED` plus one
+  `FC_*` sub-flag per feature: a relational `engage` Postgres schema with a
+  forward-only migration runner, covered by export and erasure. Per-slice
+  record in `docs/specs/AZF-P1_Fight_Camp_Build_Record.md`.
 - Meal photo analysis is open to free accounts on the daily credit meter (3 credits a scan). Running out of credits now offers the plan page instead of a generic upload error.
 - Food photo training consent (off by default, never a condition of any feature). When on, confirming a meal keeps the photograph, the model's guess and the confirmed foods for up to 730 days. Turning it off erases them at once. Production needs `UPLOADS_DIR` on a persistent volume before this is enabled for users.
 - Staging promotion path (`feature` to `staging` to `main`), with disjoint

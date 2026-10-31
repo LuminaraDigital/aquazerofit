@@ -20,10 +20,10 @@
  *    a payment the server confirms with Stripe grants premium.
  *
  * A premium account sees its position and what is switched on, not a sales
- * page it has already bought — and, when Stripe bills it, the way into
+ * page it has already bought, and, when Stripe bills it, the way into
  * Stripe's billing portal to change the card or cancel.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppHeader } from '@/components/ui/AppHeader';
@@ -36,7 +36,6 @@ import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ApiError } from '@/lib/api';
 import {
-  queryKeys,
   useBillingConfig,
   useEntitlements,
   useOpenStripePortal,
@@ -46,6 +45,7 @@ import {
   type BillingConfig,
   type Entitlements,
 } from '@/lib/queries';
+import { pollPremiumEntitlement } from '@/lib/pollEntitlements';
 import { canPayWithStars, isTMA, openStarsInvoice } from '@/lib/telegram';
 
 /**
@@ -275,7 +275,15 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
   const qc = useQueryClient();
   const checkout = useStartStarsSubscription();
   const [note, setNote] = useState<string | null>(null);
+  const mounted = useRef(true);
   const period = starsPeriodLabel(offer.periodSeconds);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   async function subscribe() {
     setNote(null);
@@ -283,8 +291,10 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
       const { invoiceLink } = await checkout.mutateAsync();
       const status = await openStarsInvoice(invoiceLink);
       if (status === 'paid') {
-        await qc.invalidateQueries({ queryKey: queryKeys.entitlements });
         setNote('Payment received. Premium is on once Telegram confirms it.');
+        void pollPremiumEntitlement(qc).then((premium) => {
+          if (mounted.current && premium) setNote('Payment received. Premium is on.');
+        });
       } else if (status === 'cancelled') {
         setNote('Payment cancelled. Nothing was charged.');
       } else if (status === 'pending') {

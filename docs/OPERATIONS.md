@@ -336,7 +336,11 @@ Photographs kept under the `foodPhotoTraining` consent are written to `food-phot
 The `aquazerofit-uploads` bucket can be mounted on the running service. Deploys keep existing volumes and env:
 
 ```bash
-gcloud run services update aquazerofit-api --region australia-southeast1 --add-volume name=uploads,type=cloud-storage,bucket=aquazerofit-uploads --add-volume-mount volume=uploads,mount-path=/data/uploads --update-env-vars UPLOADS_DIR=/data/uploads
+gcloud run services update aquazerofit-api --region australia-southeast1 --add-volume "name=uploads,type=cloud-storage,bucket=aquazerofit-uploads,mount-options=uid=65532;gid=65532" --add-volume-mount volume=uploads,mount-path=/data/uploads --update-env-vars UPLOADS_DIR=/data/uploads
 ```
+
+The `uid` and `gid` are the image's `nonroot` user. Keep them: the app writes in-flight meal photos to the same directory, so a mount that user cannot write to can fail every meal scan, not only the retained samples.
+
+The bucket has a 7-day soft-delete window, so an erased photo stays recoverable by operators in Cloud Storage for 7 days after the app deletes it.
 
 Before the consent ships in a store release, update the Photos row of the Play Data safety form to match `docs/play-store/DECLARATIONS.md`.

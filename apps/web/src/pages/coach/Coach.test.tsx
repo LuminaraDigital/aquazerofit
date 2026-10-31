@@ -54,6 +54,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
   api: vi.fn(async (path: string) => {
     if (path === '/chat/meal-drafts') return { drafts: state.pending };
     if (path === '/chat/action-drafts') return { drafts: state.actions };
+    if (path === '/analytics/nutrition/daily') return { kcalConsumed: 0, kcalTarget: 0, meals: {}, waterMl: { consumed: 0 } };
     if (path === '/chat/sessions') return { sessions: [{ id: 'cs_1', title: 'Chat', updatedAt: '2026-10-30T00:00:00Z' }] };
     if (path.startsWith('/chat/sessions/')) return { session: {}, messages: [] };
     if (path.startsWith('/coaches')) return { roster: [], activeCoachId: 'aqua' };

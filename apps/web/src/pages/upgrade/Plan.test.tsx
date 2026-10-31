@@ -76,7 +76,7 @@ const FREE: Entitlements = {
   dailyCredits: FREE_TIER_DAILY_CREDITS,
   creditsRemaining: 12,
   costs: { ...CREDIT_COSTS },
-  premiumLanes: ['insightBatch', 'visionPrimary'],
+  premiumLanes: ['insightBatch'],
 };
 
 const PREMIUM: Entitlements = { ...FREE, tier: 'premium', creditsRemaining: 47 };
@@ -164,9 +164,9 @@ describe('plan page  -  free tier', () => {
     renderWith({ data: FREE });
 
     expect(screen.getByRole('heading', { name: /a coach-written weekly note/i })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: /meal photo analysis/i })).toBeTruthy();
-    expect(screen.getAllByText('Premium')).toHaveLength(2);
-    expect(screen.getByText(/that is the difference today/i)).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: /meal photo analysis/i })).toBeNull();
+    expect(screen.getAllByText('Premium')).toHaveLength(1);
+    expect(screen.getByText(/that is the whole difference today/i)).toBeTruthy();
   });
 
   it('prices every AI action from the server cost map', () => {
@@ -204,7 +204,7 @@ describe('plan page  -  premium tier', () => {
     expect(screen.getByText('Premium')).toBeTruthy();
     expect(screen.getByText('47')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /what premium gives you/i })).toBeTruthy();
-    expect(screen.getAllByText('On')).toHaveLength(2);
+    expect(screen.getAllByText('On')).toHaveLength(1);
 
     expect(screen.queryByText(/upgrading is not available/i)).toBeNull();
     expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();

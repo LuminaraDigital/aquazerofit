@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Which of the four consent bits a toggle is addressing. */
-enum class ConsentKey { WELLNESS, AI_PERSONALISATION, ANALYTICS, REMINDERS }
+enum class ConsentKey { WELLNESS, AI_PERSONALISATION, ANALYTICS, REMINDERS, FOOD_PHOTO_TRAINING }
 
 /** Modal confirmations Settings can raise. All of them are destructive. */
 sealed interface SettingsDialog {

@@ -258,7 +258,7 @@ class SetupViewModel @Inject constructor(
     }
 
     /**
-     * Persist the four consents chosen alongside the first profile, then bring
+     * Persist the consents chosen alongside the first profile, then bring
      * the local reminder schedule in line — a `reminders` consent that does not
      * actually start or stop reminders is display state, not consent.
      */
@@ -269,6 +269,7 @@ class SetupViewModel @Inject constructor(
                 aiPersonalisation = state.consentAi,
                 anonymisedAnalytics = state.consentAnalytics,
                 reminders = state.consentReminders,
+                foodPhotoTraining = false,
             ),
         )
         if (result is ApiResult.Success) {

@@ -665,6 +665,14 @@ private fun ConsentCard(state: SettingsUiState, viewModel: SettingsViewModel) {
         )
         Spacer(modifier = Modifier.height(4.dp))
         AzfSwitchRow(
+            title = stringResource(R.string.consent_food_photo_title),
+            body = stringResource(R.string.consent_food_photo_body),
+            checked = consents.foodPhotoTraining,
+            onCheckedChange = { viewModel.setConsent(ConsentKey.FOOD_PHOTO_TRAINING, it) },
+            enabled = state.savingConsent == null,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        AzfSwitchRow(
             title = stringResource(R.string.consent_reminders_title),
             body = stringResource(R.string.consent_reminders_body),
             checked = consents.reminders,

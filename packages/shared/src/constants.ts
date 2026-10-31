@@ -101,14 +101,13 @@ export type CreditTask = keyof typeof CREDIT_COSTS;
 /**
  * The free daily allowance for lanes a free account may call.
  *
- * Ten credits is ten coach messages, five meal suggestions, or two AI
- * training plans. Meal photographs are not part of this allowance:
- * visionPrimary is premium, and a free account is refused before a credit
- * is reserved. Coach chat stays on this meter.
+ * Ten credits is ten coach messages, five meal suggestions, three meal
+ * photographs, or two AI training plans. This meter is what bounds a free
+ * account's vision spend: scans are free so that logging by photograph is open
+ * to everyone, and the volume is what Premium sells.
  *
  * It was 50, which at three scans a day is a fortnight of AI for every signup
- * on an unfunded product, and gave a paying user nothing to buy. Photos have
- * since moved to premium; the grant still caps the free coach.
+ * on an unfunded product, and gave a paying user nothing to buy.
  */
 export const FREE_TIER_DAILY_CREDITS = 10;
 
@@ -399,3 +398,10 @@ export const BUDDY_CHALLENGE_CODE_PREFIX = 'AQUA';
  * and every 6 hours alongside the deletion sweep.
  */
 export const GROWTH_EVENT_RETENTION_DAYS = 180;
+
+/**
+ * How long a meal photograph kept under the foodPhotoTraining consent survives.
+ * Withdrawing the consent or deleting the account erases it sooner. Published in
+ * the privacy notice, so changing this figure changes a promise.
+ */
+export const FOOD_PHOTO_SAMPLE_RETENTION_DAYS = 730;

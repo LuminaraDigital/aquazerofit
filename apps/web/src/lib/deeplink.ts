@@ -93,13 +93,23 @@ export class DeepLinkRouter {
 
     // Stars Premium smoke and the in-app upgrade screen.
     // startapp=plan and startapp=upgrade both land on /plan. The page itself
-    // decides what a free or premium account can buy.
+    // decides what a free or premium account can buy. Those payloads stay on
+    // /plan: existing links already point there.
     const openPlan: DeepLinkHandler = (_res, navigate) => {
       navigate('/plan');
       return true;
     };
     this.register('plan', openPlan);
     this.register('upgrade', openPlan);
+
+    // Training library. Separate from plan/upgrade so a workouts link does
+    // not open the premium screen.
+    const openWorkouts: DeepLinkHandler = (_res, navigate) => {
+      navigate('/workouts');
+      return true;
+    };
+    this.register('workouts', openWorkouts);
+    this.register('workout', openWorkouts);
   }
 
   /**

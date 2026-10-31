@@ -320,6 +320,15 @@ Each environment's endpoint (`<APP_PUBLIC_URL>/api/v1/billing/stripe/webhook`, A
 - No third-party error tracking (Sentry etc.). The `kind:"error"` records plus request-id correlation cover a single-instance deployment; wire a sink when the fleet or the on-call rotation justifies it.
 - No tracing. Async lanes are bounded and request-scoped today; revisit if chat streaming fan-out grows.
 
+## Deploying to production
+
+Merging to `main` deploys nothing, and production has two parts that move separately. Deploy both from a clean checkout of `main`.
+
+1. **API (Cloud Run):** run the `gcloud builds submit` command at the top of `cloudbuild.yaml`. A new revision only takes traffic by itself while the service routes to latest; if traffic is pinned to a named revision, finish with `gcloud run services update-traffic aquazerofit-api --to-latest --project=aquazerofit --region=australia-southeast1`.
+2. **Frontend (Cloudflare Worker):** `aquazerofit.com` serves `apps/web/dist` as Worker assets, not the copy inside the API image. Run `VITE_SITE_ORIGIN=https://aquazerofit.com npm run build --workspace apps/web`, then `npx wrangler deploy` from `cloudflare/`. A clean checkout matters: `apps/web/.env` is gitignored and would add Firebase web keys to the build. Pass `VITE_TG_ANALYTICS_TOKEN` and `VITE_TG_ANALYTICS_APP_NAME` to the build as well, or Telegram Mini App Analytics stays off.
+
+`gate-staging` proves nothing until `STAGING_PUBLIC_URL` is set. Confirm a release with `GET /ready`, whose `version` is the deployed commit.
+
 ## Local verification
 
 ```bash

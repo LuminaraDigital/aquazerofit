@@ -223,14 +223,16 @@ export const config = {
   },
 
   /**
-   * Where meal photographs are written while a vision job is in flight.
+   * Where meal photographs are written while a vision job is in flight, and
+   * where food-photo-samples keeps those retained under foodPhotoTraining.
    *
    * Defaults to apps/api/uploads. On a host whose filesystem is ephemeral -
    * many managed hosts reset it on every deploy - point UPLOADS_DIR at a mounted
    * persistent volume, or in-flight photos vanish on redeploy. The blast
    * radius is deliberately small (the sweep deletes them within 24 hours
    * anyway and a missing file is tolerated everywhere it is read), but a lost
-   * photo is a failed analysis the user has to repeat.
+   * photo is a failed analysis the user has to repeat. Retained samples have no
+   * such margin: without a volume, a redeploy destroys them.
    */
   get uploadsDir(): string {
     const override = process.env.UPLOADS_DIR?.trim();

@@ -318,6 +318,7 @@ export function useUpdateConsents() {
       aiPersonalisation: boolean;
       anonymisedAnalytics: boolean;
       reminders: boolean;
+      foodPhotoTraining?: boolean;
     }) => api<ConsentState>('/me/consents', { method: 'PUT', body: input }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['consents'] }),
   });

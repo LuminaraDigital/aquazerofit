@@ -194,6 +194,7 @@ class AccountRepository @Inject constructor(
         aiPersonalisation = aiPersonalisation,
         anonymisedAnalytics = anonymisedAnalytics,
         reminders = reminders,
+        foodPhotoTraining = foodPhotoTraining,
         updatedAt = updatedAt,
     )
 

@@ -1,9 +1,9 @@
 /**
  * Freemium split on the HTTP boundary.
  *
- * A free account cannot start a meal-photo job (visionPrimary). The same
- * account can still talk to the coach, and running out of credits on that
- * lane is 402, not the premium 403. A premium account can upload a photo.
+ * A free account can start a meal-photo job (visionPrimary) and pays for it from
+ * the same daily credits as the coach. Running out on either lane is 402, not the
+ * premium 403.
  */
 import fs from 'node:fs';
 import sharp from 'sharp';
@@ -97,38 +97,39 @@ function mealPhotoHolds(userId: string): number {
   ).length;
 }
 
-describe('meal-photo premium gate', () => {
-  it('refuses a free account before any credit is held', async () => {
-    const holdsBefore = mealPhotoHolds(freeUserId);
-    const res = await request(app)
-      .post(`${base}/meal-photos`)
-      .set(auth(freeToken))
-      .field('mealType', 'lunch')
-      .attach('photo', await jpeg(), { filename: 'lunch.jpg', contentType: 'image/jpeg' });
-
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe('FORBIDDEN');
-    expect(res.body.message).toBe('This feature is part of AquaZeroFit Premium.');
-    expect(mealPhotoHolds(freeUserId)).toBe(holdsBefore);
-    expect(res.body.jobId).toBeUndefined();
-  });
-
-  it('accepts the same upload from a premium account', async () => {
-    const res = await request(app)
-      .post(`${base}/meal-photos`)
-      .set(auth(premiumToken))
-      .field('mealType', 'lunch')
-      .attach('photo', await jpeg(), { filename: 'lunch.jpg', contentType: 'image/jpeg' });
-
-    expect(res.status).toBe(202);
-    expect(typeof res.body.jobId).toBe('string');
+async function uploadPhoto(token: string) {
+  const res = await request(app)
+    .post(`${base}/meal-photos`)
+    .set(auth(token))
+    .field('mealType', 'lunch')
+    .attach('photo', await jpeg(), { filename: 'lunch.jpg', contentType: 'image/jpeg' });
+  if (typeof res.body.jobId === 'string') {
     const job = getStore().byId<{
       id: string;
       imagePath?: string;
       imageVariants?: { path: string }[];
-    }>('ai', res.body.jobId as string);
+    }>('ai', res.body.jobId);
     if (job?.imagePath) written.push(job.imagePath);
     for (const variant of job?.imageVariants ?? []) written.push(variant.path);
+  }
+  return res;
+}
+
+describe('meal photos on the credit meter', () => {
+  it('accepts a free account and holds the scan price', async () => {
+    const holdsBefore = mealPhotoHolds(freeUserId);
+    const res = await uploadPhoto(freeToken);
+
+    expect(res.status).toBe(202);
+    expect(typeof res.body.jobId).toBe('string');
+    expect(mealPhotoHolds(freeUserId)).toBe(holdsBefore + 1);
+  });
+
+  it('accepts the same upload from a premium account', async () => {
+    const res = await uploadPhoto(premiumToken);
+
+    expect(res.status).toBe(202);
+    expect(typeof res.body.jobId).toBe('string');
   });
 });
 
@@ -167,5 +168,13 @@ describe('coach chat stays on the free credit meter', () => {
 
     expect(res.status).toBe(402);
     expect(res.body.code).toBe('CREDITS_INSUFFICIENT');
+  });
+
+  it('refuses a photo with the same 402 once the allowance is spent', async () => {
+    const res = await uploadPhoto(freeToken);
+
+    expect(res.status).toBe(402);
+    expect(res.body.code).toBe('CREDITS_INSUFFICIENT');
+    expect(res.body.jobId).toBeUndefined();
   });
 });

@@ -32,6 +32,7 @@ import { cancelStripeSubscriptions } from '../billing/stripe';
 import { addDays } from '../../platform/dates';
 import type { TrendPoint } from '@aquazerofit/shared';
 import { mealLogsForDate, weightLogsInRange } from '../logs/service';
+import { eraseFoodPhotoSamples } from '../vision/trainingSamples';
 
 export type ProfileDoc = WellnessProfile & { id: string; type: 'wellnessProfile' };
 export type TargetsDoc = DerivedTargets & { id: string; type: 'derivedTargets' };
@@ -276,6 +277,10 @@ export function hasConsent(userId: string, key: keyof Omit<ConsentState, 'update
  * can re-enable the consent without losing their memory. Permanent removal is
  * the user's explicit choice: DELETE /me/memory (wipe) or account deletion
  * (purgeUser erases the whole `ai` container for the user).
+ *
+ * foodPhotoTraining works the other way: those photographs exist only because of
+ * the consent, so withdrawing it erases them at once. A body that omits the field
+ * keeps the stored value, so a client that predates it cannot withdraw by accident.
  */
 export function saveConsents(userId: string, input: Omit<ConsentState, 'updatedAt'>): ConsentDoc {
   const doc: ConsentDoc = {
@@ -283,10 +288,12 @@ export function saveConsents(userId: string, input: Omit<ConsentState, 'updatedA
     type: 'consent',
     userId,
     ...input,
+    foodPhotoTraining: input.foodPhotoTraining ?? getConsents(userId).foodPhotoTraining ?? false,
     updatedAt: new Date().toISOString(),
   };
   getStore().upsert('users', doc);
-  auditDataAccess(userId, 'consents.update', { input });
+  const foodPhotosErased = doc.foodPhotoTraining ? 0 : eraseFoodPhotoSamples(userId);
+  auditDataAccess(userId, 'consents.update', { input, foodPhotosErased });
   return doc;
 }
 
@@ -415,17 +422,23 @@ export async function purgeUser(userId: string): Promise<void> {
 
   // Meal photo files on disk belong to the user's vision jobs. Remove them
   // before the job docs go (missing files are tolerated: best-effort cleanup).
-  const jobs = store.where<{ id: string; userId?: string; type?: string; imagePath?: string }>(
-    'ai',
-    (d) => d.userId === userId && d.type === 'cvJob' && typeof d.imagePath === 'string',
-  );
+  const jobs = store.where<{
+    id: string;
+    userId?: string;
+    type?: string;
+    imagePath?: string;
+    imageVariants?: { path: string }[];
+  }>('ai', (d) => d.userId === userId && d.type === 'cvJob' && typeof d.imagePath === 'string');
   for (const job of jobs) {
-    try {
-      unlinkSync(job.imagePath!);
-    } catch {
-      /* already gone */
+    for (const file of new Set([job.imagePath!, ...(job.imageVariants ?? []).map((v) => v.path)])) {
+      try {
+        unlinkSync(file);
+      } catch {
+        /* already gone */
+      }
     }
   }
+  eraseFoodPhotoSamples(userId);
 
   // A belt shown as the user's Telegram emoji status is on their profile, not
   // in our store, so the sweep below cannot reach it. Take it down first, while

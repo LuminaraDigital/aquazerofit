@@ -7,6 +7,7 @@ import {
 } from './lib/useTelegramChrome';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
+import { ScrollToTop } from './components/layout/ScrollToTop';
 import { RequireAuth, RequireTargets, useProfileGate } from './components/layout/RequireAuth';
 import { RouteFallbackSkeleton } from './components/ui/Skeleton';
 
@@ -99,6 +100,7 @@ export default function App() {
   return (
     <>
     <TelegramChrome />
+    <ScrollToTop />
     <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={<RouteFallbackSkeleton />}>
         <Routes>

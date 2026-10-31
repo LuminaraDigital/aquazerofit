@@ -161,3 +161,27 @@ export interface MealRecommendation {
   loggedMealId?: string | null;
   createdAt: string;
 }
+
+/** A change the coach proposed. Every field is resolved by code, never by a model. */
+export type CoachAction =
+  | { kind: 'logWater'; amountMl: number }
+  | { kind: 'logWeight'; weightKg: number }
+  | { kind: 'swapExercise'; sessionId: string; exerciseId: string; exerciseName: string }
+  | { kind: 'rebuildPlan'; daysPerWeek: number; focus: 'general' | 'strength' | 'weightLoss' };
+
+/** `confirming` holds a draft across an awaited action, so a second tap is refused. */
+export type ChatActionDraftStatus = 'proposed' | 'confirming' | 'confirmed' | 'dismissed' | 'superseded';
+
+export interface ChatActionDraft {
+  id: string;
+  userId: string;
+  type: 'chatActionDraft';
+  sessionId: string;
+  action: CoachAction;
+  sourceText: string;
+  localDate: string;
+  status: ChatActionDraftStatus;
+  loggedId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

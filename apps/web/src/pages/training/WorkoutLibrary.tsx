@@ -1,5 +1,5 @@
 /**
- * Workout Library — pixel reference: Figma workout_library.
+ * Workout Library. Pixel reference: Figma workout_library.
  * Weekly plan strip (GET /plans/current), Today's Workout hero
  * (GET /workouts/today), server-driven exercise search with pagination
  * (GET /exercises?search=&category=&muscle=&equipment=&limit=&offset=),
@@ -18,12 +18,12 @@ import {
 import {
   EQUIPMENT,
   type Exercise,
-  type TrainingPlan,
   type WorkoutSession,
 } from '@aquazerofit/shared';
 import { api, ApiError, mediaUrl } from '@/lib/api';
 import { asList, orNull } from '@/lib/envelopes';
-import { todayWorkoutQuery, unwrapWorkoutSession } from '@/lib/queries';
+import { queryKeys, todayWorkoutQuery, unwrapWorkoutSession } from '@/lib/queries';
+import { cacheGeneratedPlan, currentPlanQuery } from '@/lib/trainingPlanCache';
 import { EQUIPMENT_ICONS, EQUIPMENT_LABELS } from '@/lib/equipmentMeta';
 import { normalizeExercisesPage } from '@/lib/contracts';
 import { AppHeader } from '@/components/ui/AppHeader';
@@ -65,14 +65,6 @@ const MUSCLES = [
   { key: 'calves', label: 'Calves' },
 ] as const;
 
-function unwrapPlan(data: unknown): TrainingPlan | null {
-  if (!data || typeof data !== 'object') return null;
-  const maybe = (data as { plan?: unknown }).plan ?? data;
-  return maybe && typeof maybe === 'object' && Array.isArray((maybe as TrainingPlan).days)
-    ? (maybe as TrainingPlan)
-    : null;
-}
-
 /**
  * /workouts/today responds { rest, focus, iteration, session }; session is
  * null on rest days. Re-exported from the data layer so this page and
@@ -101,7 +93,7 @@ export function estimateKcal(session: WorkoutSession): number {
  * mediaUrl(): same origin by default, VITE_MEDIA_BASE_URL when the API and
  * the static site are hosted on different origins.
  *
- * CONTRACT: `className` must pin the box — every call site passes either an
+ * CONTRACT: `className` must pin the box. Every call site passes either an
  * `aspect-*` ratio or explicit `h-`/`w-` sizes. Imported wger media has no
  * fixed intrinsic size, so width/height attributes here would be a guess; the
  * caller's box is what actually keeps this out of the layout-shift budget.
@@ -188,7 +180,7 @@ function mondayOfThisWeek(): Date {
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 /**
- * Exercise detail sheet body — attribution (AQF-12, never omitted), media
+ * Exercise detail sheet body: attribution (AQF-12, never omitted), media
  * strip with SVG-icon fallback, and a variations strip when the exercise
  * belongs to a wger variation group.
  */
@@ -411,10 +403,7 @@ export default function WorkoutLibrary() {
     return () => window.clearTimeout(t);
   }, [search]);
 
-  const planQuery = useQuery({
-    queryKey: ['plan'],
-    queryFn: async () => unwrapPlan(await orNull(() => api<unknown>('/plans/current'))),
-  });
+  const planQuery = useQuery(currentPlanQuery);
 
   // Shared cache key ⇒ shared queryFn (raw envelope); carve with `select`.
   const todayQuery = useQuery({ ...todayWorkoutQuery, select: unwrapSession });
@@ -464,11 +453,15 @@ export default function WorkoutLibrary() {
 
   const generatePlan = useMutation({
     mutationFn: () =>
-      api<TrainingPlan>('/plans/generate', { method: 'POST', body: { daysPerWeek, focus } }),
-    onSuccess: () => {
+      api<unknown>('/plans/generate', { method: 'POST', body: { daysPerWeek, focus } }),
+    onSuccess: async (created) => {
+      // Drop an in-flight GET that still thinks there is no plan, then show
+      // the plan this response already contains. The refetch confirms it.
+      await queryClient.cancelQueries({ queryKey: queryKeys.plan });
+      cacheGeneratedPlan(queryClient, created);
       setGenerateOpen(false);
       toast.success('Your new training plan is ready');
-      void queryClient.invalidateQueries({ queryKey: ['plan'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.plan });
       void queryClient.invalidateQueries({ queryKey: ['workout'] });
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Plan generation failed'),

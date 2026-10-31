@@ -59,6 +59,11 @@ export interface Entitlements {
   maxBankedCredits?: number;
   costs: Record<CreditTask, number>;
   premiumLanes: ModelGroup[];
+  /**
+   * The rail behind the latest entitlement; 'stripe' means the subscription is
+   * managed in Stripe's billing portal. Optional for APIs from before it.
+   */
+  billingSource?: 'play' | 'stripe' | 'stars' | 'admin' | null;
 }
 
 export const queryKeys = {
@@ -240,6 +245,18 @@ export function useStartStripeCheckout() {
 }
 
 /**
+ * POST /billing/stripe/portal, then leave for Stripe's billing portal, which
+ * returns to /plan. A mutation is safe here, unlike the sync below: it fires
+ * from a click, never from an effect.
+ */
+export function useOpenStripePortal() {
+  return useMutation({
+    mutationFn: () => api<{ url: string }>('/billing/stripe/portal', { method: 'POST' }),
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+}
+
+/**
  * POST /billing/stripe/sync  -  settle the session Stripe redirected back with.
  *
  * A query, not a mutation, although it POSTs: settling is idempotent server
@@ -301,6 +318,7 @@ export function useUpdateConsents() {
       aiPersonalisation: boolean;
       anonymisedAnalytics: boolean;
       reminders: boolean;
+      foodPhotoTraining?: boolean;
     }) => api<ConsentState>('/me/consents', { method: 'PUT', body: input }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['consents'] }),
   });

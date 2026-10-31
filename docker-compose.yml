@@ -41,7 +41,7 @@ services:
       # flush silently overwrites the other's documents. `docker compose up
       # --scale api=N` is therefore unsafe, and compose has no file-level
       # replica count to key off, so the intent is declared here instead: the
-      # API refuses to boot on anything but 1 (platform/config.ts,
+      # API refuses to boot on anything but 1 (platform/bootGuards.ts,
       # assertSingleInstance). See docs/OPERATIONS.md § Scaling.
       - AZF_INSTANCE_COUNT=1
     volumes:

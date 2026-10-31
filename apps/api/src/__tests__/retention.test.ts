@@ -15,7 +15,7 @@ process.env.AZF_DATA_DIR = dataDir;
 const { createApp } = await import('../app');
 const { getStore } = await import('../platform/store');
 const { addDays } = await import('../platform/dates');
-const { cohortRetention, weeklyActiveLoggers } = await import('../modules/admin/retention');
+const { cohortRetention, retentionReport, weeklyActiveLoggers } = await import('../modules/admin/retention');
 type Subject = import('../modules/admin/retention').RetentionSubject;
 
 afterAll(async () => {
@@ -56,6 +56,12 @@ describe('cohort retention', () => {
     const [cohort] = cohortRetention([subject(MON, [1]), subject(addDays(MON, 4), [1])], today, 4);
     // Day 7 for the Friday signup is MON+11, still in the future.
     expect(cohort).toEqual({ weekOf: MON, users: 2, d1: 2, d7: null, d30: null });
+  });
+
+  it('does not measure a day that is still in progress', () => {
+    // Signed up yesterday: today is their day 1, and it is not over yet.
+    const [cohort] = cohortRetention([subject(MON, [])], addDays(MON, 1), 4);
+    expect(cohort?.d1).toBeNull();
   });
 
   it('drops cohorts older than the window and orders newest first', () => {
@@ -144,5 +150,40 @@ describe('GET /admin/retention', () => {
       .get(`${base}/admin/retention?weeks=0`)
       .set({ Authorization: `Bearer ${admin.token}` });
     expect(bad.status).toBe(400);
+  });
+
+  /*
+   * Active days are the device's local dates, so the signup day has to be too.
+   * Both clients name their zone on every request; the account keeps the first
+   * valid one it is seen with.
+   */
+  it('records the zone the client names on its first authenticated request, and only that one', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(`${addDays(MON, 13)}T03:00:00.000Z`));
+    const member = await register('retention-zone@example.com');
+    const me = (zone: string) =>
+      request(app).get(`${base}/me`).set({ Authorization: `Bearer ${member.token}`, 'X-Timezone': zone });
+    const storedZone = () => getStore().byId<{ id: string; timezone?: string }>('users', member.id)?.timezone;
+
+    expect((await me('Not/AZone')).status).toBe(200);
+    expect(storedZone()).toBeUndefined();
+
+    await me('Pacific/Kiritimati');
+    await me('America/Los_Angeles');
+    expect(storedZone()).toBe('Pacific/Kiritimati');
+  });
+
+  it('puts a signup in the cohort of the local day the account was created', async () => {
+    // Sunday 20:00 UTC is already Monday 10:00 in Kiritimati (UTC+14).
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(`${addDays(MON, 20)}T20:00:00.000Z`));
+    const member = await register('retention-kiritimati@example.com');
+    await request(app)
+      .get(`${base}/me`)
+      .set({ Authorization: `Bearer ${member.token}`, 'X-Timezone': 'Pacific/Kiritimati' });
+
+    const { cohorts } = retentionReport(addDays(MON, 22), 4);
+
+    expect(cohorts).toContainEqual(expect.objectContaining({ weekOf: addDays(MON, 21), users: 1 }));
   });
 });

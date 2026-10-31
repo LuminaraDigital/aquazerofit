@@ -9,6 +9,7 @@ import {
   CF_CONNECTING_IP_HEADER,
   ORIGIN_SHARED_SECRET_HEADER,
   clientIpForRateLimit,
+  clientNetworkKey,
   originSecretMatches,
   resetOriginSecretWarning,
 } from '../platform/clientIp';
@@ -150,7 +151,45 @@ describe('clientIpForRateLimit', () => {
   });
 });
 
+describe('clientNetworkKey', () => {
+  it('keeps an IPv4 address as the host it names', () => {
+    expect(clientNetworkKey('198.51.100.20')).toBe('198.51.100.20');
+    // Node reports IPv4 peers on a dual-stack socket in mapped form.
+    expect(clientNetworkKey('::ffff:10.0.0.8')).toBe('10.0.0.8');
+    expect(clientNetworkKey('unknown')).toBe('unknown');
+  });
+
+  it('keys an IPv6 address on its /64, however it is written', () => {
+    const key = '2001:db8:0:0::/64';
+    expect(clientNetworkKey('2001:db8::1')).toBe(key);
+    expect(clientNetworkKey('2001:db8::2')).toBe(key);
+    expect(clientNetworkKey('2001:0DB8:0000:0000:ffff:0:0:9')).toBe(key);
+    expect(clientNetworkKey('2001:db8:0:1::1')).toBe('2001:db8:0:1::/64');
+    expect(clientNetworkKey('fe80::1%eth0')).toBe('fe80:0:0:0::/64');
+  });
+});
+
 describe('rate limiter client address', () => {
+  /*
+   * An IPv6 subscriber is normally handed a whole /64 and can use any address
+   * in it, so a bucket per address is a bucket per request for anyone who
+   * rotates. The /64 is the client.
+   */
+  it('gives one auth bucket to every address in an IPv6 /64', () => {
+    process.env.ORIGIN_SHARED_SECRET = 'worker-secret';
+    process.env.AZF_RATE_LIMIT_FORCE = '1';
+    resetRateLimiter();
+    const limit = config.authRateLimitPerMinute;
+    for (let i = 1; i <= limit; i += 1) {
+      const cf = `2001:db8:1:2::${i.toString(16)}`;
+      expect(callLimiter(fakeReq({ cf, secret: 'worker-secret' }))).toBe(true);
+    }
+    expect(
+      callLimiter(fakeReq({ cf: '2001:0db8:0001:0002:0000:0000:0000:ffff', secret: 'worker-secret' })),
+    ).toBe(false);
+    expect(callLimiter(fakeReq({ cf: '2001:db8:1:3::1', secret: 'worker-secret' }))).toBe(true);
+  });
+
   it('gives each trusted CF-Connecting-IP its own auth bucket on one socket', () => {
     process.env.ORIGIN_SHARED_SECRET = 'worker-secret';
     process.env.AZF_RATE_LIMIT_FORCE = '1';

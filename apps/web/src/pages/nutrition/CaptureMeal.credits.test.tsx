@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
- * A free account that photographs a meal gets the premium refusal and a way
- * to the plan page. Other upload failures stay on the existing toast.
+ * An account out of credits that photographs a meal gets the server's refusal
+ * and a way to the plan page. Other upload failures stay on the existing toast.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -47,19 +47,19 @@ afterEach(() => {
   cleanup();
 });
 
-describe('meal photo premium gate', () => {
+describe('meal photo credit refusal', () => {
   it('shows the server refusal and a link to Your plan', async () => {
     api.mockRejectedValue(
-      new ApiError(403, {
-        code: 'FORBIDDEN',
-        message: 'This feature is part of AquaZeroFit Premium.',
+      new ApiError(402, {
+        code: 'CREDITS_INSUFFICIENT',
+        message: 'You have used your credits for today.',
       }),
     );
     renderCapture();
     await choosePhoto();
     fireEvent.click(screen.getByRole('button', { name: /analyze meal/i }));
 
-    expect(await screen.findByText('This feature is part of AquaZeroFit Premium.')).toBeTruthy();
+    expect(await screen.findByText('You have used your credits for today.')).toBeTruthy();
     const link = screen.getByRole('link', { name: 'Your plan' });
     expect(link.getAttribute('href')).toBe('/plan');
   });
@@ -72,6 +72,6 @@ describe('meal photo premium gate', () => {
 
     await waitFor(() => expect(api).toHaveBeenCalled());
     expect(screen.queryByRole('link', { name: 'Your plan' })).toBeNull();
-    expect(screen.queryByText('This feature is part of AquaZeroFit Premium.')).toBeNull();
+    expect(screen.queryByText('You have used your credits for today.')).toBeNull();
   });
 });

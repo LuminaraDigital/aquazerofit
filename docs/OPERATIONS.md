@@ -60,7 +60,7 @@ None of the deploy surfaces expresses an instance count the process can read —
 | `1` | Boots normally. |
 | anything else (`2`, `0`, `auto`, …) | **Boot refused** with an error naming the data-loss risk. A value that is not a positive integer is refused too: a guard that cannot read its own input has verified nothing. |
 
-Enforced by `assertSingleInstance()` in `apps/api/src/platform/config.ts`, called from `apps/api/src/index.ts` before the store initialises. Skipped under test.
+Enforced by `assertSingleInstance()` in `apps/api/src/platform/bootGuards.ts`, called from `apps/api/src/index.ts` before the store initialises. Skipped under test.
 
 Per platform:
 
@@ -75,7 +75,7 @@ Raising `AZF_INSTANCE_COUNT` does not make the deployment scalable; it makes the
 
 ## Closing the run.app bypass (`REQUIRE_ORIGIN_SECRET`)
 
-Cloud Run ingress is `all` and cannot be limited to the Worker, so `https://aquazerofit-api-592686987043.australia-southeast1.run.app` answers anyone and skips the edge. With `REQUIRE_ORIGIN_SECRET=true` the API refuses, with `403 {"code":"FORBIDDEN"}`, every request whose `X-Origin-Shared-Secret` does not match `ORIGIN_SHARED_SECRET`. `/health` and `/ready` are exempt for Cloud Run's probes. The switch is off by default, and boot is refused if it is on while `ORIGIN_SHARED_SECRET` is empty, still a `replace-with-...` placeholder, or under 32 characters (`requireWorkerOrigin` in `apps/api/src/platform/clientIp.ts`, `assertOriginSecretConfigured` in `platform/config.ts`).
+Cloud Run ingress is `all` and cannot be limited to the Worker, so `https://aquazerofit-api-592686987043.australia-southeast1.run.app` answers anyone and skips the edge. With `REQUIRE_ORIGIN_SECRET=true` the API refuses, with `403 {"code":"FORBIDDEN"}`, every request whose `X-Origin-Shared-Secret` does not match `ORIGIN_SHARED_SECRET`. `/health` and `/ready` are exempt for Cloud Run's probes. The switch is off by default. Boot is refused if it is on while `ORIGIN_SHARED_SECRET` is empty; if `ORIGIN_SHARED_SECRET` or `ORIGIN_SHARED_SECRET_PREVIOUS` is a `replace-with-...` placeholder or under 32 characters, on or off, because the secret also decides whose `CF-Connecting-IP` the rate limits believe; and if `REQUIRE_ORIGIN_SECRET` is anything but `true`/`1`/`false`/`0` (`requireWorkerOrigin` in `apps/api/src/platform/clientIp.ts`, `assertOriginSecretConfigured` in `platform/bootGuards.ts`).
 
 Refusals write at most one line a minute: `kind:"security"`, `event:"origin_secret_rejected"`, `refusedSinceLastLog`, and the `reason` and `path` of the request that tripped it. `secret_missing` is a direct caller. `secret_mismatch` on real traffic means the Worker and Cloud Run hold different values.
 
@@ -99,7 +99,7 @@ Telegram, Stripe and Pub/Sub cannot add a custom header. Only the Worker adds it
      ```
    - **Nothing** means it is not set. Generate one in step 1.
 
-   Reusing the Cloud Run value means step 2 brings the Worker into line with it, whatever the Worker held before. A fresh value generated while Cloud Run still holds an old one would split the two sides, and every visitor would share one rate-limit bucket until they matched again. A reused value under 32 characters, or a `replace-with-...` placeholder, would stop step 5 from booting; finish steps 2 and 3 with it, then replace it with "Rotating `ORIGIN_SHARED_SECRET`" below before step 5.
+   Reusing the Cloud Run value means step 2 brings the Worker into line with it, whatever the Worker held before. A fresh value generated while Cloud Run still holds an old one would split the two sides, and every visitor would share one rate-limit bucket until they matched again. A value under 32 characters, or a `replace-with-...` placeholder, cannot be reused: no revision boots with one set, gate on or off. Treat it as **Nothing** and generate one in step 1; the two sides then disagree, and visitors share one rate-limit bucket, only until step 3 lands.
 1. **Generate**, only if step 0 found nothing. Keep this shell for steps 2 and 3.
    ```bash
    SECRET="$(openssl rand -hex 32)"
@@ -328,3 +328,15 @@ curl -s http://localhost:4000/health
 curl -s http://localhost:4000/ready
 curl -s http://localhost:4000/metrics
 ```
+
+## Food photo training storage
+
+Photographs kept under the `foodPhotoTraining` consent are written to `food-photo-samples` inside `UPLOADS_DIR`. `deploy/cloudrun/service.yaml` sets no `UPLOADS_DIR` and no volume, and the container filesystem does not survive a new revision, so confirm the live service has a persistent volume before relying on this data. Without one, every deploy destroys the images and leaves only their label documents.
+
+The `aquazerofit-uploads` bucket can be mounted on the running service. Deploys keep existing volumes and env:
+
+```bash
+gcloud run services update aquazerofit-api --region australia-southeast1 --add-volume name=uploads,type=cloud-storage,bucket=aquazerofit-uploads --add-volume-mount volume=uploads,mount-path=/data/uploads --update-env-vars UPLOADS_DIR=/data/uploads
+```
+
+Before the consent ships in a store release, update the Photos row of the Play Data safety form to match `docs/play-store/DECLARATIONS.md`.

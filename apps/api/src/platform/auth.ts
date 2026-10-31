@@ -7,8 +7,9 @@
 import crypto from 'node:crypto';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import type { User, UserRole, UserTier } from '@aquazerofit/shared';
+import { timezoneSchema, type User, type UserRole, type UserTier } from '@aquazerofit/shared';
 import { config } from './config';
+import { timezoneOf } from './dates';
 import { AppError } from './errors';
 import { getStore, newId } from './store';
 import { effectiveTier } from '../modules/billing/entitlements';
@@ -253,6 +254,20 @@ function attachUser(req: Request, user: User): void {
    * somebody noticed.
    */
   req.user = { id: user.id, role: user.role, tier: effectiveTier(user) };
+  recordFirstTimezone(req, user);
+}
+
+/**
+ * Give an account with no timezone the one its client names. Both clients
+ * send X-Timezone on every request, so for a new account this lands seconds
+ * after `createdAt`, and day-keyed reads that have no request of their own
+ * (the retention report's signup day) use the device's calendar, the one
+ * logs are dated in. Written once: changing it afterwards is PATCH /me.
+ */
+function recordFirstTimezone(req: Request, user: User): void {
+  if (user.timezone) return;
+  const zone = timezoneSchema.safeParse(timezoneOf(req));
+  if (zone.success) getStore().upsert('users', { ...user, timezone: zone.data });
 }
 
 function isUserDocument(user: User | undefined): user is User {

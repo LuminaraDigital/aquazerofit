@@ -14,6 +14,7 @@
  */
 import { Link } from 'react-router-dom';
 import {
+  FOOD_PHOTO_SAMPLE_RETENTION_DAYS,
   GROWTH_EVENT_RETENTION_DAYS,
   MEAL_PHOTO_MAX_BYTES,
   MEMORY_REJECTED_RETENTION_DAYS,
@@ -63,7 +64,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
         <List
           items={[
             'We collect what you enter — your wellness profile, food and water logs, workouts, weights — plus the account details needed to sign you in.',
-            'Meal photographs are stripped of their metadata on upload, never served publicly, and deleted within a day of the analysis finishing.',
+            'Meal photographs are stripped of their metadata on upload, never served publicly, and deleted within a day of the analysis finishing, unless you choose to let us keep them to improve food recognition.',
             'AI features send the relevant slice of your data to a model provider. They are off until you consent, and the coach only remembers facts you have approved.',
             'You can delete your account from the app. Doing so erases your data and anonymises the records we must keep.',
             'We do not sell your data, and we do not use it for advertising.',
@@ -150,6 +151,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
           items={[
             'To run the service you asked for: computing your targets, keeping your logs, generating the plans and answers you request.',
             'To keep the service working and safe: rate limiting, abuse investigation, and auditing whether the safety guardrails fired.',
+            'To improve our own food recognition, only if you turn on food photo training.',
             'To meet legal and accounting obligations, which is the only reason any record survives your account deletion.',
           ]}
         />
@@ -203,6 +205,18 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
             'The photograph and its job record are deleted within 24 hours of the analysis finishing. If the analysis fails, the photograph is deleted immediately.',
           ]}
         />
+        <P>
+          Food photo training is a separate choice, off until you turn it on in Settings. Every
+          feature works the same either way. If it is on, then when you confirm a meal we keep the
+          photograph, what the model identified and the foods and amounts you confirmed, linked to
+          your account, to develop and test our own food recognition. We do not sell these
+          photographs. A photograph holds whatever was in the frame, so leave out anything you
+          would not want kept.
+        </P>
+        <P>
+          Turning it off deletes the photographs and labels we hold from you at once. It cannot
+          undo training already carried out with them.
+        </P>
       </Section>
 
       <Section id="third-parties" index={7} heading="Who else sees it">
@@ -310,6 +324,10 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
               'Up to 24 hours after the analysis finishes; immediately on failure.',
             ],
             [
+              'Meal photographs kept for food photo training',
+              `Up to ${FOOD_PHOTO_SAMPLE_RETENTION_DAYS} days after you confirm the meal, or until you turn the choice off or delete your account, whichever comes first.`,
+            ],
+            [
               'Facts you rejected for the coach to remember',
               `${MEMORY_REJECTED_RETENTION_DAYS} days, then erased.`,
             ],
@@ -334,6 +352,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
         <List
           items={[
             'Turn AI personalisation on or off.',
+            'Turn food photo training on or off.',
             'Review, confirm, reject or delete every fact the coach has remembered.',
             'Edit or delete individual logs.',
             'Download a copy of your data from Settings → Export my data (JSON), on the web or in the Android app.',

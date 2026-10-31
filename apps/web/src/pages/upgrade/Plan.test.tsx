@@ -19,13 +19,18 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS, MAX_BANKED_CREDITS } from '@aquazerofit/shared';
+import { ApiError } from '@/lib/api';
 import type { BillingConfig, Entitlements } from '@/lib/queries';
 
 const mocks = vi.hoisted(() => ({
   useEntitlements: vi.fn(),
   useBillingConfig: vi.fn(),
   startCheckout: vi.fn(),
+  // Overrides for the Stripe checkout mutation's state; idle unless a case says otherwise.
+  stripeCheckoutState: vi.fn((): Record<string, unknown> => ({})),
   startStars: vi.fn(() => Promise.resolve({ invoiceLink: 'https://t.me/invoice/test', stars: 417 })),
+  openPortal: vi.fn(),
+  portalFailed: vi.fn(() => false),
   // The sync hook's state for the session in the URL; idle unless a case says otherwise.
   syncCheckout: vi.fn(
     (_sessionId: string | null): { isError: boolean; isSuccess: boolean; data?: { tier: string } } => ({
@@ -43,7 +48,14 @@ vi.mock('@/lib/queries', () => ({
   queryKeys: { entitlements: ['entitlements'] },
   useEntitlements: mocks.useEntitlements,
   useBillingConfig: mocks.useBillingConfig,
-  useStartStripeCheckout: () => ({ mutate: mocks.startCheckout, isPending: false, isError: false }),
+  useStartStripeCheckout: () => ({
+    mutate: mocks.startCheckout,
+    isPending: false,
+    isError: false,
+    error: null,
+    ...mocks.stripeCheckoutState(),
+  }),
+  useOpenStripePortal: () => ({ mutate: mocks.openPortal, isPending: false, isError: mocks.portalFailed() }),
   useStripeCheckoutSync: mocks.syncCheckout,
   useStartStarsSubscription: () => ({
     mutateAsync: mocks.startStars,
@@ -64,10 +76,11 @@ const FREE: Entitlements = {
   dailyCredits: FREE_TIER_DAILY_CREDITS,
   creditsRemaining: 12,
   costs: { ...CREDIT_COSTS },
-  premiumLanes: ['insightBatch', 'visionPrimary'],
+  premiumLanes: ['insightBatch'],
 };
 
 const PREMIUM: Entitlements = { ...FREE, tier: 'premium', creditsRemaining: 47 };
+const STRIPE_SUBSCRIBER: Entitlements = { ...PREMIUM, billingSource: 'stripe' };
 
 const NO_STRIPE: BillingConfig = { stripe: { available: false, price: null } };
 const STRIPE: BillingConfig = {
@@ -110,6 +123,8 @@ afterEach(() => {
   mocks.openStarsInvoice.mockResolvedValue('cancelled');
   mocks.syncCheckout.mockReset();
   mocks.syncCheckout.mockImplementation(() => ({ isError: false, isSuccess: false }));
+  mocks.stripeCheckoutState.mockReturnValue({});
+  mocks.portalFailed.mockReturnValue(false);
 });
 
 describe('plan page  -  free tier', () => {
@@ -149,9 +164,9 @@ describe('plan page  -  free tier', () => {
     renderWith({ data: FREE });
 
     expect(screen.getByRole('heading', { name: /a coach-written weekly note/i })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: /meal photo analysis/i })).toBeTruthy();
-    expect(screen.getAllByText('Premium')).toHaveLength(2);
-    expect(screen.getByText(/that is the difference today/i)).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: /meal photo analysis/i })).toBeNull();
+    expect(screen.getAllByText('Premium')).toHaveLength(1);
+    expect(screen.getByText(/that is the whole difference today/i)).toBeTruthy();
   });
 
   it('prices every AI action from the server cost map', () => {
@@ -189,7 +204,7 @@ describe('plan page  -  premium tier', () => {
     expect(screen.getByText('Premium')).toBeTruthy();
     expect(screen.getByText('47')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /what premium gives you/i })).toBeTruthy();
-    expect(screen.getAllByText('On')).toHaveLength(2);
+    expect(screen.getAllByText('On')).toHaveLength(1);
 
     expect(screen.queryByText(/upgrading is not available/i)).toBeNull();
     expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
@@ -245,6 +260,37 @@ describe('plan page  -  Stripe checkout', () => {
 
     fireEvent.click(subscribe);
     expect(mocks.startCheckout).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the server's reason when checkout is refused, rather than asking for a retry that cannot work", () => {
+    mocks.stripeCheckoutState.mockReturnValue({
+      isError: true,
+      error: new ApiError(409, {
+        code: 'CONFLICT',
+        message: 'This account already has a card subscription. Contact Support to update or cancel it.',
+      }),
+    });
+    renderWith({ data: FREE }, STRIPE);
+
+    expect(screen.getByText(/already has a card subscription/i)).toBeTruthy();
+    expect(screen.queryByText(/try again in a moment/i)).toBeNull();
+  });
+
+  it('keeps the retry wording for a checkout that failed for any other reason', () => {
+    mocks.stripeCheckoutState.mockReturnValue({
+      isError: true,
+      error: new ApiError(503, { code: 'PAYMENT_UNAVAILABLE', message: 'Could not reach Stripe.' }),
+    });
+    renderWith({ data: FREE }, STRIPE);
+
+    expect(screen.getByText(/could not open checkout\. nothing was charged/i)).toBeTruthy();
+  });
+
+  it('tells a buyer they can cancel from this page, not by contacting Support', () => {
+    renderWith({ data: FREE }, STRIPE);
+
+    expect(screen.getByText(/cancel any time from this page/i)).toBeTruthy();
+    expect(screen.queryByText(/to cancel, contact/i)).toBeNull();
   });
 
   it('keeps Stripe out of the Telegram Mini App, where Telegram requires Stars', () => {
@@ -309,5 +355,38 @@ describe('plan page  -  Stripe checkout', () => {
 
     expect(screen.getByRole('status').textContent).toMatch(/nothing was charged/i);
     expect(mocks.syncCheckout.mock.calls.every(([sessionId]) => sessionId === null)).toBe(true);
+  });
+});
+
+describe('plan page — managing a Stripe subscription', () => {
+  it("lets a Stripe subscriber manage or cancel, opening Stripe's billing portal", () => {
+    renderWith({ data: STRIPE_SUBSCRIBER }, STRIPE);
+
+    fireEvent.click(screen.getByRole('button', { name: /manage or cancel subscription/i }));
+    expect(mocks.openPortal).toHaveBeenCalledTimes(1);
+    // There is something to do here now, so the page does not say otherwise.
+    expect(screen.queryByText(/nothing to do here/i)).toBeNull();
+  });
+
+  it('offers no portal to premium that Stripe is not billing', () => {
+    for (const billingSource of ['play', 'admin', null, undefined] as const) {
+      renderWith({ data: { ...PREMIUM, billingSource } }, STRIPE);
+      expect(screen.queryByRole('button', { name: /manage or cancel/i })).toBeNull();
+      cleanup();
+    }
+  });
+
+  it('keeps the portal out of the Telegram Mini App', () => {
+    mocks.isTMA.mockReturnValue(true);
+    renderWith({ data: STRIPE_SUBSCRIBER }, STRIPE);
+
+    expect(screen.queryByRole('button', { name: /manage or cancel/i })).toBeNull();
+  });
+
+  it('says plainly when the billing page could not be opened', () => {
+    mocks.portalFailed.mockReturnValue(true);
+    renderWith({ data: STRIPE_SUBSCRIBER }, STRIPE);
+
+    expect(screen.getByRole('alert').textContent).toMatch(/could not open .*nothing has changed/i);
   });
 });

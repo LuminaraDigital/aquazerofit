@@ -341,6 +341,9 @@ export const consentsSchema = z.object({
   aiPersonalisation: z.boolean(),
   anonymisedAnalytics: z.boolean(),
   reminders: z.boolean(),
+  // Optional so a client built before this consent existed cannot withdraw it
+  // by omission: withdrawing erases photographs, so only an explicit false does.
+  foodPhotoTraining: z.boolean().optional(),
 });
 
 // ---------- query helpers ----------

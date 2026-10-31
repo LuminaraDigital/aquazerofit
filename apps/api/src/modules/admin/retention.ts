@@ -13,8 +13,9 @@
  *    (`activeDatesOf` in progress/service): a meal, water or weigh-in log, or a
  *    completed workout, on a local date.
  *  - **Signup day**: the user's local calendar date of `createdAt`, in their
- *    stored timezone (UTC when none is set), so day 1 means the user's
- *    tomorrow and not the server's.
+ *    stored timezone, so day 1 means the user's tomorrow and not the server's.
+ *    requireAuth records that zone from the client's X-Timezone on the first
+ *    authenticated request; an account never seen since then reads as UTC.
  *  - **D1 / D7**: active on signup day + 1 / + 7. **D30**: active on any of
  *    days 28 to 31, the AZF-W3-02 definition, kept so the baseline is
  *    comparable with the targets written against it.
@@ -82,9 +83,9 @@ function activeOnAny(dates: ReadonlySet<string>, from: string, offsets: readonly
 
 /**
  * Count the members retained on `offsets` (days after signup), or null when
- * the last of those days is still in the future for any member: the cohort is
- * measured whole or not at all, so a partly elapsed week cannot read as a
- * drop.
+ * the last of those days is not over for any member (today included, since a
+ * member can still log later today): the cohort is measured whole or not at
+ * all, so a partly elapsed day or week cannot read as a drop.
  */
 function retained(
   members: readonly RetentionSubject[],
@@ -92,7 +93,7 @@ function retained(
   today: string,
 ): number | null {
   const last = Math.max(...offsets);
-  if (members.some((m) => addDays(m.signupDate, last) > today)) return null;
+  if (members.some((m) => addDays(m.signupDate, last) >= today)) return null;
   return members.filter((m) => activeOnAny(m.activeDates, m.signupDate, offsets)).length;
 }
 

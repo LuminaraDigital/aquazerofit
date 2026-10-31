@@ -599,7 +599,8 @@ apps/api/src/
 ├── index.ts                    # Bootstrap, sweeps, graceful shutdown
 ├── app.ts                      # Express factory, middleware stack, SPA serving
 ├── platform/
-│   ├── config.ts               # Central config (getters, production guards)
+│   ├── config.ts               # Central config (getters)
+│   ├── bootGuards.ts           # Boot-time refusals (production secrets, single instance, origin gate)
 │   ├── store.ts                # MemoryBackedStore, JsonStore, PostgresStore, initStore/getStore
 │   ├── errors.ts               # AppError, errorHandler, notFoundHandler
 │   ├── telemetry.ts            # requestLogger, logAiCall

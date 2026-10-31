@@ -20,7 +20,8 @@
  *    a payment the server confirms with Stripe grants premium.
  *
  * A premium account sees its position and what is switched on, not a sales
- * page it has already bought.
+ * page it has already bought — and, when Stripe bills it, the way into
+ * Stripe's billing portal to change the card or cancel.
  */
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -33,10 +34,12 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ApiError } from '@/lib/api';
 import {
   queryKeys,
   useBillingConfig,
   useEntitlements,
+  useOpenStripePortal,
   useStartStarsSubscription,
   useStartStripeCheckout,
   useStripeCheckoutSync,
@@ -239,18 +242,17 @@ function SubscribeCard({ price }: { price: StripePrice }) {
         </p>
         <p className="text-sm leading-relaxed text-on-surface-variant">
           Renews each {price.interval}. You pay on Stripe&apos;s secure checkout page, and
-          AquaZeroFit never sees your card. To cancel, contact{' '}
-          <Link to="/support" className="text-primary underline-offset-2 hover:underline">
-            Support
-          </Link>
-          .
+          AquaZeroFit never sees your card. Cancel any time from this page.
         </p>
         <PrimaryButton loading={checkout.isPending} onClick={() => checkout.mutate()}>
           Subscribe for {amount} / {price.interval}
         </PrimaryButton>
         {checkout.isError && (
           <p role="alert" className="text-sm text-error">
-            We could not open checkout. Nothing was charged. Try again in a moment.
+            {/* A refusal (already premium, or a subscription still open) will not clear on retry. */}
+            {checkout.error instanceof ApiError && checkout.error.code === 'CONFLICT'
+              ? checkout.error.message
+              : 'We could not open checkout. Nothing was charged. Try again in a moment.'}
           </p>
         )}
       </GlassCard>
@@ -330,6 +332,36 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
   );
 }
 
+/** A Stripe subscriber's way to change their card, read receipts or cancel, on Stripe's own page. */
+function ManageSubscriptionCard() {
+  const portal = useOpenStripePortal();
+
+  return (
+    <section aria-labelledby="plan-manage">
+      <GlassCard className="p-card-padding space-y-3">
+        <h2
+          id="plan-manage"
+          className="font-heading font-semibold uppercase tracking-wide text-base text-on-surface"
+        >
+          Your subscription
+        </h2>
+        <p className="text-sm leading-relaxed text-on-surface-variant">
+          Premium is billed through Stripe. Update your card, download receipts or cancel on
+          Stripe&apos;s secure billing page.
+        </p>
+        <SecondaryButton loading={portal.isPending} onClick={() => portal.mutate()}>
+          Manage or cancel subscription
+        </SecondaryButton>
+        {portal.isError && (
+          <p role="alert" className="text-sm text-error">
+            We could not open the billing page. Nothing has changed. Try again in a moment.
+          </p>
+        )}
+      </GlassCard>
+    </section>
+  );
+}
+
 /** Shown where Stripe sends the buyer back: cancelled, or paid and being confirmed. */
 function CheckoutReturn({ state, sessionId }: { state: string | null; sessionId: string | null }) {
   const sync = useStripeCheckoutSync(state === 'success' ? sessionId : null);
@@ -364,7 +396,8 @@ export default function Plan() {
   const { data: entitlements, isLoading, isError, refetch } = useEntitlements();
   const billing = useBillingConfig();
   // Telegram requires its own Stars for digital goods inside a Mini App.
-  const stripePrice = !isTMA() && billing.data?.stripe?.available ? billing.data.stripe.price : null;
+  const stripeAllowed = !isTMA();
+  const stripePrice = stripeAllowed && billing.data?.stripe?.available ? billing.data.stripe.price : null;
   const starsConfig = billing.data?.stars;
   const starsOffer: StarsOffer | null =
     isTMA() &&
@@ -407,6 +440,7 @@ export default function Plan() {
   }
 
   const premium = entitlements.tier === 'premium';
+  const manageInStripe = premium && stripeAllowed && entitlements.billingSource === 'stripe';
   const lanes = entitlements.premiumLanes;
 
   return (
@@ -487,7 +521,8 @@ export default function Plan() {
           </section>
         )}
 
-        {premium && (
+        {manageInStripe && <ManageSubscriptionCard />}
+        {premium && !manageInStripe && (
           <p className="px-2 text-xs leading-relaxed text-on-surface-variant">
             Nothing to do here. This page is just your current position. Your weekly note is
             written for you automatically.

@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -26,6 +27,7 @@ const { getStore } = await import('../platform/store');
 const { ensureUserFromFirebase } = await import('../modules/auth/firebaseUsers');
 const { signTelegramInitData } = await import('../modules/auth/telegram');
 const { resetTelegramNewAccountLimits } = await import('../modules/auth/service');
+const { credentialsId } = await import('../modules/me/service');
 const app = createApp();
 const base = '/api/v1';
 
@@ -496,5 +498,202 @@ describe('Firebase email linking requires a verified email', () => {
     expect(user.tier).toBe('free');
     expect(user.emailVerified).toBe(true);
     expect(user.firebaseUid).toBe('fb-dev-unverified-new');
+  });
+});
+
+/** Provision the way production does: an unverified token stores an unverified address. */
+function provisionUnproved(uid: string, email: string): string {
+  const previous = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  try {
+    return ensureUserFromFirebase({ uid, email, emailVerified: false, name: 'Early Bird' }).id;
+  } finally {
+    if (previous === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previous;
+  }
+}
+
+function tgInitData(tgId: number): string {
+  return signTelegramInitData({
+    auth_date: String(Math.floor(Date.now() / 1000)),
+    query_id: `AA-${tgId}`,
+    user: JSON.stringify({ id: tgId, first_name: 'Tess' }),
+  });
+}
+
+type StoredUser = { id: string; email: string; emailVerified: boolean; firebaseUid?: string; tgId?: number; role: string };
+
+describe('a Firebase account whose email is unproved', () => {
+  it('cannot add a password or link Telegram until the email is verified', async () => {
+    const userId = provisionUnproved('fb-early-bird', 'early.bird@example.com');
+    const unverified = { uid: 'fb-early-bird', email: 'early.bird@example.com', emailVerified: false };
+
+    verifyFirebaseIdToken.mockResolvedValueOnce(unverified);
+    const creds = await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', 'Bearer early-bird-token')
+      .send({ email: 'early.bird@example.com', password: 'CorrectHorse9Battery' });
+    expect(creds.status).toBe(403);
+    expect(creds.body.code).toBe('AUTH_EMAIL_UNVERIFIED');
+
+    resetTelegramNewAccountLimits();
+    verifyFirebaseIdToken.mockResolvedValueOnce(unverified);
+    const link = await request(app)
+      .post(`${base}/me/link-telegram`)
+      .set('Authorization', 'Bearer early-bird-token')
+      .send({ initData: tgInitData(770101) });
+    expect(link.status).toBe(403);
+    expect(link.body.code).toBe('AUTH_EMAIL_UNVERIFIED');
+
+    expect(getStore().byId<StoredUser>('users', userId)?.tgId).toBeUndefined();
+    expect(getStore().byId('users', credentialsId(userId))).toBeUndefined();
+  });
+
+  it('loses a password and Telegram link attached before a verified sign-in proves the email', async () => {
+    const userId = provisionUnproved('fb-pre-proof', 'pre.proof@example.com');
+    // What a session on this account could write before the guard above existed.
+    const store = getStore();
+    store.upsert('users', { ...store.byId<StoredUser>('users', userId)!, tgId: 770102, tgUsername: 'early' });
+    store.upsert('users', {
+      id: credentialsId(userId),
+      type: 'credentials',
+      userId,
+      passwordHash: await bcrypt.hash('EarlyBird9Password', 4),
+    });
+
+    resetTelegramNewAccountLimits();
+    const tg = await request(app).post(`${base}/auth/telegram`).send({ initData: tgInitData(770102) });
+    expect(tg.status).toBe(200);
+    expect(tg.body.user.id).toBe(userId);
+    const pw = await request(app)
+      .post(`${base}/auth/login`)
+      .send({ email: 'pre.proof@example.com', password: 'EarlyBird9Password' });
+    expect(pw.status).toBe(200);
+
+    verifyFirebaseIdToken.mockResolvedValueOnce({
+      uid: 'fb-pre-proof',
+      email: 'pre.proof@example.com',
+      emailVerified: true,
+      name: 'Owner',
+    });
+    const proved = await request(app)
+      .post(`${base}/auth/firebase/session`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({});
+    expect(proved.status).toBe(200);
+    expect(proved.body.user).toMatchObject({
+      id: userId,
+      emailVerified: true,
+      hasPassword: false,
+      telegramLinked: false,
+    });
+
+    const login = await request(app)
+      .post(`${base}/auth/login`)
+      .send({ email: 'pre.proof@example.com', password: 'EarlyBird9Password' });
+    expect(login.status).toBe(401);
+    for (const refreshToken of [tg.body.refreshToken, pw.body.refreshToken]) {
+      const res = await request(app).post(`${base}/auth/refresh`).send({ refreshToken });
+      expect(res.status).toBe(401);
+    }
+    const tgAgain = await request(app).post(`${base}/auth/telegram`).send({ initData: tgInitData(770102) });
+    expect(tgAgain.status).toBe(200);
+    expect(tgAgain.body.user.id).not.toBe(userId);
+
+    const proof = getStore().where<{ id: string; userId?: string; action?: string; detail?: Record<string, unknown> }>(
+      'audit',
+      (d) => d.userId === userId && d.action === 'firebase.email.proved',
+    );
+    expect(proof).toHaveLength(1);
+    expect(proof[0]?.detail).toMatchObject({ droppedPassword: true, droppedTelegram: true });
+  });
+
+  it('stays unproved when the verified token carries a different address', async () => {
+    const userId = provisionUnproved('fb-moved-address', 'moved.from@example.com');
+    verifyFirebaseIdToken.mockResolvedValueOnce({
+      uid: 'fb-moved-address',
+      email: 'moved.to@example.com',
+      emailVerified: true,
+    });
+    const session = await request(app)
+      .post(`${base}/auth/firebase/session`)
+      .set('Authorization', 'Bearer moved-token')
+      .send({});
+    expect(session.status).toBe(200);
+    expect(session.body.user).toMatchObject({ id: userId, email: 'moved.from@example.com', emailVerified: false });
+
+    verifyFirebaseIdToken.mockResolvedValueOnce({
+      uid: 'fb-moved-address',
+      email: 'moved.to@example.com',
+      emailVerified: true,
+    });
+    const creds = await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', 'Bearer moved-token')
+      .send({ email: 'moved.from@example.com', password: 'CorrectHorse9Battery' });
+    expect(creds.status).toBe(403);
+    expect(creds.body.code).toBe('AUTH_EMAIL_UNVERIFIED');
+
+    verifyFirebaseIdToken.mockResolvedValueOnce({
+      uid: 'fb-owner-of-from',
+      email: 'moved.from@example.com',
+      emailVerified: true,
+    });
+    const owner = await request(app)
+      .post(`${base}/auth/firebase/session`)
+      .set('Authorization', 'Bearer owner-of-from-token')
+      .send({});
+    expect(owner.status).toBe(403);
+    expect(getStore().byId<StoredUser>('users', userId)?.firebaseUid).toBe('fb-moved-address');
+  });
+});
+
+describe('Firebase sign-in on a domain this project does not own', () => {
+  it('does not link a verified identity onto a legacy admin on that domain', async () => {
+    getStore().upsert('users', {
+      id: 'usr_legacy_domain_admin',
+      email: 'admin@aquazero.fit',
+      emailVerified: true,
+      role: 'admin',
+      tier: 'premium',
+      displayName: 'Legacy Admin',
+      createdAt: new Date().toISOString(),
+      deletionRequestedAt: null,
+    });
+    verifyFirebaseIdToken.mockResolvedValueOnce({
+      uid: 'fb-domain-holder',
+      email: 'Admin@AquaZero.fit',
+      emailVerified: true,
+      name: 'Domain Holder',
+    });
+
+    const res = await request(app)
+      .post(`${base}/auth/firebase/session`)
+      .set('Authorization', 'Bearer domain-holder-token')
+      .send({});
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+
+    const admin = getStore().byId<StoredUser>('users', 'usr_legacy_domain_admin');
+    expect(admin?.firebaseUid).toBeUndefined();
+    expect(admin?.role).toBe('admin');
+    expect(getStore().where<StoredUser>('users', (d) => d.firebaseUid === 'fb-domain-holder')).toHaveLength(0);
+  });
+
+  it('does not provision a new account on that domain or its subdomains', async () => {
+    verifyFirebaseIdToken.mockResolvedValueOnce({
+      uid: 'fb-synthetic-lookalike',
+      email: 'tg-880001@telegram.aquazero.fit',
+      emailVerified: true,
+      name: 'Lookalike',
+    });
+
+    const res = await request(app)
+      .post(`${base}/auth/firebase/session`)
+      .set('Authorization', 'Bearer lookalike-token')
+      .send({});
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+    expect(getStore().where<StoredUser>('users', (d) => d.firebaseUid === 'fb-synthetic-lookalike')).toHaveLength(0);
   });
 });

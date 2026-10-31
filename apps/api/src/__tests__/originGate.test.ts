@@ -16,7 +16,7 @@ import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app';
 import { ORIGIN_SHARED_SECRET_HEADER, resetOriginRefusalLog } from '../platform/clientIp';
-import { assertOriginSecretConfigured } from '../platform/config';
+import { assertOriginSecretConfigured } from '../platform/bootGuards';
 import { getStore } from '../platform/store';
 import { bindIsolatedDataDir, createIsolatedDataDir } from './helpers/integrationIsolation';
 
@@ -268,12 +268,31 @@ describe('assertOriginSecretConfigured', () => {
     expect(() => assertOriginSecretConfigured()).not.toThrow();
   });
 
-  it('does not judge the secret while the gate is off', () => {
-    // Off, the secret only steers rate-limit buckets; a deploy must not fail
-    // over it before the operator has chosen to turn the gate on.
+  it('refuses a placeholder or short secret even while the gate is off', () => {
+    // Off, the secret still decides whose CF-Connecting-IP is believed, and so
+    // which address every rate limit and signup cap counts.
     delete process.env.REQUIRE_ORIGIN_SECRET;
-    process.env.ORIGIN_SHARED_SECRET = 'replace-with-production-only-origin-secret';
-    expect(() => assertOriginSecretConfigured()).not.toThrow();
+    for (const value of ['replace-with-production-only-origin-secret', 'x'.repeat(31)]) {
+      process.env.ORIGIN_SHARED_SECRET = value;
+      expect(() => assertOriginSecretConfigured()).toThrow(/Refusing to start: ORIGIN_SHARED_SECRET/);
+    }
+    process.env.ORIGIN_SHARED_SECRET = SECRET;
+    process.env.ORIGIN_SHARED_SECRET_PREVIOUS = 'y'.repeat(31);
+    expect(() => assertOriginSecretConfigured()).toThrow(/Refusing to start: ORIGIN_SHARED_SECRET_PREVIOUS/);
+  });
+
+  it('refuses to boot on a REQUIRE_ORIGIN_SECRET value it does not recognise', () => {
+    // "yes" or "on" reads as switched on to whoever set it; taking it as off
+    // would leave run.app open while the operator believes it is closed.
+    process.env.ORIGIN_SHARED_SECRET = SECRET;
+    for (const value of ['yes', 'on', 'enabled']) {
+      process.env.REQUIRE_ORIGIN_SECRET = value;
+      expect(() => assertOriginSecretConfigured()).toThrow(/Refusing to start: REQUIRE_ORIGIN_SECRET/);
+    }
+    for (const value of ['true', '1', ' TRUE ', 'false', '0', '']) {
+      process.env.REQUIRE_ORIGIN_SECRET = value;
+      expect(() => assertOriginSecretConfigured()).not.toThrow();
+    }
   });
 
   it('boots with the gate on and a secret set, or with the gate off', () => {

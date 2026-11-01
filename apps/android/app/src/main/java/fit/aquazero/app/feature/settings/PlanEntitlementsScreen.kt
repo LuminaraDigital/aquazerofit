@@ -200,6 +200,8 @@ fun PlanEntitlementsScreen(
                         item {
                             UpgradeCard(
                                 offers = state.offers,
+                                premiumDailyCredits = state.entitlements?.premiumDailyCredits ?: 0,
+                                playVerifyAvailable = state.playVerifyAvailable,
                                 selectedPeriod = state.selectedPeriod,
                                 onSelectPeriod = viewModel::selectPeriod,
                                 offerLoading = state.offerLoading,
@@ -209,17 +211,26 @@ fun PlanEntitlementsScreen(
                         }
                     } else {
                         item {
+                            val playActive = state.entitlements?.hasActivePlaySubscription() == true
                             Column(modifier = Modifier.padding(horizontal = 4.dp)) {
                                 Text(
-                                    text = stringResource(R.string.plan_premium_note),
+                                    text = stringResource(
+                                        if (playActive) {
+                                            R.string.plan_premium_play_note
+                                        } else {
+                                            R.string.plan_premium_note
+                                        },
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-                                SecondaryButton(
-                                    text = stringResource(R.string.plan_manage_subscription),
-                                    onClick = { context.openPlaySubscriptions() },
-                                )
+                                if (playActive) {
+                                    Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
+                                    SecondaryButton(
+                                        text = stringResource(R.string.plan_manage_subscription),
+                                        onClick = { context.openPlaySubscriptions() },
+                                    )
+                                }
                             }
                         }
                     }
@@ -399,6 +410,8 @@ private fun CostRow(task: String, cost: Int) {
 @Composable
 private fun UpgradeCard(
     offers: PremiumOffers?,
+    premiumDailyCredits: Int,
+    playVerifyAvailable: Boolean,
     selectedPeriod: PlanPeriod,
     onSelectPeriod: (PlanPeriod) -> Unit,
     offerLoading: Boolean,
@@ -422,7 +435,11 @@ private fun UpgradeCard(
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = stringResource(R.string.plan_upgrade_body),
+            text = if (premiumDailyCredits > 0) {
+                stringResource(R.string.plan_upgrade_body, premiumDailyCredits)
+            } else {
+                stringResource(R.string.plan_upgrade_body_capped)
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -436,6 +453,11 @@ private fun UpgradeCard(
 
         when {
             offerLoading -> Skeleton(modifier = Modifier.fillMaxWidth().height(140.dp))
+            !playVerifyAvailable -> Text(
+                text = stringResource(R.string.plan_upgrade_server_unavailable),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             offers == null || (offers.annual == null && offers.monthly == null) -> Text(
                 text = stringResource(R.string.plan_upgrade_unavailable),
                 style = MaterialTheme.typography.bodySmall,
@@ -658,6 +680,8 @@ private fun PlanPreview() {
             )
             LaneCard(lane = "insightBatch", premium = false)
             UpgradeCard(
+                premiumDailyCredits = 60,
+                playVerifyAvailable = true,
                 offers = PremiumOffers(
                     annual = PremiumOffer(
                         productId = "azf_premium_annual",

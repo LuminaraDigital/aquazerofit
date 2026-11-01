@@ -3,8 +3,8 @@
  * The plan page exists because the weekly-insight footnote had nowhere to send
  * a free-tier user. Two things about it are worth failing a build over.
  *
- * First, it must state the account's real position  -  the tier and the credit
- * balance  -  rather than a value proposition, so the numbers come from the API
+ * First, it must state the account's real position - the tier and the credit
+ * balance - rather than a value proposition, so the numbers come from the API
  * fixture and are asserted as rendered.
  *
  * Second, and the reason this file is emphatic about it: a purchase control
@@ -18,7 +18,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS, MAX_BANKED_CREDITS } from '@aquazerofit/shared';
+import {
+  CREDIT_COSTS,
+  FREE_TIER_DAILY_CREDITS,
+  MAX_BANKED_CREDITS,
+  PREMIUM_TIER_DAILY_CREDITS,
+} from '@aquazerofit/shared';
 import { ApiError } from '@/lib/api';
 import type { BillingConfig, Entitlements } from '@/lib/queries';
 
@@ -77,6 +82,7 @@ const FREE: Entitlements = {
   creditsRemaining: 12,
   costs: { ...CREDIT_COSTS },
   premiumLanes: ['insightBatch'],
+  premiumDailyCredits: PREMIUM_TIER_DAILY_CREDITS,
 };
 
 const PREMIUM: Entitlements = { ...FREE, tier: 'premium', creditsRemaining: 47 };
@@ -127,7 +133,7 @@ afterEach(() => {
   mocks.portalFailed.mockReturnValue(false);
 });
 
-describe('plan page  -  free tier', () => {
+describe('plan page - free tier', () => {
   it('leads with the account position: tier and the credits actually available', () => {
     renderWith({ data: FREE });
 
@@ -166,6 +172,8 @@ describe('plan page  -  free tier', () => {
     expect(screen.getByRole('heading', { name: /a coach-written weekly note/i })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: /meal photo analysis/i })).toBeNull();
     expect(screen.getAllByText('Premium')).toHaveLength(1);
+    expect(screen.getByText(new RegExp(`${PREMIUM_TIER_DAILY_CREDITS} AI credits a day`, 'i'))).toBeTruthy();
+    expect(screen.getByText(/that is a cap/i)).toBeTruthy();
     expect(screen.getByText(/that is the whole difference today/i)).toBeTruthy();
   });
 
@@ -186,7 +194,7 @@ describe('plan page  -  free tier', () => {
     expect(screen.getByRole('heading', { name: /upgrading is not available here yet/i })).toBeTruthy();
     expect(screen.getByText(/you cannot buy premium from this screen yet/i)).toBeTruthy();
 
-    // No checkout affordance of any kind  -  not even a disabled one.
+    // No checkout affordance of any kind - not even a disabled one.
     for (const role of ['button', 'link'] as const) {
       expect(
         screen.queryByRole(role, { name: /upgrade|buy|subscribe|checkout|go premium|pay/i }),
@@ -197,7 +205,7 @@ describe('plan page  -  free tier', () => {
   });
 });
 
-describe('plan page  -  premium tier', () => {
+describe('plan page - premium tier', () => {
   it('shows the position and what is switched on, not a sales page', () => {
     renderWith({ data: PREMIUM });
 
@@ -235,7 +243,7 @@ describe('plan page  -  premium tier', () => {
   });
 });
 
-describe('plan page  -  non-content states', () => {
+describe('plan page - non-content states', () => {
   it('shows skeletons while the entitlements request is in flight', () => {
     const { container } = renderWith({ isLoading: true });
 
@@ -251,7 +259,7 @@ describe('plan page  -  non-content states', () => {
   });
 });
 
-describe('plan page  -  Stripe checkout', () => {
+describe('plan page - Stripe checkout', () => {
   it("offers Subscribe with Stripe's price on the button, and opens checkout when pressed", () => {
     renderWith({ data: FREE }, STRIPE);
 
@@ -260,6 +268,42 @@ describe('plan page  -  Stripe checkout', () => {
 
     fireEvent.click(subscribe);
     expect(mocks.startCheckout).toHaveBeenCalledTimes(1);
+    expect(mocks.startCheckout).toHaveBeenCalledWith('month');
+  });
+
+  it('offers annual checkout at A$79.99 when that plan is open', () => {
+    const both: BillingConfig = {
+      stripe: {
+        available: true,
+        price: { amount: 999, currency: 'aud', interval: 'month' },
+        plans: [
+          { interval: 'month', amount: 999, currency: 'aud', available: true },
+          { interval: 'year', amount: 7999, currency: 'aud', available: true },
+        ],
+      },
+    };
+    renderWith({ data: FREE }, both);
+
+    fireEvent.click(screen.getByRole('button', { name: /subscribe for .*79\.99 \/ year/i }));
+    expect(mocks.startCheckout).toHaveBeenCalledWith('year');
+    expect(screen.getByRole('button', { name: /subscribe for .*9\.99 \/ month/i })).toBeTruthy();
+  });
+
+  it('hides annual checkout when that plan is listed but not open', () => {
+    const monthlyOnly: BillingConfig = {
+      stripe: {
+        available: true,
+        price: { amount: 999, currency: 'aud', interval: 'month' },
+        plans: [
+          { interval: 'month', amount: 999, currency: 'aud', available: true },
+          { interval: 'year', amount: 7999, currency: 'aud', available: false },
+        ],
+      },
+    };
+    renderWith({ data: FREE }, monthlyOnly);
+
+    expect(screen.getByRole('button', { name: /subscribe for .*9\.99 \/ month/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /year/i })).toBeNull();
   });
 
   it("gives the server's reason when checkout is refused, rather than asking for a retry that cannot work", () => {
@@ -358,13 +402,27 @@ describe('plan page  -  Stripe checkout', () => {
   });
 });
 
-describe('plan page — managing a Stripe subscription', () => {
+describe('plan page - managing a Stripe subscription', () => {
   it("lets a Stripe subscriber manage or cancel, opening Stripe's billing portal", () => {
     renderWith({ data: STRIPE_SUBSCRIBER }, STRIPE);
 
     fireEvent.click(screen.getByRole('button', { name: /manage or cancel subscription/i }));
     expect(mocks.openPortal).toHaveBeenCalledTimes(1);
     // There is something to do here now, so the page does not say otherwise.
+    expect(screen.queryByText(/nothing to do here/i)).toBeNull();
+  });
+
+  it('tells a Play subscriber to cancel in the Play Store', () => {
+    renderWith(
+      { data: { ...PREMIUM, billingSource: 'play', activeBillingSources: ['play'] } },
+      STRIPE,
+    );
+
+    expect(screen.getByText(/cancel it in the play store/i)).toBeTruthy();
+    expect(screen.getByRole('link', { name: /manage subscription in google play/i }).getAttribute('href')).toBe(
+      'https://play.google.com/store/account/subscriptions?package=fit.aquazero.app',
+    );
+    expect(screen.queryByRole('button', { name: /manage or cancel/i })).toBeNull();
     expect(screen.queryByText(/nothing to do here/i)).toBeNull();
   });
 

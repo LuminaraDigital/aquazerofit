@@ -10,7 +10,7 @@
  */
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS } from '@aquazerofit/shared';
+import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS, PREMIUM_TIER_DAILY_CREDITS } from '@aquazerofit/shared';
 import {
   bindIsolatedDataDir,
   createIsolatedDataDir,
@@ -64,6 +64,7 @@ describe('GET /me/entitlements', () => {
     expect(res.body.creditsRemaining).toBe(FREE_TIER_DAILY_CREDITS);
     expect(res.body.tier).toBe('free');
     expect(res.body.dailyCredits).toBe(FREE_TIER_DAILY_CREDITS);
+    expect(res.body.premiumDailyCredits).toBe(PREMIUM_TIER_DAILY_CREDITS);
     expect(res.body.costs).toEqual(CREDIT_COSTS);
     expect(res.body.premiumLanes).toEqual(['insightBatch']);
   });

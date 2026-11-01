@@ -1059,6 +1059,7 @@
     <string name="settings_delete_body">Deleting your account removes your profile, logs, plans and coach memory. There is a %1$d-day grace period first - signing in again with your email and password during that time cancels the request.</string>
     <string name="settings_delete_cta">Delete my account</string>
     <string name="settings_delete_export_first">Export your data first if you want to keep a copy.</string>
+    <string name="settings_delete_play_warning">You have a Google Play subscription. Deleting this account does not cancel it. Cancel it in the Play Store, or Google will keep billing you.</string>
     <string name="settings_delete_dialog_title">Delete account?</string>
     <string name="settings_delete_dialog_body">Your profile, meal logs, weight history, training plans and coach memory will be scheduled for permanent removal. Nothing is erased for %1$d days, and signing in again with your email and password during that time cancels the request. After the grace period it cannot be undone.</string>
     <string name="settings_delete_dialog_confirm">Yes, delete my account</string>
@@ -1220,7 +1221,8 @@
     <string name="plan_task_exercise_swap">Exercise swap suggestion</string>
     <string name="plan_task_memory_extraction">Coach memory update</string>
     <string name="plan_upgrade_heading">Go premium</string>
-    <string name="plan_upgrade_body">Premium gives you 150 daily AI credits (15× free tier) and personalized coach-written insights. Everything on your free plan keeps working exactly as it does now.</string>
+    <string name="plan_upgrade_body">Premium is %1$d AI credits a day. That is a cap, and it adds a coach-written weekly note. Everything on your free plan keeps working exactly as it does now.</string>
+    <string name="plan_upgrade_body_capped">Premium raises your daily AI credit allowance. It is a cap, and it adds a coach-written weekly note. Everything on your free plan keeps working exactly as it does now.</string>
     <string name="plan_upgrade_coaches">Coaches are not part of this. Every coach is earned by training, on both plans, and no amount of money unlocks one.</string>
     <string name="plan_period_annual">Annual</string>
     <string name="plan_period_annual_discount">SAVE %1$d%%</string>
@@ -1242,8 +1244,11 @@
     <string name="plan_upgrade_verify_later">Google took the purchase, but we could not confirm it just yet. The app keeps retrying on its own each time you open it, and premium starts as soon as it goes through. If it still has not after a day or two, contact Support rather than buying again.</string>
     <string name="plan_upgrade_offline">You\'re offline, so the purchase could not be confirmed. It will be picked up next time you open the app with a connection.</string>
     <string name="plan_upgrade_play_unavailable">Google Play billing isn\'t available on this device, so premium can\'t be bought here.</string>
+    <string name="plan_upgrade_server_unavailable">Premium cannot be bought in the app right now, because this server cannot confirm a Play purchase. Your free plan is unaffected.</string>
+    <string name="plan_upgrade_already_premium">This account is already on premium, so this Play purchase was not applied. If Google is still holding the charge, it refunds a purchase the app does not confirm. Cancel any Play subscription you do not want in the Play Store.</string>
     <string name="plan_upgrade_failed">That purchase didn\'t go through. Your plan is unchanged.</string>
-    <string name="plan_premium_note">You\'re on premium - your weekly note is written for you automatically. The subscription renews in Google Play, and you can cancel it there whenever you like.</string>
+    <string name="plan_premium_note">You\'re on premium. Your weekly note is written for you automatically.</string>
+    <string name="plan_premium_play_note">You\'re on premium. This subscription is billed by Google Play. Cancel it in the Play Store. Deleting your account does not cancel it.</string>
     <string name="plan_manage_subscription">Manage subscription in Google Play</string>
     <string name="plan_error">We could not read your plan details right now.</string>
 

@@ -18,7 +18,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS, MAX_BANKED_CREDITS } from '@aquazerofit/shared';
+import {
+  CREDIT_COSTS,
+  FREE_TIER_DAILY_CREDITS,
+  MAX_BANKED_CREDITS,
+  PREMIUM_TIER_DAILY_CREDITS,
+} from '@aquazerofit/shared';
 import { ApiError } from '@/lib/api';
 import type { BillingConfig, Entitlements } from '@/lib/queries';
 
@@ -77,6 +82,7 @@ const FREE: Entitlements = {
   creditsRemaining: 12,
   costs: { ...CREDIT_COSTS },
   premiumLanes: ['insightBatch'],
+  premiumDailyCredits: PREMIUM_TIER_DAILY_CREDITS,
 };
 
 const PREMIUM: Entitlements = { ...FREE, tier: 'premium', creditsRemaining: 47 };
@@ -166,6 +172,8 @@ describe('plan page - free tier', () => {
     expect(screen.getByRole('heading', { name: /a coach-written weekly note/i })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: /meal photo analysis/i })).toBeNull();
     expect(screen.getAllByText('Premium')).toHaveLength(1);
+    expect(screen.getByText(new RegExp(`${PREMIUM_TIER_DAILY_CREDITS} AI credits a day`, 'i'))).toBeTruthy();
+    expect(screen.getByText(/that is a cap/i)).toBeTruthy();
     expect(screen.getByText(/that is the whole difference today/i)).toBeTruthy();
   });
 

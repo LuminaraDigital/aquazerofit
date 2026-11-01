@@ -99,6 +99,11 @@ data class EntitlementsDto(
     /** Defaults to the *least* entitled tier: an unreadable tier grants nothing. */
     val tier: UserTier = UserTier.FREE,
     val dailyCredits: Int,
+    /**
+     * Paid daily cap. 0 means this server did not send it, and the upgrade
+     * copy then omits a number rather than inventing one.
+     */
+    val premiumDailyCredits: Int = 0,
     val creditsRemaining: Int,
     /**
      * Ceiling on a banked balance - the daily grant tops [creditsRemaining] up

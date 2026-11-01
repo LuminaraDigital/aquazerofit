@@ -1221,7 +1221,8 @@
     <string name="plan_task_exercise_swap">Exercise swap suggestion</string>
     <string name="plan_task_memory_extraction">Coach memory update</string>
     <string name="plan_upgrade_heading">Go premium</string>
-    <string name="plan_upgrade_body">Premium gives you 150 daily AI credits (15× free tier) and personalized coach-written insights. Everything on your free plan keeps working exactly as it does now.</string>
+    <string name="plan_upgrade_body">Premium is %1$d AI credits a day. That is a cap, and it adds a coach-written weekly note. Everything on your free plan keeps working exactly as it does now.</string>
+    <string name="plan_upgrade_body_capped">Premium raises your daily AI credit allowance. It is a cap, and it adds a coach-written weekly note. Everything on your free plan keeps working exactly as it does now.</string>
     <string name="plan_upgrade_coaches">Coaches are not part of this. Every coach is earned by training, on both plans, and no amount of money unlocks one.</string>
     <string name="plan_period_annual">Annual</string>
     <string name="plan_period_annual_discount">SAVE %1$d%%</string>

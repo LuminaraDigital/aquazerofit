@@ -48,6 +48,8 @@ export type TrendRange = '7d' | '30d' | '90d';
 export interface Entitlements {
   tier: UserTier;
   dailyCredits: number;
+  /** Paid daily cap, sent on every account so the upgrade screen can state it. */
+  premiumDailyCredits?: number;
   creditsRemaining: number;
   /**
    * Ceiling on a carried-over balance: the daily grant tops up toward this and

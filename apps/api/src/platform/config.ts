@@ -523,9 +523,10 @@ export const config = {
   },
 
   /**
-   * Recurring Price for annual Premium (A$79.99 AUD per year). Created in
-   * Stripe outside this repo; unset means annual checkout is not offered.
-   * The id is whatever Stripe assigns when that Price is created.
+   * Recurring Price for annual Premium (A$79.99 AUD per year). Live id:
+   * price_1UX1Ue2KRdTmwWCnbO3bW4eh, mounted as STRIPE_PRICE_ID_ANNUAL.
+   * Unset means annual checkout is not offered. The amount is still checked
+   * against the launch catalog before a session is opened.
    */
   get stripePriceIdAnnual(): string {
     return process.env.STRIPE_PRICE_ID_ANNUAL?.trim() ?? '';

@@ -200,6 +200,7 @@ fun PlanEntitlementsScreen(
                         item {
                             UpgradeCard(
                                 offers = state.offers,
+                                premiumDailyCredits = state.entitlements?.premiumDailyCredits ?: 0,
                                 playVerifyAvailable = state.playVerifyAvailable,
                                 selectedPeriod = state.selectedPeriod,
                                 onSelectPeriod = viewModel::selectPeriod,
@@ -409,6 +410,7 @@ private fun CostRow(task: String, cost: Int) {
 @Composable
 private fun UpgradeCard(
     offers: PremiumOffers?,
+    premiumDailyCredits: Int,
     playVerifyAvailable: Boolean,
     selectedPeriod: PlanPeriod,
     onSelectPeriod: (PlanPeriod) -> Unit,
@@ -433,7 +435,11 @@ private fun UpgradeCard(
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = stringResource(R.string.plan_upgrade_body),
+            text = if (premiumDailyCredits > 0) {
+                stringResource(R.string.plan_upgrade_body, premiumDailyCredits)
+            } else {
+                stringResource(R.string.plan_upgrade_body_capped)
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -674,6 +680,7 @@ private fun PlanPreview() {
             )
             LaneCard(lane = "insightBatch", premium = false)
             UpgradeCard(
+                premiumDailyCredits = 60,
                 playVerifyAvailable = true,
                 offers = PremiumOffers(
                     annual = PremiumOffer(

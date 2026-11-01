@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import {
   CREDIT_COSTS,
+  PREMIUM_TIER_DAILY_CREDITS,
   dailyCreditsFor,
   maxBankedCreditsFor,
   consentsSchema,
@@ -75,6 +76,9 @@ meRouter.get(
       // Per tier, not the free constant: a premium account told it receives
       // the free allowance is being shown the plan it did not buy.
       dailyCredits: dailyCreditsFor(tier),
+      // The paid cap, on every account, so the upgrade screen can state it
+      // without a client-side constant.
+      premiumDailyCredits: PREMIUM_TIER_DAILY_CREDITS,
       creditsRemaining: remaining,
       // The carry-over ceiling. Sent because the daily top-up stops at it, so
       // a client that says "unspent credits carry over" without naming the

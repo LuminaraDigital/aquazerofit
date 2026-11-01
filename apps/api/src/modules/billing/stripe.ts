@@ -112,7 +112,7 @@ export type PremiumInterval = 'month' | 'year';
  * and interval.
  *
  * Monthly production Price: price_1UTzLC2KRdTmwWCnfblYV22F (STRIPE_PRICE_ID).
- * Annual Price is created in Stripe and named by STRIPE_PRICE_ID_ANNUAL.
+ * Annual production Price: price_1UX1Ue2KRdTmwWCnbO3bW4eh (STRIPE_PRICE_ID_ANNUAL).
  */
 export const PREMIUM_PLAN_CATALOG: Record<PremiumInterval, PremiumPrice> = {
   month: { amount: 999, currency: 'aud', interval: 'month' },

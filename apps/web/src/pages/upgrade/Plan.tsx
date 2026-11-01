@@ -546,8 +546,12 @@ export default function Plan() {
             <>
               <LaneList lanes={lanes} premium={premium} />
               <p className="mt-3 px-2 text-xs leading-relaxed text-on-surface-variant">
+                {typeof entitlements.premiumDailyCredits === 'number' &&
+                entitlements.premiumDailyCredits > 0
+                  ? `Premium is ${entitlements.premiumDailyCredits.toLocaleString()} AI credits a day. That is a cap. `
+                  : null}
                 {lanes.length === 1
-                  ? 'Beyond more daily credits, that is the whole difference today.'
+                  ? 'Beyond the daily credit cap, that is the whole difference today.'
                   : 'That is the difference today.'}{' '}
                 Your targets, your logging, your training plans, the coach chat and every number in
                 your weekly summary work the same way on both plans.

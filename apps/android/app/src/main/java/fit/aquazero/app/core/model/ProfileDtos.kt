@@ -28,7 +28,7 @@ data class WellnessProfileDto(
 /**
  * Body for `PUT /me/profile` (shared `profileSchema`).
  *
- * Outbound only — nothing ever decodes this type, so [goal], [activityLevel]
+ * Outbound only - nothing ever decodes this type, so [goal], [activityLevel]
  * and [exerciseExperience] deliberately stay required. `coerceInputValues` has
  * no bearing on an encode, and a default here would buy nothing while making
  * it possible to silently ship someone else's goal for a user who chose one.
@@ -101,7 +101,7 @@ data class EntitlementsDto(
     val dailyCredits: Int,
     val creditsRemaining: Int,
     /**
-     * Ceiling on a banked balance — the daily grant tops [creditsRemaining] up
+     * Ceiling on a banked balance - the daily grant tops [creditsRemaining] up
      * towards this number and never past it.
      *
      * Defaults to 0, which is the sentinel for "this server did not say":
@@ -113,4 +113,23 @@ data class EntitlementsDto(
     val maxBankedCredits: Int = 0,
     val costs: Map<String, Int> = emptyMap(),
     val premiumLanes: List<String> = emptyList(),
-)
+    /**
+     * Latest entitlement rail. Null when this server did not send one.
+     * Used only when [activeBillingSources] is absent.
+     */
+    val billingSource: String? = null,
+    /**
+     * Rails whose paid period is still running. Null when the server predates
+     * the field, which is different from an empty list (no live rail).
+     */
+    val activeBillingSources: List<String>? = null,
+) {
+    /**
+     * A Play subscription that is still in its paid period. Deleting the
+     * account does not cancel it, and this app has no Play cancel call.
+     */
+    fun hasActivePlaySubscription(): Boolean {
+        activeBillingSources?.let { sources -> return sources.any { it == "play" } }
+        return tier == UserTier.PREMIUM && billingSource == "play"
+    }
+}

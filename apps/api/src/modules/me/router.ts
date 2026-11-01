@@ -22,7 +22,7 @@ import { getStore } from '../../platform/store';
 import { setCredentials } from '../auth/service';
 import { validateTelegramInitData } from '../auth/telegram';
 import { memoryRouter } from '../memory/router';
-import { effectiveTier, entitlementHistory } from '../billing/entitlements';
+import { activeEntitlementSources, effectiveTier, entitlementHistory } from '../billing/entitlements';
 import {
   exportUserData,
   getConsents,
@@ -85,6 +85,10 @@ meRouter.get(
       // Which rail the latest entitlement came from, so the plan page offers
       // Stripe's billing portal only to the people Stripe is billing.
       billingSource: entitlementHistory(userId)[0]?.source ?? null,
+      // Rails whose paid period is still running. A Play entry means the
+      // account-delete and unsubscribe screens must say to cancel in the
+      // Play Store. There is no Play cancel API on this server.
+      activeBillingSources: activeEntitlementSources(userId),
     });
   }),
 );

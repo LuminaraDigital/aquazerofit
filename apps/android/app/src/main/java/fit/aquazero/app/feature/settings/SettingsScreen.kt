@@ -298,7 +298,7 @@ fun SettingsScreen(
                     )
                     // AGPL-3.0 §13: the source of the running program must be
                     // offered to its users. This row is a licence obligation,
-                    // not a credit — do not remove it, and repoint it if you
+                    // not a credit - do not remove it, and repoint it if you
                     // ship a modified build.
                     AzfNavigationRow(
                         title = stringResource(R.string.settings_source_code),
@@ -702,6 +702,14 @@ private fun DeletionCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (state.playSubscriptionActive) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.settings_delete_play_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
             SecondaryButton(
                 text = stringResource(R.string.settings_delete_cta),
@@ -750,13 +758,22 @@ private fun DeletionCard(
 }
 
 @Composable
+private fun deletionBody(base: String, playSubscriptionActive: Boolean): String {
+    if (!playSubscriptionActive) return base
+    return base + "\n\n" + stringResource(R.string.settings_delete_play_warning)
+}
+
+@Composable
 private fun SettingsDialogs(state: SettingsUiState, viewModel: SettingsViewModel) {
     val dialog = state.dialog ?: return
     val grace = SettingsViewModel.DELETION_GRACE_DAYS
     when (dialog) {
         SettingsDialog.RequestDeletion -> ConfirmDialog(
             title = stringResource(R.string.settings_delete_dialog_title),
-            body = stringResource(R.string.settings_delete_dialog_body, grace),
+            body = deletionBody(
+                stringResource(R.string.settings_delete_dialog_body, grace),
+                state.playSubscriptionActive,
+            ),
             confirmLabel = stringResource(R.string.settings_delete_dialog_confirm),
             busy = state.deleting,
             onConfirm = viewModel::confirmDeletion,
@@ -764,7 +781,10 @@ private fun SettingsDialogs(state: SettingsUiState, viewModel: SettingsViewModel
         )
         SettingsDialog.PurgeNow -> ConfirmDialog(
             title = stringResource(R.string.settings_delete_now_dialog_title),
-            body = stringResource(R.string.settings_delete_now_dialog_body),
+            body = deletionBody(
+                stringResource(R.string.settings_delete_now_dialog_body),
+                state.playSubscriptionActive,
+            ),
             confirmLabel = stringResource(R.string.settings_delete_now_confirm),
             busy = state.deleting,
             onConfirm = viewModel::confirmDeletion,

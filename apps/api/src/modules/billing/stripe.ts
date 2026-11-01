@@ -5,7 +5,7 @@
  * what was paid. The browser never reports a payment, a period or an amount;
  * it can only ask us to open a Checkout Session or the billing portal, and
  * later ask us to look a Checkout Session up. Anything that grants premium
- * reads it from Stripe  -  a signed webhook
+ * reads it from Stripe - a signed webhook
  * delivery, or our own authenticated API call.
  *
  * NO NEW DEPENDENCY, for the reason `play.ts` gives: the SDK would be a large
@@ -97,14 +97,34 @@ interface CheckoutSession {
 }
 
 export interface PremiumPrice {
-  /** Minor units, as Stripe stores it: 999 is $9.99. */
+  /** Minor units, as Stripe stores it: 999 is A$9.99. */
   amount: number;
   currency: string;
   interval: string;
 }
 
+/** Which Premium subscription Checkout should open. One tier, two periods. */
+export type PremiumInterval = 'month' | 'year';
+
+/**
+ * Launch prices. One Premium tier. Checkout is offered for an interval only
+ * when Stripe's Price for that env var matches this row: amount, currency
+ * and interval.
+ *
+ * Monthly production Price: price_1UTzLC2KRdTmwWCnfblYV22F (STRIPE_PRICE_ID).
+ * Annual Price is created in Stripe and named by STRIPE_PRICE_ID_ANNUAL.
+ */
+export const PREMIUM_PLAN_CATALOG: Record<PremiumInterval, PremiumPrice> = {
+  month: { amount: 999, currency: 'aud', interval: 'month' },
+  year: { amount: 7999, currency: 'aud', interval: 'year' },
+};
+
 export function stripeConfigured(): boolean {
-  return config.stripeSecretKey !== '' && config.stripePriceId !== '';
+  return config.stripeSecretKey !== '' && (config.stripePriceId !== '' || config.stripePriceIdAnnual !== '');
+}
+
+export function stripePriceIdFor(interval: PremiumInterval): string {
+  return interval === 'year' ? config.stripePriceIdAnnual : config.stripePriceId;
 }
 
 async function stripeApi<T>(path: string, form?: URLSearchParams, method = form ? 'POST' : 'GET'): Promise<T> {
@@ -136,35 +156,86 @@ async function stripeApi<T>(path: string, form?: URLSearchParams, method = form 
   return (await res.json()) as T;
 }
 
-let cachedPrice: { value: PremiumPrice | null; expiresAt: number } | null = null;
+const priceCache = new Map<string, { value: PremiumPrice | null; expiresAt: number }>();
 
 export function resetStripePriceCache(): void {
-  cachedPrice = null;
+  priceCache.clear();
 }
 
-/**
- * What premium costs, as Stripe holds it. Null means checkout is not offered:
- * the plan page states the price on the button, and a button without one is
- * not shown at all.
- */
-export async function premiumPrice(): Promise<PremiumPrice | null> {
-  if (!stripeConfigured()) return null;
-  if (cachedPrice && cachedPrice.expiresAt > Date.now()) return cachedPrice.value;
+function priceMatchesCatalog(interval: PremiumInterval, price: PremiumPrice): boolean {
+  const expected = PREMIUM_PLAN_CATALOG[interval];
+  return (
+    price.amount === expected.amount &&
+    price.currency.toLowerCase() === expected.currency &&
+    price.interval === expected.interval
+  );
+}
+
+async function readStripePrice(priceId: string): Promise<PremiumPrice | null> {
+  if (!priceId || config.stripeSecretKey === '') return null;
+  const cached = priceCache.get(priceId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
   let value: PremiumPrice | null = null;
   try {
     const price = await stripeApi<{
       unit_amount?: number | null;
       currency?: string;
       recurring?: { interval?: string } | null;
-    }>(`/prices/${encodeURIComponent(config.stripePriceId)}`);
+    }>(`/prices/${encodeURIComponent(priceId)}`);
     if (typeof price.unit_amount === 'number' && price.currency && price.recurring?.interval) {
       value = { amount: price.unit_amount, currency: price.currency, interval: price.recurring.interval };
     }
   } catch {
     value = null;
   }
-  cachedPrice = { value, expiresAt: Date.now() + (value ? PRICE_TTL_MS : PRICE_FAILURE_TTL_MS) };
+  priceCache.set(priceId, { value, expiresAt: Date.now() + (value ? PRICE_TTL_MS : PRICE_FAILURE_TTL_MS) });
   return value;
+}
+
+export interface ResolvedPremiumPlan {
+  interval: PremiumInterval;
+  /** Catalog amount. Shown even when checkout is off, so the launch price stays visible. */
+  price: PremiumPrice;
+  /** True only when the env Price id is set and Stripe's Price matches the catalog. */
+  available: boolean;
+}
+
+/**
+ * One launch plan. `available` is false when the env var is unset, Stripe
+ * cannot be read, or the Price object is not the launch amount. The price
+ * field is always the catalog row, never a mismatched Stripe amount.
+ */
+export async function resolvedPremiumPlan(interval: PremiumInterval): Promise<ResolvedPremiumPlan> {
+  const price = { ...PREMIUM_PLAN_CATALOG[interval] };
+  const priceId = stripePriceIdFor(interval);
+  if (!priceId || config.stripeSecretKey === '') return { interval, price, available: false };
+  const live = await readStripePrice(priceId);
+  if (!live || !priceMatchesCatalog(interval, live)) {
+    if (live) {
+      logEvent('stripe_price_mismatch', {
+        interval,
+        amount: live.amount,
+        currency: live.currency,
+        stripeInterval: live.interval,
+      });
+    }
+    return { interval, price, available: false };
+  }
+  return { interval, price, available: true };
+}
+
+/** Monthly and annual Premium, in that order. */
+export async function premiumPlans(): Promise<ResolvedPremiumPlan[]> {
+  return [await resolvedPremiumPlan('month'), await resolvedPremiumPlan('year')];
+}
+
+/**
+ * What monthly premium costs, as Stripe holds it, when that Price matches the
+ * catalog. Null means monthly checkout is not offered.
+ */
+export async function premiumPrice(): Promise<PremiumPrice | null> {
+  const monthly = await resolvedPremiumPlan('month');
+  return monthly.available ? monthly.price : null;
 }
 
 /**
@@ -176,12 +247,16 @@ export async function premiumPrice(): Promise<PremiumPrice | null> {
  * now is traced back to an account. Return URLs come from APP_PUBLIC_URL,
  * never from the request.
  */
-export async function createCheckoutSession(userId: string): Promise<string> {
+export async function createCheckoutSession(userId: string, interval: PremiumInterval = 'month'): Promise<string> {
+  const priceId = stripePriceIdFor(interval);
+  if (!priceId) {
+    throw new AppError('PAYMENT_UNAVAILABLE', 'This plan is not available right now.');
+  }
   const session = await stripeApi<CheckoutSession>(
     '/checkout/sessions',
     new URLSearchParams({
       mode: 'subscription',
-      'line_items[0][price]': config.stripePriceId,
+      'line_items[0][price]': priceId,
       'line_items[0][quantity]': '1',
       client_reference_id: userId,
       'subscription_data[metadata][userId]': userId,
@@ -197,7 +272,7 @@ export async function createCheckoutSession(userId: string): Promise<string> {
 
 /**
  * Grant the period a paid invoice covers. The service period lives on the
- * line items  -  Stripe's docs say so explicitly of `invoice.period_end`, which
+ * line items - Stripe's docs say so explicitly of `invoice.period_end`, which
  * is an invoicing window, not what was bought.
  */
 function grantFromInvoice(userId: string, invoice: StripeInvoice): void {
@@ -271,7 +346,7 @@ export async function liveSubscriptionOf(userId: string): Promise<string | null>
 /**
  * Settle a Checkout Session the buyer has just returned from.
  *
- * The webhook would get there on its own, usually within seconds  -  but
+ * The webhook would get there on its own, usually within seconds - but
  * "usually" is the user staring at a free plan they have just paid for, and on
  * a deployment whose webhook is misconfigured it is never. Both paths key the
  * grant on the same invoice id, so whichever lands second is a duplicate.
@@ -335,7 +410,7 @@ const ENDED_STATUSES = new Set(['canceled', 'incomplete_expired']);
  * from.
  *
  * Never throws. Erasure is the user's right and does not wait on Stripe, so a
- * failure is logged with the subscription id — the one thing an operator needs
+ * failure is logged with the subscription id - the one thing an operator needs
  * to finish the cancellation by hand once the account is gone.
  */
 export async function cancelStripeSubscriptions(userId: string): Promise<void> {
@@ -356,7 +431,7 @@ export async function cancelStripeSubscriptions(userId: string): Promise<void> {
 
 /**
  * Verify a `Stripe-Signature` header against the exact bytes received.
- * https://docs.stripe.com/webhooks#verify-manually  -  v1 only (v0 is a test
+ * https://docs.stripe.com/webhooks#verify-manually - v1 only (v0 is a test
  * decoy and anything else is a downgrade), constant-time compared, and refused
  * outside the tolerance window so a captured delivery cannot be replayed.
  */

@@ -49,6 +49,17 @@ class PlanUiStateTest {
     }
 
     @Test
+    fun `an active Play subscription is what the delete warning keys on`() {
+        val base = EntitlementsDto(tier = UserTier.PREMIUM, dailyCredits = 150, creditsRemaining = 150)
+        assertTrue(base.copy(activeBillingSources = listOf("play")).hasActivePlaySubscription())
+        assertFalse(base.copy(activeBillingSources = listOf("stripe")).hasActivePlaySubscription())
+        assertFalse(base.copy(activeBillingSources = emptyList(), billingSource = "play").hasActivePlaySubscription())
+        // A server that has not sent the list yet: the latest rail is the fallback.
+        assertTrue(base.copy(billingSource = "play").hasActivePlaySubscription())
+        assertFalse(base.copy(tier = UserTier.FREE, billingSource = "play").hasActivePlaySubscription())
+    }
+
+    @Test
     fun `the tier flag comes from the server, never from a local toggle`() {
         assertFalse(state(50, 10).premium)
         assertTrue(state(50, 10, tier = UserTier.PREMIUM).premium)

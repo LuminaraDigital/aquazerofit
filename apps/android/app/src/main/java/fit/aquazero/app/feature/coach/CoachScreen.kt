@@ -385,11 +385,10 @@ private fun AutoScrollToNewest(
 /** Polite announcements for streaming state, invisible to sighted users. */
 @Composable
 private fun LiveRegion(state: CoachUiState) {
+    val failure = state.turnFailure
     val note = when {
         state.streaming -> stringResource(R.string.coach_replying, state.persona.firstName)
-        state.turnFailure == TurnFailure.Unavailable ->
-            stringResource(R.string.coach_error_unavailable)
-        state.turnFailure == TurnFailure.Dropped -> stringResource(R.string.coach_error_dropped)
+        failure != null -> stringResource(coachTurnFailureMessageRes(failure))
         else -> ""
     }
     Box(
@@ -583,10 +582,7 @@ private fun TurnFailureFrame(
         CoachByline(persona)
         Spacer(Modifier.height(6.dp))
         SafetyFrame(
-            content = when (failure) {
-                TurnFailure.Unavailable -> stringResource(R.string.coach_error_unavailable)
-                TurnFailure.Dropped -> stringResource(R.string.coach_error_dropped)
-            },
+            content = stringResource(coachTurnFailureMessageRes(failure)),
             modifier = Modifier.fillMaxWidth(0.92f),
         )
         Row(modifier = Modifier.padding(top = 8.dp)) {

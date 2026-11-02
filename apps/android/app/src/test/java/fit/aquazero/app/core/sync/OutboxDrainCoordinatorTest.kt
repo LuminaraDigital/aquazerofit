@@ -32,6 +32,11 @@ class OutboxDrainCoordinatorTest {
     }
 
     @Test
+    fun `drainPending returns zero when the outbox is already empty`() = runTest {
+        assertEquals(0, coordinator().drainPending())
+    }
+
+    @Test
     fun `drainForLogout clears a deliverable create`() = runTest {
         outbox.enqueueCreate(
             entityType = OutboxEntityTypes.WATER_LOG,

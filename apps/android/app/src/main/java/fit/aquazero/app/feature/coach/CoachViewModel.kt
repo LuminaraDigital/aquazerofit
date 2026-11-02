@@ -18,6 +18,8 @@ import fit.aquazero.app.core.navigation.CoachPromptStore
 import fit.aquazero.app.core.network.ChatStreamEvent
 import fit.aquazero.app.core.network.api.ConfirmMealDraftRequest
 import fit.aquazero.app.core.network.api.MealDraftSelection
+import fit.aquazero.app.core.sync.ConnectivityMonitor
+import fit.aquazero.app.core.sync.OutboxDrainCoordinator
 import fit.aquazero.app.core.ui.CoachPersona
 import fit.aquazero.app.core.ui.CoachRoster
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,7 +39,7 @@ import javax.inject.Inject
 
 /** How the current turn ended, when it ended badly. */
 enum class TurnFailure {
-    /** `AI_UNAVAILABLE` — the gateway declined; nothing was written. */
+    /** `AI_UNAVAILABLE` - the gateway declined; nothing was written. */
     Unavailable,
 
     /** The stream dropped and the bounded poll found no reply. */
@@ -47,7 +49,7 @@ enum class TurnFailure {
 /** Immutable state of the coach conversation. */
 data class CoachUiState(
     val loading: Boolean = true,
-    /** True when the session bootstrap itself failed — history may still show. */
+    /** True when the session bootstrap itself failed - history may still show. */
     val bootstrapFailed: Boolean = false,
     val sessionId: String? = null,
     val persona: CoachPersona = CoachRoster.default(),
@@ -67,7 +69,7 @@ data class CoachUiState(
 ) {
     val canSend: Boolean get() = sessionId != null && !streaming && !proposingDraft
 
-    /** Nothing said yet — show the greeting, the mascot and the prompt chips. */
+    /** Nothing said yet - show the greeting, the mascot and the prompt chips. */
     val isEmptyConversation: Boolean
         get() = !loading && messages.isEmpty() && pendingUserMessage == null && !streaming
 }
@@ -87,7 +89,7 @@ sealed interface CoachEvent {
     // "log it manually" affordance straight to its own `onOpenManualLogging`
     // callback, so the event never travelled through the ViewModel and the
     // branch handling it was unreachable. Route it through here again only if a
-    // ViewModel decision — not a tap — needs to trigger the navigation.
+    // ViewModel decision - not a tap - needs to trigger the navigation.
 }
 
 /** Toast identities, resolved to strings by the screen. */
@@ -125,6 +127,8 @@ class CoachViewModel @Inject constructor(
     private val coachesRepository: CoachesRepository,
     private val voiceEngine: CoachVoiceEngine,
     private val logsRepository: LogsRepository,
+    private val outboxDrainCoordinator: OutboxDrainCoordinator,
+    private val connectivityMonitor: ConnectivityMonitor,
     private val coachPromptStore: CoachPromptStore,
 ) : ViewModel() {
 
@@ -141,7 +145,7 @@ class CoachViewModel @Inject constructor(
 
     private val gateway = object : ChatTurnGateway {
         override fun stream(sessionId: String, content: String): Flow<ChatStreamEvent> =
-            chatRepository.stream(sessionId, content)
+            chatRepository.stream(sessionId, content, LocalDates.today())
 
         override suspend fun refreshMessages(sessionId: String): List<ChatMessageDto>? =
             when (val result = chatRepository.refreshMessages(sessionId)) {
@@ -290,6 +294,14 @@ class CoachViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
+            // The coach reads the server, not Room. A meal or glass logged
+            // moments ago is still in the outbox until this drain, and the
+            // model would answer as if the day were empty. Offline, skip the
+            // drain: the turn cannot reach the server either, and a timed-out
+            // upload would only delay that failure.
+            if (connectivityMonitor.currentlyOnline()) {
+                runCatching { outboxDrainCoordinator.drainPending() }
+            }
             val result = runner.run(
                 sessionId = sessionId,
                 content = text,

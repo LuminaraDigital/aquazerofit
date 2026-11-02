@@ -1348,6 +1348,7 @@
     <string name="meal_plan_logged_toast">Added to your log.</string>
     <string name="meal_plan_log_failed">Could not log that meal - please try again.</string>
     <string name="meal_plan_slot_failed">Couldn\'t generate a suggestion.</string>
+    <string name="meal_plan_slot_credits">You\'re out of AI credits for today. They refresh daily, and Premium raises the daily cap. Logging a meal by hand stays free.</string>
     <string name="meal_plan_slot_retry">Retry</string>
     <string name="meal_plan_offline_title">Meal ideas need a connection</string>
     <string name="meal_plan_offline_body">Suggestions are generated on the server, so they are online-only. Your logged meals and targets are unaffected.</string>

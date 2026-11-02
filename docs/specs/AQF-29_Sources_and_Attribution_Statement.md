@@ -181,7 +181,7 @@ The gateway also supports two closed-weight commercial families, which have no o
 
 **Obligations noted.** Because we call these models as a service and redistribute neither weights nor a derived model, the Llama Community Licenses impose no source-level duty on our repository. Two runtime duties do apply and are recorded here so they are not forgotten at release: the acceptable use policy attached to each Llama Community License binds how the product may use the model, and those licences require a product built with Llama to display a "Built with Llama" acknowledgement. The second is a product surface item, tracked against the in-app attribution page.
 
-Model output is never trusted for arithmetic. Calorie, macronutrient and hydration figures are computed deterministically in our own code; the model is used for recognition and language only. That is a safety decision documented in AQF-11 and AQF-28, and it also limits how far any model licence could reach into the product's results.
+Model output is never trusted for arithmetic. Calorie, macronutrient and hydration figures are computed deterministically in our own code; the model is used for recognition and language only. That is a safety decision documented in AQF-11 and AQF-24, and it also limits how far any model licence could reach into the product's results.
 
 ## 4.5 Typography and iconography
 

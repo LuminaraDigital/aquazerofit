@@ -17,6 +17,7 @@ import type {
   MockChatContext,
   MockMemoryContext,
   MockNutritionContext,
+  MockNutritionFood,
   MockPlanContext,
   MockProfileContext,
   MockProgressContext,
@@ -26,7 +27,7 @@ import { byIdDoc, localToday, readTargets, round1, whereDocs } from '../ai/util'
 // Deliberate team-boundary exceptions (same as the router's hasConsent import):
 // getProfile is the typed profile read (vs the duck-typed ai/util readProfile)
 // and getMemoryForPrompt is the memory module's only sanctioned prompt-facing
-// API — both are consent-aware read paths, not aggregation helpers.
+// API. Both are consent-aware read paths, not aggregation helpers.
 import { getProfile } from '../me/service';
 import { getMemoryForPrompt } from '../memory/service';
 import { computeConsistency, computeStreak, type UserActivity } from '../progress/service';
@@ -56,6 +57,21 @@ export async function getTodayNutrition(
   const fatConsumed = meals.reduce((s, m) => s + (m.totalFatG ?? 0), 0);
   const waterConsumed = water.reduce((s, w) => s + (w.amountMl ?? 0), 0);
 
+  // Names, not just totals. A totals-only payload is how "what did I eat"
+  // becomes "no meal data" even when mealsLogged is above zero. Capped so a
+  // long day cannot blow the context window. The names are user-authored and
+  // stay inside the untrusted context block.
+  const foods: MockNutritionFood[] = [];
+  for (const meal of meals) {
+    for (const item of meal.items ?? []) {
+      const name = typeof item.name === 'string' ? item.name.trim() : '';
+      if (!name) continue;
+      foods.push({ name, mealType: meal.mealType });
+      if (foods.length >= 12) break;
+    }
+    if (foods.length >= 12) break;
+  }
+
   const data: MockNutritionContext = {
     kcalTarget: targets.kcalTarget,
     kcalConsumed: round1(kcalConsumed),
@@ -65,6 +81,7 @@ export async function getTodayNutrition(
     fatG: { consumed: round1(fatConsumed), target: targets.fatG },
     waterMl: { consumed: Math.round(waterConsumed), target: targets.waterMl },
     mealsLogged: meals.length,
+    ...(foods.length > 0 ? { foods } : {}),
   };
   return {
     data,
@@ -250,14 +267,16 @@ export interface GatheredContext {
 
 /**
  * Consent-off variant (aiPersonalisation === false): no profile or log data is
- * read or injected into model context. Chat still works generically — each
+ * read or injected into model context. Chat still works generically. Each
  * grounding tool reports that personalisation is off instead of returning data.
+ * `personalisation: 'off'` is the signal the model and the offline engine read.
+ * Null nutrition alone is not that signal: it looks like an empty day.
  */
-export function gatherChatContextDenied(userName?: string): GatheredContext {
-  const denied = 'not available — personalisation off';
+export function gatherChatContextDenied(): GatheredContext {
+  const denied = 'not available, personalisation off';
   return {
     context: {
-      userName,
+      personalisation: 'off',
       nutrition: null,
       workout: null,
       plan: null,
@@ -283,7 +302,7 @@ export async function gatherChatContext(
   userName?: string,
 ): Promise<GatheredContext> {
   const toolCalls: ChatToolCall[] = [];
-  const context: MockChatContext = { userName };
+  const context: MockChatContext = { userName, personalisation: 'on' };
 
   try {
     const nutrition = await getTodayNutrition(userId, localDate);
@@ -314,7 +333,7 @@ export async function gatherChatContext(
     context.progress = null;
   }
 
-  // Profile essentials (typed me/service read — consent already checked by the
+  // Profile essentials (typed me/service read; consent already checked by the
   // caller; this function only runs with aiPersonalisation on).
   try {
     const profile = getProfile(userId);

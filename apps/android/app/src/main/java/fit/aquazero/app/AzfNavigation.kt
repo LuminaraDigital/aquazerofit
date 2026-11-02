@@ -1,5 +1,6 @@
 package fit.aquazero.app
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -38,7 +39,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavEntryDecorator
-import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
@@ -225,9 +225,16 @@ private fun PreAuthFlow() {
 }
 
 /**
- * The authed shell. One root back stack: the bottom entry is always a
- * [TabKey]; full-screen destinations are pushed above it and render WITHOUT
- * the bottom bar, exactly as the web renders them outside `AppLayout`.
+ * The authed shell. One root back stack: the bottom entry is always Home.
+ * Full-screen destinations are pushed above the current tab and render
+ * WITHOUT the bottom bar, exactly as the web renders them outside `AppLayout`.
+ *
+ * [tabRootStack] keeps Home under every other tab, so system Back from
+ * Workouts, Nutrition, Coach, or Progress returns to Home instead of
+ * finishing the activity. A destination pushed above a tab is still above
+ * that pair, so Back pops it first. Back from Home itself leaves the app.
+ * A restored stack that is only a non-home tab selects Home as well, because
+ * Navigation 3 does not handle Back when the current entry has nothing under it.
  */
 @Composable
 private fun MainShell(
@@ -252,15 +259,21 @@ private fun MainShell(
     }
 
     fun switchTab(tab: AzfTab) {
-        val key: NavKey = when (tab) {
-            AzfTab.Home -> DashboardKey
-            AzfTab.Nutrition -> NutritionKey
-            AzfTab.Workouts -> WorkoutLibraryKey
-            AzfTab.Progress -> ProgressKey
-            AzfTab.Coach -> CoachKey
-        }
+        val next = tabRootStack(tab)
         backStack.clear()
-        backStack.add(key)
+        next.forEach { backStack.add(it) }
+    }
+
+    /**
+     * System Back. [NavDisplay] only invokes this when a previous entry
+     * exists, so a lone non-home tab is also caught by [BackHandler] below.
+     */
+    fun onShellBack() {
+        when (shellBack(backStack)) {
+            ShellBack.Pop -> backStack.removeLastOrNull()
+            ShellBack.SelectHome -> switchTab(AzfTab.Home)
+            ShellBack.Leave -> Unit
+        }
     }
 
     /** Switch to the coach tab, optionally queueing a pre-filled prompt. */
@@ -319,6 +332,8 @@ private fun MainShell(
         }
     }
 
+    BackHandler(enabled = shellBack(backStack) == ShellBack.SelectHome, onBack = ::onShellBack)
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
@@ -339,7 +354,7 @@ private fun MainShell(
             ) {
                 NavDisplay(
                     backStack = backStack,
-                    onBack = { backStack.removeLastOrNull() },
+                    onBack = ::onShellBack,
                     entryDecorators = azfEntryDecorators(),
                     transitionSpec = { screenForward(reducedMotion) },
                     popTransitionSpec = { screenBack(reducedMotion) },

@@ -2,7 +2,6 @@
 logo: design/brand/AquaZeroFit(single_Logo).png
 brand: AquaZero
 tagline: AI Wellness Assistant
-unit: NIT3004 IT Capstone Project 2
 title: Sources and Attribution Statement
 subtitle: The external work that informed AquaZeroFit, what we took from it, and the licence our own code carries
 details:
@@ -10,7 +9,7 @@ details:
   Project: AquaZeroFit, an AI-powered wellness platform (web and Telegram Mini App)
   Repository: https://github.com/LuminaraDigital/aquazerofit
   Prepared by: Babatundji Williams-Fulwood, Eric La, Victor Hong
-  Group: Group 15, Victoria University, Melbourne
+  Organisation: Luminara Digital
   Date: 17 August 2026
   Project licence: GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
   Related documents: AQF-12 Upstream Integration and Licensing Register, AQF-12A wger Integration Addendum
@@ -95,7 +94,7 @@ Nor is AGPL "viral" across the boundary of a separate program. Calling a hosted 
 
 An earlier revision of this project was not copyleft, and AQF-12 recorded a hard exclusion on AGPL-licensed source code on compatibility grounds (ADR-013). Now that AquaZeroFit is itself AGPL-3.0-or-later, that compatibility constraint no longer applies.
 
-**The exclusion nevertheless stands, now as an architectural decision rather than a legal one.** No wger source code is vendored, and none will be adopted without re-opening AQF-12. Keeping the two codebases free of any derivation relationship means our contribution claims stay unambiguous and independently verifiable, which matters more to an assessed capstone project than the convenience of borrowing code would. AQF-12A section 2, obligation 1, records the control that enforces this.
+**The exclusion nevertheless stands, now as an architectural decision rather than a legal one.** No wger source code is vendored, and none will be adopted without re-opening AQF-12. Keeping the two codebases free of any derivation relationship means our contribution claims stay unambiguous and independently verifiable, which matters more to a commercial product than the convenience of borrowing code would. AQF-12A section 2, obligation 1, records the control that enforces this.
 
 # 4. Register of Sources
 
@@ -291,4 +290,4 @@ wger Project 2026, *wger REST API documentation*, viewed 17 August 2026, https:/
 
 wger Project 2026, *wger source repository*, viewed 17 August 2026, https://github.com/wger-project/wger.
 
-Williams-Fulwood, B, La, E & Hong, V 2026, *AquaZeroFit source repository*, Victoria University, Melbourne, viewed 17 August 2026, https://github.com/LuminaraDigital/aquazerofit.
+Williams-Fulwood, B, La, E & Hong, V 2026, *AquaZeroFit source repository*, Luminara Digital, viewed 17 August 2026, https://github.com/LuminaraDigital/aquazerofit.

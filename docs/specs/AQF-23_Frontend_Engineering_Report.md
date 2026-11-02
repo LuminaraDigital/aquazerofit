@@ -2,7 +2,6 @@
 logo: design/brand/AquaZeroFit(single_Logo).png
 brand: AquaZero
 tagline: AI Wellness Assistant
-unit: NIT3004 IT Capstone Project 2
 title: Front End Engineering Report
 subtitle: How the AquaZeroFit application and its landing pages were designed, built and verified
 details:
@@ -10,7 +9,7 @@ details:
   Project: AquaZeroFit, an AI-powered wellness platform (web and Telegram Mini App)
   Scope: Client-side application, marketing landing pages and legal pages
   Prepared by: Babatundji Williams-Fulwood, Technical Lead and Software Architect
-  Team: Babatundji Williams-Fulwood (s8138393), Eric La, Victor Hong
+  Team: Babatundji Williams-Fulwood, Eric La, Victor Hong
   Date: 4 August 2026
   Audience: Technical and non-technical readers. No prior web development knowledge assumed.
   Document status: Issued

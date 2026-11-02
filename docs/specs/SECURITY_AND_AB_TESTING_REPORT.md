@@ -35,7 +35,7 @@ However, there are **no security headers**, **no `trust proxy` config**, **token
 - `auth.integration.test.ts` (10), `memory.integration.test.ts` (13), `chatConsentContext.integration.test.ts` (3)
 - `isolation.integration.test.ts` (24)
 
-**Notable:** Tests cover auth flows, guardrail safety, isolation, consent gates, AI plan engine, credit ledger, and wger mappings. The test suite is comprehensive for a capstone project.
+**Notable:** Tests cover auth flows, guardrail safety, isolation, consent gates, AI plan engine, credit ledger, and wger mappings. The test suite is comprehensive across these areas.
 
 **Stderr warnings (expected, not bugs):**
 - `[ai-plan-engine] P-05 draft rejected: name missing or too long` — intentional rejection path tested in `aiPlanEngine.test.ts`

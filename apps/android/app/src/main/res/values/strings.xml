@@ -370,7 +370,6 @@
     <string name="dashboard_error_title">Today didn\'t load</string>
     <string name="dashboard_error_message">Everything you log is safe on this device and syncs when you\'re back online.</string>
     <string name="dashboard_calories_cd">Daily calories: %1$s of %2$s kilocalories consumed</string>
-    <string name="fab_capture_meal">Scan a meal with your camera</string>
     <string name="target_explain_link">Why this target?</string>
     <string name="target_explain_title">Why this target</string>
     <string name="target_explain_bmr">Basal metabolic rate (BMR)</string>
@@ -447,7 +446,6 @@
     <string name="nutrition_open_calendar">Open the calendar</string>
     <string name="nutrition_error_title">This day didn\'t load</string>
     <string name="nutrition_error_message">Anything you log stays on this device until you\'re back online.</string>
-    <string name="nutrition_calories_remaining">Calories remaining</string>
     <string name="nutrition_goal">Goal</string>
     <string name="nutrition_food">Food</string>
     <string name="nutrition_exercise">Exercise</string>
@@ -468,23 +466,12 @@
     <string name="unit_milligrams">%1$s mg</string>
 
     <string name="quick_scan_title">Scan your meal</string>
-    <string name="quick_scan_sub">Smart Scan AI</string>
     <string name="quick_barcode_title">Scan barcode</string>
-    <string name="quick_barcode_sub">Packaged foods</string>
-    <string name="quick_barcode_unavailable">Scanner arriving soon</string>
     <string name="quick_copy_title">Copy yesterday\'s</string>
-    <string name="quick_copy_sub">Duplicate meals</string>
     <string name="quick_copy_busy">Copying…</string>
     <string name="quick_meal_plan_title">AI meal plan</string>
-    <string name="quick_meal_plan_sub">Suggestions for target</string>
 
-    <string name="timeline_title">Meal timeline</string>
-    <string name="timeline_empty_title">Nothing logged yet</string>
-    <string name="timeline_empty_today">Log your first meal by searching foods or scanning your plate.</string>
-    <string name="timeline_empty_past">No meals were logged on this day.</string>
-    <string name="timeline_add_meal">Add a meal</string>
     <string name="timeline_not_logged">Not logged</string>
-    <string name="timeline_tap_to_add">Tap to add your %1$s</string>
     <string name="timeline_add_to">Add food to %1$s</string>
     <string name="timeline_edit">Edit %1$s entry</string>
     <string name="timeline_delete">Delete %1$s entry</string>
@@ -1453,4 +1440,63 @@
     <string name="signin_reset_sent_title">Check your email</string>
     <string name="signin_reset_sent_body">If that address has an AquaZeroFit account, a password reset link is on its way. The link expires shortly, so use it soon.</string>
     <string name="signin_reset_sent_dismiss">Got it</string>
+
+    <!-- Quick log sheet -->
+    <string name="quick_log_open_cd">Quick log</string>
+    <string name="quick_log_title">What are we logging?</string>
+    <string name="quick_log_ask_coach">Or just tell your coach what happened</string>
+    <string name="quick_log_photo">Photo</string>
+    <string name="quick_log_barcode">Barcode</string>
+    <string name="quick_log_search">Search</string>
+    <string name="quick_log_water">Water</string>
+    <string name="quick_log_weight">Weight</string>
+    <string name="quick_log_workout">Workout</string>
+
+    <!-- Home: today's loop -->
+    <string name="home_greeting_morning">Good morning</string>
+    <string name="home_greeting_afternoon">Good afternoon</string>
+    <string name="home_greeting_evening">Good evening</string>
+    <string name="home_greeting_morning_named">Good morning, %1$s</string>
+    <string name="home_greeting_afternoon_named">Good afternoon, %1$s</string>
+    <string name="home_greeting_evening_named">Good evening, %1$s</string>
+    <string name="home_week_active">%1$d of the last %2$d days</string>
+    <string name="home_week_open_progress_cd">Open your progress. Active on %1$d of the last %2$d days.</string>
+    <string name="home_loop_count">%1$d of %2$d done today</string>
+    <string name="home_loop_title">Today</string>
+    <string name="home_hero_details_show">Show the numbers</string>
+    <string name="home_hero_details_hide">Hide the numbers</string>
+    <string name="home_next_label">Next up</string>
+    <string name="home_next_breakfast">Breakfast next. Snap it and I\'ll do the numbers.</string>
+    <string name="home_next_lunch">Lunch next. A photo is all I need.</string>
+    <string name="home_next_dinner">Dinner next. Show me the plate.</string>
+    <string name="home_next_water">A glass now keeps today\'s water on pace.</string>
+    <string name="home_next_workout">%1$s is ready when you are.</string>
+    <string name="home_next_workout_plain">Today\'s session is ready when you are.</string>
+    <string name="home_next_weigh_in">A weekly weigh-in keeps your trend honest.</string>
+    <string name="home_quiet">You\'re on track. Nothing needs you right now.</string>
+    <string name="home_night">The day is winding down. Nothing else needed tonight.</string>
+    <string name="home_closed">Today\'s loop is closed. Go and enjoy the rest of your day.</string>
+    <string name="home_ask_coach_day">How did today go?</string>
+    <string name="home_action_snap">Snap it</string>
+    <string name="home_action_log">Log</string>
+    <string name="home_action_add_glass">+250 ml</string>
+    <string name="home_action_start">Start</string>
+    <string name="home_action_weigh">Weigh in</string>
+    <string name="home_action_reflect">Talk it over</string>
+    <string name="home_step_breakfast">Breakfast</string>
+    <string name="home_step_lunch">Lunch</string>
+    <string name="home_step_dinner">Dinner</string>
+    <string name="home_step_water">Water</string>
+    <string name="home_step_workout">Workout</string>
+    <string name="home_step_weigh_in">Weekly weigh-in</string>
+    <string name="home_step_water_detail">%1$s of %2$s L</string>
+    <string name="home_step_done_cd">%1$s, done</string>
+
+    <!-- Workouts filters -->
+    <string name="training_filters">More filters</string>
+    <string name="training_filters_active">More filters (%1$d on)</string>
+
+    <!-- Challenges podium -->
+    <string name="challenges_podium_cd">Rank %1$d, %2$s, %3$d days</string>
+    <string name="challenges_days_short">%1$dd</string>
 </resources>

@@ -23,6 +23,7 @@ import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -78,6 +79,18 @@ class LogsRepository @Inject constructor(
             kcalBurned = kcalBurnedFromSession(session),
         )
     }
+
+    /** Which meal slots already hold a log on [localDate]. */
+    fun mealTypesLogged(localDate: String): Flow<Set<MealType>> =
+        logsDao.mealLogsForDate(localDate).map { logs ->
+            logs.mapNotNull { log ->
+                MealType.entries.firstOrNull { it.name.equals(log.mealType, ignoreCase = true) }
+            }.toSet()
+        }
+
+    /** Days between [from] and [to], inclusive, with anything logged on this device. */
+    fun loggedDates(from: String, to: String): Flow<Set<String>> =
+        logsDao.loggedDates(from, to).map { it.toSet() }
 
     // ----- optimistic writes -----
 

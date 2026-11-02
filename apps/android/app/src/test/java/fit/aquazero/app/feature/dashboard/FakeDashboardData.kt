@@ -20,6 +20,8 @@ import java.io.IOException
 class FakeDashboardData : DashboardData {
 
     val nutritionFlow = MutableStateFlow(EMPTY_DAY)
+    val mealTypesFlow = MutableStateFlow<Set<MealType>>(emptySet())
+    val loggedDatesFlow = MutableStateFlow<Set<String>>(emptySet())
     val userFlow = MutableStateFlow<UserEntity?>(null)
     val summaryFlow = MutableStateFlow<ProgressSummaryDto?>(null)
     val weightFlow = MutableStateFlow<List<Double>>(emptyList())
@@ -46,6 +48,10 @@ class FakeDashboardData : DashboardData {
         ApiResult.Success(ProgressionStatusDto())
 
     override fun dailyNutrition(localDate: String): Flow<LocalDailyNutrition> = nutritionFlow
+
+    override fun mealTypesLogged(localDate: String): Flow<Set<MealType>> = mealTypesFlow
+
+    override fun loggedDates(from: String, to: String): Flow<Set<String>> = loggedDatesFlow
 
     override fun user(): Flow<UserEntity?> = userFlow
 

@@ -97,17 +97,20 @@ class MainShellNavigationTest {
         launchApp()
 
         awaitTabBar()
-        // All five roots are reachable from the bar; a missing one is a tab
-        // the user simply cannot get to.
+        // Four roots sit in the dock either side of quick log; Progress is
+        // reached from Home. A missing one is a tab the user cannot get to.
         listOf(
             R.string.tab_home,
             R.string.tab_nutrition,
             R.string.tab_workouts,
-            R.string.tab_progress,
             R.string.tab_coach,
         ).forEach { tab ->
             composeRule.onAllNodes(hasText(string(tab))).onFirst().assertIsDisplayed()
         }
+        composeRule
+            .onAllNodesWithContentDescription(string(R.string.quick_log_open_cd))
+            .onFirst()
+            .assertIsDisplayed()
     }
 
     @Test

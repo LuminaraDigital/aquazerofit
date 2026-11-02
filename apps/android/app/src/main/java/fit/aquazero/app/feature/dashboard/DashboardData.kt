@@ -39,6 +39,12 @@ interface DashboardData {
     /** Live, Room-backed day totals — correct offline (plan §4.2 recompute). */
     fun dailyNutrition(localDate: String): Flow<LocalDailyNutrition>
 
+    /** Meal slots already logged on [localDate] (drives the day loop). */
+    fun mealTypesLogged(localDate: String): Flow<Set<MealType>>
+
+    /** Days in the range with something logged (drives the week strip). */
+    fun loggedDates(from: String, to: String): Flow<Set<String>>
+
     /** Cached account row (drives the greeting). */
     fun user(): Flow<UserEntity?>
 
@@ -95,6 +101,12 @@ class DefaultDashboardData @Inject constructor(
 
     override fun dailyNutrition(localDate: String): Flow<LocalDailyNutrition> =
         logsRepository.localDailyNutrition(localDate)
+
+    override fun mealTypesLogged(localDate: String): Flow<Set<MealType>> =
+        logsRepository.mealTypesLogged(localDate)
+
+    override fun loggedDates(from: String, to: String): Flow<Set<String>> =
+        logsRepository.loggedDates(from, to)
 
     override fun user(): Flow<UserEntity?> = profileRepository.user()
 

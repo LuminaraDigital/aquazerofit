@@ -6,28 +6,35 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
+import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,9 +52,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -61,24 +73,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.audio.SpeechInputState
 import fit.aquazero.app.core.database.ChatMessageEntity
-import fit.aquazero.app.core.designsystem.AkinStage
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfChip
+import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
-import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.GlowFrame
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
+import fit.aquazero.app.core.designsystem.pressScale
 import fit.aquazero.app.core.gamification.CelebrationHost
 import fit.aquazero.app.core.model.ChatMealDraftDto
 import fit.aquazero.app.core.ui.CoachAvatar
 import fit.aquazero.app.core.ui.CoachPersona
-import fit.aquazero.app.core.ui.CoachPortrait
-import fit.aquazero.app.core.ui.CoachRoster
 import fit.aquazero.app.core.ui.rememberToastSink
 import kotlinx.coroutines.flow.conflate
 
@@ -609,18 +620,11 @@ private fun EmptyConversation(state: CoachUiState, onPrompt: (String) -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (state.persona.id == CoachRoster.DEFAULT_ID) {
-            AkinStage(size = 180.dp)
-        } else {
-            CoachPortrait(
-                persona = state.persona,
-                modifier = Modifier.size(width = 140.dp, height = 180.dp),
-                contentDescription = stringResource(
-                    R.string.coach_portrait_cd,
-                    state.persona.name,
-                ),
-            )
-        }
+        CoachAvatar(
+            persona = state.persona,
+            size = 72.dp,
+            contentDescription = stringResource(R.string.coach_portrait_cd, state.persona.name),
+        )
         Spacer(Modifier.height(16.dp))
         Text(
             text = stringResource(R.string.coach_greeting_title, state.persona.firstName),
@@ -638,13 +642,11 @@ private fun EmptyConversation(state: CoachUiState, onPrompt: (String) -> Unit) {
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 6.dp),
         )
-        Spacer(Modifier.height(16.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Spacer(Modifier.height(20.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             prompts.forEach { prompt ->
-                AzfChip(text = prompt, selected = false, onClick = { onPrompt(prompt) })
+                val (icon, tint) = coachActionStyle(prompt)
+                CoachActionRow(text = prompt, icon = icon, tint = tint, onClick = { onPrompt(prompt) })
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -656,6 +658,59 @@ private fun EmptyConversation(state: CoachUiState, onPrompt: (String) -> Unit) {
                 textAlign = TextAlign.Center,
             )
         }
+    }
+}
+
+/**
+ * Picks a row's icon from what the prompt is about. Prompts can arrive from the
+ * server, so position says nothing about topic; anything unrecognised gets the
+ * neutral spark rather than a misleading picture.
+ */
+@Composable
+private fun coachActionStyle(prompt: String): Pair<ImageVector, Color> {
+    val extended = LocalAzfExtended.current
+    val text = prompt.lowercase()
+    return when {
+        listOf("eat", "meal", "dinner", "lunch", "breakfast").any(text::contains) ->
+            Icons.Outlined.Restaurant to extended.primaryFixedDim
+        listOf("workout", "train").any(text::contains) ->
+            Icons.Outlined.FitnessCenter to extended.secondaryFixedDim
+        "weight" in text -> Icons.Outlined.MonitorWeight to extended.coral
+        "tracking" in text -> Icons.Outlined.Insights to extended.warning
+        else -> Icons.Outlined.AutoAwesome to extended.primaryFixedDim
+    }
+}
+
+/** One suggested prompt: a full-width thumb target rather than a small chip. */
+@Composable
+private fun CoachActionRow(text: String, icon: ImageVector, tint: Color, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 60.dp)
+            .pressScale(interaction)
+            .clip(AzfShapes.Card)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -686,7 +741,6 @@ private fun Composer(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
             .imePadding()
-            .navigationBarsPadding()
             .padding(horizontal = AzfSpacing.ContainerMargin, vertical = 10.dp),
     ) {
         if (state.sessionId == null && !state.loading) {
@@ -719,61 +773,130 @@ private fun Composer(
             }
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onToggleMic, enabled = enabled) {
-                Icon(
-                    imageVector = if (isListening) Icons.Outlined.MicOff else Icons.Outlined.Mic,
-                    contentDescription = stringResource(
-                        if (isListening) {
-                            R.string.coach_dictation_stop_cd
-                        } else {
-                            R.string.coach_dictation_start_cd
-                        },
-                    ),
-                    tint = if (isListening) {
-                        state.persona.colour
-                    } else if (enabled) {
-                        accent
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                    },
+        GlowFrame(
+            active = isListening || state.streaming || hasText,
+            shape = AzfShapes.Composer,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(AzfShapes.Composer)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+        ) {
+            Column(modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp)) {
+                ComposerField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    placeholder = stringResource(R.string.coach_input_placeholder, state.persona.firstName),
+                    enabled = enabled,
                 )
-            }
-            Spacer(Modifier.width(4.dp))
-            AzfTextField(
-                value = value,
-                onValueChange = onValueChange,
-                label = stringResource(R.string.coach_input_placeholder, state.persona.firstName),
-                modifier = Modifier.weight(1f),
-                enabled = enabled,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            )
-            Spacer(Modifier.width(6.dp))
-            IconButton(onClick = onProposeMeal, enabled = enabled && hasText) {
-                Icon(
-                    imageVector = Icons.Outlined.Restaurant,
-                    contentDescription = stringResource(R.string.coach_log_meal),
-                    tint = if (enabled && hasText) {
-                        accent
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                    },
-                )
-            }
-            IconButton(onClick = onSend, enabled = enabled && hasText) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.Send,
-                    contentDescription = stringResource(R.string.coach_send),
-                    tint = if (enabled && hasText) {
-                        accent
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                    },
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onToggleMic, enabled = enabled) {
+                        Icon(
+                            imageVector = if (isListening) Icons.Outlined.MicOff else Icons.Outlined.Mic,
+                            contentDescription = stringResource(
+                                if (isListening) {
+                                    R.string.coach_dictation_stop_cd
+                                } else {
+                                    R.string.coach_dictation_start_cd
+                                },
+                            ),
+                            tint = if (isListening) {
+                                state.persona.colour
+                            } else if (enabled) {
+                                accent
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            },
+                        )
+                    }
+                    IconButton(onClick = onProposeMeal, enabled = enabled && hasText) {
+                        Icon(
+                            imageVector = Icons.Outlined.Restaurant,
+                            contentDescription = stringResource(R.string.coach_log_meal),
+                            tint = if (enabled && hasText) {
+                                accent
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            },
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    SendButton(enabled = enabled && hasText, onClick = onSend)
+                }
             }
         }
     }
 }
+
+@Composable
+private fun ComposerField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    enabled: Boolean,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        enabled = enabled,
+        maxLines = COMPOSER_MAX_LINES,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(LocalAzfExtended.current.primaryFixedDim),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(end = 8.dp, bottom = 4.dp)
+            .semantics { contentDescription = placeholder },
+        decorationBox = { field ->
+            Box {
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                field()
+            }
+        },
+    )
+}
+
+/** The composer's one loud control: lit only when there is something to send. */
+@Composable
+private fun SendButton(enabled: Boolean, onClick: () -> Unit) {
+    val extended = LocalAzfExtended.current
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .pressScale(interaction)
+            .clip(CircleShape)
+            .background(
+                if (enabled) {
+                    extended.ctaGradient
+                } else {
+                    SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh)
+                },
+            )
+            .clickable(
+                enabled = enabled,
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.Send,
+            contentDescription = stringResource(R.string.coach_send),
+            tint = if (enabled) AzfColors.OnPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+private const val COMPOSER_MAX_LINES = 5
 
 /** `2026-08-27T18:42:03.000Z` → `18:42`, without a formatter dependency. */
 internal fun String.timeOfDay(): String {

@@ -1,5 +1,13 @@
 package fit.aquazero.app
 
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,8 +24,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -33,20 +45,27 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.core.auth.AuthState
+import fit.aquazero.app.core.common.Hydration
+import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.data.AccountRepository
 import fit.aquazero.app.core.data.AuthRepository
+import fit.aquazero.app.core.data.LogsRepository
 import fit.aquazero.app.core.designsystem.AzfBottomNav
 import fit.aquazero.app.core.designsystem.AzfColors
+import fit.aquazero.app.core.designsystem.AzfMotion
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTab
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.ToastHost
+import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.navigation.CoachPromptStore
 import fit.aquazero.app.core.navigation.DeepLinkStore
 import fit.aquazero.app.core.navigation.PendingDeepLink
+import fit.aquazero.app.core.ui.QuickLogAction
+import fit.aquazero.app.core.ui.QuickLogSheet
 import fit.aquazero.app.feature.challenges.ChallengesScreen
 import fit.aquazero.app.feature.coach.CoachScreen
 import fit.aquazero.app.feature.coach.CoachSelectScreen
@@ -105,6 +124,7 @@ class RootViewModel @Inject constructor(
 @HiltViewModel
 class ShellViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
+    private val logsRepository: LogsRepository,
     val deepLinkStore: DeepLinkStore,
     val coachPromptStore: CoachPromptStore,
 ) : ViewModel() {
@@ -128,6 +148,17 @@ class ShellViewModel @Inject constructor(
                 // Offline with nothing cached: the honest answer is "not set up".
                 _hasProfile.value = false
             }
+        }
+    }
+
+    /** The dock's one-tap glass of water. Reports whether it landed. */
+    fun logWater(onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            onResult(
+                runCatching {
+                    logsRepository.logWater(Hydration.WATER_INCREMENT_ML, LocalDates.today())
+                }.isSuccess,
+            )
         }
     }
 }
@@ -208,6 +239,9 @@ private fun MainShell(
     val pendingDeepLink by shellViewModel.deepLinkStore.pending.collectAsStateWithLifecycle()
     val currentKey = backStack.lastOrNull()
     val onTab = currentKey is TabKey
+    var quickLogOpen by remember { mutableStateOf(false) }
+    val reducedMotion = rememberReducedMotion()
+    val resources = LocalResources.current
     val selectedTab = when (currentKey) {
         is DashboardKey -> AzfTab.Home
         is NutritionKey -> AzfTab.Nutrition
@@ -267,12 +301,34 @@ private fun MainShell(
         switchTab(AzfTab.Nutrition)
     }
 
+    fun onQuickLog(action: QuickLogAction) {
+        quickLogOpen = false
+        when (action) {
+            QuickLogAction.Photo -> backStack.add(CaptureMealKey)
+            QuickLogAction.Barcode -> backStack.add(BarcodeKey)
+            QuickLogAction.Search -> switchTab(AzfTab.Nutrition)
+            QuickLogAction.Weight -> backStack.add(LogWeightKey)
+            QuickLogAction.Workout -> switchTab(AzfTab.Workouts)
+            QuickLogAction.Water -> shellViewModel.logWater { logged ->
+                if (logged) {
+                    toastController?.success(resources.getString(R.string.water_logged))
+                } else {
+                    toastController?.error(resources.getString(R.string.water_log_failed))
+                }
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
             bottomBar = {
                 if (onTab) {
-                    AzfBottomNav(selected = selectedTab, onSelect = ::switchTab)
+                    AzfBottomNav(
+                        selected = selectedTab,
+                        onSelect = ::switchTab,
+                        onQuickLog = { quickLogOpen = true },
+                    )
                 }
             },
         ) { padding ->
@@ -285,6 +341,8 @@ private fun MainShell(
                     backStack = backStack,
                     onBack = { backStack.removeLastOrNull() },
                     entryDecorators = azfEntryDecorators(),
+                    transitionSpec = { screenForward(reducedMotion) },
+                    popTransitionSpec = { screenBack(reducedMotion) },
                     entryProvider = entryProvider {
                         // ----- tab roots -----
                         entry<DashboardKey> {
@@ -321,6 +379,7 @@ private fun MainShell(
                                     },
                                     onOpenProgress = { switchTab(AzfTab.Progress) },
                                     onOpenCoach = { prompt -> openCoach(prompt) },
+                                    onLogWeight = { backStack.add(LogWeightKey) },
                                     seasonCard = { modifier ->
                                         SeasonCard(
                                             onOpenFightRecord = { backStack.add(FightRecordKey) },
@@ -490,8 +549,46 @@ private fun MainShell(
                 }
             }
         }
+
+        if (quickLogOpen) {
+            QuickLogSheet(
+                onAction = ::onQuickLog,
+                onAskCoach = {
+                    quickLogOpen = false
+                    openCoach()
+                },
+                onDismiss = { quickLogOpen = false },
+            )
+        }
     }
 }
+
+/**
+ * Forward screen change: the new screen slides a short way in and settles, so
+ * it reads as arriving on top without the whole viewport travelling.
+ */
+private fun screenForward(reducedMotion: Boolean): ContentTransform {
+    if (reducedMotion) return fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+    val enter = tween<Float>(AzfMotion.ScreenEnterMs, easing = AzfMotion.RevealEasing)
+    return (
+        slideInHorizontally(tween(AzfMotion.ScreenEnterMs, easing = AzfMotion.RevealEasing)) {
+            it / SCREEN_SHIFT_DIVISOR
+        } + fadeIn(enter) + scaleIn(enter, initialScale = SCREEN_ENTER_SCALE)
+        ) togetherWith fadeOut(tween(AzfMotion.ScreenExitMs))
+}
+
+/** The same move in reverse, for back. */
+private fun screenBack(reducedMotion: Boolean): ContentTransform {
+    if (reducedMotion) return fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+    return fadeIn(tween(AzfMotion.ScreenEnterMs, easing = AzfMotion.RevealEasing)) togetherWith
+        (
+            slideOutHorizontally(tween(AzfMotion.ScreenExitMs)) { it / SCREEN_SHIFT_DIVISOR } +
+                fadeOut(tween(AzfMotion.ScreenExitMs))
+            )
+}
+
+private const val SCREEN_SHIFT_DIVISOR = 12
+private const val SCREEN_ENTER_SCALE = 0.98f
 
 /**
  * Entry decorators for every [NavDisplay] in the app.

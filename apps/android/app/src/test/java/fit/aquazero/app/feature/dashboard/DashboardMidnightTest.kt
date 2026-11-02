@@ -134,6 +134,10 @@ private class DayKeyedDashboardData : DashboardData {
         return nutritionFlow
     }
 
+    override fun mealTypesLogged(localDate: String): Flow<Set<MealType>> = MutableStateFlow(emptySet())
+
+    override fun loggedDates(from: String, to: String): Flow<Set<String>> = MutableStateFlow(emptySet())
+
     override fun user(): Flow<UserEntity?> = MutableStateFlow(null)
 
     override fun profile(): Flow<fit.aquazero.app.core.database.ProfileEntity?> = MutableStateFlow(null)

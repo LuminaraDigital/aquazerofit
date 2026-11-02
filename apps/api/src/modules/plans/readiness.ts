@@ -91,7 +91,7 @@ const HEADLINES: Record<ReadinessMode, string> = {
 };
 
 const COLD_START_HEADLINE =
-  'Fresh start — your plan stays as built while we get to know your week.';
+  'Fresh start: your plan stays as built while we get to know your week.';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));

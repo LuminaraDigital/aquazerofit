@@ -207,6 +207,14 @@ describe('assessReadiness cold start', () => {
     expect(assessment.signals.some((s) => /not enough history/i.test(s.detail))).toBe(true);
   });
 
+  it('writes the fresh start headline without an em dash or en dash', () => {
+    const { headline } = assessReadiness(NEW_USER, TODAY);
+    expect(headline).toBe(
+      'Fresh start: your plan stays as built while we get to know your week.',
+    );
+    expect(headline).not.toMatch(/\u2014|\u2013/);
+  });
+
   it('still holds on day one, when a plan exists but the week does not', () => {
     const assessment = assessReadiness(DAY_ONE_USER, TODAY);
     expect(assessment.mode).toBe('maintain');

@@ -6,8 +6,8 @@ masters, screen captures, Markdown) into the committed artefacts the app and
 the document set consume.
 
 Everything these scripts produce is committed. That is deliberate: neither the
-web build nor the Gradle build has an image pipeline, and the marked
-specification set is submitted as `.docx`. You run a tool when the *source*
+web build nor the Gradle build has an image pipeline, and the
+specification set is distributed as `.docx`. You run a tool when the *source*
 changes, then commit the result.
 
 Root-level npm scripts exist for each, so they are discoverable from

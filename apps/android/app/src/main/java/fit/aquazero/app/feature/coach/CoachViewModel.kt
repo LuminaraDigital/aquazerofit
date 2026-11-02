@@ -246,6 +246,15 @@ class CoachViewModel @Inject constructor(
 
     private fun loadActiveCoach() {
         viewModelScope.launch {
+            coachesRepository.activeCoachId().collect { coachId ->
+                if (coachId != null) {
+                    _uiState.value = _uiState.value.copy(
+                        persona = CoachRoster.resolve(coachId),
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
             when (val roster = coachesRepository.refreshRoster()) {
                 is ApiResult.Success ->
                     _uiState.value = _uiState.value.copy(

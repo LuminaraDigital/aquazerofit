@@ -74,6 +74,7 @@ import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.GlowFrame
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.currentLocale
 import fit.aquazero.app.core.designsystem.pressScale
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.ui.CoachAvatar
@@ -84,7 +85,6 @@ import fit.aquazero.app.core.ui.NutritionFormat
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
-import java.util.Locale
 
 private const val MORNING_END_HOUR = 12
 private const val AFTERNOON_END_HOUR = 18
@@ -204,7 +204,7 @@ private fun DayCell(day: LocalDate, isToday: Boolean, logged: Boolean) {
     ) {
         val ink = if (isToday) AzfColors.OnPrimary else MaterialTheme.colorScheme.onSurfaceVariant
         Text(
-            text = day.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+            text = day.dayOfWeek.getDisplayName(TextStyle.NARROW, currentLocale()),
             style = MaterialTheme.typography.labelSmall,
             color = ink,
         )

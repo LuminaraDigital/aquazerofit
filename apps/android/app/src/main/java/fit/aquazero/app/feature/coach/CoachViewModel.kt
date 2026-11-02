@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -44,6 +45,12 @@ enum class TurnFailure {
 
     /** The stream dropped and the bounded poll found no reply. */
     Dropped,
+
+    /**
+     * HTTP 402 `CREDITS_INSUFFICIENT`. The turn was refused before it was
+     * stored, so the optimistic user line stays in the thread.
+     */
+    OutOfCredits,
 }
 
 /** Immutable state of the coach conversation. */
@@ -189,13 +196,21 @@ class CoachViewModel @Inject constructor(
                 }
                 .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
                 .collect { messages ->
-                    _uiState.value = _uiState.value.copy(
-                        messages = messages,
-                        // The optimistic bubble retires the moment the real one
-                        // lands, so the user never sees their sentence twice.
-                        pendingUserMessage = _uiState.value.pendingUserMessage
-                            ?.takeIf { pending -> messages.none { it.content == pending } },
-                    )
+                    _uiState.update { current ->
+                        current.copy(
+                            messages = messages,
+                            // The optimistic bubble retires the moment the real
+                            // one lands, so the user never sees their sentence
+                            // twice. A credits refusal is the exception: that
+                            // turn was not stored, so an older line with the
+                            // same words must not hide it.
+                            pendingUserMessage = retainPendingUserMessage(
+                                pending = current.pendingUserMessage,
+                                failure = current.turnFailure,
+                                messages = messages,
+                            ),
+                        )
+                    }
                 }
         }
     }
@@ -311,21 +326,19 @@ class CoachViewModel @Inject constructor(
                     streamingText = _uiState.value.streamingText + token,
                 )
             }
-            _uiState.value = _uiState.value.copy(
-                streaming = false,
-                streamingText = "",
-                turnFailure = when (result) {
-                    ChatTurnResult.Unavailable -> TurnFailure.Unavailable
-                    ChatTurnResult.Dropped -> TurnFailure.Dropped
-                    // Safety refusals are already in history as supportive
-                    // assistant messages; surfacing a frame too shows them twice.
-                    else -> null
-                },
-                pendingUserMessage = when (result) {
-                    ChatTurnResult.Unavailable -> _uiState.value.pendingUserMessage
-                    else -> null
-                },
-            )
+            _uiState.update { current ->
+                current.copy(
+                    streaming = false,
+                    streamingText = "",
+                    turnFailure = coachTurnFailure(result),
+                    pendingUserMessage = pendingUserMessageAfterTurn(
+                        result = result,
+                        sent = text,
+                        pending = current.pendingUserMessage,
+                        messages = current.messages,
+                    ),
+                )
+            }
         }
     }
 
@@ -337,7 +350,15 @@ class CoachViewModel @Inject constructor(
     }
 
     fun dismissTurnFailure() {
-        _uiState.value = _uiState.value.copy(turnFailure = null, pendingUserMessage = null)
+        _uiState.update { state ->
+            state.copy(
+                turnFailure = null,
+                pendingUserMessage = pendingUserMessageAfterDismiss(
+                    failure = state.turnFailure,
+                    pending = state.pendingUserMessage,
+                ),
+            )
+        }
     }
 
     // -----------------------------------------------------------------------

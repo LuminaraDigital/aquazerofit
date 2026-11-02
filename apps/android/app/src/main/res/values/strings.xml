@@ -613,6 +613,7 @@
     <string name="coach_change_cd">%1$s is your coach. Change coach.</string>
     <string name="coach_error_unavailable">Your coach is unavailable right now. Please try again in a moment.</string>
     <string name="coach_error_dropped">That reply did not come through. Your message is saved - ask again whenever you are ready.</string>
+    <string name="coach_error_credits">You\'re out of AI credits for today. They refresh daily, and Premium raises the daily cap.</string>
     <string name="coach_error_send_retry">Ask again</string>
     <string name="coach_offline">You are offline. Past conversations are here to read; a new question needs a connection.</string>
     <string name="coach_safety_cd">Supportive note from your coach</string>

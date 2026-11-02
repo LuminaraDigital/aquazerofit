@@ -1453,4 +1453,7 @@
     <string name="signin_reset_sent_title">Check your email</string>
     <string name="signin_reset_sent_body">If that address has an AquaZeroFit account, a password reset link is on its way. The link expires shortly, so use it soon.</string>
     <string name="signin_reset_sent_dismiss">Got it</string>
+
+    <!-- First-launch intro video -->
+    <string name="intro_skip">Skip</string>
 </resources>

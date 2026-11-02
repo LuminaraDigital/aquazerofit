@@ -61,10 +61,18 @@ class ChatStreamClient @Inject constructor(
     @param:Named("apiBaseUrl") private val baseUrl: String,
 ) {
 
-    /** Open a streaming turn on [sessionId] with the user's [content]. */
-    fun stream(sessionId: String, content: String): Flow<ChatStreamEvent> = callbackFlow {
+    /**
+     * Open a streaming turn on [sessionId] with the user's [content].
+     *
+     * [localDate] is sent on the body so today's logs are the day the device
+     * logged them against, not the server's fallback zone.
+     */
+    fun stream(sessionId: String, content: String, localDate: String): Flow<ChatStreamEvent> = callbackFlow {
         val body = AzfJson
-            .encodeToString(ChatSendRequest.serializer(), ChatSendRequest(content))
+            .encodeToString(
+                ChatSendRequest.serializer(),
+                ChatSendRequest(content = content, localDate = localDate),
+            )
             .toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url("$baseUrl/chat/sessions/$sessionId/messages")
@@ -133,7 +141,7 @@ class ChatStreamClient @Inject constructor(
  * Render an SSE frame's `message` as text fit for a user.
  *
  * The field is typed [JsonElement] because the `done` frame carries a message
- * *object*, but the `error` frame carries a plain string — and `toString()` on
+ * *object*, but the `error` frame carries a plain string - and `toString()` on
  * a string [JsonPrimitive] re-emits it in JSON form, quotes included. Server
  * error copy was reaching the UI as `"Something went wrong"`, quote marks and
  * all. Unwrap the primitive; fall back to the raw form for any other shape so

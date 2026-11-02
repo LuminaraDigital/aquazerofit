@@ -98,7 +98,7 @@ import kotlinx.coroutines.flow.conflate
  *
  * Structure, top to bottom: header (coach avatar → character select), the
  * **persistent** wellness disclaimer, the message list, and a composer with
- * three buttons — mic (speech dictation), meal log, and send.
+ * three buttons - mic (speech dictation), meal log, and send.
  *
  * The celebration layer is hosted here as well as on the dashboard, because
  * logging a meal from chat can be the thing that levels someone up, and the
@@ -131,7 +131,7 @@ fun CoachScreen(
 
     // Denial copy is about the microphone, not the meal draft. Two distinct
     // cases: a plain "not now", and a blocked permission where Android stops
-    // showing the dialog entirely — there the button would otherwise do
+    // showing the dialog entirely - there the button would otherwise do
     // nothing at all, forever, with no explanation.
     val micDenied = stringResource(R.string.coach_mic_denied)
     val micBlocked = stringResource(R.string.coach_mic_blocked)
@@ -343,8 +343,8 @@ fun CoachContent(
 /**
  * Keep the newest turn in view.
  *
- * The list is [reverseLayout][LazyColumn], so **index 0 is the newest turn** —
- * the draft, the in-flight stream, the pending user line — and scrolling to 0
+ * The list is [reverseLayout][LazyColumn], so **index 0 is the newest turn**:
+ * the draft, the in-flight stream, the pending user line. Scrolling to 0
  * pins the conversation to the bottom of the screen.
  *
  * Two effects, deliberately, because they want different scroll calls:
@@ -353,7 +353,7 @@ fun CoachContent(
  *   ending) are rare and are worth animating.
  * - Tokens are not. Keying an effect on `streamingText` restarted it on every
  *   token, cancelling the in-flight `animateScrollToItem` before it could
- *   settle — the list visibly juddered and never arrived. Tokens are followed
+ *   settle - the list visibly juddered and never arrived. Tokens are followed
  *   instead by a conflated snapshot flow that jumps instantly, which no
  *   subsequent token can interrupt.
  */
@@ -518,7 +518,7 @@ private fun Conversation(
         ) { index ->
             val message = state.messages[state.messages.lastIndex - index]
             if (message.role == "user") {
-                UserBubble(content = message.content, timestamp = message.createdAt.timeOfDay())
+                UserBubble(content = message.content, timestamp = formatChatTime(message.createdAt))
             } else {
                 val actions = remember(message.content, message.id) {
                     ChatActionExtractor.extractActions(message.content, message.id)
@@ -528,7 +528,7 @@ private fun Conversation(
                     persona = state.persona,
                     guardrailBlocked = message.guardrailBlocked,
                     reported = message.reported,
-                    timestamp = message.createdAt.timeOfDay(),
+                    timestamp = formatChatTime(message.createdAt),
                     actions = actions,
                     isSpeaking = speakingMessageId == message.id,
                     onSpeakClick = { onSpeakMessage(message.id, message.content) },
@@ -718,7 +718,7 @@ private fun CoachActionRow(text: String, icon: ImageVector, tint: Color, onClick
  * Send and "log this as a meal", side by side.
  *
  * Two buttons, zero ambiguity about what each one does. The meal button is the
- * app's second confirmation gate opening, not a shortcut past it — it proposes
+ * app's second confirmation gate opening, not a shortcut past it - it proposes
  * a draft, and the draft still has to be confirmed line by line.
  */
 @Composable
@@ -898,12 +898,6 @@ private fun SendButton(enabled: Boolean, onClick: () -> Unit) {
 
 private const val COMPOSER_MAX_LINES = 5
 
-/** `2026-08-27T18:42:03.000Z` → `18:42`, without a formatter dependency. */
-internal fun String.timeOfDay(): String {
-    val timePart = substringAfter('T', "").takeIf { it.length >= 5 } ?: return ""
-    return timePart.take(5)
-}
-
 // ---------------------------------------------------------------------------
 // Previews
 // ---------------------------------------------------------------------------
@@ -978,7 +972,7 @@ private fun CoachContentStreamingPreview() {
                 sessionId = "s1",
                 messages = previewMessages(),
                 streaming = true,
-                streamingText = "Looking at today first — you have ",
+                streamingText = "Looking at today first - you have ",
                 pendingUserMessage = "How is my week going?",
             ),
             onSend = {},

@@ -92,7 +92,7 @@ import java.time.LocalDate
 import java.time.format.TextStyle as JavaTextStyle
 
 /**
- * Workout library — the Workouts tab.
+ * Workout library - the Workouts tab.
  *
  * Weekly plan strip, today's hero with the resolved prescription rendered
  * exactly as the web renders it ("3 × 8–10 @ 40 kg • RiR 2 • 90s rest"), a
@@ -199,7 +199,11 @@ private fun WorkoutLibraryContent(
                             )
                         }
 
-                        state.todayError -> ErrorState(
+                        showTodaySessionError(
+                            todayError = state.todayError,
+                            hasPlan = state.plan != null,
+                            planError = state.planError,
+                        ) -> ErrorState(
                             title = stringResource(R.string.session_error_title),
                             message = stringResource(R.string.session_error_body),
                             retryLabel = stringResource(R.string.training_refresh),
@@ -712,8 +716,8 @@ private fun FilterChipRow(
 }
 
 /**
- * One library row. The attribution line is part of the card by construction —
- * there is no variant of this composable without it.
+ * One library row. The attribution line is part of the card by construction.
+ * There is no variant of this composable without it.
  */
 @Composable
 private fun ExerciseListCard(card: ExerciseCard, onClick: () -> Unit) {
@@ -757,8 +761,8 @@ private fun ExerciseListCard(card: ExerciseCard, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 // CC-BY-SA: required on every exercise card (plan §5.6).
-                // When the card renders media, the credit follows the image —
-                // the exercise says "wger.de community contributors" while the
+                // When the card renders media, the credit follows the image.
+                // The exercise says "wger.de community contributors" while the
                 // picture may be Everkinetic's, and the licence asks for the
                 // author of the work being reproduced.
                 ExerciseAttribution

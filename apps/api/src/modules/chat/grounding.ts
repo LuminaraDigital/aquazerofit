@@ -20,6 +20,11 @@
  * into a trusted system instruction. With personalisation off, earlier replies
  * that already contain those figures are dropped from the replay, and a
  * finished reply that still quotes them is replaced before it is stored.
+ *
+ * The empty-log matcher also has to allow a word between the verb and
+ * "empty", and treat "no record of what you've eaten" as the same claim.
+ * Otherwise a personalisation-off reply that says the log is currently empty
+ * is stored as-is and never mentions Privacy.
  */
 export interface NutritionFoodGrounding {
   name: string;
@@ -70,10 +75,31 @@ export function containsConsentedPersonalData(text: string): boolean {
 
 /**
  * Claims that the day has no nutrition data. A missing meal slot ("haven't
- * logged dinner") is not a claim that the whole log is empty.
+ * logged dinner") is not a claim that the whole log is empty, and "not empty"
+ * is not one either. A word between the verb and "empty" ("log is currently
+ * empty") still counts, as does having no record of what the user has eaten.
+ * Up to two modifiers are allowed so "still completely empty" matches without
+ * treating "not" or "never" as a modifier.
  */
-const EMPTY_LOG_CLAIM =
-  /\b(?:(?:nutrition|food|meal)\s+)?logs?\s+(?:is|are|looks|appears|seems)\s+empty\b|\blog(?:'s| is| looks) empty\b|\bno meal data\b|\bno meals? (?:logged|recorded|data|yet)\b|\bno logged meals\b|\bno food logged\b|\bnothing (?:has been |was |is )?logged\b|\b(?:have not|has not|haven['’]t|hasn['’]t) logged (?:anything|any meals|a meal|meals|food|nutrition)\b|\b(?:do not|don['’]t) (?:see|have) (?:any )?(?:meals|meal data|food|foods|nutrition data|a nutrition log)\b|\b(?:cannot|can['’]t) see (?:any )?(?:meals|food|your (?:meals|log|nutrition))\b/i;
+const EMPTY_LOG_MODIFIER = String.raw`(?:\s+(?!not\b|never\b)\w+){0,2}`;
+
+const EMPTY_LOG_CLAIM = new RegExp(
+  [
+    String.raw`\b(?:(?:nutrition|food|meal)\s+)?logs?\s+(?:is|are|looks|appears|seems)${EMPTY_LOG_MODIFIER}\s+empty\b`,
+    String.raw`\blog(?:'s|\s+is|\s+looks)${EMPTY_LOG_MODIFIER}\s+empty\b`,
+    String.raw`\bno meal data\b`,
+    String.raw`\bno meals? (?:logged|recorded|data|yet)\b`,
+    String.raw`\bno logged meals\b`,
+    String.raw`\bno food logged\b`,
+    String.raw`\bnothing (?:has been |was |is )?logged\b`,
+    String.raw`\b(?:have not|has not|haven['’]t|hasn['’]t) logged (?:anything|any meals|a meal|meals|food|nutrition)\b`,
+    String.raw`\b(?:do not|don['’]t) (?:see|have) (?:any )?(?:meals|meal data|food|foods|nutrition data|a nutrition log)\b`,
+    String.raw`\b(?:cannot|can['’]t) see (?:any )?(?:meals|food|your (?:meals|log|nutrition))\b`,
+    String.raw`\b(?:do not|don['’]t) have (?:any |a )?records? of what you(?:['’]ve| have) eaten\b`,
+    String.raw`\bno records? of what you(?:['’]ve| have) eaten\b`,
+  ].join('|'),
+  'i',
+);
 
 export function claimsLogEmpty(text: string): boolean {
   return EMPTY_LOG_CLAIM.test(text);

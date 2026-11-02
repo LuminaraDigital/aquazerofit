@@ -65,10 +65,19 @@ const OFF: MockChatContext = { personalisation: 'off', nutrition: null };
 describe('empty-log claims', () => {
   it('recognises the phrasings the playtest hit, and not a missing meal slot', () => {
     expect(claimsLogEmpty('Your nutrition log is empty.')).toBe(true);
+    expect(claimsLogEmpty('Your nutrition log is currently empty.')).toBe(true);
+    expect(claimsLogEmpty('The log is currently empty.')).toBe(true);
+    expect(claimsLogEmpty("I don't have any record of what you've eaten today.")).toBe(true);
     expect(claimsLogEmpty('I have no meal data.')).toBe(true);
     expect(claimsLogEmpty("You haven't logged anything yet today.")).toBe(true);
     expect(claimsLogEmpty("I don't see any meals.")).toBe(true);
+    expect(claimsLogEmpty('Your nutrition log is still completely empty.')).toBe(true);
     expect(claimsLogEmpty("You haven't logged dinner yet.")).toBe(false);
+    expect(claimsLogEmpty('The nutrition log is not empty.')).toBe(false);
+    expect(claimsLogEmpty('The nutrition log is never empty.')).toBe(false);
+    expect(
+      claimsLogEmpty("If you've already logged meals, they might not have synced yet."),
+    ).toBe(false);
     expect(claimsLogEmpty(PERSONALISATION_OFF_REPLY)).toBe(false);
   });
 });
@@ -101,6 +110,19 @@ describe('enforceCoachGrounding', () => {
     expect(text).not.toMatch(/615|Oats/);
   });
 
+  it('replaces a currently-empty or no-record reply with the Privacy line when personalisation is off', () => {
+    const slipped =
+      "I don't have any record of what you've eaten today. Your nutrition log is currently empty. If you've already logged meals, they might not have synced yet.";
+    expect(enforceCoachGrounding(slipped, OFF)).toBe(PERSONALISATION_OFF_REPLY);
+    expect(enforceCoachGrounding('Your nutrition log is currently empty.', OFF)).toBe(
+      PERSONALISATION_OFF_REPLY,
+    );
+    expect(
+      enforceCoachGrounding("I don't have any record of what you've eaten today.", OFF),
+    ).toBe(PERSONALISATION_OFF_REPLY);
+    expect(enforceCoachGrounding('The log is currently empty.', OFF)).toBe(PERSONALISATION_OFF_REPLY);
+  });
+
   it('replaces a reply that quotes an earlier turn totals when personalisation is off', () => {
     const text = enforceCoachGrounding(
       'You have logged 615 of your 2740 kcal target across 3 meals. Food logged: Oats, Eggs and Rice.',
@@ -125,6 +147,20 @@ describe('enforceCoachGrounding', () => {
   it('leaves a genuinely empty day alone', () => {
     const original = "You haven't logged anything yet today.";
     expect(enforceCoachGrounding(original, EMPTY_DAY)).toBe(original);
+    expect(enforceCoachGrounding('Your nutrition log is currently empty.', EMPTY_DAY)).toBe(
+      'Your nutrition log is currently empty.',
+    );
+  });
+
+  it('replaces a currently-empty or no-record claim with the totals when the day has intake', () => {
+    const text = enforceCoachGrounding(
+      "I don't have any record of what you've eaten today. Your nutrition log is currently empty. A walk after dinner is plenty.",
+      INTAKE,
+    );
+    expect(text).toContain('615');
+    expect(text).toContain('Oats');
+    expect(text).toContain('A walk after dinner is plenty.');
+    expect(claimsLogEmpty(text)).toBe(false);
   });
 
   it('does not put a suspicious food name into the corrected sentence', () => {

@@ -57,7 +57,7 @@ import {
   type ChatMealItem,
 } from './mealDraft';
 import { gatherChatContext, gatherChatContextDenied } from './tools';
-import { enforceCoachGrounding, groundingOverrideMessage, redactStaleEmptyLogClaims } from './grounding';
+import { enforceCoachGrounding, groundingOverrideMessage, redactGroundingHistory } from './grounding';
 
 export const chatRouter = Router();
 chatRouter.use(requireAuth);
@@ -289,12 +289,14 @@ chatRouter.post(
       // Replay prior turns so the coach has conversational memory. The current
       // user message is already persisted above - exclude it here and append
       // it explicitly as the final message. Guardrail-blocked messages are
-      // filtered inside buildHistoryMessages.
+      // filtered inside buildHistoryMessages. With personalisation off, an
+      // earlier assistant reply that quotes nutrition or plan figures is
+      // replaced before replay, so this turn cannot copy it.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const priorMessages = await whereDocs<ChatMessage>('ai', (d: any) => {
         return d?.sessionId === sessionId && d?.type === 'chatMessage' && d?.userId === user.id && d?.id !== userMessage.id;
       });
-      const history = redactStaleEmptyLogClaims(buildHistoryMessages(priorMessages), context);
+      const history = redactGroundingHistory(buildHistoryMessages(priorMessages), context);
       // After history, immediately before the question: the spot a stale
       // "log is empty" reply would otherwise occupy.
       const groundingOverride = groundingOverrideMessage(context);
@@ -304,7 +306,11 @@ chatRouter.post(
       // ordering is the safety-relevant part rather than a stylistic one.
       const coach = activeCoachFor(user.id);
       // --- Stream the reply using real SSE from provider (AI-02)
+      // Consent off holds tokens until grounding has run. The Android client
+      // paints each token as the finished bubble until history reloads, so a
+      // quote of an earlier meal total must never be the text that lands.
       let fullText = '';
+      const heldTokens: string[] = [];
       const streamResult = await stream(
         'chatFast',
         [
@@ -318,8 +324,12 @@ chatRouter.post(
           promptId: 'P-07',
           coachId: coach.id,
           onToken: (token) => {
-            if (clientGone) return;
             fullText += token;
+            if (!consented) {
+              heldTokens.push(token);
+              return;
+            }
+            if (clientGone) return;
             sendFrame(res, { type: 'token', token });
           },
         },
@@ -356,14 +366,15 @@ chatRouter.post(
           finalResult = step.value;
           break;
         }
-        // The token already went out through the onToken callback above.
+        // Consent-on tokens already went out through onToken. Consent-off
+        // tokens are held until the reply is checked below.
       }
 
       // finalResult is guaranteed to be non-null here due to fallback
       const result = {
-        // Streamed tokens may still have said the log was empty. The stored
-        // reply is the one the next turn replays, so it has to be the
-        // corrected one.
+        // Streamed tokens may still have said the log was empty, or quoted a
+        // meal total from an earlier turn. The stored reply is the one the
+        // next turn replays, so it has to be the corrected one.
         text: enforceCoachGrounding(fullText || finalResult!.text, context),
         meta: finalResult!.meta,
       };
@@ -431,6 +442,14 @@ chatRouter.post(
       }
 
       if (!clientGone) {
+        if (!consented) {
+          const chunks =
+            result.text === fullText && heldTokens.length > 0 ? heldTokens : [result.text];
+          for (const token of chunks) {
+            if (token.length === 0) continue;
+            sendFrame(res, { type: 'token', token });
+          }
+        }
         sendFrame(res, { type: 'done', message: assistantMessage });
       }
       res.end();

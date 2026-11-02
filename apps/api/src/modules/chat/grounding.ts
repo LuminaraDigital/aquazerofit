@@ -9,9 +9,17 @@
  * models copy from. Food names were also missing, so "no meal data" was an
  * easy wrong answer to "what did I eat".
  *
+ * A third failure is the reverse order. Personalisation was on, the coach
+ * quoted today's totals, then personalisation was turned off in the same
+ * thread. The tools correctly reported that logs were not fetched, but the
+ * earlier assistant reply was still replayed, and the model copied those
+ * totals into the new answer.
+ *
  * Numbers in the correction come from the tool result. Food names stay in the
  * untrusted USER CONTEXT block: they are user-authored and must not be copied
- * into a trusted system instruction.
+ * into a trusted system instruction. With personalisation off, earlier replies
+ * that already contain those figures are dropped from the replay, and a
+ * finished reply that still quotes them is replaced before it is stored.
  */
 export interface NutritionFoodGrounding {
   name: string;
@@ -35,6 +43,30 @@ export const PERSONALISATION_OFF_REPLY =
   'AI personalisation is off, so I cannot see today\'s nutrition log. Enable it in Privacy if you want answers based on what you have logged.';
 
 const STALE_TURN_PLACEHOLDER = 'Continuing from the earlier turn.';
+
+/**
+ * Figures the coach only has while AI personalisation is on: intake, foods it
+ * named, water and macro totals, the active plan, and a body weight. With
+ * consent off those sentences must not be replayed or stored on a later turn.
+ * Generic advice ("a walk after dinner") does not match.
+ */
+const CONSENTED_PERSONAL_DATA: readonly RegExp[] = [
+  /\b\d[\d,]*(?:\.\d+)?\s*(?:kcal|calories)\b/i,
+  /\bkcal\s+(?:target|budget|remaining)\b/i,
+  /\bacross\s+\d+\s+meals\b/i,
+  /\b\d+\s+meals?\s+(?:today|logged)\b/i,
+  /\bfood logged\b/i,
+  /\b\d[\d,]*(?:\.\d+)?\s*ml\s+of\s+\d/i,
+  /\bwater is\s+\d/i,
+  /\b\d[\d,]*(?:\.\d+)?\s*g\s+of\s+(?:your\s+)?\d/i,
+  /\btraining days a week\b/i,
+  /\b\d+\s+days a week\b/i,
+  /\b\d+(?:\.\d+)?\s*kg\b/i,
+];
+
+export function containsConsentedPersonalData(text: string): boolean {
+  return CONSENTED_PERSONAL_DATA.some((pattern) => pattern.test(text));
+}
 
 /**
  * Claims that the day has no nutrition data. A missing meal slot ("haven't
@@ -133,6 +165,28 @@ export function redactStaleEmptyLogClaims<T extends { role: string; content: str
 }
 
 /**
+ * History actually sent to the model. Personalisation on still drops a stale
+ * empty-log sentence. Personalisation off drops an earlier assistant reply
+ * that quotes nutrition or plan figures, so the model cannot copy it. The
+ * user's own questions stay. A reply that was only those figures becomes a
+ * placeholder that does not repeat them.
+ */
+export function redactGroundingHistory<T extends { role: string; content: string }>(
+  history: T[],
+  ctx: CoachGrounding,
+): T[] {
+  const prepared =
+    ctx.personalisation === 'off'
+      ? history.map((message) =>
+          message.role === 'assistant' && containsConsentedPersonalData(message.content)
+            ? { ...message, content: STALE_TURN_PLACEHOLDER }
+            : message,
+        )
+      : history;
+  return redactStaleEmptyLogClaims(prepared, ctx);
+}
+
+/**
  * Sits after history and immediately before the current user message, which is
  * the position that beats a stale "log is empty" reply. Food names are not
  * copied in: they remain in the untrusted context block.
@@ -142,7 +196,7 @@ export function groundingOverrideMessage(ctx: CoachGrounding): { role: 'system';
     return {
       role: 'system',
       content:
-        "TODAY'S GROUNDING OVERRIDES earlier turns in this chat. AI personalisation is off, so today's logs were not fetched. Tell the user personalisation is off and that they can enable it in Privacy. Do not say the nutrition log is empty.",
+        "TODAY'S GROUNDING OVERRIDES earlier turns in this chat. AI personalisation is off, so today's logs were not fetched. Do not repeat kcal totals, food names, meal counts or plan details from earlier replies. Tell the user personalisation is off and that they can enable it in Privacy. Do not say the nutrition log is empty.",
     };
   }
   if (ctx.nutrition && hasNutritionIntake(ctx.nutrition)) {
@@ -157,11 +211,16 @@ export function groundingOverrideMessage(ctx: CoachGrounding): { role: 'system';
 }
 
 /**
- * Last line of defence for a model that still copies a stale empty-log claim.
- * Runs on the finished reply, before it is stored, so the next turn cannot
- * replay the false sentence.
+ * Last line of defence before the reply is stored. A stale empty-log claim is
+ * replaced with today's totals when personalisation is on. With it off, an
+ * empty-log claim or a quote of nutrition or plan figures is replaced with
+ * the Privacy sentence, so the next turn cannot replay either one.
  */
 export function enforceCoachGrounding(text: string, ctx: CoachGrounding): string {
+  if (ctx.personalisation === 'off') {
+    if (claimsLogEmpty(text) || containsConsentedPersonalData(text)) return PERSONALISATION_OFF_REPLY;
+    return text;
+  }
   const replacement = correctionFor(ctx);
   if (!replacement || !claimsLogEmpty(text)) return text;
   const next: string[] = [];

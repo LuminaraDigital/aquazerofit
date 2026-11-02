@@ -20,7 +20,7 @@ import org.junit.runner.RunWith
  * This is the test that would have caught a database that does not open at
  * all. Room generates its implementation at build time, so a bad converter, a
  * column type it cannot map, or an index on a column that no longer exists is
- * a *runtime* failure on first access — and until now nothing on the JVM side
+ * a *runtime* failure on first access. Until now nothing on the JVM side
  * touched a real Room implementation, so the first person to find out would
  * have been a user.
  */
@@ -149,7 +149,7 @@ class AzfDatabaseDaoTest {
         val thumbnails = dao.thumbnailsFor(listOf("ex_bench"))
         assertEquals(1, thumbnails.size)
         // Lowest rowId wins, so the library row does not shuffle its picture
-        // between refreshes — and a video is never offered as a thumbnail.
+        // between refreshes, and a video is never offered as a thumbnail.
         assertEquals("/media/bench-1.png", thumbnails.single().url)
         // CC-BY-SA: the credit travels with the picture, not with the exercise.
         assertEquals("Everkinetic", thumbnails.single().licenceAuthor)
@@ -186,7 +186,7 @@ class AzfDatabaseDaoTest {
 
     /**
      * The `achievement_definitions` half of this test went with the DAO
-     * accessors it exercised — nothing ever wrote or read that table, so the
+     * accessors it exercised. Nothing ever wrote or read that table, so the
      * accessors were deleted as dead code. The entity and its table are still
      * registered (dropping them is a schema change this database forbids doing
      * destructively), so there is nothing left here to assert about them.
@@ -251,6 +251,18 @@ class AzfDatabaseDaoTest {
         dao.upsertPlan(TrainingPlanEntity(id = "p2", name = "New", docJson = "{}", isCurrent = true))
 
         assertEquals("p2", dao.currentPlan().first()!!.id)
+    }
+
+    @Test
+    fun deleteCurrentPlanRemovesTheCurrentRowAndLeavesSessions() = runTest {
+        val dao = db.trainingDao()
+        dao.upsertPlan(TrainingPlanEntity(id = "current", name = "Current", docJson = "{}", isCurrent = true))
+        dao.upsertSession(session(id = "s1"))
+
+        dao.deleteCurrentPlan()
+
+        assertNull(dao.currentPlan().first())
+        assertNotNull(dao.sessionById("s1"))
     }
 
     @Test

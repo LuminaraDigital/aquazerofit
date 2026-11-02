@@ -1501,4 +1501,7 @@
     <!-- Challenges podium -->
     <string name="challenges_podium_cd">Rank %1$d, %2$s, %3$d days</string>
     <string name="challenges_days_short">%1$dd</string>
+
+    <!-- First-launch intro video -->
+    <string name="intro_skip">Skip</string>
 </resources>

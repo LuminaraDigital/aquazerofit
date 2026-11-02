@@ -4,9 +4,12 @@
  * Personalisation off used to look like an empty log (every field null, and
  * the offline engine said nothing had been logged). A later turn with real
  * totals still repeated that, because the empty-log reply was replayed after
- * the context block. These tests pin the three corrections: say Privacy when
- * logs were not fetched, answer from totals and food names when they were,
- * and stop replaying the stale empty-log sentence.
+ * the context block. Turning personalisation off after a meal-grounded reply
+ * had the same shape in reverse: the tools withheld the log, but the earlier
+ * reply was still replayed and the new answer copied its totals. These tests
+ * pin the corrections: say Privacy when logs were not fetched, answer from
+ * totals and food names when they were, stop replaying a stale empty-log
+ * sentence, and drop a prior nutrition or plan reply once consent is off.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,6 +23,7 @@ import {
   foodNameSentence,
   groundingOverrideMessage,
   PERSONALISATION_OFF_REPLY,
+  redactGroundingHistory,
   redactStaleEmptyLogClaims,
 } from '../modules/chat/grounding';
 
@@ -97,6 +101,27 @@ describe('enforceCoachGrounding', () => {
     expect(text).not.toMatch(/615|Oats/);
   });
 
+  it('replaces a reply that quotes an earlier turn totals when personalisation is off', () => {
+    const text = enforceCoachGrounding(
+      'You have logged 615 of your 2740 kcal target across 3 meals. Food logged: Oats, Eggs and Rice.',
+      OFF,
+    );
+    expect(text).toBe(PERSONALISATION_OFF_REPLY);
+    expect(text).toMatch(/personalisation is off/i);
+    expect(text).toMatch(/Privacy/);
+    expect(text).not.toMatch(/615|2740|Oats|Eggs|Rice/);
+    expect(claimsLogEmpty(text)).toBe(false);
+  });
+
+  it('keeps a totals reply when personalisation is on', () => {
+    const original = 'You have logged 615 of your 2740 kcal target across 3 meals. Food logged: Oats.';
+    expect(enforceCoachGrounding(original, INTAKE)).toBe(original);
+  });
+
+  it('leaves the privacy reply unchanged', () => {
+    expect(enforceCoachGrounding(PERSONALISATION_OFF_REPLY, OFF)).toBe(PERSONALISATION_OFF_REPLY);
+  });
+
   it('leaves a genuinely empty day alone', () => {
     const original = "You haven't logged anything yet today.";
     expect(enforceCoachGrounding(original, EMPTY_DAY)).toBe(original);
@@ -152,8 +177,42 @@ describe('stale thread', () => {
     const override = groundingOverrideMessage(OFF);
     expect(override?.content).toMatch(/personalisation is off/i);
     expect(override?.content).toMatch(/Privacy/);
+    expect(override?.content).toMatch(/do not repeat/i);
     expect(override?.content).not.toMatch(/615|Oats|not empty/);
     expect(groundingOverrideMessage(EMPTY_DAY)).toBeNull();
+  });
+
+  it('drops a prior meal or plan reply when personalisation is off, and keeps it when on', () => {
+    const meal =
+      'You have logged 615 of your 2740 kcal target across 3 meals. Food logged: Oats, Eggs and Rice. Water is 500 ml.';
+    const plan = 'You are on "Full Body", 4 training days a week.';
+    const off = redactGroundingHistory(
+      [
+        { role: 'user', content: 'What did I eat?' },
+        { role: 'assistant', content: meal },
+        { role: 'user', content: 'What is my plan?' },
+        { role: 'assistant', content: plan },
+        { role: 'assistant', content: 'A walk after dinner is plenty.' },
+        { role: 'assistant', content: PERSONALISATION_OFF_REPLY },
+      ],
+      OFF,
+    );
+    expect(off[0]).toEqual({ role: 'user', content: 'What did I eat?' });
+    expect(off[1]?.content).toBe('Continuing from the earlier turn.');
+    expect(off[2]).toEqual({ role: 'user', content: 'What is my plan?' });
+    expect(off[3]?.content).toBe('Continuing from the earlier turn.');
+    expect(off[4]?.content).toBe('A walk after dinner is plenty.');
+    expect(off[5]?.content).toBe(PERSONALISATION_OFF_REPLY);
+    expect(off.map((message) => message.content).join('\n')).not.toMatch(/615|2740|Oats|Eggs|Rice|Full Body|500 ml/);
+
+    const on = redactGroundingHistory(
+      [
+        { role: 'user', content: 'What did I eat?' },
+        { role: 'assistant', content: meal },
+      ],
+      INTAKE,
+    );
+    expect(on[1]?.content).toBe(meal);
   });
 });
 
@@ -192,10 +251,11 @@ describe('offline coach', () => {
 describe('P-07', () => {
   it('bumps the version and forbids both failure modes, with no em or en dash', () => {
     const prompt = loadPrompt('P-07');
-    expect(prompt.version).toBe('1.0.4');
+    expect(prompt.version).toBe('1.0.5');
     expect(prompt.content).toMatch(/personalisation is off/i);
     expect(prompt.content).toMatch(/Privacy/);
     expect(prompt.content).toMatch(/log is not empty/);
+    expect(prompt.content).toMatch(/do not repeat kcal totals/i);
     expect(prompt.content).not.toMatch(/\u2014|\u2013/);
 
     const here = path.dirname(fileURLToPath(import.meta.url));

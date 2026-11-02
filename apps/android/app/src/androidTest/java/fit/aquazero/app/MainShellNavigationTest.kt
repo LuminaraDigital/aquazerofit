@@ -15,6 +15,7 @@ import androidx.work.WorkManager
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import fit.aquazero.app.core.auth.RefreshTokenVault
+import fit.aquazero.app.core.ui.CoachRoster
 import fit.aquazero.app.di.CannedResponse
 import fit.aquazero.app.di.FakeHttp
 import kotlinx.coroutines.runBlocking
@@ -28,7 +29,7 @@ import javax.inject.Inject
  * The authed shell: five tab roots in one back stack, with full-screen
  * destinations pushed *above* them.
  *
- * The rule the shell encodes — and the one that is easy to break — is that the
+ * The rule the shell encodes, and the one that is easy to break, is that the
  * bottom bar is drawn only while the top of the back stack is a `TabKey`. Get
  * it wrong and a full-screen destination keeps a tab bar that navigates out
  * from under it, or a tab root loses the bar entirely. Neither is visible from
@@ -59,8 +60,8 @@ class MainShellNavigationTest {
         hiltRule.inject()
         FakeHttp.reset()
         // Only the rotation answers. Everything else 404s, which is exactly
-        // the state of a signed-in device with nothing cached and no server —
-        // every screen below therefore renders its offline/empty branch.
+        // the state of a signed-in device with nothing cached and no server.
+        // Every screen below therefore renders its offline/empty branch.
         FakeHttp.respondTo(
             "auth/refresh" to CannedResponse(
                 status = 200,
@@ -82,8 +83,8 @@ class MainShellNavigationTest {
     fun tearDown() {
         // Remove the task, not just the activity. A `MainActivity` left in a
         // task record is relaunched by the system when the next instrumentation
-        // run starts the process — before `HiltAndroidRule` has built the test
-        // component — and the whole run dies with "The component was not
+        // run starts the process, before `HiltAndroidRule` has built the test
+        // component, and the whole run dies with "The component was not
         // created". Closing the scenario alone does not clear the record.
         runCatching { scenario?.onActivity { it.finishAndRemoveTask() } }
         scenario?.close()
@@ -134,7 +135,7 @@ class MainShellNavigationTest {
         awaitText(string(R.string.screen_workouts).uppercase())
 
         // Settings is drawn by the shell, not by the tab, precisely so it is
-        // reachable from any root — a Play compliance requirement.
+        // reachable from any root, a Play compliance requirement.
         composeRule
             .onAllNodesWithContentDescription(string(R.string.shell_open_settings))
             .onFirst()
@@ -147,10 +148,29 @@ class MainShellNavigationTest {
 
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
 
-        // Back pops one entry, so the tab underneath — Workouts, not Home —
-        // comes back with its bar.
+        // Back pops one entry, so Workouts comes back with its bar.
         awaitText(string(R.string.tab_home))
         awaitText(string(R.string.screen_workouts).uppercase())
+    }
+
+    @Test
+    fun backFromARootTabSelectsHomeInsteadOfLeaving() {
+        launchApp()
+        awaitTabBar()
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+
+        listOf(
+            R.string.tab_workouts to string(R.string.screen_workouts).uppercase(),
+            R.string.tab_nutrition to string(R.string.screen_nutrition).uppercase(),
+            R.string.tab_coach to string(R.string.coach_title, CoachRoster.default().firstName).uppercase(),
+        ).forEach { (tabRes, screenTitle) ->
+            composeRule.onAllNodes(hasText(string(tabRes))).onFirst().performClick()
+            awaitText(screenTitle)
+
+            device.pressBack()
+
+            assertReturnedHome(screenTitle)
+        }
     }
 
     private fun launchApp() {
@@ -165,8 +185,24 @@ class MainShellNavigationTest {
         }
     }
 
-    private fun string(resId: Int): String =
-        InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
+    private fun string(resId: Int, vararg formatArgs: Any): String =
+        InstrumentationRegistry.getInstrumentation().targetContext.getString(resId, *formatArgs)
+
+    /**
+     * Home is back on screen and the activity is still running. The previous
+     * screen title is gone, which is how a tab root is told apart from the
+     * same word in the dock.
+     */
+    private fun assertReturnedHome(leftScreenTitle: String) {
+        composeRule.waitUntil(TIMEOUT_MS) {
+            composeRule.onAllNodes(hasText(leftScreenTitle)).fetchSemanticsNodes().isEmpty() &&
+                composeRule.onAllNodes(hasText(string(R.string.tab_home))).fetchSemanticsNodes().isNotEmpty()
+        }
+        val host = checkNotNull(scenario) { "app was not launched" }
+        var finishing = true
+        host.onActivity { finishing = it.isFinishing || it.isDestroyed }
+        check(!finishing) { "Back from a root tab finished the activity" }
+    }
 
     private companion object {
         const val TIMEOUT_MS = 20_000L

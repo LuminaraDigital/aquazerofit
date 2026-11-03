@@ -17,6 +17,15 @@ object AzfShapes {
 
     /** Fully rounded pill (chips, buttons, indicators). */
     val Pill = RoundedCornerShape(percent = 50)
+
+    /** The lit hero surface: larger than a card so it reads as the lead. */
+    val Hero = RoundedCornerShape(28.dp)
+
+    /** The coach composer. */
+    val Composer = RoundedCornerShape(24.dp)
+
+    /** The floating bottom dock. */
+    val Dock = RoundedCornerShape(30.dp)
 }
 
 /** Material shape scheme mapped onto the Deep Sea shape language. */

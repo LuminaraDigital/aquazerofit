@@ -23,7 +23,7 @@ process.env.AZF_DATA_DIR = dataDir;
 
 const { createApp } = await import('../app');
 const { getStore } = await import('../platform/store');
-const { effectiveTier } = await import('../modules/billing/entitlements');
+const { effectiveTier, entitlementHistory, grantPremium } = await import('../modules/billing/entitlements');
 const { resetPlayTokenCache, obfuscatedAccountIdFor } = await import('../modules/billing/play');
 
 const app = createApp();
@@ -129,6 +129,101 @@ afterAll(async () => {
 });
 
 describe('POST /billing/play/verify', () => {
+  it('rejects a product id that is not a launch subscription before calling Google', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const res = await request(app)
+      .post(`${base}/billing/play/verify`)
+      .set(auth())
+      .send({ purchaseToken: 'tok-other', productId: 'azf_other' });
+
+    expect(res.status).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(effectiveTier(userDoc())).toBe('free');
+  });
+
+  it('grants the annual product for the period Google reports', async () => {
+    const expiry = inDays(365);
+    stubGoogle(activeSubscription(expiry));
+
+    const res = await request(app)
+      .post(`${base}/billing/play/verify`)
+      .set(auth())
+      .send({ purchaseToken: 'tok-annual', productId: 'azf_premium_annual' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.tier).toBe('premium');
+    const listed = await request(app).get(`${base}/me/entitlements`).set(auth());
+    expect(listed.body.activeBillingSources).toContain('play');
+  });
+
+  it('refuses a new Play purchase while Stripe premium is still running', async () => {
+    grantPremium({
+      userId,
+      source: 'stripe',
+      externalId: `stripe:${crypto.randomUUID()}`,
+      providerRef: 'sub_already',
+      premiumUntil: inDays(20),
+    });
+    stubGoogle(activeSubscription(inDays(30)));
+
+    const res = await request(app)
+      .post(`${base}/billing/play/verify`)
+      .set(auth())
+      .send({ purchaseToken: 'tok-on-stripe', productId: 'azf_premium_monthly' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('CONFLICT');
+    expect(entitlementHistory(userId).some((grant) => grant.source === 'play')).toBe(false);
+    expect(effectiveTier(userDoc())).toBe('premium');
+  });
+
+  it('refuses a new Play purchase while Stars premium is still running', async () => {
+    grantPremium({
+      userId,
+      source: 'stars',
+      externalId: `stars:${crypto.randomUUID()}`,
+      providerRef: 'stars-charge',
+      premiumUntil: inDays(20),
+    });
+    stubGoogle(activeSubscription(inDays(30)));
+
+    const res = await request(app)
+      .post(`${base}/billing/play/verify`)
+      .set(auth())
+      .send({ purchaseToken: 'tok-on-stars', productId: 'azf_premium_annual' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('CONFLICT');
+    expect(entitlementHistory(userId).some((grant) => grant.source === 'play')).toBe(false);
+  });
+
+  it('still re-verifies a Play token already bound to the account', async () => {
+    stubGoogle(activeSubscription(inDays(30)));
+    const first = await request(app)
+      .post(`${base}/billing/play/verify`)
+      .set(auth())
+      .send({ purchaseToken: 'tok-own', productId: 'azf_premium_monthly' });
+    expect(first.status).toBe(200);
+
+    grantPremium({
+      userId,
+      source: 'stripe',
+      externalId: `stripe:${crypto.randomUUID()}`,
+      providerRef: 'sub_later',
+      premiumUntil: inDays(10),
+    });
+    stubGoogle(activeSubscription(inDays(60)));
+
+    const again = await request(app)
+      .post(`${base}/billing/play/verify`)
+      .set(auth())
+      .send({ purchaseToken: 'tok-own', productId: 'azf_premium_monthly' });
+
+    expect(again.status).toBe(200);
+    expect(again.body.tier).toBe('premium');
+  });
+
   it('grants the period Google reports, not the one the client asked for', async () => {
     process.env.PLAY_SERVICE_ACCOUNT_JSON = SERVICE_ACCOUNT;
     process.env.PLAY_PACKAGE_NAME = 'fit.aquazero.app';

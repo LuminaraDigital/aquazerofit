@@ -6,26 +6,26 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Meal-photo FORBIDDEN is the premium refusal. Other upload failures are not. */
+/** Running out of credits offers the plan. Other upload failures do not. */
 class CaptureFailureBannerTest {
 
     @Test
     fun `a premium refusal keeps the server sentence and offers the plan`() {
         val banner = captureUploadFailureBanner(
-            code = "FORBIDDEN",
+            code = "CREDITS_INSUFFICIENT",
             message = "This feature is part of AquaZeroFit Premium.",
         )
         assertTrue(banner.showPlan)
         assertEquals("This feature is part of AquaZeroFit Premium.", banner.message)
-        assertEquals(R.string.capture_premium_required, banner.messageRes)
+        assertEquals(R.string.capture_credits_used, banner.messageRes)
     }
 
     @Test
     fun `a blank premium message falls back to the local sentence`() {
-        val banner = captureUploadFailureBanner(code = "FORBIDDEN", message = "  ")
+        val banner = captureUploadFailureBanner(code = "CREDITS_INSUFFICIENT", message = "  ")
         assertTrue(banner.showPlan)
         assertEquals(null, banner.message)
-        assertEquals(R.string.capture_premium_required, banner.messageRes)
+        assertEquals(R.string.capture_credits_used, banner.messageRes)
     }
 
     @Test

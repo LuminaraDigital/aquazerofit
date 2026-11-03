@@ -134,6 +134,10 @@ private class DayKeyedDashboardData : DashboardData {
         return nutritionFlow
     }
 
+    override fun mealTypesLogged(localDate: String): Flow<Set<MealType>> = MutableStateFlow(emptySet())
+
+    override fun loggedDates(from: String, to: String): Flow<Set<String>> = MutableStateFlow(emptySet())
+
     override fun user(): Flow<UserEntity?> = MutableStateFlow(null)
 
     override fun profile(): Flow<fit.aquazero.app.core.database.ProfileEntity?> = MutableStateFlow(null)
@@ -143,6 +147,8 @@ private class DayKeyedDashboardData : DashboardData {
     override fun progressSummary(): Flow<ProgressSummaryDto?> = MutableStateFlow(null)
 
     override fun weightSeries(): Flow<List<Double>> = MutableStateFlow(emptyList())
+
+    override fun latestWeighInDate(): Flow<String?> = MutableStateFlow(null)
 
     override suspend fun refreshDay(localDate: String): ApiResult<DailyNutritionDto> {
         refreshedDays += localDate
@@ -164,7 +170,10 @@ private class DayKeyedDashboardData : DashboardData {
     override suspend fun suggestMeal(mealType: MealType): ApiResult<MealRecommendationDto> =
         ApiResult.Failure.Network(IOException("offline"))
 
-    override suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto> =
+    override suspend fun logRecommendation(
+        recommendationId: String,
+        localDate: String,
+    ): ApiResult<MealLogDto> =
         ApiResult.Failure.Network(IOException("offline"))
 
     override suspend fun readiness(): ApiResult<fit.aquazero.app.core.model.ReadinessAssessmentDto> =

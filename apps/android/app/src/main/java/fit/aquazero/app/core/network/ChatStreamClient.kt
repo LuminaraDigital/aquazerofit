@@ -1,5 +1,6 @@
 package fit.aquazero.app.core.network
 
+import fit.aquazero.app.core.model.ApiErrorEnvelope
 import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.model.ChatMessageDto
 import fit.aquazero.app.core.model.ChatSendRequest
@@ -26,6 +27,10 @@ import javax.inject.Singleton
  * One frame of the chat stream, per the API's SSE contract
  * (`{type: token|done|error}` with error codes
  * `SAFETY_INPUT` / `SAFETY_OUTPUT` / `AI_UNAVAILABLE`).
+ *
+ * Credit admission is not an SSE frame. The ledger answers HTTP 402 with a
+ * JSON error envelope before any event stream starts, and [ChatStreamClient]
+ * surfaces that as [ChatStreamEvent.Error] with [CHAT_CODE_CREDITS_INSUFFICIENT].
  */
 sealed interface ChatStreamEvent {
     /** One generated token. */
@@ -61,10 +66,18 @@ class ChatStreamClient @Inject constructor(
     @param:Named("apiBaseUrl") private val baseUrl: String,
 ) {
 
-    /** Open a streaming turn on [sessionId] with the user's [content]. */
-    fun stream(sessionId: String, content: String): Flow<ChatStreamEvent> = callbackFlow {
+    /**
+     * Open a streaming turn on [sessionId] with the user's [content].
+     *
+     * [localDate] is sent on the body so today's logs are the day the device
+     * logged them against, not the server's fallback zone.
+     */
+    fun stream(sessionId: String, content: String, localDate: String): Flow<ChatStreamEvent> = callbackFlow {
         val body = AzfJson
-            .encodeToString(ChatSendRequest.serializer(), ChatSendRequest(content))
+            .encodeToString(
+                ChatSendRequest.serializer(),
+                ChatSendRequest(content = content, localDate = localDate),
+            )
             .toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url("$baseUrl/chat/sessions/$sessionId/messages")
@@ -119,7 +132,15 @@ class ChatStreamClient @Inject constructor(
                 t: Throwable?,
                 response: Response?,
             ) {
-                if (!finished) trySend(ChatStreamEvent.TransportError(t))
+                if (!finished) {
+                    val admission = response?.let { chatStreamAdmissionError(it) }
+                    if (admission != null) {
+                        finished = true
+                        trySend(admission)
+                    } else {
+                        trySend(ChatStreamEvent.TransportError(t))
+                    }
+                }
                 close()
             }
         }
@@ -133,7 +154,7 @@ class ChatStreamClient @Inject constructor(
  * Render an SSE frame's `message` as text fit for a user.
  *
  * The field is typed [JsonElement] because the `done` frame carries a message
- * *object*, but the `error` frame carries a plain string — and `toString()` on
+ * *object*, but the `error` frame carries a plain string - and `toString()` on
  * a string [JsonPrimitive] re-emits it in JSON form, quotes included. Server
  * error copy was reaching the UI as `"Something went wrong"`, quote marks and
  * all. Unwrap the primitive; fall back to the raw form for any other shape so
@@ -143,3 +164,36 @@ private fun JsonElement?.asDisplayText(): String {
     val primitive = this as? JsonPrimitive ?: return this?.toString().orEmpty()
     return if (primitive.isString) primitive.content else primitive.toString()
 }
+
+/**
+ * Credit admission fails before the response is an event stream: HTTP 402,
+ * body `{code: CREDITS_INSUFFICIENT, message, details?}`. OkHttp reports that
+ * as [EventSourceListener.onFailure] with the response still attached, not as
+ * an `error` frame. Either the status or the envelope code is enough. The
+ * screen does not show [ChatStreamEvent.Error.message] for this code. The
+ * ledger sentence is not the product copy.
+ */
+internal fun chatStreamAdmissionError(response: Response): ChatStreamEvent.Error? {
+    val body = runCatching { response.peekBody(ADMISSION_BODY_BYTES).string() }.getOrNull()
+    return chatStreamAdmissionError(response.code, body)
+}
+
+internal fun chatStreamAdmissionError(httpStatus: Int, body: String?): ChatStreamEvent.Error? {
+    val envelope = body?.takeIf { it.isNotBlank() }?.let { raw ->
+        runCatching { AzfJson.decodeFromString(ApiErrorEnvelope.serializer(), raw) }.getOrNull()
+    }
+    val code = envelope?.code
+    if (httpStatus != HTTP_PAYMENT_REQUIRED && code != CHAT_CODE_CREDITS_INSUFFICIENT) {
+        return null
+    }
+    return ChatStreamEvent.Error(
+        code = CHAT_CODE_CREDITS_INSUFFICIENT,
+        message = envelope?.message.orEmpty(),
+    )
+}
+
+/** Bytes of an admission body worth inspecting. Error envelopes are tiny. */
+private const val ADMISSION_BODY_BYTES: Long = 64L * 1024L
+
+internal const val HTTP_PAYMENT_REQUIRED: Int = 402
+internal const val CHAT_CODE_CREDITS_INSUFFICIENT: String = "CREDITS_INSUFFICIENT"

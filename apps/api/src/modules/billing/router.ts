@@ -28,6 +28,7 @@ import { logEvent } from '../../platform/telemetry';
 import { getStore } from '../../platform/store';
 import {
   accountForProviderRef,
+  activeEntitlementSources,
   effectiveTier,
   grantPremium,
   revokePremium,
@@ -40,9 +41,11 @@ import {
   createPortalSession,
   handleStripeEvent,
   liveSubscriptionOf,
-  premiumPrice,
+  premiumPlans,
+  resolvedPremiumPlan,
   stripeSignatureValid,
   syncCheckoutSession,
+  type PremiumInterval,
   type StripeEvent,
 } from './stripe';
 import {
@@ -59,12 +62,23 @@ export const billingRouter = Router();
 billingRouter.get(
   '/config',
   asyncHandler(async (_req, res) => {
-    const price = await premiumPrice();
+    const plans = await premiumPlans();
+    const monthly = plans.find((plan) => plan.interval === 'month');
     const starsPrice = starsPremiumPrice();
     const starsOn = starsPremiumAvailable();
     res.json({
       play: { available: playBillingConfigured() },
-      stripe: { available: price !== null, price },
+      stripe: {
+        available: plans.some((plan) => plan.available),
+        // Monthly, when checkout for it is open. Older clients read this one field.
+        price: monthly?.available ? monthly.price : null,
+        plans: plans.map((plan) => ({
+          interval: plan.interval,
+          amount: plan.price.amount,
+          currency: plan.price.currency,
+          available: plan.available,
+        })),
+      },
       stars: {
         available: starsOn,
         price: starsOn ? starsPrice : null,
@@ -74,9 +88,12 @@ billingRouter.get(
   }),
 );
 
+/** Play Console subscription ids for package fit.aquazero.app. */
+const PLAY_PREMIUM_PRODUCT_IDS = ['azf_premium_monthly', 'azf_premium_annual'] as const;
+
 const verifySchema = z.object({
   purchaseToken: z.string().min(1).max(4096),
-  productId: z.string().min(1).max(200),
+  productId: z.enum(PLAY_PREMIUM_PRODUCT_IDS),
 });
 
 /**
@@ -146,6 +163,23 @@ billingRouter.post(
     if (boundTo && boundTo !== userId && getStore().byId<User>('users', boundTo)) {
       logEvent('play_purchase_token_rebind_refused', { userId });
       throw new AppError('PURCHASE_INVALID', 'This purchase belongs to a different account.');
+    }
+
+    /*
+     * A second paid rail would bill the same tier twice. Stripe checkout and
+     * Stars already refuse an account that is premium. Play must do the same
+     * when the running period came from Stripe or Stars.
+     *
+     * Skipped when this token is already bound to the caller. That call is a
+     * renewal or a retry of their own Play subscription, and refusing it would
+     * leave a purchase Google is still charging with no way to extend it.
+     */
+    if (boundTo !== userId) {
+      const sources = activeEntitlementSources(userId);
+      if (sources.includes('stripe') || sources.includes('stars')) {
+        logEvent('play_purchase_already_premium', { userId, sources });
+        throw new AppError('CONFLICT', 'This account is already on premium.');
+      }
     }
 
     grantPremium({
@@ -330,6 +364,10 @@ billingRouter.post(
  * renewal being retried after the grace ran out): a second subscription would
  * bill the user twice for one tier.
  */
+const checkoutSchema = z.object({
+  interval: z.enum(['month', 'year']).optional(),
+});
+
 billingRouter.post(
   '/stripe/checkout',
   requireAuth,
@@ -353,7 +391,12 @@ billingRouter.post(
         'This account already has a card subscription. Contact Support to update or cancel it.',
       );
     }
-    res.json({ url: await createCheckoutSession(userId) });
+    const interval: PremiumInterval = checkoutSchema.parse(req.body ?? {}).interval ?? 'month';
+    const plan = await resolvedPremiumPlan(interval);
+    if (!plan.available) {
+      throw new AppError('PAYMENT_UNAVAILABLE', 'This plan is not available right now.');
+    }
+    res.json({ url: await createCheckoutSession(userId, interval) });
   }),
 );
 

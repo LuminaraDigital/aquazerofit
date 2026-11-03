@@ -1,6 +1,7 @@
 package fit.aquazero.app.core.designsystem
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -8,7 +9,7 @@ import coil3.compose.AsyncImage
 /**
  * Bundled-asset image loader. Brand art ships in `assets/` (e.g.
  * `brand/akin-idle.jpg`, `coaches/akin/portrait.webp`) and loads through
- * Coil's `file:///android_asset/` scheme — no network, disk-cache free.
+ * Coil's `file:///android_asset/` scheme. No network, and no disk cache.
  */
 @Composable
 fun AssetImage(
@@ -16,12 +17,14 @@ fun AssetImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
+    alignment: Alignment = Alignment.Center,
 ) {
     AsyncImage(
         model = "file:///android_asset/${assetPath.trimStart('/')}",
         contentDescription = contentDescription,
         modifier = modifier,
         contentScale = contentScale,
+        alignment = alignment,
     )
 }
 
@@ -36,8 +39,8 @@ object BrandAssets {
      * The mark and the logo are the same artwork. `brand/mark.png` was a
      * byte-identical copy of `brand/logo.png` (83 KB shipped twice), so the
      * duplicate file is gone and both constants resolve to one asset. The
-     * distinct name stays because call sites mean different things by it —
-     * point this at real mark artwork if the brand ever diverges.
+     * distinct name stays because call sites mean different things by it.
+     * Point this at real mark artwork if the brand ever diverges.
      */
     const val MARK = LOGO
 

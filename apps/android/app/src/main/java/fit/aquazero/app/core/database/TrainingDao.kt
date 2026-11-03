@@ -16,6 +16,15 @@ interface TrainingDao {
     @Query("UPDATE training_plans SET isCurrent = 0")
     suspend fun clearCurrentPlan()
 
+    /**
+     * Delete the cached current plan row.
+     *
+     * Older plan rows and workout sessions stay. A server that has no
+     * current plan is not a reason to wipe the training cache.
+     */
+    @Query("DELETE FROM training_plans WHERE isCurrent = 1")
+    suspend fun deleteCurrentPlan()
+
     @Query("SELECT * FROM training_plans WHERE isCurrent = 1 LIMIT 1")
     fun currentPlan(): Flow<TrainingPlanEntity?>
 

@@ -20,9 +20,12 @@ import java.io.IOException
 class FakeDashboardData : DashboardData {
 
     val nutritionFlow = MutableStateFlow(EMPTY_DAY)
+    val mealTypesFlow = MutableStateFlow<Set<MealType>>(emptySet())
+    val loggedDatesFlow = MutableStateFlow<Set<String>>(emptySet())
     val userFlow = MutableStateFlow<UserEntity?>(null)
     val summaryFlow = MutableStateFlow<ProgressSummaryDto?>(null)
     val weightFlow = MutableStateFlow<List<Double>>(emptyList())
+    val latestWeighInFlow = MutableStateFlow<String?>(null)
     val profileFlow = MutableStateFlow<fit.aquazero.app.core.database.ProfileEntity?>(null)
     val targetsFlow = MutableStateFlow<fit.aquazero.app.core.database.TargetsEntity?>(null)
 
@@ -47,6 +50,10 @@ class FakeDashboardData : DashboardData {
 
     override fun dailyNutrition(localDate: String): Flow<LocalDailyNutrition> = nutritionFlow
 
+    override fun mealTypesLogged(localDate: String): Flow<Set<MealType>> = mealTypesFlow
+
+    override fun loggedDates(from: String, to: String): Flow<Set<String>> = loggedDatesFlow
+
     override fun user(): Flow<UserEntity?> = userFlow
 
     override fun profile(): Flow<fit.aquazero.app.core.database.ProfileEntity?> = profileFlow
@@ -56,6 +63,8 @@ class FakeDashboardData : DashboardData {
     override fun progressSummary(): Flow<ProgressSummaryDto?> = summaryFlow
 
     override fun weightSeries(): Flow<List<Double>> = weightFlow
+
+    override fun latestWeighInDate(): Flow<String?> = latestWeighInFlow
 
     override suspend fun refreshDay(localDate: String): ApiResult<DailyNutritionDto> = dayResult
 
@@ -77,7 +86,10 @@ class FakeDashboardData : DashboardData {
         return suggestResult
     }
 
-    override suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto> =
+    override suspend fun logRecommendation(
+        recommendationId: String,
+        localDate: String,
+    ): ApiResult<MealLogDto> =
         logRecommendationResult
 
     override suspend fun readiness(): ApiResult<ReadinessAssessmentDto> = readinessResult

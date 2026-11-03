@@ -29,10 +29,16 @@ const PUBLIC_NAME: Record<string, string | null> = {
 
 function policyProviders(): string[] {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const operator = fs.readFileSync(
-    path.resolve(here, '../../../web/src/pages/legal/operator.tsx'),
-    'utf8',
-  );
+  // apps/api/Dockerfile copies this file before `npm test` in the image. The
+  // rest of apps/web arrives only after that gate, so a missing file here is a
+  // packaging bug, not a policy with no providers.
+  const operatorPath = path.resolve(here, '../../../web/src/pages/legal/operator.tsx');
+  if (!fs.existsSync(operatorPath)) {
+    throw new Error(
+      `${operatorPath} is not in this tree. The API image must COPY it before the API tests (apps/api/Dockerfile).`,
+    );
+  }
+  const operator = fs.readFileSync(operatorPath, 'utf8');
   const match = /aiProviders:\s*\[([^\]]*)\]/.exec(operator.slice(operator.indexOf('export const OPERATOR')));
   expect(match, 'aiProviders array in OPERATOR').toBeTruthy();
   return [...match![1]!.matchAll(/'([^']+)'/g)].map((m) => m[1]!);

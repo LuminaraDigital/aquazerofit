@@ -3,7 +3,7 @@
   Home-screen surfaces: the "Today" app widget and the launcher shortcuts.
 
   A separate file from strings.xml purely to keep two concurrent workstreams
-  out of each other's diffs — Android merges everything under res/values into
+  out of each other's diffs. Android merges everything under res/values into
   one namespace, so these resolve identically. Keys are prefixed widget_ /
   shortcut_ so the merge can never collide.
 
@@ -16,7 +16,7 @@
 
     <!-- Widget picker -->
     <string name="widget_name">Today</string>
-    <string name="widget_description">Calories, water and today\'s workout — with a one-tap glass of water.</string>
+    <string name="widget_description">Calories, water and today\'s workout, with a one-tap glass of water.</string>
 
     <!-- Widget body -->
     <string name="widget_open_app_cd">Open AquaZeroFit</string>

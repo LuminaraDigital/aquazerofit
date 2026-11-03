@@ -4,6 +4,7 @@ import fit.aquazero.app.core.model.ChatMealDraftDto
 import fit.aquazero.app.core.model.ChatMessagesDto
 import fit.aquazero.app.core.model.ChatSessionCreatedDto
 import fit.aquazero.app.core.model.ChatSessionsDto
+import fit.aquazero.app.core.model.MealLogDto
 import fit.aquazero.app.core.model.MealType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -56,10 +57,11 @@ data class ConfirmMealDraftRequest(
     val acknowledgeAllergens: Boolean? = null,
 )
 
-/** Envelope `{draft}` returned by the meal-draft routes. */
+/** Envelope `{draft}` (and `{mealLog, draft}` on confirm) returned by the meal-draft routes. */
 @Serializable
 data class MealDraftEnvelopeDto(
     val draft: ChatMealDraftDto,
+    val mealLog: MealLogDto? = null,
 )
 
 /** Envelope `{drafts}` returned by `GET /chat/meal-drafts`. */

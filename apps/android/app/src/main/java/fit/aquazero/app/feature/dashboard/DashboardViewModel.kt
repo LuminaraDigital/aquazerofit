@@ -14,8 +14,10 @@ import fit.aquazero.app.core.common.proactiveCoachNudges
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
+import fit.aquazero.app.core.model.ConsistencyStatusDto
 import fit.aquazero.app.core.model.DerivedTargetsDto
 import fit.aquazero.app.core.model.MealRecommendationDto
+import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.NutritionEmphasis
 import fit.aquazero.app.core.model.ProgressionStatusDto
 import fit.aquazero.app.core.model.ReadinessAssessmentDto
@@ -34,6 +36,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.LocalTime
 import javax.inject.Inject
 
 private val AMBIENT_REACTION_KINDS = setOf(
@@ -84,6 +89,9 @@ data class SuggestionUi(
     val logging: Boolean = false,
 )
 
+private const val NOON = 12
+private const val DAYS_AFTER_MONDAY = 6L
+
 /** Immutable dashboard state (one screen, one state object). */
 @Immutable
 data class DashboardUiState(
@@ -116,10 +124,34 @@ data class DashboardUiState(
     /** Ambient coach card: persona, bond, XP ladder, and proactive nudges. */
     val coachAmbient: CoachAmbientUi? = null,
     val coachAmbientLoading: Boolean = true,
+    /** Wall-clock hour, refreshed on resume. Decides what the loop asks for. */
+    val hour: Int = NOON,
+    val mealsLogged: Set<MealType> = emptySet(),
+    /** Days of this Monday-first week with something logged. */
+    val loggedThisWeek: Set<String> = emptySet(),
+    val consistency: ConsistencyStatusDto? = null,
+    val lastWeighIn: String? = null,
 ) {
     /** Merges offline session burn with the server day total. */
     val effectiveKcalBurned: Double
         get() = maxOf(nutrition?.kcalBurned ?: 0.0, kcalBurned)
+
+    /** Today's plan. Derived, so it can never disagree with the cards around it. */
+    val dayLoop: DayLoop
+        get() = DayLoopPlanner.plan(
+            DayLoopInput(
+                hour = hour,
+                mealsLogged = mealsLogged,
+                waterMl = waterConsumedMl,
+                waterTargetMl = nutrition?.waterTargetMl ?: 0,
+                workout = when {
+                    workout == null || workout.rest -> WorkoutToday.RestOrUnknown
+                    workout.completed -> WorkoutToday.Completed
+                    else -> WorkoutToday.Scheduled
+                },
+                weighIn = DayLoopPlanner.weighInToday(lastWeighIn, LocalDate.parse(today)),
+            ),
+        )
 
     /** Millilitres to render in the hydration card. */
     val waterConsumedMl: Int
@@ -194,6 +226,7 @@ class DashboardViewModel @Inject constructor(
      */
     private fun syncToToday(): String {
         val current = today
+        _uiState.update { it.copy(hour = LocalTime.now(clock).hour) }
         if (observedDay.value != current) {
             observedDay.value = current
             _uiState.update {
@@ -209,6 +242,7 @@ class DashboardViewModel @Inject constructor(
      * a resume on the same day costs nothing.
      */
     fun onResumed() {
+        _uiState.update { it.copy(hour = LocalTime.now(clock).hour) }
         if (observedDay.value == today) return
         refresh()
     }
@@ -221,6 +255,17 @@ class DashboardViewModel @Inject constructor(
 
     /** The day's nutrition roll-up; arriving content also clears a stale fetch error. */
     private fun observeNutrition() {
+        viewModelScope.launch {
+            observedDay.flatMapLatest { data.mealTypesLogged(it) }.collect { meals ->
+                _uiState.update { it.copy(mealsLogged = meals) }
+            }
+        }
+        viewModelScope.launch {
+            observedDay.flatMapLatest { day ->
+                val monday = LocalDate.parse(day).with(DayOfWeek.MONDAY)
+                data.loggedDates(monday.toString(), monday.plusDays(DAYS_AFTER_MONDAY).toString())
+            }.collect { days -> _uiState.update { it.copy(loggedThisWeek = days) } }
+        }
         viewModelScope.launch {
             observedDay.flatMapLatest { data.dailyNutrition(it) }.collect { nutrition ->
                 _uiState.update { state ->
@@ -273,8 +318,11 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             data.progressSummary().collect { summary ->
                 _uiState.update { state ->
+                    val summaryLast = summary?.weightSeries?.maxOfOrNull { it.date }
                     state.copy(
                         currentWeightKg = summary?.currentWeightKg,
+                        consistency = summary?.consistency,
+                        lastWeighIn = listOfNotNull(state.lastWeighIn, summaryLast).maxOrNull(),
                         achievements = summary?.achievements.orEmpty().take(MAX_ACHIEVEMENTS).map {
                             AchievementUi(
                                 id = it.definition.id,
@@ -284,6 +332,13 @@ class DashboardViewModel @Inject constructor(
                         },
                         achievementsLoading = summary == null && state.achievementsLoading,
                     )
+                }
+            }
+        }
+        viewModelScope.launch {
+            data.latestWeighInDate().collect { localLast ->
+                _uiState.update { state ->
+                    state.copy(lastWeighIn = listOfNotNull(state.lastWeighIn, localLast).maxOrNull())
                 }
             }
         }
@@ -441,9 +496,10 @@ class DashboardViewModel @Inject constructor(
     fun logSuggestion() {
         val current = _uiState.value.suggestion ?: return
         if (current.logged || current.logging) return
+        val localDate = syncToToday()
         _uiState.update { it.copy(suggestion = current.copy(logging = true)) }
         viewModelScope.launch {
-            when (data.logRecommendation(current.id)) {
+            when (data.logRecommendation(current.id, localDate)) {
                 is ApiResult.Success -> {
                     _uiState.update {
                         it.copy(suggestion = current.copy(logging = false, logged = true))

@@ -16,10 +16,12 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import {
+  CREDIT_COSTS,
   EQUIPMENT,
   type Exercise,
   type WorkoutSession,
 } from '@aquazerofit/shared';
+import { estimateSessionMinutes } from '@/lib/workoutEstimate';
 import { api, ApiError, mediaUrl } from '@/lib/api';
 import { asList, orNull } from '@/lib/envelopes';
 import { queryKeys, todayWorkoutQuery, unwrapWorkoutSession } from '@/lib/queries';
@@ -73,11 +75,20 @@ const MUSCLES = [
 export const unwrapSession = unwrapWorkoutSession;
 
 export function estimateMinutes(session: WorkoutSession): number {
-  const seconds = session.exercises.reduce(
-    (acc, ex) => acc + ex.setsPlanned * (ex.reps * 4 + ex.restSeconds),
-    0,
-  );
-  return session.durationMinutes ?? Math.max(10, Math.round(seconds / 60));
+  return estimateSessionMinutes(session);
+}
+
+/** Empty-state copy for generating a plan. The credit cost is the server price. */
+export function workoutPlanEmptyCopy(creditCost: number = CREDIT_COSTS.planGeneration): {
+  title: string;
+  body: string;
+  action: string;
+} {
+  return {
+    title: 'No training plan yet',
+    body: `Generate a weekly plan matched to your equipment and experience. This uses ${creditCost} AI credits.`,
+    action: 'Generate my plan',
+  };
 }
 
 export function estimateKcal(session: WorkoutSession): number {
@@ -469,12 +480,23 @@ export default function WorkoutLibrary() {
 
   const plan = planQuery.data ?? null;
   const today = todayQuery.data ?? null;
+  const emptyPlan = workoutPlanEmptyCopy();
   const monday = useMemo(mondayOfThisWeek, []);
   const todayIdx = (new Date().getDay() + 6) % 7;
 
   return (
     <div className="w-full px-5">
-      <AppHeader />
+      <AppHeader
+        right={
+          <button
+            type="button"
+            onClick={() => setGenerateOpen(true)}
+            className="text-sm font-bold text-primary px-2 py-1 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            Generate plan
+          </button>
+        }
+      />
 
       {/* ---- Weekly plan strip ---- */}
       <section aria-label="This week's plan" className="mt-4">
@@ -494,10 +516,10 @@ export default function WorkoutLibrary() {
         ) : !plan ? (
           <EmptyState
             icon="fitness_center"
-            title="No training plan yet"
-            body="Generate a personalised weekly plan matched to your equipment and experience."
+            title={emptyPlan.title}
+            body={emptyPlan.body}
             action={
-              <PrimaryButton onClick={() => setGenerateOpen(true)}>Generate my plan</PrimaryButton>
+              <PrimaryButton onClick={() => setGenerateOpen(true)}>{emptyPlan.action}</PrimaryButton>
             }
           />
         ) : (
@@ -565,7 +587,16 @@ export default function WorkoutLibrary() {
                 Recovery is part of the plan. See you tomorrow.
               </p>
             </GlassCard>
-          ) : null
+          ) : (
+            <EmptyState
+              icon="fitness_center"
+              title={emptyPlan.title}
+              body={emptyPlan.body}
+              action={
+                <PrimaryButton onClick={() => setGenerateOpen(true)}>{emptyPlan.action}</PrimaryButton>
+              }
+            />
+          )
         ) : (
           <GlassCard className="relative overflow-hidden p-6">
             <div
@@ -816,7 +847,9 @@ export default function WorkoutLibrary() {
               disabled={generatePlan.isPending}
               onClick={() => generatePlan.mutate()}
             >
-              {generatePlan.isPending ? 'Generating…' : 'Generate my plan'}
+              {generatePlan.isPending
+                ? 'Generating…'
+                : `Generate my plan · ${CREDIT_COSTS.planGeneration} credits`}
             </PrimaryButton>
             <SecondaryButton onClick={() => setGenerateOpen(false)}>Cancel</SecondaryButton>
           </div>

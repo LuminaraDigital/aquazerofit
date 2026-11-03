@@ -569,7 +569,7 @@ export default function Nutrition() {
                     title="Nothing logged yet"
                     body={
                       isToday
-                        ? 'Log your first meal by searching foods or scanning your plate.'
+                        ? 'Search foods or scan your plate to log a meal.'
                         : 'No meals were logged on this day.'
                     }
                     action={

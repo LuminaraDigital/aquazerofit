@@ -173,8 +173,9 @@ describe('plan page - free tier', () => {
     expect(screen.queryByRole('heading', { name: /meal photo analysis/i })).toBeNull();
     expect(screen.getAllByText('Premium')).toHaveLength(1);
     expect(screen.getByText(new RegExp(`${PREMIUM_TIER_DAILY_CREDITS} AI credits a day`, 'i'))).toBeTruthy();
-    expect(screen.getByText(/that is a cap/i)).toBeTruthy();
-    expect(screen.getByText(/that is the whole difference today/i)).toBeTruthy();
+    expect(screen.getByText(/only difference from the free plan/i)).toBeTruthy();
+    expect(screen.queryByText(/that is a cap/i)).toBeNull();
+    expect(screen.queryByText(/whole difference today/i)).toBeNull();
   });
 
   it('prices every AI action from the server cost map', () => {
@@ -378,6 +379,8 @@ describe('plan page - Stripe checkout', () => {
 
     expect(screen.queryByRole('button', { name: /9\.99/i })).toBeNull();
     expect(screen.getAllByText(/30 days/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/until you cancel/i)).toBeTruthy();
+    expect(screen.getByText(/my stars/i)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /subscribe for 417 stars/i }));
 
     expect(await screen.findByText(/payment received/i)).toBeTruthy();

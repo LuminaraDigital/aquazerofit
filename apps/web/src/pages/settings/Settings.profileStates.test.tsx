@@ -19,6 +19,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const mocks = vi.hoisted(() => ({
   refetch: vi.fn(),
+  openExternalLink: vi.fn(),
   profile: {
     /** 'loaded' | 'absent' | 'failed' */
     state: 'loaded' as 'loaded' | 'absent' | 'failed',
@@ -51,6 +52,7 @@ vi.mock('../../lib/telegram', () => ({
   haptic: vi.fn(),
   isTMA: () => false,
   getTelegramInitData: () => null,
+  openExternalLink: mocks.openExternalLink,
 }));
 vi.mock('../../lib/queries', () => ({
   useSetCredentials: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -197,6 +199,20 @@ describe('no wellness profile yet', () => {
     );
     // Notifications do not depend on the profile, so they stay.
     expect(screen.getByText('Notifications & reminders')).toBeDefined();
+  });
+});
+
+describe('legal links', () => {
+  it('opens the privacy policy, terms and account deletion through Telegram openLink', () => {
+    renderSettings();
+    fireEvent.click(screen.getByRole('button', { name: 'Privacy policy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Terms of use' }));
+    fireEvent.click(screen.getByRole('button', { name: 'How to delete your account' }));
+    expect(mocks.openExternalLink.mock.calls.map((call) => call[0])).toEqual([
+      'https://aquazerofit.com/privacy',
+      'https://aquazerofit.com/terms',
+      'https://aquazerofit.com/account/deletion',
+    ]);
   });
 });
 

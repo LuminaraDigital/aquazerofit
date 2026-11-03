@@ -25,6 +25,8 @@ import {
   estimateDurationMinutes,
   fmtInt,
   formatLocalDate,
+  hasLoggingHistory,
+  homeNextStep,
   todayLocalDate,
 } from './lib';
 
@@ -77,6 +79,7 @@ export default function Dashboard() {
     !dailyQuery.isError &&
     profileQuery.isPending &&
     progressQuery.isPending;
+  const nextStep = homeNextStep(progressQuery.isSuccess && !hasLoggingHistory(progress));
 
   const headerRight = (
     <div className="flex items-center gap-2.5">
@@ -138,11 +141,10 @@ export default function Dashboard() {
                     Next step
                   </p>
                   <h2 className="font-heading font-semibold text-xl text-on-surface mb-1">
-                    Log your first meal
+                    {nextStep.title}
                   </h2>
                   <p className="text-sm text-on-surface-variant mb-4">
-                    Search a food, scan a barcode, or photograph your plate. One log unlocks the
-                    rest of today&apos;s targets.
+                    {nextStep.body}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button

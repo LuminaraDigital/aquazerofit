@@ -178,9 +178,11 @@ export default function TermsPage() {
           Premium inside the Mini App, when a Stars price is configured for this deployment, is a
           Telegram Stars subscription. The billing period is 30 days (2592000 seconds). The plan
           page shows the Stars price before you pay, which is why these terms do not copy a price.
+          It renews every 30 days until you cancel. Cancel in Telegram: Settings, then My Stars,
+          then Subscriptions. You keep Premium until the period you have already paid for ends.
           Each successful payment, including a renewal, keeps that subscription's premium until the
           expiration Telegram reports for that payment. If a renewal payment does not arrive, that
-          subscription is not extended. The app has no button that cancels this subscription.
+          subscription is not extended. The Mini App does not cancel the subscription for you.
         </P>
         <P>
           A support refund of a Stars charge returns the Stars for that charge and stops further

@@ -51,6 +51,10 @@ function captureTelegramAttribution(): void {
   });
 }
 
+function hideBootShell(): void {
+  document.getElementById('azf-boot')?.remove();
+}
+
 function mount(): void {
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
@@ -63,6 +67,9 @@ function mount(): void {
       </QueryClientProvider>
     </React.StrictMode>,
   );
+  // The branded shell in index.html is visible before this module evaluates.
+  // Remove it on the frame after React commits, so the dark page never flashes white.
+  requestAnimationFrame(() => requestAnimationFrame(hideBootShell));
 }
 
 /**
@@ -84,8 +91,11 @@ if (looksLikeTelegramLaunch()) {
   void ensureTelegram()
     .then(async (inTelegram) => {
       if (inTelegram) {
-        await initTelegramAnalytics();
         captureTelegramAttribution();
+        // Start catalog analytics without holding the shell. The collector
+        // pulls a large chunk; awaiting it kept the branded loader up after
+        // the Telegram SDK had already arrived.
+        void initTelegramAnalytics();
       } else {
         captureWebAttribution();
       }

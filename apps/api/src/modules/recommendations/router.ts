@@ -45,6 +45,7 @@ import {
   whereDocs,
 } from '../ai/util';
 import { excludeAllergens } from './allergenFilter';
+import { mealBudgetKcal, mealBudgetRationale, rationaleQuotesDayAsMeal } from './mealBudget';
 
 export const recommendationsRouter = Router();
 recommendationsRouter.use(requireAuth);
@@ -104,14 +105,6 @@ function foodToCandidate(f: Food): Candidate {
 
 // ---------------------------------------------------------------------------
 
-/** Rough share of the remaining daily budget one meal should cover. */
-const MEAL_BUDGET_SHARE: Record<string, number> = {
-  breakfast: 0.3,
-  lunch: 0.35,
-  dinner: 0.35,
-  snack: 0.15,
-};
-
 /** Generic daily targets used when wellness data may not be processed. */
 const GENERIC_TARGETS = { kcal: 2000, proteinG: 110, carbsG: 230, fatG: 65 };
 
@@ -119,20 +112,16 @@ function proteinDensity(c: Candidate): number {
   return c.proteinG / Math.max(c.kcal, 1);
 }
 
-/** Deterministic pick: kcal budget by default, protein density when protein_first. */
+/** Deterministic pick: the per-meal kcal budget by default, protein density when protein_first. */
 function pickDeterministicCandidate(
   candidates: Candidate[],
-  budget: { kcal: number; proteinG: number },
-  mealType: string,
+  mealKcal: number,
   proteinFirst: boolean,
 ): Candidate {
   if (proteinFirst) {
     return [...candidates].sort((a, b) => proteinDensity(b) - proteinDensity(a))[0]!;
   }
-  const share = budget.kcal * (MEAL_BUDGET_SHARE[mealType] ?? 0.3);
-  return [...candidates].sort(
-    (a, b) => Math.abs(a.kcal - share) - Math.abs(b.kcal - share),
-  )[0]!;
+  return [...candidates].sort((a, b) => Math.abs(a.kcal - mealKcal) - Math.abs(b.kcal - mealKcal))[0]!;
 }
 
 recommendationsRouter.post(
@@ -199,8 +188,7 @@ recommendationsRouter.post(
 
         const chosen = pickDeterministicCandidate(
           candidates,
-          budget,
-          mealType,
+          mealBudgetKcal(budget.kcal, budget.kcal, mealType),
           proteinFirst,
         );
 
@@ -263,6 +251,7 @@ recommendationsRouter.post(
         carbsG: round1(Math.max(0, targets.carbsG - consumed.carbsG)),
         fatG: round1(Math.max(0, targets.fatG - consumed.fatG)),
       };
+      const mealKcal = mealBudgetKcal(remaining.kcal, targets.kcalTarget, mealType);
 
       // --- Candidates: recipes first, foods as fallback breadth.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -301,7 +290,7 @@ recommendationsRouter.post(
           { role: 'system', content: loadPrompt('P-02').content },
           {
             role: 'user',
-            content: `Recommend a ${mealType} within remaining budget ${JSON.stringify(remaining)}.`,
+            content: `Recommend a ${mealType}. The meal budget is ${mealKcal} kcal. Day remaining is ${JSON.stringify(remaining)}.`,
           },
         ],
         {
@@ -310,6 +299,7 @@ recommendationsRouter.post(
           context: {
             mealType,
             remaining,
+            mealBudgetKcal: mealKcal,
             proteinFirst,
             candidates: safeCandidates.map((c) => ({
               id: c.id,
@@ -327,16 +317,25 @@ recommendationsRouter.post(
       const safeIds = new Set(safeCandidates.map((c) => c.id));
       const chosenId =
         (ranked.rankedIds ?? []).find((id) => safeIds.has(id)) ??
-        pickDeterministicCandidate(safeCandidates, remaining, mealType, proteinFirst).id;
+        pickDeterministicCandidate(safeCandidates, mealKcal, proteinFirst).id;
       const chosen = safeCandidates.find((c) => c.id === chosenId)!;
 
       // Model-authored rationale passes the output guardrail before it can
       // reach the user; on any block the deterministic rationale substitutes.
-      const deterministicRationale = proteinFirst
-        ? `Prioritises protein for ${mealType}: about ${Math.round(chosen.proteinG)} g toward your ${Math.round(remaining.proteinG)} g remaining.`
-        : `Fits your remaining ~${Math.round(remaining.kcal)} kcal for ${mealType} and supports your protein goal.`;
-      let rationale = ranked.rationale ?? deterministicRationale;
-      if (ranked.rationale && postGuardrail(ranked.rationale, { userId: user.id }).blocked) {
+      const deterministicRationale = mealBudgetRationale({
+        mealType,
+        mealBudgetKcal: mealKcal,
+        remainingKcal: remaining.kcal,
+        remainingProteinG: remaining.proteinG,
+        chosenProteinG: chosen.proteinG,
+        proteinFirst,
+      });
+      const modelRationale = ranked.rationale;
+      const quotesDayAsMeal =
+        typeof modelRationale === 'string' &&
+        rationaleQuotesDayAsMeal(modelRationale, remaining.kcal, mealKcal);
+      let rationale = modelRationale && !quotesDayAsMeal ? modelRationale : deterministicRationale;
+      if (modelRationale && !quotesDayAsMeal && postGuardrail(modelRationale, { userId: user.id }).blocked) {
         rationale = deterministicRationale;
       }
 

@@ -16,6 +16,13 @@ export interface CoachLiveSnapshot {
   meals: number;
   waterMl: number;
   planName: string | null;
+  /**
+   * Today's nutrition query has resolved. Until then a stored card is left
+   * alone, so a slow fetch cannot paint zeros over a same-day total.
+   * Once it has resolved, the latest card follows that day in both directions:
+   * a previous calendar day's "540 kcal, 1 meal" must not stay up as today.
+   */
+  nutritionReady?: boolean;
 }
 
 const APOSTROPHE = "['\u2019]";
@@ -38,7 +45,7 @@ function nutritionSummary(live: CoachLiveSnapshot): string {
 }
 
 function nutritionIsBehind(summary: string, live: CoachLiveSnapshot): boolean {
-  const meals = /,\s*(\d+) meals\b/.exec(summary);
+  const meals = /,\s*(\d+) meals?\b/.exec(summary);
   const kcal = /^(\d+)\//.exec(summary);
   if (!meals && !kcal) return false;
   const shownMeals = meals ? Number(meals[1]) : 0;
@@ -46,13 +53,28 @@ function nutritionIsBehind(summary: string, live: CoachLiveSnapshot): boolean {
   return live.meals > shownMeals || live.kcalConsumed > shownKcal;
 }
 
+function groundedLocalDate(call: ChatToolCall): string | null {
+  const value = call.args.localDate;
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function nutritionNeedsRefresh(call: ChatToolCall, live: CoachLiveSnapshot, today?: string): boolean {
+  if (live.nutritionReady && today) {
+    // The latest card is "right now". Another day, or a card with no day, is
+    // not today's log — including when today is empty and the card is not.
+    return groundedLocalDate(call) !== today || nutritionIsBehind(call.resultSummary, live);
+  }
+  return nutritionIsBehind(call.resultSummary, live);
+}
+
 export function reconcileToolSummaries(
   toolCalls: ChatToolCall[] | undefined,
   live: CoachLiveSnapshot | null,
+  today?: string,
 ): ChatToolCall[] | undefined {
   if (!toolCalls || !live || snapshotSuppressed(toolCalls)) return toolCalls;
   return toolCalls.map((call) => {
-    if (call.tool === 'getTodayNutrition' && nutritionIsBehind(call.resultSummary, live)) {
+    if (call.tool === 'getTodayNutrition' && nutritionNeedsRefresh(call, live, today)) {
       return { ...call, resultSummary: nutritionSummary(live) };
     }
     if (call.tool === 'getCurrentPlan' && live.planName && /no active plan/i.test(call.resultSummary)) {

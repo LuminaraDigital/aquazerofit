@@ -3,8 +3,10 @@
  *
  * https://docs.tganalytics.xyz/sdk/installation-via-npm-package
  *
- * The SDK records app launches and TON Connect events. It has to run before
- * React renders, and only inside a Mini App. The browser site never loads it.
+ * The SDK records app launches and TON Connect events. It runs only inside a
+ * Mini App, and it is started before the shell mounts but not awaited: the
+ * collector chunk is large, and holding first paint for it left a blank wait
+ * after the Telegram SDK had loaded. The browser site never loads it.
  *
  * The token and app name come from the Vite build (`VITE_TG_ANALYTICS_TOKEN`,
  * `VITE_TG_ANALYTICS_APP_NAME`). Either one missing skips init. A throw from

@@ -8,6 +8,7 @@ import { MAX_PAGE_LIMIT, type Food } from '@aquazerofit/shared';
 import { requireAuth } from '../../platform/auth';
 import { AppError, asyncHandler } from '../../platform/errors';
 import { getStore } from '../../platform/store';
+import { rankFoodSearch } from './search';
 import { findFoodByBarcode, isValidBarcode } from './service';
 
 const querySchema = z.object({
@@ -26,23 +27,8 @@ function searchFoods(search: string, limit: number): Food[] {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.items;
 
-  const q = search.trim().toLowerCase();
   const foods = getStore().where<Food>('content', (d) => d.type === 'food');
-  const items = foods
-    .filter(
-      (f) =>
-        q.length === 0 ||
-        f.name.toLowerCase().includes(q) ||
-        f.category.toLowerCase().includes(q) ||
-        (f.brand ?? '').toLowerCase().includes(q),
-    )
-    .sort((a, b) => {
-      // Prefix matches first, then alphabetical — stable, predictable ranking.
-      const aPrefix = a.name.toLowerCase().startsWith(q) ? 0 : 1;
-      const bPrefix = b.name.toLowerCase().startsWith(q) ? 0 : 1;
-      return aPrefix - bPrefix || a.name.localeCompare(b.name);
-    })
-    .slice(0, limit);
+  const items = rankFoodSearch(foods, search, limit);
 
   if (cache.size >= CACHE_MAX_ENTRIES) {
     // Simple FIFO eviction: Map preserves insertion order.

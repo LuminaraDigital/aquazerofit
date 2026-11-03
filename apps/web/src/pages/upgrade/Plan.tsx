@@ -304,12 +304,41 @@ function starsPeriodLabel(periodSeconds: number): string {
 }
 
 /** Stars subscription inside the Mini App. The price and the period come from the API. */
+/**
+ * One in-flight invoice per price. Creating the link is a Telegram round
+ * trip, so the plan page starts it when the card is shown and the tap
+ * reuses it. A failed attempt is dropped so the next tap can try again.
+ */
+const starsInvoicePrefetch = new Map<number, Promise<{ invoiceLink: string; stars: number }>>();
+
+function prefetchStarsInvoice(
+  price: number,
+  start: () => Promise<{ invoiceLink: string; stars: number }>,
+): Promise<{ invoiceLink: string; stars: number }> {
+  const existing = starsInvoicePrefetch.get(price);
+  if (existing) return existing;
+  const pending = start().catch((err: unknown) => {
+    starsInvoicePrefetch.delete(price);
+    throw err;
+  });
+  starsInvoicePrefetch.set(price, pending);
+  return pending;
+}
+
 function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
   const qc = useQueryClient();
   const checkout = useStartStarsSubscription();
   const [note, setNote] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
   const mounted = useRef(true);
+  const startRef = useRef(checkout.mutateAsync);
+  startRef.current = checkout.mutateAsync;
   const period = starsPeriodLabel(offer.periodSeconds);
+
+  useEffect(() => {
+    if (!canPayWithStars()) return;
+    void prefetchStarsInvoice(offer.price, () => startRef.current()).catch(() => undefined);
+  }, [offer.price]);
 
   useEffect(() => {
     mounted.current = true;
@@ -320,8 +349,10 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
 
   async function subscribe() {
     setNote(null);
+    setOpening(true);
     try {
-      const { invoiceLink } = await checkout.mutateAsync();
+      const { invoiceLink } = await prefetchStarsInvoice(offer.price, () => startRef.current());
+      if (mounted.current) setOpening(false);
       const status = await openStarsInvoice(invoiceLink);
       if (status === 'paid') {
         setNote('Payment received. Premium is on once Telegram confirms it.');
@@ -336,7 +367,10 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
         setNote('The payment did not complete. Nothing was charged.');
       }
     } catch {
-      setNote(null);
+      if (mounted.current) {
+        setOpening(false);
+        setNote(null);
+      }
     }
   }
 
@@ -354,11 +388,13 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
           <span className="text-sm text-on-surface-variant">Stars / {period}</span>
         </p>
         <p className="text-sm leading-relaxed text-on-surface-variant">
-          Renews every {period} until support stops it. You pay with Telegram Stars. If a renewal
-          does not arrive, premium from this subscription is not extended.
+          Renews every {period} until you cancel. Cancel in Telegram under Settings, then My Stars,
+          then Subscriptions. You keep Premium until the period you have already paid for ends. You
+          pay with Telegram Stars. If a renewal does not arrive, Premium from this subscription is
+          not extended.
         </p>
-        <PrimaryButton loading={checkout.isPending} onClick={() => void subscribe()}>
-          Subscribe for {offer.price} Stars
+        <PrimaryButton loading={opening} onClick={() => void subscribe()}>
+          {opening ? 'Preparing secure checkout…' : `Subscribe for ${offer.price} Stars`}
         </PrimaryButton>
         {checkout.isError && (
           <p role="alert" className="text-sm text-error">
@@ -548,13 +584,13 @@ export default function Plan() {
               <p className="mt-3 px-2 text-xs leading-relaxed text-on-surface-variant">
                 {typeof entitlements.premiumDailyCredits === 'number' &&
                 entitlements.premiumDailyCredits > 0
-                  ? `Premium is ${entitlements.premiumDailyCredits.toLocaleString()} AI credits a day. That is a cap. `
+                  ? `Premium includes ${entitlements.premiumDailyCredits.toLocaleString()} AI credits a day. `
                   : null}
                 {lanes.length === 1
-                  ? 'Beyond the daily credit cap, that is the whole difference today.'
-                  : 'That is the difference today.'}{' '}
-                Your targets, your logging, your training plans, the coach chat and every number in
-                your weekly summary work the same way on both plans.
+                  ? 'That daily allowance is the only difference from the free plan. '
+                  : 'The features above are the rest of the difference. '}
+                Targets, logging, training plans, coach chat and your weekly summary work the same
+                way on both plans.
               </p>
             </>
           )}

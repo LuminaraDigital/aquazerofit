@@ -201,6 +201,7 @@ describe('POST /billing/stars/subscription', () => {
     expect(res.body).toEqual({ invoiceLink: 'https://t.me/invoice/test-premium', stars: 417 });
     expect(fetchCalls).toHaveLength(1);
     expect(fetchCalls[0]!.url).toMatch(/\/createInvoiceLink$/);
+    expect(fetchCalls[0]!.body.description).toMatch(/until you cancel/i);
     expect(fetchCalls[0]!.body.currency).toBe('XTR');
     expect(fetchCalls[0]!.body.subscription_period).toBe(PERIOD);
     expect(fetchCalls[0]!.body.provider_token).toBeUndefined();

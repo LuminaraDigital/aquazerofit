@@ -128,8 +128,6 @@ export async function createPremiumSubscriptionInvoice(
     throw new AppError('CONFLICT', 'This account is already on premium.');
   }
 
-  sweepUnpaidAnchors();
-
   const payload = `${PREMIUM_PAYLOAD_PREFIX}${randomUUID()}`;
   const anchor: StarsSubscription = {
     type: 'starsSubscription',
@@ -143,13 +141,18 @@ export async function createPremiumSubscriptionInvoice(
   // if the process restarts between the two.
   getStore().upsert('ledger', anchor);
 
-  const link = await createStarsInvoiceLink({
+  // Start the Telegram call before the ledger sweep. The sweep scans every
+  // unpaid anchor and used to sit on the critical path in front of createInvoiceLink.
+  const linkPromise = createStarsInvoiceLink({
     title: 'AquaZeroFit Premium',
-    description: 'Premium for 30 days. Renews every 30 days until support stops it.',
+    description:
+      'Premium for 30 days. Renews every 30 days until you cancel in Telegram: Settings, My Stars, Subscriptions.',
     payload,
     stars,
     subscriptionPeriod: STARS_SUBSCRIPTION_PERIOD_SECONDS,
   });
+  sweepUnpaidAnchors();
+  const link = await linkPromise;
   if (!link.ok) {
     getStore().delete('ledger', anchor.id);
     logEvent('stars_subscription_invoice_failed', { reason: link.error });

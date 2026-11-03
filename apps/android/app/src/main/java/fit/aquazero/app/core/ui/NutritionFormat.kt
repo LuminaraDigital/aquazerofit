@@ -56,11 +56,15 @@ object NutritionFormat {
         MealType.SNACK -> Icons.Outlined.Cookie
     }
 
-    /** Best-guess meal type for the current time of day. */
+    /**
+     * Best-guess meal type for the current time of day.
+     * The small hours are a snack, not breakfast. Same boundaries as the web.
+     */
     fun mealTypeForNow(hour: Int = LocalTime.now().hour): MealType = when {
+        hour < 5 || hour >= 21 -> MealType.SNACK
         hour < 11 -> MealType.BREAKFAST
         hour < 15 -> MealType.LUNCH
-        hour < 18 -> MealType.SNACK
+        hour < 17 -> MealType.SNACK
         else -> MealType.DINNER
     }
 
@@ -159,11 +163,17 @@ object NutritionFormat {
         )
     }
 
-    /** Rough duration estimate when a session carries no explicit duration. */
+    /**
+     * Session length shared by Home and Workouts.
+     * sets × (reps × 4 seconds + rest), floored at 10 minutes. A positive
+     * server duration wins. This is the only copy of that formula.
+     */
     fun estimateDurationMinutes(session: WorkoutSessionDto): Int {
         session.durationMinutes?.takeIf { it > 0 }?.let { return it }
-        val totalSets = session.exercises.sumOf { it.setsPlanned }
-        return max(15, (totalSets * 2.5).roundToInt())
+        val seconds = session.exercises.sumOf { ex ->
+            ex.setsPlanned * (ex.reps * 4 + ex.restSeconds)
+        }
+        return max(10, (seconds / 60.0).roundToInt())
     }
 
     /**

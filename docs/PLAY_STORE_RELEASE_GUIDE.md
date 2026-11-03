@@ -269,8 +269,8 @@ is restricted**, with one entry:
 | Field | Value |
 | :--- | :--- |
 | Access requirements | All functionality (sign-in required) |
-| Username | the demo account's email address |
-| Password | the demo account's password |
+| Username | the `PLAY_REVIEWER_EMAIL` secret |
+| Password | the `PLAY_REVIEWER_PASSWORD` secret |
 | Any other instructions | See the steps below |
 
 Instructions to paste, adjusted for what you actually seed:
@@ -284,8 +284,12 @@ Instructions to paste, adjusted for what you actually seed:
 
 #### The account must be pre-created
 
-Create the demo account yourself before you submit, and give the reviewer only
-its credentials - never ask them to register.
+Use the dedicated reviewer account the API provisions from Secret Manager
+(`PLAY_REVIEWER_EMAIL` / `PLAY_REVIEWER_PASSWORD`, comped to premium through a
+server-side allowlist): **`docs/play-store/REVIEWER_ACCESS.md`** has the setup,
+rotation and Console text. Never give Google the old seeded demo account: its
+password was committed to this public repository and is compromised. Give the
+reviewer only the reviewer account's credentials - never ask them to register.
 
 `assertHuman` runs on `POST /auth/register` and `POST /auth/password-reset/request`
 and on **nothing else**: `apps/api/src/modules/auth/router.ts` calls it at the top
@@ -301,9 +305,9 @@ password, while `SessionManager.register()` carries a `captchaToken`.
 
 Two operational cautions:
 
-- **Complete onboarding once on the demo account.** The Home tab branches on
-  `hasProfile`; an account with no profile gets `FirstRunScreen` rather than the
-  dashboard. Set targets once so the reviewer sees the real product.
+- **Onboarding is already done.** The provisioner writes a full profile and two
+  weeks of sample history, so the Home tab shows the dashboard rather than
+  `FirstRunScreen`. Sign in once yourself to confirm.
 - **Do not rotate the password after submitting, and test the credentials
   yourself last.** Five consecutive failures lock that email address for 15
   minutes (`MAX_FAILURES` / `LOCKOUT_MS` in `apps/api/src/modules/auth/service.ts`),
@@ -323,7 +327,11 @@ What login genuinely requires is the API being up and durable: `JWT_ACCESS_SECRE
 and `DATABASE_URL` from §5D. Without `DATABASE_URL` the store falls back to JSON
 files and the demo account disappears on the next deploy - mid-review.
 
-#### Premium entitlement for the demo account
+#### Premium entitlement for the reviewer account
+
+The provisioned reviewer account is already premium (`COMPED_PREMIUM_ACCOUNTS` in
+`apps/api/src/data/seed.ts`); the admin route below is only for any other
+account you choose to comp.
 
 Not required to *reach* the subscription surface: **Settings -> Your plan** renders
 for a free account, showing the tier, the locked premium lanes and the Play offers
@@ -683,7 +691,7 @@ between those two orderings is where a submission stalls.
 | 15 | Target audience and content | **Not designed for children.** The profile schema accepts ages from **16** upward (`packages/shared/src/constants.ts:50`, enforced at `packages/shared/src/schemas.ts:81`) and the privacy notice says so (`apps/web/src/pages/legal/Privacy.tsx`, §11 "Age"). Ticking any under-13 band pulls the app into the Families policy - do not. **Owner action:** the exact age bands. |
 | 16 | Data safety | §4A - the longest form and the one most likely to be filled in wrongly. Note in particular that Crash logs, Diagnostics and App interactions must all be declared **optional**, never omitted because they are off by default. |
 | 17 | Foreground service types | **One service, typed `health`** (`WorkoutLiveService`); §4E. Needs a screen recording, and any leftover `specialUse` draft deleted. |
-| 18 | Health apps declaration | Declare **"Activity and Fitness"** and **"Nutrition and Weight Management"** only - never a medical category (`ANDROID_IMPLEMENTATION_PLAN.md` Phase 8.4). Health Connect does ship: **four read types, no write type** - `READ_STEPS`, `READ_HEART_RATE`, `READ_SLEEP`, `READ_TOTAL_CALORIES_BURNED` (`AndroidManifest.xml:36-39`); §5F.5. Verify against the merged manifest, not against this list. |
+| 18 | Health apps declaration | Declare **"Activity and Fitness"**, **"Nutrition and Weight Management"** and **"Sleep management"** (the app reads and shows sleep duration) - never a medical category (`ANDROID_IMPLEMENTATION_PLAN.md` Phase 8.4). Health Connect does ship: **four read types, no write type** - `READ_STEPS`, `READ_HEART_RATE`, `READ_SLEEP`, `READ_TOTAL_CALORIES_BURNED` (`AndroidManifest.xml:36-39`); §5F.5. Verify against the merged manifest, not against this list. |
 | 19 | Government apps | **No.** |
 | 20 | Financial features | **None of these.** Play Billing subscriptions are declared as in-app products (row 23), not as a financial feature. |
 | 21 | News apps | **No.** |

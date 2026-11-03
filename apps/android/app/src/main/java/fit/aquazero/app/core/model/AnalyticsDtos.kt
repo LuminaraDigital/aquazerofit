@@ -32,12 +32,22 @@ data class DailyNutritionDto(
     val meals: Map<MealType, List<MealLogDto>> = emptyMap(),
 )
 
+/** Nested macro series inside `NutritionTrendsDto`. */
+@Serializable
+data class NutritionTrendMacrosDto(
+    val proteinG: List<TrendPointDto> = emptyList(),
+    val carbsG: List<TrendPointDto> = emptyList(),
+    val fatG: List<TrendPointDto> = emptyList(),
+)
+
 /** Response of `GET /analytics/nutrition/trends?range=`. */
 @Serializable
 data class NutritionTrendsDto(
     val range: String,
     val kcal: List<TrendPointDto> = emptyList(),
-    val proteinG: List<TrendPointDto> = emptyList(),
-    val carbsG: List<TrendPointDto> = emptyList(),
-    val fatG: List<TrendPointDto> = emptyList(),
+    val weight: List<TrendPointDto> = emptyList(),
+    val macros: NutritionTrendMacrosDto = NutritionTrendMacrosDto(),
+    val proteinG: List<TrendPointDto> = macros.proteinG,
+    val carbsG: List<TrendPointDto> = macros.carbsG,
+    val fatG: List<TrendPointDto> = macros.fatG,
 )

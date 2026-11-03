@@ -25,6 +25,8 @@ internal class FakeLogsDao : LogsDao {
         meals.value = meals.value.filterNot { it.localId == log.localId } + log
     }
 
+    override fun loggedDates(from: String, to: String): Flow<List<String>> = MutableStateFlow(emptyList())
+
     override fun mealLogsForDate(localDate: String): Flow<List<MealLogEntity>> =
         meals.map { rows -> rows.filter { it.localDate == localDate && !it.deleted }.sortedBy { it.loggedAt } }
 

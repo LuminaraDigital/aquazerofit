@@ -93,22 +93,20 @@ export function AccountAccessSection({ user }: { user: PublicUser }) {
       <div className="glass-card overflow-hidden">
         {/* Email sign-in row */}
         <div className="p-4 border-b border-outline-variant/50 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="material-symbols-outlined text-on-surface-variant" aria-hidden="true">
-                mail
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined shrink-0 text-on-surface-variant" aria-hidden="true">
+              mail
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-base">Email sign-in</span>
+              <span className="block truncate text-xs text-on-surface-variant">
+                {needsCredentials
+                  ? 'Not set - needed to sign in from any browser'
+                  : user.email}
               </span>
-              <div className="min-w-0">
-                <span className="block text-base">Email sign-in</span>
-                <span className="block text-xs text-on-surface-variant truncate">
-                  {needsCredentials
-                    ? 'Not set - needed to sign in from any browser'
-                    : user.email}
-                </span>
-              </div>
             </div>
             {needsCredentials && !formOpen && (
-              <SecondaryButton onClick={() => setFormOpen(true)} className="shrink-0 min-h-[44px]">
+              <SecondaryButton fullWidth={false} onClick={() => setFormOpen(true)} className="px-4">
                 Set up
               </SecondaryButton>
             )}
@@ -167,34 +165,33 @@ export function AccountAccessSection({ user }: { user: PublicUser }) {
         </div>
 
         {/* Telegram row */}
-        <div className="p-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="material-symbols-outlined text-on-surface-variant" aria-hidden="true">
-              send
+        <div className="flex items-center gap-3 p-4">
+          <span className="material-symbols-outlined shrink-0 text-on-surface-variant" aria-hidden="true">
+            send
+          </span>
+          <div className="min-w-0 flex-1">
+            <span className="block truncate text-base">Telegram</span>
+            <span className="block text-xs text-on-surface-variant">
+              {user.telegramLinked
+                ? 'Connected - the Mini App signs straight into this account'
+                : inTelegram
+                  ? 'Link this Telegram to sign in automatically here'
+                  : 'Open the Mini App inside Telegram and sign in with your email to link it'}
             </span>
-            <div className="min-w-0">
-              <span className="block text-base">Telegram</span>
-              <span className="block text-xs text-on-surface-variant">
-                {user.telegramLinked
-                  ? 'Connected - the Mini App signs straight into this account'
-                  : inTelegram
-                    ? 'Link this Telegram to sign in automatically here'
-                    : 'Open the Mini App inside Telegram and sign in with your email to link it'}
-              </span>
-            </div>
           </div>
           {user.telegramLinked ? (
             <span
-              className="material-symbols-outlined text-secondary shrink-0"
+              className="material-symbols-outlined shrink-0 text-secondary"
               aria-hidden="true"
             >
               check_circle
             </span>
           ) : inTelegram ? (
             <SecondaryButton
+              fullWidth={false}
               onClick={() => void onLinkTelegram()}
               disabled={linkTelegram.isPending}
-              className="shrink-0 min-h-[44px]"
+              className="px-4"
             >
               {linkTelegram.isPending ? 'Linking…' : 'Link'}
             </SecondaryButton>

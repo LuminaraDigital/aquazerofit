@@ -64,9 +64,9 @@ export default function CaptureMeal() {
       }
     },
     onError: (e) => {
-      if (e instanceof ApiError && e.code === 'FORBIDDEN') {
+      if (e instanceof ApiError && e.code === 'CREDITS_INSUFFICIENT') {
         setPremiumGate(true);
-        setError(e.message || 'This feature is part of AquaZeroFit Premium.');
+        setError(e.message);
         return;
       }
       setPremiumGate(false);

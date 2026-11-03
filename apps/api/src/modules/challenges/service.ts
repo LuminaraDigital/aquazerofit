@@ -157,8 +157,10 @@ export function getChallenge(id: string, userId: string): BuddyChallenge {
   if (!raw || raw.type !== 'buddyChallenge') {
     throw new AppError('NOT_FOUND', 'Challenge not found');
   }
+  // A non-member gets the same 404 as a missing id, so the endpoint never
+  // confirms that someone else's huddle exists (house style for owned data).
   if (!raw.members.some((m: BuddyChallengeMember) => m.userId === userId)) {
-    throw new AppError('FORBIDDEN', 'You are not a member of this challenge');
+    throw new AppError('NOT_FOUND', 'Challenge not found');
   }
   const refreshed = refreshStatus(raw);
   if (refreshed !== raw) getStore().upsert('logs', refreshed);

@@ -21,9 +21,8 @@ const savedAzfDataDir = process.env.AZF_DATA_DIR;
 const dataDir = createIsolatedDataDir('azf-entitlements-');
 bindIsolatedDataDir(dataDir);
 
-const { effectiveTier, entitlementHistory, grantPremium, revokePremium } = await import(
-  '../modules/billing/entitlements'
-);
+const { activeEntitlementSources, effectiveTier, entitlementHistory, grantPremium, revokePremium } =
+  await import('../modules/billing/entitlements');
 const { getStore } = await import('../platform/store');
 
 afterAll(async () => {
@@ -70,7 +69,7 @@ describe('effectiveTier', () => {
 
   /*
    * The case the whole design exists for. A cancelled or lapsed subscription
-   * must stop being premium on its own, with no scheduled job in the loop  - 
+   * must stop being premium on its own, with no scheduled job in the loop -
    * a job is a thing that can fail to run, and the failure mode is silent
    * unlimited access.
    */
@@ -238,5 +237,51 @@ describe('revokePremium', () => {
     expect(history[0]!.action).toBe('revoke');
     // The value the User doc no longer carries is still recoverable.
     expect(history[0]!.previousPremiumUntil).not.toBeNull();
+  });
+});
+
+describe('activeEntitlementSources', () => {
+  it('names only rails whose period is still running', () => {
+    const id = newUser();
+    expect(activeEntitlementSources(id)).toEqual([]);
+
+    grantPremium({
+      userId: id,
+      source: 'stripe',
+      externalId: 'stripe:sources-live',
+      providerRef: 'sub_sources_live',
+      premiumUntil: inDays(15),
+    });
+    grantPremium({
+      userId: id,
+      source: 'play',
+      externalId: 'play:sources-expired',
+      providerRef: 'tok-sources-expired',
+      premiumUntil: inDays(-1),
+    });
+    expect(activeEntitlementSources(id)).toEqual(['stripe']);
+
+    revokePremium(id, 'stripe', 'stripe:deleted:sub_sources_live', 'deleted', 'sub_sources_live');
+    expect(activeEntitlementSources(id)).toEqual([]);
+  });
+
+  it('drops a Stars charge once that charge is refunded and keeps the other rail', () => {
+    const id = newUser();
+    grantPremium({
+      userId: id,
+      source: 'stars',
+      externalId: 'stars:sources-c1',
+      providerRef: 'premium.sources',
+      premiumUntil: inDays(20),
+    });
+    grantPremium({
+      userId: id,
+      source: 'play',
+      externalId: 'play:sources-live',
+      providerRef: 'tok-sources-live',
+      premiumUntil: inDays(10),
+    });
+    revokePremium(id, 'stars', 'stars:refund:sources-c1', 'refund', 'premium.sources', 'stars:sources-c1');
+    expect(activeEntitlementSources(id)).toEqual(['play']);
   });
 });

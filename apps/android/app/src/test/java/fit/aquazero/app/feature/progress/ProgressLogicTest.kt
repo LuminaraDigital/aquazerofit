@@ -1,9 +1,35 @@
 package fit.aquazero.app.feature.progress
 
+import fit.aquazero.app.core.data.ProgressRepository
+import fit.aquazero.app.core.database.ProgressDao
+import fit.aquazero.app.core.database.ProgressSummaryEntity
+import fit.aquazero.app.core.database.TrendPointEntity
+import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.ConsistencyState
 import fit.aquazero.app.core.model.ConsistencyStatusDto
+import fit.aquazero.app.core.model.CreateMealLogRequest
+import fit.aquazero.app.core.model.CreateWaterLogRequest
+import fit.aquazero.app.core.model.CreateWeightLogRequest
+import fit.aquazero.app.core.model.DailyNutritionDto
+import fit.aquazero.app.core.model.MealDayDto
+import fit.aquazero.app.core.model.MealLogEnvelopeDto
+import fit.aquazero.app.core.model.NutritionTrendsDto
+import fit.aquazero.app.core.model.ProgressInsightDto
+import fit.aquazero.app.core.model.ProgressInsightEnvelopeDto
 import fit.aquazero.app.core.model.ProgressSummaryDto
 import fit.aquazero.app.core.model.TrendPointDto
+import fit.aquazero.app.core.model.UpdateMealLogRequest
+import fit.aquazero.app.core.model.WaterDayDto
+import fit.aquazero.app.core.model.WaterLogDto
+import fit.aquazero.app.core.model.WeightLogEnvelopeDto
+import fit.aquazero.app.core.model.WeightLogsDto
+import fit.aquazero.app.core.network.api.LogsApi
+import fit.aquazero.app.core.network.api.ProgressApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
+import okhttp3.ResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -158,7 +184,104 @@ class ProgressLogicTest {
         }
     }
 
+    @Test
+    fun `refreshNutritionTrends caches carbsG and fatG series alongside kcal and proteinG`() =
+        runTest {
+            val dao = InMemoryProgressDao()
+            val logsApi = object : LogsApi {
+                override suspend fun nutritionTrends(range: String) = NutritionTrendsDto(
+                    range = range,
+                    kcal = listOf(TrendPointDto("2026-08-26", 2050.0)),
+                    proteinG = listOf(TrendPointDto("2026-08-26", 145.0)),
+                    carbsG = listOf(TrendPointDto("2026-08-26", 210.0)),
+                    fatG = listOf(TrendPointDto("2026-08-26", 65.0)),
+                )
+
+                override suspend fun createMealLog(
+                    idempotencyKey: String,
+                    body: CreateMealLogRequest,
+                ): MealLogEnvelopeDto = error("unused")
+
+                override suspend fun mealLogs(date: String?): MealDayDto = error("unused")
+                override suspend fun updateMealLog(
+                    id: String,
+                    body: UpdateMealLogRequest,
+                ): MealLogEnvelopeDto = error("unused")
+
+                override suspend fun deleteMealLog(id: String): ResponseBody? = error("unused")
+                override suspend fun copyPreviousMeals(): MealDayDto = error("unused")
+                override suspend fun createWaterLog(
+                    idempotencyKey: String,
+                    body: CreateWaterLogRequest,
+                ): WaterLogDto = error("unused")
+
+                override suspend fun waterDay(date: String?): WaterDayDto = error("unused")
+                override suspend fun createWeightLog(
+                    idempotencyKey: String,
+                    body: CreateWeightLogRequest,
+                ): WeightLogEnvelopeDto = error("unused")
+
+                override suspend fun weightLogs(range: String): WeightLogsDto = error("unused")
+                override suspend fun dailyNutrition(date: String?): DailyNutritionDto = error("unused")
+            }
+            val progressApi = object : ProgressApi {
+                override suspend fun summary(): ProgressSummaryDto = error("unused")
+                override suspend fun insight(periodDays: Int?) = ProgressInsightEnvelopeDto(
+                    insight = ProgressInsightDto(
+                        id = "pi-1",
+                        userId = "u-1",
+                        periodStart = "2026-08-20",
+                        narrative = "Balanced week.",
+                    ),
+                    cached = true,
+                )
+            }
+            val repository = ProgressRepository(progressApi, logsApi, dao)
+            repository.refreshNutritionTrends("7d")
+            val insightResult = repository.insight(7)
+
+            assertEquals(1, dao.series("kcal").first().size)
+            assertEquals(1, dao.series("proteinG").first().size)
+            assertEquals(1, dao.series("carbsG").first().size)
+            assertEquals(1, dao.series("fatG").first().size)
+            assertTrue(insightResult is ApiResult.Success)
+            assertEquals("pi-1", (insightResult as ApiResult.Success).data.id)
+        }
+
     private fun state(current: Double?, start: Double?) = ProgressUiState(
         summary = ProgressSummaryDto(currentWeightKg = current, startWeightKg = start),
     )
+}
+
+private class InMemoryProgressDao : ProgressDao {
+    private val points = mutableMapOf<String, MutableStateFlow<List<TrendPointEntity>>>()
+    private val summaries = mutableMapOf<String, MutableStateFlow<ProgressSummaryEntity?>>()
+
+    override suspend fun upsertSummary(summary: ProgressSummaryEntity) {
+        summaries.getOrPut(summary.userId) { MutableStateFlow(null) }.value = summary
+    }
+
+    override fun snapshot(key: String): Flow<ProgressSummaryEntity?> =
+        summaries.getOrPut(key) { MutableStateFlow(null) }
+
+    override suspend fun upsertTrendPoints(points: List<TrendPointEntity>) {
+        points.groupBy { it.series }.forEach { (series, items) ->
+            this.points.getOrPut(series) { MutableStateFlow(emptyList()) }.value = items
+        }
+    }
+
+    override suspend fun clearSeries(series: String) {
+        points.getOrPut(series) { MutableStateFlow(emptyList()) }.value = emptyList()
+    }
+
+    override fun series(series: String): Flow<List<TrendPointEntity>> =
+        points.getOrPut(series) { MutableStateFlow(emptyList()) }
+
+    override suspend fun clearSummary() {
+        summaries.values.forEach { it.value = null }
+    }
+
+    override suspend fun clearAllTrendPoints() {
+        points.values.forEach { it.value = emptyList() }
+    }
 }

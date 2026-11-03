@@ -18,25 +18,39 @@ import fit.aquazero.app.core.network.api.SwapExerciseRequest
 import fit.aquazero.app.core.network.api.WorkoutsApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.JsonObject
 import java.io.IOException
 
-/** In-memory [TrainingDao] with the draft columns the guided session uses. */
+/**
+ * In-memory [TrainingDao] with the draft columns the guided session uses.
+ *
+ * Plan queries follow the Room SQL: [currentPlan] is the row with
+ * `isCurrent = 1`, and [deleteCurrentPlan] removes only that row.
+ */
 class FakeTrainingDao : TrainingDao {
 
-    private val plans = MutableStateFlow<TrainingPlanEntity?>(null)
+    private val plans = MutableStateFlow<List<TrainingPlanEntity>>(emptyList())
     val sessions = mutableMapOf<String, WorkoutSessionEntity>()
     private val sessionFlow = MutableStateFlow<WorkoutSessionEntity?>(null)
 
+    /** Every cached plan row, including ones that are not current. */
+    fun storedPlans(): List<TrainingPlanEntity> = plans.value
+
     override suspend fun upsertPlan(plan: TrainingPlanEntity) {
-        plans.value = plan
+        plans.value = plans.value.filterNot { it.id == plan.id } + plan
     }
 
     override suspend fun clearCurrentPlan() {
-        plans.value = plans.value?.copy(isCurrent = false)
+        plans.value = plans.value.map { it.copy(isCurrent = false) }
     }
 
-    override fun currentPlan(): Flow<TrainingPlanEntity?> = plans
+    override suspend fun deleteCurrentPlan() {
+        plans.value = plans.value.filterNot { it.isCurrent }
+    }
+
+    override fun currentPlan(): Flow<TrainingPlanEntity?> =
+        plans.map { rows -> rows.firstOrNull { it.isCurrent } }
 
     override suspend fun upsertSession(session: WorkoutSessionEntity) {
         sessions[session.id] = session
@@ -74,7 +88,7 @@ class FakeTrainingDao : TrainingDao {
     }
 
     override suspend fun clearAllPlans() {
-        plans.value = null
+        plans.value = emptyList()
     }
 
     override suspend fun clearAllTraining() {

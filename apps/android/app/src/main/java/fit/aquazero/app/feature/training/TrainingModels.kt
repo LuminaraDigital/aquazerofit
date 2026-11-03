@@ -1,5 +1,6 @@
 package fit.aquazero.app.feature.training
 
+import fit.aquazero.app.core.model.PlanDayDto
 import fit.aquazero.app.core.model.SessionExerciseDto
 import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
 import fit.aquazero.app.core.model.WorkoutSessionDto
@@ -8,6 +9,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -32,6 +35,24 @@ data class ResolvedEntry(
     val restSeconds: Int,
     val notes: String? = null,
 )
+
+/**
+ * Which plan day a calendar date falls on. A plan is a seven-day cycle repeated
+ * from its start date, not a Monday-to-Sunday week, and the server resolves
+ * today's session the same way (`readiness.ts`); the two must never disagree.
+ */
+object PlanCalendar {
+    private const val CYCLE_DAYS = 7L
+
+    fun dayOn(days: List<PlanDayDto>, startDate: String, date: LocalDate): PlanDayDto? {
+        val start = runCatching { LocalDate.parse(startDate.take(ISO_DATE_LENGTH)) }.getOrNull() ?: return null
+        if (date.isBefore(start)) return null
+        val order = (ChronoUnit.DAYS.between(start, date) % CYCLE_DAYS).toInt() + 1
+        return days.firstOrNull { it.order == order }
+    }
+
+    private const val ISO_DATE_LENGTH = 10
+}
 
 /** Formatting + envelope-shaping helpers shared by the library and session screens. */
 object TrainingFormat {

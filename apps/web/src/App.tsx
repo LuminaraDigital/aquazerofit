@@ -10,6 +10,7 @@ import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { ScrollToTop } from './components/layout/ScrollToTop';
 import { RequireAuth, RequireTargets, useProfileGate } from './components/layout/RequireAuth';
 import { RouteFallbackSkeleton } from './components/ui/Skeleton';
+import { IntroVideo } from './components/brand/IntroVideo';
 
 const Landing = lazy(() => import('./pages/landing/Landing'));
 const FeaturesPage = lazy(() => import('./pages/landing/Features'));
@@ -100,6 +101,7 @@ export default function App() {
   return (
     <>
     <TelegramChrome />
+    <IntroVideo />
     <ScrollToTop />
     <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={<RouteFallbackSkeleton />}>

@@ -51,6 +51,13 @@ class FakeCoachesRepository : CoachesRepository(
     /** Every coach id passed to [selectCoach], in order. */
     val selectCalls = mutableListOf<String>()
 
+    /** What the next [progression] returns. */
+    var progressionResult: ApiResult<ProgressionStatusDto> =
+        ApiResult.Success(ProgressionStatusDto())
+
+    /** Every [ReactionAckRequest] passed to [ackReactions], in order. */
+    val ackCalls = mutableListOf<ReactionAckRequest>()
+
     var refreshCalls = 0
         private set
 
@@ -69,11 +76,12 @@ class FakeCoachesRepository : CoachesRepository(
         return selectResult
     }
 
-    override suspend fun progression(): ApiResult<ProgressionStatusDto> =
-        ApiResult.Success(ProgressionStatusDto())
+    override suspend fun progression(): ApiResult<ProgressionStatusDto> = progressionResult
 
-    override suspend fun ackReactions(ack: ReactionAckRequest): ApiResult<Unit> =
-        ApiResult.Success(Unit)
+    override suspend fun ackReactions(ack: ReactionAckRequest): ApiResult<Unit> {
+        ackCalls += ack
+        return ApiResult.Success(Unit)
+    }
 }
 
 /** A cached entitlement row, as [CoachesRepository.refreshRoster] would file it. */

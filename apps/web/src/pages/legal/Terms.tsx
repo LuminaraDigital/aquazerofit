@@ -142,8 +142,9 @@ export default function TermsPage() {
         <P>
           AI features consume credits. The free allowance is {FREE_TIER_DAILY_CREDITS} credits each
           day. Premium raises that allowance to {PREMIUM_TIER_DAILY_CREDITS} credits each day.
-          Deterministic features (targets, logging, hydration, the exercise library, charts) do not
-          consume credits and keep working when the allowance is spent.
+          That figure is a cap. Unspent credits bank at most two days of the allowance for the
+          tier you are on. Deterministic features (targets, logging, hydration, the exercise
+          library, charts) do not consume credits and keep working when the allowance is spent.
         </P>
         <P>Credits are a daily allowance. They are not a product you can buy on their own.</P>
         <P>

@@ -282,6 +282,21 @@ class DashboardViewModelTest {
         assertEquals(DashboardViewModel.WEIGHT_WINDOW, series.size)
         assertEquals(100.0, series.last(), 0.0)
     }
+
+    @Test
+    fun `a local weigh-in immediately marks today's weigh-in step done`() = runTest(dispatcher) {
+        val data = FakeDashboardData()
+        val viewModel = DashboardViewModel(data)
+        advanceUntilIdle()
+
+        val today = viewModel.uiState.value.today
+        data.latestWeighInFlow.value = today
+        advanceUntilIdle()
+
+        assertEquals(today, viewModel.uiState.value.lastWeighIn)
+        val weighInStep = viewModel.uiState.value.dayLoop.steps.first { it.kind == DayStepKind.WeighIn }
+        assertEquals(DayStepState.Done, weighInStep.state)
+    }
 }
 
 /**

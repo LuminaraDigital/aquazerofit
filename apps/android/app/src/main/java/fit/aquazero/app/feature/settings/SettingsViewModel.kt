@@ -13,6 +13,7 @@ import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.model.DerivedTargetsDto
 import fit.aquazero.app.core.model.DietaryPreference
+import fit.aquazero.app.core.model.EntitlementsDto
 import fit.aquazero.app.core.model.NutritionEmphasis
 import fit.aquazero.app.core.model.ProfileInputDto
 import fit.aquazero.app.core.model.UnitPreference
@@ -31,7 +32,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Which of the four consent bits a toggle is addressing. */
-enum class ConsentKey { WELLNESS, AI_PERSONALISATION, ANALYTICS, REMINDERS }
+enum class ConsentKey { WELLNESS, AI_PERSONALISATION, ANALYTICS, REMINDERS, FOOD_PHOTO_TRAINING }
 
 /** Modal confirmations Settings can raise. All of them are destructive. */
 sealed interface SettingsDialog {
@@ -55,7 +56,7 @@ data class SettingsUiState(
     val nameDraft: String = "",
     val savingName: Boolean = false,
     val profile: WellnessProfileDto? = null,
-    /** True when the profile call failed — scoped to its own section, not the page. */
+    /** True when the profile call failed - scoped to its own section, not the page. */
     val profileUnavailable: Boolean = false,
     val savingProfile: Boolean = false,
     val consents: ConsentEntity? = null,
@@ -70,6 +71,11 @@ data class SettingsUiState(
     val targets: DerivedTargetsDto? = null,
     /** True while a logout drain or final sign-out is in flight. */
     val signingOut: Boolean = false,
+    /**
+     * A Play subscription is still in its paid period. Deletion does not
+     * cancel it, and the dialog has to say so.
+     */
+    val playSubscriptionActive: Boolean = false,
 ) {
     /** False while a profile write is in flight, so a second tap cannot race it. */
     val profileEditable: Boolean get() = profile != null && !savingProfile
@@ -82,12 +88,12 @@ sealed interface SettingsEvent {
     /** The export bundle is ready; the screen hands it to the share sheet. */
     data class ShareExport(val json: String) : SettingsEvent
 
-    /** Session is over — the shell drops back to the pre-auth graph on its own. */
+    /** Session is over - the shell drops back to the pre-auth graph on its own. */
     data object SignedOut : SettingsEvent
 }
 
 /**
- * Profile and settings — and, for Play purposes, a compliance surface.
+ * Profile and settings - and, for Play purposes, a compliance surface.
  *
  * Three obligations land here and are treated as behaviour rather than layout:
  * the four granular consents genuinely gate what the app does (turning
@@ -118,7 +124,21 @@ class SettingsViewModel @Inject constructor(
         observeTargets()
         observeConsents()
         observeOutbox()
+        observeEntitlements()
         refresh()
+    }
+
+    private fun observeEntitlements() = viewModelScope.launch {
+        accountRepository.entitlements().collect { cached ->
+            val decoded = cached?.docJson?.let { json ->
+                runCatching {
+                    AzfJson.decodeFromString(EntitlementsDto.serializer(), json)
+                }.getOrNull()
+            }
+            _uiState.value = _uiState.value.copy(
+                playSubscriptionActive = decoded?.hasActivePlaySubscription() == true,
+            )
+        }
     }
 
     private fun observeUser() = viewModelScope.launch {
@@ -172,6 +192,7 @@ class SettingsViewModel @Inject constructor(
         val profile = accountRepository.refreshProfile()
         accountRepository.refreshTargets()
         accountRepository.refreshConsents()
+        accountRepository.refreshEntitlements()
         _uiState.value = _uiState.value.copy(
             loading = false,
             profileUnavailable = profile is ApiResult.Failure,
@@ -245,7 +266,7 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * Add or remove a declared allergy. These are excluded deterministically
-     * from every suggestion server-side — this is the control that does it.
+     * from every suggestion server-side - this is the control that does it.
      */
     fun toggleAllergy(allergen: Allergen) {
         saveProfilePatch { input ->
@@ -260,7 +281,7 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * `PUT /me/profile` takes the whole document, so a patch is always applied
-     * to the current profile and sent in full — never a partial that would
+     * to the current profile and sent in full - never a partial that would
      * blank the fields it omits.
      */
     private fun saveProfilePatch(patch: (ProfileInputDto) -> ProfileInputDto) {
@@ -351,7 +372,7 @@ class SettingsViewModel @Inject constructor(
      * The route is genuinely two-step: the first `DELETE /me` flags the account
      * and starts the grace period, and a second call while flagged erases
      * immediately. The session is deliberately kept alive after step one so
-     * step two is reachable — and so the person can see, and change their mind
+     * step two is reachable - and so the person can see, and change their mind
      * about, what they just scheduled.
      */
     fun confirmDeletion() {

@@ -39,7 +39,11 @@ export function SuggestMealCard({ date }: { date: string }) {
 
   const addToLog = useMutation({
     mutationFn: (id: string) =>
-      api(`/recommendations/${id}/log`, { method: 'POST', idempotencyKey: newIdempotencyKey() }),
+      api(`/recommendations/${id}/log`, {
+        method: 'POST',
+        body: { localDate: date },
+        idempotencyKey: newIdempotencyKey(),
+      }),
     onSuccess: () => {
       setLogged(true);
       show('Added to your log');

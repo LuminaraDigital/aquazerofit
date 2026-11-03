@@ -93,7 +93,11 @@ export default function MealPlan() {
 
   const logRec = useMutation({
     mutationFn: (id: string) =>
-      api(`/recommendations/${id}/log`, { method: 'POST', idempotencyKey: newIdempotencyKey() }),
+      api(`/recommendations/${id}/log`, {
+        method: 'POST',
+        body: { localDate: today },
+        idempotencyKey: newIdempotencyKey(),
+      }),
     onSuccess: (_data, id) => {
       show('Added to your log');
       setSlots((s) => {
@@ -106,7 +110,7 @@ export default function MealPlan() {
       void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
-    onError: () => show('Could not log that meal — please try again'),
+    onError: () => show('Could not log that meal - please try again'),
   });
 
   const sendFeedback = useMutation({

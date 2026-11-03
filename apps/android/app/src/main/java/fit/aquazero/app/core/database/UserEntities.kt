@@ -1,5 +1,6 @@
 package fit.aquazero.app.core.database
 
+import androidx.room3.ColumnInfo
 import androidx.room3.Entity
 import androidx.room3.PrimaryKey
 
@@ -46,7 +47,7 @@ data class TargetsEntity(
     val computedAt: String = "",
 )
 
-/** Cached `ConsentState` — the four granular consent bits. */
+/** Cached `ConsentState` — the granular consent bits. */
 @Entity(tableName = "consents")
 data class ConsentEntity(
     @PrimaryKey val userId: String,
@@ -54,6 +55,7 @@ data class ConsentEntity(
     val aiPersonalisation: Boolean = false,
     val anonymisedAnalytics: Boolean = false,
     val reminders: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val foodPhotoTraining: Boolean = false,
     val updatedAt: String = "",
 )
 

@@ -2,7 +2,7 @@
  * Adaptive readiness (Protect / Maintain / Progress).
  *
  * Two things are pinned here beyond the arithmetic. First, that `maintain`
- * leaves plan generation byte-identical to the pre-readiness engine — the
+ * leaves plan generation byte-identical to the pre-readiness engine. The
  * multiplier must never leak into the default path. Second, that no headline
  * or signal the user can see reaches for a shaming vocabulary: `protect` is
  * the app taking load off, and that is a product requirement, so it gets a
@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   READINESS_MAINTAIN_MAX_SCORE,
@@ -207,6 +208,14 @@ describe('assessReadiness cold start', () => {
     expect(assessment.signals.some((s) => /not enough history/i.test(s.detail))).toBe(true);
   });
 
+  it('writes the fresh start headline without an em dash or en dash', () => {
+    const { headline } = assessReadiness(NEW_USER, TODAY);
+    expect(headline).toBe(
+      'Fresh start: your plan stays as built while we get to know your week.',
+    );
+    expect(headline).not.toMatch(/\u2014|\u2013/);
+  });
+
   it('still holds on day one, when a plan exists but the week does not', () => {
     const assessment = assessReadiness(DAY_ONE_USER, TODAY);
     expect(assessment.mode).toBe('maintain');
@@ -226,6 +235,23 @@ describe('assessReadiness scoring', () => {
     const { headline } = assessReadiness(DROPOUT, TODAY);
     expect(headline).toMatch(/lighter|eased/i);
     expect(headline).not.toMatch(SHAMING);
+  });
+
+  it('writes each mode headline without an em dash or en dash', () => {
+    const expected: Record<string, string> = {
+      [DROPOUT]: 'Lighter week ahead: we have eased the volume so you can get back into rhythm.',
+      [STEADY]: 'Steady week: your plan carries on exactly as it is.',
+      [CONSISTENT]: 'Strong rhythm: we have nudged this week up a notch.',
+    };
+    for (const [userId, headline] of Object.entries(expected)) {
+      const assessment = assessReadiness(userId, TODAY);
+      expect(assessment.headline).toBe(headline);
+      expect(assessment.headline).not.toMatch(/\u2014|\u2013/);
+      for (const signal of assessment.signals) {
+        expect(signal.label).not.toMatch(/\u2014|\u2013/);
+        expect(signal.detail).not.toMatch(/\u2014|\u2013/);
+      }
+    }
   });
 
   it('puts high adherence into progress', () => {
@@ -254,7 +280,7 @@ describe('assessReadiness scoring', () => {
     expect(stopped.score).toBeLessThan(spread.score);
   });
 
-  it('reports 2–4 signals that explain the number', () => {
+  it('reports 2-4 signals that explain the number', () => {
     for (const userId of [DROPOUT, CONSISTENT, STEADY]) {
       const { signals } = assessReadiness(userId, TODAY);
       expect(signals.length).toBeGreaterThanOrEqual(2);
@@ -281,7 +307,7 @@ describe('assessReadiness scoring', () => {
     expect(assessReadiness(under, TODAY).score).toBe(assessReadiness(over, TODAY).score);
   });
 
-  it('clamps every score to 0–100 and keeps the period on the assessment', () => {
+  it('clamps every score to 0-100 and keeps the period on the assessment', () => {
     for (const userId of [NEW_USER, DAY_ONE_USER, DROPOUT, CONSISTENT, STEADY]) {
       const assessment = assessReadiness(userId, TODAY);
       expect(assessment.score).toBeGreaterThanOrEqual(0);
@@ -482,6 +508,14 @@ describe('buildPlan under readiness', () => {
 // ----- product requirement: nothing readiness says may shame the user -----
 
 describe('non-shaming copy', () => {
+  it('keeps the readiness module free of em dashes and en dashes', () => {
+    const source = fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), '../modules/plans/readiness.ts'),
+      'utf8',
+    );
+    expect(source).not.toMatch(/\u2014|\u2013/);
+  });
+
   it('keeps every headline and signal clear of blame vocabulary', () => {
     const assessments: ReadinessAssessment[] = [
       NEW_USER,

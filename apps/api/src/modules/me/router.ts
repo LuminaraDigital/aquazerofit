@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import {
   CREDIT_COSTS,
+  PREMIUM_TIER_DAILY_CREDITS,
   dailyCreditsFor,
   maxBankedCreditsFor,
   consentsSchema,
@@ -22,7 +23,7 @@ import { getStore } from '../../platform/store';
 import { setCredentials } from '../auth/service';
 import { validateTelegramInitData } from '../auth/telegram';
 import { memoryRouter } from '../memory/router';
-import { effectiveTier, entitlementHistory } from '../billing/entitlements';
+import { activeEntitlementSources, effectiveTier, entitlementHistory } from '../billing/entitlements';
 import {
   exportUserData,
   getConsents,
@@ -75,6 +76,9 @@ meRouter.get(
       // Per tier, not the free constant: a premium account told it receives
       // the free allowance is being shown the plan it did not buy.
       dailyCredits: dailyCreditsFor(tier),
+      // The paid cap, on every account, so the upgrade screen can state it
+      // without a client-side constant.
+      premiumDailyCredits: PREMIUM_TIER_DAILY_CREDITS,
       creditsRemaining: remaining,
       // The carry-over ceiling. Sent because the daily top-up stops at it, so
       // a client that says "unspent credits carry over" without naming the
@@ -85,6 +89,10 @@ meRouter.get(
       // Which rail the latest entitlement came from, so the plan page offers
       // Stripe's billing portal only to the people Stripe is billing.
       billingSource: entitlementHistory(userId)[0]?.source ?? null,
+      // Rails whose paid period is still running. A Play entry means the
+      // account-delete and unsubscribe screens must say to cancel in the
+      // Play Store. There is no Play cancel API on this server.
+      activeBillingSources: activeEntitlementSources(userId),
     });
   }),
 );

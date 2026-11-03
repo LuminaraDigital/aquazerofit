@@ -1,5 +1,5 @@
 /**
- * react-query hooks over api() — the single data layer for the web app.
+ * react-query hooks over api()  -  the single data layer for the web app.
  * Query keys are namespaced (see `queryKeys`); every mutation invalidates
  * exactly the slices listed in the engineering brief.
  */
@@ -12,12 +12,8 @@ import {
 import type {
   AuthResponse,
   ConsentState,
-  CreateMealLogInput,
   CreditTask,
-  DailyNutrition,
   DerivedTargets,
-  Food,
-  MealLog,
   MemoryFact,
   MemoryFactCategory,
   MemoryFactStatus,
@@ -28,46 +24,53 @@ import type {
   CoachUnlock,
   ProgressInsight,
   ProgressionStatus,
-  ProgressSummary,
   PublicUser,
   ReadinessAssessment,
-  TrainingPlan,
-  TrendPoint,
   UserMemory,
   UserTier,
-  WaterLog,
-  WeightLog,
   WellnessProfile,
   WorkoutSession,
 } from '@aquazerofit/shared';
 import { api, ApiError, tokenStore } from './api';
+import { toAuthResponseStub, useFirebaseAuth } from './AuthProvider';
+import { asList, orNull, unwrap } from './envelopes';
 
 export type TrendRange = '7d' | '30d' | '90d';
-
-export interface NutritionTrends {
-  kcal: TrendPoint[];
-  weight: TrendPoint[];
-  macros: {
-    proteinG: TrendPoint[];
-    carbsG: TrendPoint[];
-    fatG: TrendPoint[];
-  };
-}
 
 /**
  * What this account can currently do (GET /me/entitlements).
  *
  * `costs` is the per-task credit price list and `premiumLanes` the model lanes
- * the free tier cannot reach — both are the server's own constants, so the plan
+ * the free tier cannot reach  -  both are the server's own constants, so the plan
  * surface can describe the tier difference from data instead of restating it in
  * copy that silently goes stale.
  */
 export interface Entitlements {
   tier: UserTier;
   dailyCredits: number;
+  /** Paid daily cap, sent on every account so the upgrade screen can state it. */
+  premiumDailyCredits?: number;
   creditsRemaining: number;
+  /**
+   * Ceiling on a carried-over balance: the daily grant tops up toward this and
+   * never past it. Optional because a deployment running an API from before
+   * the ceiling shipped omits it, and the plan copy has to read correctly
+   * against both  -  present, it names the limit; absent, it falls back to the
+   * old unlimited-carry-over sentence, which for that server is still true.
+   */
+  maxBankedCredits?: number;
   costs: Record<CreditTask, number>;
   premiumLanes: ModelGroup[];
+  /**
+   * The rail behind the latest entitlement; 'stripe' means the subscription is
+   * managed in Stripe's billing portal. Optional for APIs from before it.
+   */
+  billingSource?: 'play' | 'stripe' | 'stars' | 'admin' | null;
+  /**
+   * Rails whose paid period is still running. Present on current APIs.
+   * Absent means the server predates the field: fall back to billingSource.
+   */
+  activeBillingSources?: Array<'play' | 'stripe' | 'stars' | 'admin'> | null;
 }
 
 export const queryKeys = {
@@ -90,27 +93,13 @@ export const queryKeys = {
   weight: (range: TrendRange) => ['weight', range] as const,
 };
 
-/** Treat 404 as "absent" rather than an error (profile / plan / session). */
-async function orNull<T>(fn: () => Promise<T>): Promise<T | null> {
-  try {
-    return await fn();
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return null;
-    throw e;
-  }
-}
-
 /**
  * Single resources come back in a named envelope ({ profile }, { targets },
  * { consents }, …). Accept both wrapped and bare shapes so hooks stay stable
  * if the envelope ever changes.
  */
-function unwrap<T>(data: unknown, key: string): T | null {
-  if (!data || typeof data !== 'object') return (data as T) ?? null;
-  const record = data as Record<string, unknown>;
-  if (key in record) return (record[key] as T) ?? null;
-  return data as T;
-}
+// orNull / unwrap / asList live in ./envelopes (SSOT for defensive unwrap).
+
 
 // ---------- profile & targets ----------
 
@@ -150,7 +139,7 @@ export function useMe(): UseQueryResult<PublicUser | null> {
   });
 }
 
-/** PATCH /me — display name / timezone. Invalidates the `me` query. */
+/** PATCH /me  -  display name / timezone. Invalidates the `me` query. */
 export function useUpdateMe() {
   const qc = useQueryClient();
   return useMutation({
@@ -168,7 +157,7 @@ export function useUpdateMe() {
 }
 
 /**
- * POST /me/credentials — first-time email + password for a Telegram-provisioned
+ * POST /me/credentials  -  first-time email + password for a Telegram-provisioned
  * account, so it can sign in on the web. The server rejects the call once a
  * password exists (change goes through the reset flow), so the Settings surface
  * gates on `user.hasPassword === false`.
@@ -190,7 +179,7 @@ export function useSetCredentials() {
 }
 
 /**
- * POST /me/link-telegram — attach the current Telegram identity (signed launch
+ * POST /me/link-telegram  -  attach the current Telegram identity (signed launch
  * data) to the signed-in account. Only callable inside the Mini App, where
  * initData exists; the server re-validates the HMAC before linking.
  */
@@ -211,10 +200,9 @@ export function useLinkTelegram() {
 }
 
 /**
- * GET /me/entitlements — read-only. There is deliberately no companion
- * mutation: nothing client-side may change `tier`, because with no payment
- * provider behind it a self-serve tier flip is an entitlement any caller could
- * grant themselves.
+ * GET /me/entitlements  -  read-only. There is deliberately no companion
+ * mutation: nothing client-side may change `tier`. Premium arrives only from a
+ * payment the server has confirmed with the provider itself.
  *
  * Answers a bare object today; `unwrap` keeps the hook stable if it is ever
  * moved into the house `{ entitlements }` envelope.
@@ -225,6 +213,97 @@ export function useEntitlements(): UseQueryResult<Entitlements | null> {
     queryFn: async () =>
       unwrap<Entitlements>(await orNull(() => api<unknown>('/me/entitlements')), 'entitlements'),
     enabled: tokenStore.isAuthenticated,
+  });
+}
+
+/** GET /billing/config: which purchase rails this deployment can take, and their prices. */
+export interface BillingConfig {
+  /** False when the API cannot verify a Play purchase. The buy control stays off. */
+  play?: { available: boolean };
+  stripe?: {
+    available: boolean;
+    /** Monthly price when monthly checkout is open. Null otherwise. */
+    price: { amount: number; currency: string; interval: string } | null;
+    /**
+     * Launch catalog: monthly A$9.99 and annual A$79.99. `available` is true
+     * only for an interval whose Stripe Price id is set and matches.
+     */
+    plans?: Array<{
+      interval: 'month' | 'year';
+      amount: number;
+      currency: string;
+      available: boolean;
+    }>;
+  };
+  stars?: {
+    available: boolean;
+    /** Whole Stars. Null whenever `available` is false. */
+    price: number | null;
+    /** 2592000 when Stars Premium is on sale. Null otherwise. The client does not invent this. */
+    periodSeconds: number | null;
+  };
+}
+
+export function useBillingConfig(): UseQueryResult<BillingConfig> {
+  return useQuery({
+    queryKey: ['billing', 'config'],
+    queryFn: () => api<BillingConfig>('/billing/config', { auth: false }),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * POST /billing/stripe/checkout, then leave for Stripe's hosted page. The page
+ * is left on success, so there is no onSuccess state to manage here.
+ */
+export function useStartStripeCheckout() {
+  return useMutation({
+    mutationFn: (interval: 'month' | 'year' = 'month') =>
+      api<{ url: string }>('/billing/stripe/checkout', {
+        method: 'POST',
+        body: { interval: interval ?? 'month' },
+      }),
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+}
+
+/**
+ * POST /billing/stripe/portal, then leave for Stripe's billing portal, which
+ * returns to /plan. A mutation is safe here, unlike the sync below: it fires
+ * from a click, never from an effect.
+ */
+export function useOpenStripePortal() {
+  return useMutation({
+    mutationFn: () => api<{ url: string }>('/billing/stripe/portal', { method: 'POST' }),
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+}
+
+/**
+ * POST /billing/stripe/sync  -  settle the session Stripe redirected back with.
+ *
+ * A query, not a mutation, although it POSTs: settling is idempotent server
+ * side, and a mutation fired from an effect loses its result to StrictMode's
+ * dev remount. Re-asks a few times while Stripe is still confirming, so the
+ * page turns premium without a reload.
+ */
+export function useStripeCheckoutSync(sessionId: string | null) {
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: ['billing', 'stripe', 'sync', sessionId],
+    queryFn: async () => {
+      const res = await api<{ tier: UserTier; premiumUntil: string | null }>('/billing/stripe/sync', {
+        method: 'POST',
+        body: { sessionId },
+      });
+      void qc.invalidateQueries({ queryKey: queryKeys.entitlements });
+      return res;
+    },
+    enabled: Boolean(sessionId),
+    retry: false,
+    staleTime: Infinity,
+    refetchInterval: (query) =>
+      query.state.data?.tier === 'free' && query.state.dataUpdateCount < 10 ? 3000 : false,
   });
 }
 
@@ -262,47 +341,22 @@ export function useUpdateConsents() {
       aiPersonalisation: boolean;
       anonymisedAnalytics: boolean;
       reminders: boolean;
+      foodPhotoTraining?: boolean;
     }) => api<ConsentState>('/me/consents', { method: 'PUT', body: input }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['consents'] }),
   });
 }
 
-// ---------- nutrition ----------
-
-export function useDailyNutrition(date: string): UseQueryResult<DailyNutrition> {
-  return useQuery({
-    queryKey: queryKeys.nutritionDaily(date),
-    queryFn: () => api<DailyNutrition>('/analytics/nutrition/daily', { query: { date } }),
-    enabled: Boolean(date) && tokenStore.isAuthenticated,
-  });
-}
-
-export function useNutritionTrends(range: TrendRange): UseQueryResult<NutritionTrends> {
-  return useQuery({
-    queryKey: queryKeys.nutritionTrends(range),
-    queryFn: () => api<NutritionTrends>('/analytics/nutrition/trends', { query: { range } }),
-    enabled: tokenStore.isAuthenticated,
-  });
-}
-
 // ---------- progress / plans / workouts ----------
 
-export function useProgressSummary(): UseQueryResult<ProgressSummary> {
-  return useQuery({
-    queryKey: queryKeys.progress,
-    queryFn: () => api<ProgressSummary>('/progress/summary'),
-    enabled: tokenStore.isAuthenticated,
-  });
-}
-
 /**
- * GET /progress/insight — the weekly narrative + deterministic "what changed"
+ * GET /progress/insight  -  the weekly narrative + deterministic "what changed"
  * lines. Answers `{ insight, cached }` (house envelope, as in the
  * recommendations lane); `cached` is diagnostic only, so the hook hands the
  * UI the insight itself.
  *
- * The endpoint is 200 on every path — new user, free tier, consent off,
- * guardrail block, credits exhausted, AI outage — so there is no failure state
+ * The endpoint is 200 on every path  -  new user, free tier, consent off,
+ * guardrail block, credits exhausted, AI outage  -  so there is no failure state
  * to render beyond an ordinary network error. `insight.ai.model` says *why* a
  * deterministic narrative was served; the card reads it (see
  * components/progress/WeeklyInsightCard).
@@ -319,17 +373,8 @@ export function useProgressInsight(): UseQueryResult<ProgressInsight | null> {
   });
 }
 
-export function useCurrentPlan(): UseQueryResult<TrainingPlan | null> {
-  return useQuery({
-    queryKey: queryKeys.plan,
-    queryFn: async () =>
-      unwrap<TrainingPlan>(await orNull(() => api<unknown>('/plans/current')), 'plan'),
-    enabled: tokenStore.isAuthenticated,
-  });
-}
-
 /**
- * GET /plans/readiness — Protect / Maintain / Progress for the current week.
+ * GET /plans/readiness  -  Protect / Maintain / Progress for the current week.
  * Answers the `{ readiness }` house envelope. Keyed under ['plan', …] so plan
  * generation and workout completion refresh it.
  */
@@ -343,15 +388,15 @@ export function useReadiness(): UseQueryResult<ReadinessAssessment | null> {
 }
 
 /**
- * GET /workouts/today answers a rich envelope — { rest, focus, session,
- * exercises: Record<exerciseId, Exercise>, resolved, … } — where `session` is
+ * GET /workouts/today answers a rich envelope  -  { rest, focus, session,
+ * exercises: Record<exerciseId, Exercise>, resolved, … }  -  where `session` is
  * null on rest days and `exercises` is a *detail map*, not the session's
  * exercise array.
  *
  * INVARIANT: every consumer of the ['workout','today'] cache key must spread
  * these options and carve its slice with `select`. React Query keeps ONE
  * cached value per key, so caching a *transformed* value here hands every
- * other consumer the wrong shape depending on mount order — that is exactly
+ * other consumer the wrong shape depending on mount order  -  that is exactly
  * what white-screened /workouts (dashboard cached the raw envelope, the
  * library then called .reduce on the envelope's Record).
  */
@@ -369,133 +414,12 @@ export function unwrapWorkoutSession(data: unknown): WorkoutSession | null {
     : null;
 }
 
-export function useTodayWorkout(): UseQueryResult<WorkoutSession | null> {
-  return useQuery({
-    ...todayWorkoutQuery,
-    select: unwrapWorkoutSession,
-    enabled: tokenStore.isAuthenticated,
-  });
-}
-
-// ---------- food search ----------
-
-export function useFoodSearch(term: string): UseQueryResult<Food[]> {
-  return useQuery({
-    queryKey: queryKeys.foods(term),
-    queryFn: async () => {
-      const res = await api<Food[] | { items: Food[] }>('/foods', { query: { search: term } });
-      return Array.isArray(res) ? res : res.items;
-    },
-    enabled: term.trim().length >= 2 && tokenStore.isAuthenticated,
-    staleTime: 5 * 60_000,
-  });
-}
-
-// ---------- mutations ----------
-
-function newIdempotencyKey(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-/** Logging a meal invalidates ['nutrition'] + ['progress']. */
-export function useLogMeal() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateMealLogInput) =>
-      api<MealLog>('/meal-logs', {
-        method: 'POST',
-        body: input,
-        idempotencyKey: newIdempotencyKey(),
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['nutrition'] });
-      void qc.invalidateQueries({ queryKey: ['progress'] });
-    },
-  });
-}
-
-/** Logging water invalidates ['nutrition'] + ['progress']. */
-export function useLogWater() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { amountMl: number; localDate: string }) =>
-      api<WaterLog>('/water-logs', {
-        method: 'POST',
-        body: input,
-        idempotencyKey: newIdempotencyKey(),
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['nutrition'] });
-      void qc.invalidateQueries({ queryKey: ['progress'] });
-    },
-  });
-}
-
-/** Logging weight invalidates ['weight'] + ['progress'] + ['targets']. */
-export function useLogWeight() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { weightKg: number; note?: string; localDate: string }) =>
-      api<WeightLog>('/weight-logs', {
-        method: 'POST',
-        body: input,
-        idempotencyKey: newIdempotencyKey(),
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['weight'] });
-      void qc.invalidateQueries({ queryKey: ['progress'] });
-      void qc.invalidateQueries({ queryKey: ['targets'] });
-    },
-  });
-}
-
-/** Generating a plan invalidates ['plan'] + ['workout']. */
-export function useGeneratePlan() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { daysPerWeek?: number; focus?: 'weightLoss' | 'strength' | 'general' }) =>
-      api<TrainingPlan>('/plans/generate', { method: 'POST', body: input }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['plan'] });
-      void qc.invalidateQueries({ queryKey: ['workout'] });
-    },
-  });
-}
-
-/** Completing a workout invalidates ['workout'] + ['plan'] + ['progress']. */
-export function useCompleteWorkout() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: {
-      id: string;
-      exercises: { exerciseId: string; setsCompleted: number; skipped?: boolean }[];
-      durationMinutes: number;
-      localDate: string;
-    }) =>
-      api<WorkoutSession>(`/workouts/${input.id}/complete`, {
-        method: 'POST',
-        body: {
-          exercises: input.exercises,
-          durationMinutes: input.durationMinutes,
-          localDate: input.localDate,
-        },
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['workout'] });
-      void qc.invalidateQueries({ queryKey: ['plan'] });
-      void qc.invalidateQueries({ queryKey: ['progress'] });
-    },
-  });
-}
-
 // ---------- auth actions ----------
 
 const USER_KEY = 'azf.user';
 
 /**
- * Last authenticated user snapshot — instant-boot fallback only.
+ * Last authenticated user snapshot  -  instant-boot fallback only.
  * GET /me (useMe) is the source of truth; this just avoids a blank identity
  * while the first request is in flight.
  */
@@ -517,19 +441,26 @@ function storeUser(user: PublicUser | undefined): void {
   try {
     if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
   } catch {
-    // storage full / unavailable — non-fatal
+    // storage full / unavailable  -  non-fatal
   }
 }
 
 /**
- * AuthContext-free auth actions wrapping api() + tokenStore.
- * Each action manages tokens and the react-query cache; navigation is up
- * to the caller.
+ * Auth actions wrapping Firebase (when enabled) or the legacy /auth API,
+ * plus tokenStore and the react-query cache. Navigation is up to the caller.
  */
 export function useAuthActions() {
   const qc = useQueryClient();
+  const firebase = useFirebaseAuth();
 
   async function login(email: string, password: string): Promise<AuthResponse> {
+    if (firebase.firebaseEnabled) {
+      const user = await firebase.signInEmail(email, password);
+      const token = tokenStore.access ?? '';
+      storeUser(user);
+      qc.clear();
+      return toAuthResponseStub(user, token);
+    }
     const res = await api<AuthResponse>('/auth/login', {
       method: 'POST',
       body: { email, password },
@@ -548,6 +479,17 @@ export function useAuthActions() {
     /** Turnstile token when the deployment is challenged; omitted otherwise. */
     captchaToken?: string;
   }): Promise<AuthResponse> {
+    if (firebase.firebaseEnabled) {
+      const user = await firebase.registerEmail({
+        email: input.email,
+        password: input.password,
+        displayName: input.displayName,
+      });
+      const token = tokenStore.access ?? '';
+      storeUser(user);
+      qc.clear();
+      return toAuthResponseStub(user, token);
+    }
     const res = await api<Partial<AuthResponse>>('/auth/register', {
       method: 'POST',
       // captchaToken rides in the body (the API reads it before the zod parse,
@@ -581,7 +523,7 @@ export function useAuthActions() {
 
   async function logout(): Promise<void> {
     // The server clears the httpOnly refresh cookie and revokes the family
-    // via the cookie itself — no body is needed (FE-01). Revocation is still
+    // via the cookie itself  -  no body is needed (FE-01). Revocation is still
     // best-effort (offline-safe).
     try {
       await api<void>('/auth/logout', {
@@ -592,6 +534,11 @@ export function useAuthActions() {
     } catch {
       // Revocation is best-effort; local sign-out always proceeds.
     }
+    try {
+      await firebase.signOutFirebase();
+    } catch {
+      // Firebase sign-out is best-effort when disabled or already signed out.
+    }
     tokenStore.clear();
     try {
       localStorage.removeItem(USER_KEY);
@@ -601,7 +548,22 @@ export function useAuthActions() {
     qc.clear();
   }
 
-  return { login, register, telegramLogin, logout };
+  async function requestPasswordReset(
+    email: string,
+    captchaToken?: string,
+  ): Promise<{ devToken?: string } | undefined> {
+    if (firebase.firebaseEnabled) {
+      await firebase.resetPassword(email);
+      return undefined;
+    }
+    return api<{ devToken?: string } | undefined>('/auth/password-reset/request', {
+      method: 'POST',
+      body: { email, captchaToken: captchaToken || undefined },
+      auth: false,
+    });
+  }
+
+  return { login, register, telegramLogin, logout, requestPasswordReset, firebaseEnabled: firebase.firebaseEnabled, mapFirebaseError: firebase.mapError };
 }
 
 export type { MemoryFact, MemoryFactCategory, MemoryFactStatus, UserMemory };
@@ -625,7 +587,7 @@ export function useMemory(): UseQueryResult<UserMemory | null> {
   });
 }
 
-/** Every memory mutation returns the fresh { memory } envelope — write it straight into the cache. */
+/** Every memory mutation returns the fresh { memory } envelope  -  write it straight into the cache. */
 function writeMemory(qc: ReturnType<typeof useQueryClient>, data: { memory: UserMemory }): void {
   const memory = unwrap<UserMemory>(data, 'memory');
   if (memory) qc.setQueryData(queryKeys.memory, memory);
@@ -641,7 +603,7 @@ export function useAddMemoryFact() {
   });
 }
 
-/** PATCH one fact (status confirm/reject or text edit) — optimistic, rolls back on error. */
+/** PATCH one fact (status confirm/reject or text edit)  -  optimistic, rolls back on error. */
 export function useUpdateMemoryFact() {
   const qc = useQueryClient();
   return useMutation({
@@ -675,7 +637,7 @@ export function useUpdateMemoryFact() {
   });
 }
 
-/** DELETE one fact — optimistic removal, rolls back on error. */
+/** DELETE one fact  -  optimistic removal, rolls back on error. */
 export function useDeleteMemoryFact() {
   const qc = useQueryClient();
   return useMutation({
@@ -770,7 +732,7 @@ export function useSelectCoach() {
       void qc.invalidateQueries({ queryKey: ['coaches'] });
       void qc.invalidateQueries({ queryKey: ['progression'] });
       // The chat header shows the coach, and existing sessions keep their
-      // history — only the voice ahead changes.
+      // history  -  only the voice ahead changes.
       void qc.invalidateQueries({ queryKey: ['chat'] });
     },
   });
@@ -786,6 +748,17 @@ export function useAcknowledgeReactions() {
   return useMutation({
     mutationFn: () => api<void>('/coaches/reactions/ack', { method: 'POST' }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['progression'] }),
+  });
+}
+
+/**
+ * POST /billing/stars/subscription. Returns the invoice link for `openInvoice`.
+ * The Stars price is the one the server read from config.
+ */
+export function useStartStarsSubscription() {
+  return useMutation({
+    mutationFn: () =>
+      api<{ invoiceLink: string; stars: number }>('/billing/stars/subscription', { method: 'POST' }),
   });
 }
 

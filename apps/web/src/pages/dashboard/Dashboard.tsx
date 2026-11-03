@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { DailyNutrition, ProgressSummary, TrendPoint } from '@aquazerofit/shared';
@@ -5,17 +6,18 @@ import { api } from '@/lib/api';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { RingProgress } from '@/components/ui/RingProgress';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { Skeleton, DashboardSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { CoachCard } from '@/components/coach/CoachCard';
 import { ConsistencyCard } from '@/components/progress/ConsistencyCard';
+import { SeasonCard } from '@/components/fightRecord/SeasonCard';
 import { ConsistencyChip } from '@/components/progress/ConsistencyChip';
 import { ReadinessChip } from '@/components/progress/ReadinessChip';
 import { WeeklyInsightCard } from '@/components/progress/WeeklyInsightCard';
-import { todayWorkoutQuery, useProgressInsight, useReadiness } from '@/lib/queries';
+import { todayWorkoutQuery, queryKeys, useProgressInsight, useReadiness } from '@/lib/queries';
+import { useTelegramMainAction } from '@/lib/useTelegramChrome';
 import { MacroBar } from './MacroBar';
 import { WaterCard } from './WaterCard';
-import { Sparkline } from './Sparkline';
 import { SuggestMealCard } from './SuggestMealCard';
 import {
   asUser,
@@ -26,6 +28,8 @@ import {
   todayLocalDate,
 } from './lib';
 
+const Sparkline = lazy(() => import('./Sparkline').then((m) => ({ default: m.Sparkline })));
+
 interface TrendsResponse {
   kcal?: TrendPoint[];
   weight?: TrendPoint[];
@@ -34,9 +38,13 @@ interface TrendsResponse {
 export default function Dashboard() {
   const navigate = useNavigate();
   const today = todayLocalDate();
+  const nativeLog = useTelegramMainAction({
+    text: 'Log a meal',
+    onClick: () => navigate('/nutrition/capture'),
+  });
 
   const dailyQuery = useQuery({
-    queryKey: ['nutrition', 'daily', today],
+    queryKey: queryKeys.nutritionDaily(today),
     queryFn: () => api<DailyNutrition>('/analytics/nutrition/daily', { query: { date: today } }),
   });
   const profileQuery = useQuery({
@@ -44,14 +52,14 @@ export default function Dashboard() {
     queryFn: () => api<unknown>('/me'),
   });
   const progressQuery = useQuery({
-    queryKey: ['progress'],
+    queryKey: queryKeys.progress,
     queryFn: () => api<ProgressSummary>('/progress/summary'),
   });
   // Shared cache key ⇒ shared queryFn; the raw envelope is unwrapped at use
   // (asWorkoutSession below), never cached pre-transformed.
   const workoutQuery = useQuery(todayWorkoutQuery);
   const trendsQuery = useQuery({
-    queryKey: ['nutrition', 'trends', '30d'],
+    queryKey: queryKeys.nutritionTrends('30d'),
     queryFn: () => api<TrendsResponse>('/analytics/nutrition/trends', { query: { range: '30d' } }),
   });
   const insightQuery = useProgressInsight();
@@ -63,6 +71,12 @@ export default function Dashboard() {
   const progress = progressQuery.data;
   const session = asWorkoutSession(workoutQuery.data);
   const weightSeries = trendsQuery.data?.weight ?? progress?.weightSeries ?? [];
+  const coldLoad =
+    dailyQuery.isPending &&
+    !daily &&
+    !dailyQuery.isError &&
+    profileQuery.isPending &&
+    progressQuery.isPending;
 
   const headerRight = (
     <div className="flex items-center gap-2.5">
@@ -85,10 +99,13 @@ export default function Dashboard() {
     <div>
       <AppHeader right={headerRight} />
 
+      {coldLoad ? (
+        <DashboardSkeleton />
+      ) : (
       <main className="px-container-margin">
         {/* Greeting - tighter, more personal */}
         <section className="mt-5 mb-5 reveal">
-          <p className="text-sm text-on-surface-variant/70 font-medium tracking-tight">
+          <p className="text-sm text-on-surface-variant font-medium tracking-tight">
             {formatLocalDate(today)}
           </p>
           <h1 className="font-heading font-semibold tracking-tight text-3xl text-on-surface leading-tight mt-0.5">
@@ -100,18 +117,53 @@ export default function Dashboard() {
           </h1>
         </section>
 
-        {/* How hard the plan should push this week — supportive, never a warning */}
+        {/* How hard the plan should push this week: supportive, never a warning */}
         <section className="mb-5 reveal reveal-2" aria-label="This week's readiness">
           <ReadinessChip readiness={readinessQuery.data} loading={readinessQuery.isPending} />
         </section>
 
         {dailyQuery.isError ? (
           <ErrorState
+            surface="dashboard"
             message="We couldn't load today's nutrition."
             retry={() => void dailyQuery.refetch()}
           />
         ) : (
           <>
+            {/* First-value callout: empty day gets an explicit next step, not a blank ring. */}
+            {daily && daily.kcalConsumed === 0 && (
+              <section className="mb-5 reveal reveal-2" aria-label="Get started">
+                <GlassCard className="p-card-padding border border-primary/30">
+                  <p className="text-xs font-bold uppercase tracking-wider text-primary mb-1">
+                    Next step
+                  </p>
+                  <h2 className="font-heading font-semibold text-xl text-on-surface mb-1">
+                    Log your first meal
+                  </h2>
+                  <p className="text-sm text-on-surface-variant mb-4">
+                    Search a food, scan a barcode, or photograph your plate. One log unlocks the
+                    rest of today&apos;s targets.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/nutrition')}
+                      className="cta-gradient px-5 py-2.5 rounded-xl text-on-primary font-bold text-sm active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    >
+                      Open nutrition
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/nutrition/capture')}
+                      className="px-5 py-2.5 rounded-xl border border-primary/60 text-primary font-bold text-sm active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    >
+                      Scan a meal
+                    </button>
+                  </div>
+                </GlassCard>
+              </section>
+            )}
+
             {/* Calorie ring hero - the visual anchor */}
             <section className="mb-5 reveal reveal-2" aria-label="Daily calories">
               <GlassCard tier="hero" className="p-card-padding flex flex-col items-center relative overflow-hidden float-gentle">
@@ -147,9 +199,38 @@ export default function Dashboard() {
                           <span className="font-heading font-semibold text-[44px] text-primary tabular-nums leading-none">
                             {fmtInt(Math.max(0, daily.kcalRemaining))}
                           </span>
-                          <span className="text-xs text-on-surface-variant/70 mt-1.5 uppercase tracking-wider">kcal left</span>
+                          <span className="text-xs text-on-surface-variant mt-1.5 uppercase tracking-wider">kcal left</span>
                         </div>
                       </RingProgress>
+                    </div>
+                    <div
+                      className="w-full grid grid-cols-4 text-center tabular-nums mb-6"
+                      aria-label={`Goal ${fmtInt(daily.kcalTarget)} minus food ${fmtInt(daily.kcalConsumed)} plus exercise ${fmtInt(daily.kcalBurned)} equals ${fmtInt(daily.kcalRemaining)} remaining`}
+                    >
+                      <div>
+                        <p className="text-base font-bold text-on-surface">{fmtInt(daily.kcalTarget)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">Goal</p>
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-on-surface">
+                          − {fmtInt(daily.kcalConsumed)}
+                        </p>
+                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">Food</p>
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-on-surface">
+                          + {fmtInt(daily.kcalBurned)}
+                        </p>
+                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">
+                          Exercise
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-primary">{fmtInt(daily.kcalRemaining)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">
+                          Remaining
+                        </p>
+                      </div>
                     </div>
                     <div className="w-full grid grid-cols-3 gap-3">
                       <MacroBar
@@ -197,18 +278,23 @@ export default function Dashboard() {
         )}
 
         {/* Your coach, what they make of the week, and the XP ladder. Placed
-            above consistency because it is the surface people come back for —
+            above consistency because it is the surface people come back for:
             the numbers below are the evidence behind what the coach just said. */}
         <section className="mb-5 reveal reveal-3" aria-label="Your coach">
           <CoachCard />
         </section>
 
-        {/* Consistency — activeDays/windowDays, never a resettable streak */}
+        {/* Consistency: activeDays/windowDays, never a resettable streak */}
         <section className="mb-5 reveal reveal-4" aria-label="Consistency">
           <ConsistencyCard
             consistency={progress?.consistency}
             loading={progressQuery.isPending}
           />
+        </section>
+
+        {/* Fight Record season and belt. Renders nothing while the feature is off. */}
+        <section className="mb-5 reveal reveal-4 empty:hidden" aria-label="Season">
+          <SeasonCard />
         </section>
 
         {/* Weekly insight */}
@@ -233,7 +319,7 @@ export default function Dashboard() {
                   {session.status === 'completed' ? 'Done' : 'Planned'}
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-on-surface-variant/70 text-sm mb-4">
+              <div className="flex items-center gap-4 text-on-surface-variant text-sm mb-4">
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                     fitness_center
@@ -269,7 +355,7 @@ export default function Dashboard() {
                 <h3 className="font-heading font-semibold uppercase tracking-[0.04em] text-lg text-on-surface">
                   Rest &amp; Recover
                 </h3>
-                <p className="text-sm text-on-surface-variant/70 mt-0.5">
+                <p className="text-sm text-on-surface-variant mt-0.5">
                   No workout scheduled. Browse the library.
                 </p>
               </div>
@@ -316,10 +402,12 @@ export default function Dashboard() {
                     <span className="text-3xl font-bold tabular-nums text-on-surface">
                       {progress.currentWeightKg.toFixed(1)}
                     </span>
-                    <span className="text-sm text-on-surface-variant/70 ml-1">kg</span>
+                    <span className="text-sm text-on-surface-variant ml-1">kg</span>
                   </p>
                 )}
-                <Sparkline points={weightSeries.slice(-14)} />
+                <Suspense fallback={null}>
+                  <Sparkline points={weightSeries.slice(-14)} />
+                </Suspense>
               </>
             )}
           </GlassCard>
@@ -359,7 +447,7 @@ export default function Dashboard() {
                 </div>
               ))}
               {(progress?.achievements ?? []).length === 0 && (
-                <p className="text-sm text-on-surface-variant/70">
+                <p className="text-sm text-on-surface-variant">
                   Keep logging to unlock achievements.
                 </p>
               )}
@@ -367,8 +455,11 @@ export default function Dashboard() {
           )}
         </section>
       </main>
+      )}
 
-      {/* Camera FAB — anchored to the centered content column, not the viewport */}
+      {/* Camera FAB: anchored to the centered content column, not the viewport.
+          Inside Telegram the same action sits on the native main button. */}
+      {!nativeLog && (
       <div className="fixed bottom-24 inset-x-0 z-40 flex max-w-md mx-auto justify-end pr-container-margin">
         <button
           type="button"
@@ -382,6 +473,7 @@ export default function Dashboard() {
           </span>
         </button>
       </div>
+      )}
     </div>
   );
 }

@@ -1,10 +1,12 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { WellnessProfile } from '@aquazerofit/shared';
 import { restoreSession, tokenStore } from '../../lib/api';
+import { useFirebaseAuth } from '../../lib/AuthProvider';
 import { isTMA } from '../../lib/telegram';
+import { useDeepLinkRouter } from '../../lib/deeplink';
 import { useProfile } from '../../lib/queries';
-import { PageSpinner } from '../ui/PageSpinner';
+import { AuthGateSkeleton } from '../ui/Skeleton';
 import { ErrorState } from '../ui/ErrorState';
 import { ToastProvider } from '../ui/Toast';
 import { TargetsNotSetScreen } from '../../pages/auth/SetupPrompt';
@@ -23,7 +25,7 @@ const ProfileGateContext = createContext<ProfileGate>({
 });
 
 /**
- * Profile loaded by the auth gate — null while the user has no profile yet.
+ * Profile loaded by the auth gate - null while the user has no profile yet.
  * That null is a supported, first-class app state, not a redirect trigger:
  * "signed in, essentials not supplied" is how a partially onboarded account is
  * represented everywhere in the client.
@@ -33,9 +35,30 @@ export function useProfileGate(): ProfileGate {
 }
 
 /**
+ * Apply a Telegram `startapp` / web `?startapp=` launch once the account is
+ * signed in.
+ *
+ * The router used to run only inside Nutrition. A Mini App cold start opens
+ * Home, so `startapp=plan` never reached a handler. It waits until sign-in
+ * finishes: Telegram auto-login then replaces the location with `/`, and the
+ * launch navigation has to happen after that replacement.
+ */
+function DeepLinkListener() {
+  const navigate = useNavigate();
+  const open = useCallback(
+    (path: string) => {
+      navigate(path, { replace: true });
+    },
+    [navigate],
+  );
+  useDeepLinkRouter(open);
+  return null;
+}
+
+/**
  * Route guard: unauthenticated users go to the marketing landing page on the
  * web, or straight to /welcome inside Telegram (where the Mini App carousel
- * and its silent auto-login belong) — in both cases preserving the intended
+ * and its silent auto-login belong) - in both cases preserving the intended
  * path. Also hosts the toast viewport for the whole authenticated tree.
  *
  * Authentication is the only thing gated here. A missing wellness profile used
@@ -45,8 +68,8 @@ export function useProfileGate(): ProfileGate {
  *
  * `publicIndex` is the marketing page, rendered in place at `/` for an
  * unauthenticated web visitor instead of redirecting there. Redirecting is
- * right for every other guarded route — `/settings` should send you to
- * marketing and remember where you were going — but wrong for the front door.
+ * right for every other guarded route - `/settings` should send you to
+ * marketing and remember where you were going - but wrong for the front door.
  * `/` is the URL cold traffic and crawlers actually arrive on, and bouncing it
  * to a second URL costs a routing round before any marketing content paints,
  * splits the site's authority across two addresses, and leaves the most
@@ -55,18 +78,29 @@ export function useProfileGate(): ProfileGate {
  * marketing page.
  *
  * It is passed in rather than imported so the landing page stays behind the
- * `lazy()` boundary App.tsx put it behind — importing it here would pull the
+ * `lazy()` boundary App.tsx put it behind - importing it here would pull the
  * entire marketing bundle into the guard that wraps every signed-in screen.
  */
 export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
   const location = useLocation();
+  const { isLoading: firebaseLoading, firebaseEnabled, firebaseUser } = useFirebaseAuth();
   // FE-01: the access token lives in memory, so a reload starts unauthenticated
-  // even with a valid session. Attempt one cookie-backed refresh on mount.
-  const [restoring, setRestoring] = useState(!tokenStore.isAuthenticated);
+  // even with a valid session. Wait for Firebase first when enabled, then
+  // attempt one cookie-backed refresh for Telegram / legacy sessions. That is
+  // pending for any unauthenticated visit, including while Firebase loads, so
+  // the render in which Firebase settles waits for the refresh instead of
+  // redirecting a session it has not tried to restore.
+  const [restoring, setRestoring] = useState(() => !tokenStore.isAuthenticated);
+
   useEffect(() => {
+    if (firebaseLoading) return;
     let alive = true;
+    if (firebaseEnabled && firebaseUser && tokenStore.isAuthenticated) {
+      setRestoring(false);
+      return;
+    }
     if (!tokenStore.isAuthenticated) {
-      void restoreSession().then((ok) => {
+      void restoreSession().then(() => {
         if (alive) setRestoring(false);
       });
     } else {
@@ -75,11 +109,13 @@ export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
     return () => {
       alive = false;
     };
-  }, []);
-  const isAuthed = tokenStore.isAuthenticated;
-  const { data: profile, isLoading, isError, refetch } = useProfile(isAuthed && !restoring);
+  }, [firebaseLoading, firebaseEnabled, firebaseUser]);
 
-  if (restoring) return <PageSpinner />;
+  const isAuthed = tokenStore.isAuthenticated;
+  const gatePending = firebaseLoading || restoring;
+  const { data: profile, isLoading, isError, refetch } = useProfile(isAuthed && !gatePending);
+
+  if (gatePending) return <AuthGateSkeleton />;
 
   if (!isAuthed) {
     if (publicIndex && location.pathname === '/' && !isTMA()) return <>{publicIndex}</>;
@@ -92,18 +128,28 @@ export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
     );
   }
 
-  if (isLoading) return <PageSpinner />;
+  if (isLoading) {
+    return (
+      <>
+        <DeepLinkListener />
+        <AuthGateSkeleton />
+      </>
+    );
+  }
 
   if (isError) {
     return (
-      <div className="max-w-md mx-auto min-h-screen flex items-center px-container-margin">
-        <div className="w-full">
-          <ErrorState
-            message="We could not load your profile."
-            retry={() => void refetch()}
-          />
+      <>
+        <DeepLinkListener />
+        <div className="max-w-md mx-auto min-h-screen flex items-center px-container-margin">
+          <div className="w-full">
+            <ErrorState
+              message="We could not load your profile."
+              retry={() => void refetch()}
+            />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -116,6 +162,7 @@ export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
       }}
     >
       <ToastProvider>
+        <DeepLinkListener />
         <Outlet />
       </ToastProvider>
     </ProfileGateContext.Provider>
@@ -124,7 +171,7 @@ export function RequireAuth({ publicIndex }: { publicIndex?: ReactNode } = {}) {
 
 /**
  * Per-surface gate for screens whose entire content is "logs measured against a
- * target" — nutrition and progress. Those cannot be rendered honestly without
+ * target" - nutrition and progress. Those cannot be rendered honestly without
  * derived targets, and the calculator refuses to invent them, so the screen is
  * replaced by the state that says so rather than by a fabricated number or by
  * the generic "we couldn't load that" error the API 404 would otherwise

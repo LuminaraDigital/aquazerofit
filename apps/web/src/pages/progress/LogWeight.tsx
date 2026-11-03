@@ -1,7 +1,7 @@
 /**
- * Log Weight — pixel reference: log_your_weight (bottom-sheet styled page).
+ * Log Weight. Pixel reference: log_your_weight (bottom-sheet styled page).
  * Big numeric input with kg/lb toggle honouring profile unitPreference
- * (display conversion only — always submits canonical kg), date (max today),
+ * (display conversion only, always submits canonical kg), date (max today),
  * optional note with quick chips, recent entries with delta badges, and
  * POST /weight-logs with an Idempotency-Key.
  */
@@ -10,7 +10,10 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UnitPreference, WeightLog } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
-import { useProfile } from '@/lib/queries';
+import { asList } from '@/lib/envelopes';
+import { kgToLbs, lbsToKg, todayLocalDate } from '@/lib/format';
+import { queryKeys, useProfile } from '@/lib/queries';
+import { optimisticPatch, pendingWeightLog, upsertWeightLog } from '@/lib/optimistic';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Chip } from '@/components/ui/Chip';
@@ -19,8 +22,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
+import { useTelegramMainAction, useTelegramUnsavedEdits } from '@/lib/useTelegramChrome';
 
-const KG_PER_LB = 0.45359237;
 type Unit = 'kg' | 'lb';
 
 /** Server may attach clamp / target-recompute advisories to the response. */
@@ -29,22 +32,6 @@ type WeightLogResponse = WeightLog & {
   clampReason?: string | null;
   advisory?: string;
 };
-
-/** Accept bare arrays and the API's { items } / { logs } envelopes. */
-function asList<T>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === 'object') {
-    const record = data as Record<string, unknown>;
-    for (const key of ['items', 'logs']) {
-      if (Array.isArray(record[key])) return record[key] as T[];
-    }
-  }
-  return [];
-}
-
-function todayLocal(): string {
-  return new Date().toLocaleDateString('en-CA');
-}
 
 const QUICK_NOTES = ['Morning fasted', 'Post-workout', 'After meal'];
 
@@ -56,7 +43,7 @@ export default function LogWeight() {
   const [unit, setUnit] = useState<Unit>('kg');
   const [unitTouched, setUnitTouched] = useState(false);
   const [value, setValue] = useState('');
-  const [date, setDate] = useState(todayLocal());
+  const [date, setDate] = useState(todayLocalDate());
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const idemKeyRef = useRef<string>(crypto.randomUUID());
@@ -75,7 +62,7 @@ export default function LogWeight() {
   }, [profileQuery.data, unitTouched]);
 
   const recentQuery = useQuery({
-    queryKey: ['weight', '30d'],
+    queryKey: queryKeys.weight('30d'),
     queryFn: async () =>
       asList<WeightLog>(await api<unknown>('/weight-logs', { query: { range: '30d' } })),
   });
@@ -86,13 +73,29 @@ export default function LogWeight() {
   );
   const latest = recent[0];
 
-  const toKg = (v: number) => (unit === 'lb' ? v * KG_PER_LB : v);
-  const display = (kg: number) => (unit === 'lb' ? kg / KG_PER_LB : kg);
+  const toKg = (v: number) => (unit === 'lb' ? lbsToKg(v) : v);
+  const display = (kg: number) => (unit === 'lb' ? kgToLbs(kg) : kg);
 
   const parsed = Number.parseFloat(value.replace(',', '.'));
   const parsedKg = Number.isFinite(parsed) ? toKg(parsed) : null;
   const deltaVsLast =
     parsedKg !== null && latest ? parsedKg - latest.weightKg : null;
+
+  /**
+   * The weigh-in lands in the cache before the request does, so the entry is
+   * already there when this page hands over to /progress on success.
+   *
+   * Safe to show in full, which the meal path is not: the weight is the number
+   * the user just typed rather than one the server derives. What the server
+   * *does* derive from it, the recomputed daily targets, is left to the
+   * ['targets'] invalidation and is never guessed here.
+   */
+  const weightPatch = optimisticPatch<
+    WeightLog[],
+    { weightKg: number; note?: string; localDate: string }
+  >(queryClient, queryKeys.weight('30d'), (previous, payload) =>
+    upsertWeightLog(previous, pendingWeightLog({ key: idemKeyRef.current, ...payload })),
+  );
 
   const mutation = useMutation({
     mutationFn: (payload: { weightKg: number; note?: string; localDate: string }) =>
@@ -101,21 +104,25 @@ export default function LogWeight() {
         body: payload,
         idempotencyKey: idemKeyRef.current,
       }),
+    ...weightPatch,
     onSuccess: (res) => {
       const hint =
         res.advisory ??
         (res.clamped && res.clampReason
           ? `Saved. ${res.clampReason}`
-          : 'Weight saved — your daily targets have been recomputed.');
+          : 'Weight saved. Your daily targets have been recomputed.');
       toast.success(hint);
       idemKeyRef.current = crypto.randomUUID();
+      navigate('/progress');
+    },
+    onError: (e, _vars, context) => {
+      weightPatch.onError(context);
+      toast.error(e instanceof ApiError ? e.message : 'Could not save your weigh-in');
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['weight'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
       void queryClient.invalidateQueries({ queryKey: ['targets'] });
-      navigate('/progress');
-    },
-    onError: (e) => {
-      toast.error(e instanceof ApiError ? e.message : 'Could not save your weigh-in');
     },
   });
 
@@ -130,7 +137,7 @@ export default function LogWeight() {
       setError(`Weight must be between ${unit === 'kg' ? '30 and 300 kg' : '66 and 661 lb'}`);
       return;
     }
-    if (date > todayLocal()) {
+    if (date > todayLocalDate()) {
       setError('Date cannot be in the future');
       return;
     }
@@ -140,6 +147,13 @@ export default function LogWeight() {
       localDate: date,
     });
   };
+
+  const nativeSave = useTelegramMainAction({
+    text: mutation.isPending ? 'Saving' : 'Save entry',
+    onClick: submit,
+    enabled: !mutation.isPending,
+  });
+  useTelegramUnsavedEdits(value.trim() !== '' || note.trim() !== '');
 
   return (
     <div className="mx-auto w-full max-w-md px-5 pb-10">
@@ -182,7 +196,7 @@ export default function LogWeight() {
                 // convert the display value so the physical weight is preserved
                 if (Number.isFinite(parsed)) {
                   const kg = toKg(parsed);
-                  setValue(((u === 'lb' ? kg / KG_PER_LB : kg)).toFixed(1));
+                  setValue((display(kg)).toFixed(1));
                 }
                 setUnit(u);
                 setUnitTouched(true);
@@ -238,7 +252,7 @@ export default function LogWeight() {
               id="weight-date"
               type="date"
               value={date}
-              max={todayLocal()}
+              max={todayLocalDate()}
               onChange={(e) => setDate(e.target.value)}
               className="flex-1 appearance-none border-none bg-transparent text-on-surface focus:outline-none focus:ring-0"
             />
@@ -263,7 +277,7 @@ export default function LogWeight() {
               placeholder="How are you feeling today?"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="flex-1 resize-none border-none bg-transparent text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:ring-0"
+              className="flex-1 resize-none border-none bg-transparent text-on-surface placeholder:text-outline focus:outline-none focus:ring-0"
             />
           </div>
           <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
@@ -278,12 +292,14 @@ export default function LogWeight() {
           </div>
         </div>
 
+        {!nativeSave && (
         <PrimaryButton disabled={mutation.isPending} onClick={submit}>
           {mutation.isPending ? 'Saving…' : 'Save Entry'}
           <span className="material-symbols-outlined" aria-hidden="true">
             arrow_forward
           </span>
         </PrimaryButton>
+        )}
       </section>
 
       {/* ---- recent entries ---- */}

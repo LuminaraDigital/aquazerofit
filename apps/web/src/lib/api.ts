@@ -3,16 +3,27 @@
  * refresh-token rotation, the error envelope, and SSE streaming for chat.
  *
  * FE-01: the refresh token lives in an httpOnly cookie scoped to
- * /api/v1/auth — it is never written to web storage. The access token is
+ * /api/v1/auth - it is never written to web storage. The access token is
  * kept in a module-level variable (memory only); a page reload restores the
  * session by calling /auth/refresh, whose cookie carries the credential.
+ *
+ * When Firebase Auth is enabled, the in-memory bearer may be a Firebase ID
+ * token instead. 401 recovery then prefers Firebase getIdToken(true) before
+ * the legacy cookie refresh.
  */
-import { isApiErrorBody, type ApiErrorBody, type AuthResponse } from '@aquazerofit/shared';
+import {
+  isApiErrorBody,
+  type ApiErrorBody,
+} from '../../../../packages/shared/src/errors';
+import type { AuthResponse } from '@aquazerofit/shared';
+import { isFirebaseAuthEnabled, loadFirebaseSdk } from './firebase';
+import { todayLocalDate } from './format';
+import { getTelegramInitData, isTMA } from './telegram';
 
 /**
  * API origin. Same-origin by default, which is what the Vite dev proxy and any
  * single-origin deployment want. Split-origin hosting (static site on a CDN,
- * API on its own hostname) sets VITE_API_BASE_URL at build time — without it
+ * API on its own hostname) sets VITE_API_BASE_URL at build time - without it
  * every request would resolve against the static host and 404.
  */
 const BASE = import.meta.env.VITE_API_BASE_URL
@@ -41,7 +52,7 @@ export class ApiError extends Error {
   }
 }
 
-// In-memory access token only — never localStorage/sessionStorage (FE-01).
+// In-memory access token only - never localStorage/sessionStorage (FE-01).
 let accessToken: string | null = null;
 
 export const tokenStore = {
@@ -74,26 +85,88 @@ function isJwtLike(token: string): boolean {
   return parts.every((part) => part.length > 0 && base64url.test(part));
 }
 
+/** A miss when the SDK will not load too, so the cookie and Telegram paths still run. */
+async function tryFirebaseRefresh(): Promise<boolean> {
+  if (!isFirebaseAuthEnabled()) return false;
+  try {
+    const sdk = await loadFirebaseSdk();
+    const user = sdk.auth?.currentUser;
+    if (!user) return false;
+    const token = await user.getIdToken(true);
+    tokenStore.set({ accessToken: token });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Rotate the session via the httpOnly refresh cookie. Empty body — the
- * cookie carries the credential. Used on 401 retry, app boot, and SSE.
+ * Cookie refresh. The httpOnly cookie is SameSite=Lax, so a Mini App iframe
+ * on web.telegram.org does not send it. A non-OK response is a normal miss,
+ * not an exception.
+ */
+async function tryCookieRefresh(): Promise<boolean> {
+  const res = await fetch(`${BASE}/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!res.ok) return false;
+  const data = (await res.json()) as AuthResponse;
+  if (!data.accessToken) return false;
+  tokenStore.set(data);
+  return true;
+}
+
+/**
+ * Inside Telegram, a failed cookie refresh is recovered by signing in again
+ * with the launch data already on the page. The server re-checks the HMAC.
+ *
+ * This only works while initData is still inside its freshness window (10
+ * minutes). After that the Mini App has to be reopened. The refresh token
+ * from the JSON body is not kept in JavaScript memory: that would undo the
+ * httpOnly cookie. SameSite=None is not used. See cookies.ts for the CSRF
+ * reason.
+ */
+async function tryTelegramReauth(): Promise<boolean> {
+  if (!isTMA()) return false;
+  const initData = getTelegramInitData();
+  if (!initData) return false;
+  const res = await fetch(`${BASE}/auth/telegram`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData }),
+  });
+  if (!res.ok) return false;
+  const data = (await res.json()) as AuthResponse;
+  if (!data.accessToken) return false;
+  tokenStore.set(data);
+  return true;
+}
+
+/**
+ * Rotate the session via Firebase ID token refresh and/or the httpOnly
+ * refresh cookie. Inside Telegram, a cookie miss falls through to initData
+ * auth. Used on 401 retry, app boot, and SSE.
  */
 async function tryRefresh(): Promise<boolean> {
   refreshPromise ??= (async () => {
     try {
-      const res = await fetch(`${BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      if (!res.ok) {
-        accessToken = null;
-        return false;
+      if (await tryFirebaseRefresh()) return true;
+      try {
+        if (await tryCookieRefresh()) return true;
+      } catch {
+        // Cookie refresh is unreachable. Fall through to Telegram re-auth.
       }
-      const data = (await res.json()) as AuthResponse;
-      tokenStore.set(data);
-      return true;
+      try {
+        if (await tryTelegramReauth()) return true;
+      } catch {
+        // Launch-data sign-in is unreachable. The session is still gone.
+      }
+      accessToken = null;
+      return false;
     } catch {
+      accessToken = null;
       return false;
     } finally {
       refreshPromise = null;
@@ -104,9 +177,8 @@ async function tryRefresh(): Promise<boolean> {
 
 /**
  * Restore a session after a page reload: the in-memory access token is gone
- * but the refresh cookie survives. Returns true when a fresh access token
- * was minted. Safe to call unconditionally on boot — it is a no-op when
- * already authenticated and deduplicates concurrent callers.
+ * but Firebase persistence and/or the refresh cookie may survive. Returns true
+ * when a fresh access token was minted. Safe to call unconditionally on boot.
  */
 export async function restoreSession(): Promise<boolean> {
   if (accessToken) return true;
@@ -200,13 +272,13 @@ export async function streamChat(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Omit the header entirely when signed out — interpolating a null
+        // Omit the header entirely when signed out - interpolating a null
         // token sends the literal "Bearer null", which reads as a malformed
         // credential rather than an absent one.
         ...(access ? { Authorization: `Bearer ${access}` } : {}),
         'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, localDate: todayLocalDate() }),
       signal,
     });
   };

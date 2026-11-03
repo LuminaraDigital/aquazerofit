@@ -24,7 +24,7 @@ import { INSIGHT_MIN_ACTIVE_DAYS, INSIGHT_PERIOD_DAYS } from '@aquazerofit/share
 import type { AiMetadata, ProgressInsight } from '@aquazerofit/shared';
 import { complete } from '../ai/gateway';
 import { post as postGuardrail } from '../ai/guardrails';
-import { creditLedger } from '../ai/creditLedger';
+import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { isLaneAllowed } from '../ai/tierPolicy';
 import { loadPrompt } from '../ai/prompts';
 import { hasConsent } from '../me/service';
@@ -188,7 +188,7 @@ progressRouter.get(
     // --- 4. Premium + consent on: reserve, narrate, guardrail, settle.
     let reservationId: string;
     try {
-      reservationId = await creditLedger.reserve(user.id, 'progressInsight');
+      reservationId = await creditLedger.reserve(user.id, 'progressInsight', user.tier);
     } catch (err) {
       // Out of credits is an expected user state, not a fault, and it is not a
       // reason to show someone nothing. Note it server-side and degrade.
@@ -230,15 +230,12 @@ progressRouter.get(
         modelText.length > 0 && !postGuardrail(modelText, { userId: user.id }).blocked;
       const insight = draft(usable ? modelText : fallbackNarrative, result.meta);
 
-      // Real providers failed and the gateway fell back to offline templates —
-      // do not charge. Keyless mock (no providers configured) keeps degraded
-      // false and bills normally per product rules. Same stance as the chat and
-      // recommendation lanes.
-      if (result.meta.degraded) {
-        await creditLedger.release(reservationId);
-      } else {
-        await creditLedger.commit(reservationId);
-      }
+      // Real providers failed and the gateway fell back to offline templates -
+      // do not charge. The keyless mock (no providers configured) is degraded
+      // too in production ('no_provider'), so it is not charged there either;
+      // only in development and tests does it bill, where it IS the product.
+      // Same stance as the chat and recommendation lanes.
+      await settleReservation(reservationId, result.meta.degraded !== true);
 
       // --- 5. Persist: this is the document the cache check above will find.
       await upsertDoc('ai', insight);

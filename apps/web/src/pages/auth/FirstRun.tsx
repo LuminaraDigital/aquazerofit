@@ -49,7 +49,7 @@ export default function FirstRun() {
           <h1 className="font-heading font-semibold tracking-tight text-3xl text-on-surface leading-tight">
             Hey{firstName ? `, ${firstName}` : ''}
           </h1>
-          <p className="text-sm text-on-surface-variant/80 mt-1.5 leading-relaxed">
+          <p className="text-sm text-on-surface-variant mt-1.5 leading-relaxed">
             You are in — nothing to fill in first. Have a look around, and set your targets
             whenever you are ready.
           </p>

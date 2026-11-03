@@ -19,6 +19,7 @@ import type {
   WorkoutSession,
 } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
+import { trackFirstValueWorkout } from '@/lib/retention';
 import {
   unwrapResolved,
   type CompleteExerciseInput,
@@ -39,6 +40,7 @@ import { asList, estimateKcal, estimateMinutes, ExerciseImage, unwrapSession } f
 import { ShareMoment } from '@/components/share/ShareMoment';
 import type { ShareCardPayload } from '@/lib/shareCard';
 import { todayWorkoutQuery, useMe } from '@/lib/queries';
+import { applyCompletedSession, optimisticPatch, patchTodaySession } from '@/lib/optimistic';
 import { AQUA_CHARACTER } from '@aquazerofit/shared';
 
 type Phase = 'overview' | 'work' | 'rest' | 'summary';
@@ -257,18 +259,35 @@ export default function WorkoutDetail() {
   });
 
   // ---- complete workout ----
+  /**
+   * The only set-related write that touches the network. Completing an
+   * individual set is local state (`setsDone` / `setLogs`) and already paints
+   * instantly; the whole session is posted once, here, at the end — which is
+   * where the user waits, and so where the optimistic write belongs.
+   *
+   * The cached value must stay the raw ['workout','today'] envelope, because
+   * the dashboard and the library read the same key and carve their own slices
+   * with `select` (see the INVARIANT on todayWorkoutQuery). patchTodaySession
+   * therefore reaches inside the envelope rather than replacing it. Server
+   * work — `kcalBurned`, achievements, plan progression — is left to the
+   * settle-time invalidation.
+   */
+  const completePatch = optimisticPatch<
+    unknown,
+    { exercises: CompleteExerciseInput[]; durationMinutes: number; localDate: string }
+  >(queryClient, todayWorkoutQuery.queryKey, (previous, payload) =>
+    patchTodaySession(previous, (s) => applyCompletedSession(s, payload)),
+  );
+
   const completeMutation = useMutation({
     mutationFn: (payload: {
       exercises: CompleteExerciseInput[];
       durationMinutes: number;
       localDate: string;
     }) => api<WorkoutSession>(`/workouts/${sessionId}/complete`, { method: 'POST', body: payload }),
+    ...completePatch,
     onSuccess: async () => {
-      void queryClient.invalidateQueries({ queryKey: ['workout'] });
-      void queryClient.invalidateQueries({ queryKey: ['plan'] });
-      void queryClient.invalidateQueries({ queryKey: ['progress'] });
-      void queryClient.invalidateQueries({ queryKey: ['workout-stats'] });
-      void queryClient.invalidateQueries({ queryKey: ['challenges'] });
+      trackFirstValueWorkout('workout_complete');
       toast.success('Workout complete - great session!');
       const mins = durationMinutes();
       setSharePayload({
@@ -297,7 +316,17 @@ export default function WorkoutDetail() {
         // achievements toast is best-effort only
       }
     },
-    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Could not save the workout'),
+    onError: (e, _vars, context) => {
+      completePatch.onError(context);
+      toast.error(e instanceof ApiError ? e.message : 'Could not save the workout');
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workout'] });
+      void queryClient.invalidateQueries({ queryKey: ['plan'] });
+      void queryClient.invalidateQueries({ queryKey: ['progress'] });
+      void queryClient.invalidateQueries({ queryKey: ['workout-stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['challenges'] });
+    },
   });
 
   const submitSummary = () => {
@@ -399,7 +428,6 @@ export default function WorkoutDetail() {
               <h1 className="heading-display font-heading text-3xl leading-tight text-on-surface">
                 {session.focus}
               </h1>
-              <p className="text-sm text-on-surface-variant">Aqua Coach • personalised session</p>
             </div>
           </section>
 
@@ -599,7 +627,7 @@ export default function WorkoutDetail() {
                         }
                         placeholder="BW"
                         aria-label={`Weight in kilograms for set ${(setsDone[exerciseIdx] ?? 0) + 1} of ${current.name}`}
-                        className="w-full rounded-lg border border-outline-variant bg-surface-container px-2 py-2 text-center font-bold text-on-surface tabular-nums placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full rounded-lg border border-outline-variant bg-surface-container px-2 py-2 text-center font-bold text-on-surface tabular-nums placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -631,7 +659,7 @@ export default function WorkoutDetail() {
                         onChange={(e) => setActualInput((s) => ({ ...s, rir: e.target.value }))}
                         placeholder="-"
                         aria-label={`Reps in reserve for set ${(setsDone[exerciseIdx] ?? 0) + 1} of ${current.name}`}
-                        className="w-full rounded-lg border border-outline-variant bg-surface-container px-2 py-2 text-center font-bold text-on-surface tabular-nums placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full rounded-lg border border-outline-variant bg-surface-container px-2 py-2 text-center font-bold text-on-surface tabular-nums placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </label>
                   </div>

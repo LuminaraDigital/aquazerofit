@@ -79,7 +79,10 @@ export function CoachCard() {
             </h2>
             <span
               className="text-[11px] uppercase tracking-wider px-1.5 py-0.5 rounded"
-              style={{ color: coach.colour, backgroundColor: `${coach.colour}1a` }}
+              style={{
+                color: `var(--azf-coach-ink, ${coach.colour})`,
+                backgroundColor: `var(--azf-coach-chip, ${coach.colour}1a)`,
+              }}
             >
               Bond {data.bondLevel}
             </span>
@@ -92,7 +95,7 @@ export function CoachCard() {
           {data.reactions.slice(1).map((reaction) => (
             <p
               key={`${reaction.kind}:${reaction.text}`}
-              className="text-xs text-on-surface-variant/70 mt-1.5 leading-relaxed"
+              className="text-xs text-on-surface-variant mt-1.5 leading-relaxed"
             >
               {reaction.text}
             </p>

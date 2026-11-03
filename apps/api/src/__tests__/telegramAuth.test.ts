@@ -1,5 +1,5 @@
 /**
- * TelegramAuthValidator — the three mandatory vectors from AQF-09 §2.1:
+ * TelegramAuthValidator. The three mandatory vectors from AQF-09 §2.1:
  * a known-good payload, a payload with one tampered field, and a payload
  * with a stale timestamp. All signed with the dev bot token.
  */
@@ -22,14 +22,18 @@ function makeInitData(overrides: Partial<Record<string, string>> = {}): string {
   );
 }
 
-function codeOf(fn: () => unknown): string | null {
+function errorOf(fn: () => unknown): { code: string; message: string } | null {
   try {
     fn();
     return null;
   } catch (err) {
-    if (err instanceof AppError) return err.code;
+    if (err instanceof AppError) return { code: err.code, message: err.message };
     throw err;
   }
+}
+
+function codeOf(fn: () => unknown): string | null {
+  return errorOf(fn)?.code ?? null;
 }
 
 describe('validateTelegramInitData', () => {
@@ -65,5 +69,56 @@ describe('validateTelegramInitData', () => {
     expect(codeOf(() => validateTelegramInitData('auth_date=123&user=%7B%7D', BOT_TOKEN))).toBe(
       'AUTH_TG_INVALID',
     );
+  });
+
+  it('rejects an auth_date in the future beyond clock skew, and allows a small skew', () => {
+    const now = Math.floor(Date.now() / 1000);
+    const withinSkew = makeInitData({ auth_date: String(now + 30) });
+    expect(validateTelegramInitData(withinSkew, BOT_TOKEN, now).id).toBe(987654321);
+
+    const ahead = makeInitData({ auth_date: String(now + 31) });
+    const err = errorOf(() => validateTelegramInitData(ahead, BOT_TOKEN, now));
+    expect(err?.code).toBe('AUTH_TG_STALE');
+    expect(err?.message).toBe('Launch data timestamp is in the future');
+  });
+
+  it('rejects raw initData over 4 KB before trusting it', () => {
+    const err = errorOf(() => validateTelegramInitData('x'.repeat(4097), BOT_TOKEN));
+    expect(err?.code).toBe('AUTH_TG_INVALID');
+    expect(err?.message).toBe('Launch data is too large');
+
+    const atCap = errorOf(() => validateTelegramInitData('x'.repeat(4096), BOT_TOKEN));
+    expect(atCap?.message).not.toBe('Launch data is too large');
+  });
+
+  it('rejects a user object that is not the Telegram shape, and strips unknown fields', () => {
+    const now = Math.floor(Date.now() / 1000);
+    const stringId = makeInitData({
+      auth_date: String(now),
+      user: JSON.stringify({ id: '987654321', first_name: 'Alex' }),
+    });
+    expect(codeOf(() => validateTelegramInitData(stringId, BOT_TOKEN, now))).toBe('AUTH_TG_INVALID');
+
+    const missingId = makeInitData({
+      auth_date: String(now),
+      user: JSON.stringify({ first_name: 'Alex' }),
+    });
+    expect(codeOf(() => validateTelegramInitData(missingId, BOT_TOKEN, now))).toBe('AUTH_TG_INVALID');
+
+    const nestedName = makeInitData({
+      auth_date: String(now),
+      user: JSON.stringify({ id: 42, first_name: { evil: true } }),
+    });
+    expect(codeOf(() => validateTelegramInitData(nestedName, BOT_TOKEN, now))).toBe('AUTH_TG_INVALID');
+
+    const extra = makeInitData({
+      auth_date: String(now),
+      user: JSON.stringify({ id: 42, first_name: 'A', is_premium: true, photo_url: 'https://cdn.example/a' }),
+    });
+    const user = validateTelegramInitData(extra, BOT_TOKEN, now);
+    expect(user.id).toBe(42);
+    expect(user.first_name).toBe('A');
+    expect(user).not.toHaveProperty('is_premium');
+    expect(user).not.toHaveProperty('photo_url');
   });
 });

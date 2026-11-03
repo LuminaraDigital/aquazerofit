@@ -3,7 +3,7 @@
  *
  * The entitlement check here is the *only* authority on whether a user may
  * train under a coach. The client renders locks for feel; this decides. That
- * separation matters more than usual because one of the doors is a paid one —
+ * separation matters more than usual because one of the doors is a paid one -
  * a lock enforced only in the UI is a coach anyone can have for free by
  * editing a request, which would make the Stars price a donation.
  */
@@ -166,6 +166,33 @@ export function selectCoach(userId: string, coachId: string, timezone?: string):
 export function grantPurchasedCoach(userId: string, coachId: string): CoachState {
   const state = getCoachState(userId);
   if (!state.purchased.includes(coachId)) state.purchased.push(coachId);
+  return saveCoachState(state);
+}
+
+/**
+ * Take back a Stars coach after a refund.
+ *
+ * Idempotent: a coach that is not in `purchased` is already gone. If that
+ * coach is the one they are training under and the level door is still
+ * closed, selection moves back to the default so a refunded persona cannot
+ * keep coaching. A coach they have also earned by level stays selected.
+ */
+export function revokePurchasedCoach(userId: string, coachId: string): CoachState {
+  const state = getCoachState(userId);
+  if (state.purchased.includes(coachId)) {
+    state.purchased = state.purchased.filter((id) => id !== coachId);
+  }
+  if (state.activeCoachId === coachId) {
+    const coach = coachById(coachId);
+    const experience = experienceOf(userId);
+    const stillUnlocked = coach ? isUnlocked(coach, state, experience.level).unlocked : false;
+    if (!stillUnlocked) {
+      state.accrued[coachId] = bondXpFor(state, coachId, experience.totalXp);
+      state.activeCoachId = DEFAULT_COACH_ID;
+      state.baselineXp = experience.totalXp;
+      state.selectedAt = nowIso();
+    }
+  }
   return saveCoachState(state);
 }
 

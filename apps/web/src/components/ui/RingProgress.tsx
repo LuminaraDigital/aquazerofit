@@ -3,10 +3,10 @@ import { useEffect, useState, type ReactNode } from 'react';
 export type RingTone = 'aqua' | 'green' | 'coral' | 'navy';
 
 const TONE_COLOR: Record<RingTone, string> = {
-  aqua: '#2fd9f4',
-  green: '#45dfa4',
-  coral: '#ffb2b9',
-  navy: '#22d3ee',
+  aqua: 'var(--azf-ring-aqua, #2fd9f4)',
+  green: 'var(--azf-ring-green, #45dfa4)',
+  coral: 'var(--azf-ring-coral, #ffb2b9)',
+  navy: 'var(--azf-ring-navy, #22d3ee)',
 };
 
 /**
@@ -60,7 +60,7 @@ export function RingProgress({
           cy={center}
           r={r}
           fill="none"
-          stroke={tone === 'navy' ? '#3c494c' : '#1E4C74'}
+          stroke={tone === 'navy' ? 'var(--azf-ring-track-navy, #3c494c)' : 'var(--azf-ring-track, #1E4C74)'}
           strokeWidth={strokeWidth}
         />
         <circle

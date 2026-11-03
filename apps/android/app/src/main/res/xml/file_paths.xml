@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Files this app is willing to hand to another app through the share sheet.
+
+     Exactly one directory, inside the app's own cache: the data export the
+     user asked for. Nothing else in app storage is shareable, and the grant is
+     per-URI and read-only. -->
+<paths>
+    <cache-path
+        name="exports"
+        path="exports/" />
+</paths>

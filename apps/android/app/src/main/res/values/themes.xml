@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base app theme: dark-only Deep Sea. Compose paints everything; this
+         only controls the window before the first frame. -->
+    <style name="Theme.AquaZeroFit" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/deep_sea_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Splash theme (core-splashscreen): dark #0E1416 with the aqua mark. -->
+    <style name="Theme.AquaZeroFit.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/deep_sea_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.AquaZeroFit</item>
+    </style>
+</resources>

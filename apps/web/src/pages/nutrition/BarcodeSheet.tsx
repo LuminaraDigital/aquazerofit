@@ -6,7 +6,7 @@
  * Looks up GET /foods/barcode/:code and renders the result card with a
  * nutriscore badge, vegan/vegetarian chips, OFF attribution and a
  * deterministic client-side ALLERGEN WARNING (food allergens ∩ profile
- * allergies — mirrors the backend filter; never model-estimated).
+ * allergies - mirrors the backend filter; never model-estimated).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
@@ -18,8 +18,10 @@ import { Chip } from '@/components/ui/Chip';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 import { haptic } from '@/lib/telegram';
-import { GramsStepper, itemFromFood } from './Nutrition';
+import { GramsStepper } from './GramsStepper';
+import { itemFromFood } from './nutritionMath';
 import { fmtInt, MEAL_LABEL, MEAL_TYPES, mealTypeForNow, round1 } from '../dashboard/lib';
 
 interface BarcodeDetectorLike {
@@ -76,6 +78,7 @@ export function BarcodeSheet({
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const canScan =
     typeof navigator !== 'undefined' &&
@@ -110,6 +113,11 @@ export function BarcodeSheet({
     setCameraOn(false);
     setTorchOn(false);
   };
+
+  useFocusTrap(open, panelRef, () => {
+    stopCamera();
+    onClose();
+  });
 
   const toggleTorch = async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -148,13 +156,13 @@ export function BarcodeSheet({
       playScanBeep();
       haptic('success');
     },
-    // VALIDATION_FAILED = not a real barcode (wrong length or check digit) —
+    // VALIDATION_FAILED = not a real barcode (wrong length or check digit) -
     // a user-input problem, not a connection failure.
     onError: (e) =>
       show(
         e instanceof ApiError && e.code === 'VALIDATION_FAILED'
-          ? "That doesn't look like a valid barcode — check the digits and try again"
-          : 'Lookup failed — check your connection and try again',
+          ? "That doesn't look like a valid barcode - check the digits and try again"
+          : 'Lookup failed - check your connection and try again',
       ),
   });
 
@@ -205,12 +213,12 @@ export function BarcodeSheet({
               if (hit && !cancelled) submitCode(hit);
             })
             .catch(() => {
-              // Detection failures on individual frames are expected — keep scanning.
+              // Detection failures on individual frames are expected - keep scanning.
             });
         }, 500);
       } catch {
         if (!cancelled) {
-          setCameraError('Camera unavailable — type the barcode below instead.');
+          setCameraError('Camera unavailable - type the barcode below instead.');
           setCameraOn(false);
         }
       }
@@ -272,7 +280,11 @@ export function BarcodeSheet({
         }}
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
       />
-      <div className="absolute inset-x-0 bottom-0 mx-auto max-h-[88vh] max-w-md overflow-y-auto rounded-t-3xl border-t border-border-aqua bg-surface-container-high p-5 pb-8">
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="absolute inset-x-0 bottom-0 mx-auto max-h-[88vh] max-w-md overflow-y-auto rounded-t-3xl border-t border-border-aqua bg-surface-container-high p-5 pb-8 outline-none"
+      >
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-outline-variant" aria-hidden="true" />
         <h3 className="mb-4 font-heading text-xl font-semibold uppercase tracking-[0.02em] text-on-surface">
           Scan barcode
@@ -287,7 +299,7 @@ export function BarcodeSheet({
                   ref={videoRef}
                   muted
                   playsInline
-                  aria-label="Camera viewfinder — point at a product barcode"
+                  aria-label="Camera viewfinder - point at a product barcode"
                   className="aspect-[4/3] w-full object-cover"
                 />
                 {/* Torch Toggle Button */}
@@ -310,10 +322,10 @@ export function BarcodeSheet({
                 >
                   <div className="relative w-full h-3/4 max-w-[220px] border border-primary/30 rounded-xl shadow-[0_0_20px_rgba(47,217,244,0.15)]">
                     {/* Reticle Corner Brackets */}
-                    <div className="absolute -top-0.5 -left-0.5 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl-sm shadow-[0_0_8px_#2fd9f4]" />
-                    <div className="absolute -top-0.5 -right-0.5 w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr-sm shadow-[0_0_8px_#2fd9f4]" />
-                    <div className="absolute -bottom-0.5 -left-0.5 w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl-sm shadow-[0_0_8px_#2fd9f4]" />
-                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 border-b-2 border-r-2 border-primary rounded-br-sm shadow-[0_0_8px_#2fd9f4]" />
+                    <div className="absolute -top-0.5 -left-0.5 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl-sm shadow-[0_0_8px_rgb(var(--azf-surface-tint)/0.9)]" />
+                    <div className="absolute -top-0.5 -right-0.5 w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr-sm shadow-[0_0_8px_rgb(var(--azf-surface-tint)/0.9)]" />
+                    <div className="absolute -bottom-0.5 -left-0.5 w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl-sm shadow-[0_0_8px_rgb(var(--azf-surface-tint)/0.9)]" />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 border-b-2 border-r-2 border-primary rounded-br-sm shadow-[0_0_8px_rgb(var(--azf-surface-tint)/0.9)]" />
                     {/* Scanning Laser Beam Line */}
                     <div className="absolute inset-x-1 top-1/2 h-0.5 -translate-y-1/2 bg-primary/90 shadow-[0_0_12px_rgba(47,217,244,0.8)]" />
                   </div>
@@ -375,7 +387,7 @@ export function BarcodeSheet({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Allergen warning — deterministic client-side check (food
+            {/* Allergen warning - deterministic client-side check (food
                 allergens ∩ profile allergies), mirroring the backend filter. */}
             {allergyHits.length > 0 && (
               <div
@@ -397,7 +409,7 @@ export function BarcodeSheet({
                       ? ' may contain traces of'
                       : ' contains'}{' '}
                   {allergyHits.join(', ')}, which you listed as an allergy. Allergen data is
-                  best-effort — always check the label.
+                  best-effort - always check the label.
                 </p>
               </div>
             )}
@@ -427,13 +439,13 @@ export function BarcodeSheet({
                   )}
                 </div>
               )}
-              {/* OFF attribution — never omitted for OFF-sourced records (ODbL). */}
+              {/* OFF attribution - never omitted for OFF-sourced records (ODbL). */}
               {result.origin === 'off-api' && (
                 <p className="mt-2 border-t border-outline-variant pt-2 text-[11px] text-on-surface-variant">
                   © Open Food Facts contributors
                   {result.food.sourceUrl && (
                     <>
-                      {' — '}
+                      {' - '}
                       <a
                         href={result.food.sourceUrl}
                         target="_blank"

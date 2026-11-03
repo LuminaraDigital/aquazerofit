@@ -78,6 +78,13 @@ describe('Safety page', () => {
     expect(within(upload).getByText(`${mib} MB`)).toBeTruthy();
   });
 
+  it('quotes the bcrypt cost the auth service uses', () => {
+    renderPage();
+
+    const hashing = screen.getByRole('row', { name: /password hashing/i });
+    expect(within(hashing).getByText('bcrypt, cost 12')).toBeTruthy();
+  });
+
   it('keeps the section describing what the product is not', () => {
     renderPage();
 

@@ -3,11 +3,11 @@
  *
  * No database anywhere: PostgresStore takes an injected QueryExecutor, so the
  * suite asserts on the exact SQL and bind parameters it would have sent. That
- * is deliberate — the store is only durable if the dirty tracking is per
+ * is deliberate. The store is only durable if the dirty tracking is per
  * document id (a per-container rewrite would push all ~995 `content` rows on
  * every meal log) and if the batched statements are shaped correctly.
  */
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -16,9 +16,15 @@ import {
   buildDelete,
   buildUpsert,
   CREATE_TABLE_SQL,
+  STARS_CHARGE_DUPLICATE_COUNT_SQL,
+  STARS_CHARGE_UNIQUE_INDEX_SQL,
+  STARS_SUBSCRIPTION_CHARGE_UNIQUE_INDEX_SQL,
   UPSERT_CHUNK_SIZE,
+  starsChargeDuplicateCount,
+  databaseSslOption,
   isLoopbackConnectionString,
   isSecureConnectionString,
+  usesLocalDatabaseTransport,
   type QueryExecutor,
 } from '../platform/pgStore';
 import type { StoredDoc } from '../platform/store';
@@ -32,9 +38,14 @@ interface Call {
 class FakeExecutor implements QueryExecutor {
   readonly calls: Call[] = [];
   rows: unknown[] = [];
+  /** Value returned by the pre-index duplicate count. Zero creates the index. */
+  duplicateGroups = 0;
 
   async query(text: string, values?: unknown[]): Promise<{ rows: unknown[] }> {
     this.calls.push({ text, values: values ?? [] });
+    if (text.includes('duplicate_groups')) {
+      return { rows: [{ duplicate_groups: this.duplicateGroups }] };
+    }
     return { rows: text.startsWith('SELECT') ? this.rows : [] };
   }
 
@@ -91,7 +102,16 @@ describe('hydrate', () => {
 
     expect(exec.calls[0]!.text).toBe(CREATE_TABLE_SQL);
     expect(exec.calls[0]!.text).toContain('CREATE TABLE IF NOT EXISTS documents');
-    expect(exec.calls[1]!.text).toBe('SELECT container, id, doc FROM documents');
+    expect(exec.calls[1]!.text).toBe(STARS_CHARGE_DUPLICATE_COUNT_SQL);
+    expect(exec.calls[1]!.text).toContain('duplicate_groups');
+    expect(exec.calls[2]!.text).toBe(STARS_CHARGE_UNIQUE_INDEX_SQL);
+    expect(exec.calls[2]!.text).toContain('CREATE UNIQUE INDEX IF NOT EXISTS documents_stars_charge_uidx');
+    expect(exec.calls[2]!.text).toContain("doc->>'telegramPaymentChargeId'");
+    expect(exec.calls[2]!.text).toContain("doc->>'type' = 'starsPurchase'");
+    expect(exec.calls[3]!.text).toBe(STARS_SUBSCRIPTION_CHARGE_UNIQUE_INDEX_SQL);
+    expect(exec.calls[3]!.text).toContain('documents_stars_subscription_charge_uidx');
+    expect(exec.calls[3]!.text).toContain("doc->>'type' = 'starsSubscriptionPayment'");
+    expect(exec.calls[4]!.text).toBe('SELECT container, id, doc FROM documents');
     expect(store.count('users')).toBe(1);
     expect(store.count('logs')).toBe(2);
     expect(store.byId('users', 'u1')).toEqual({ id: 'u1', email: 'a@b.c' });
@@ -113,7 +133,63 @@ describe('hydrate', () => {
     const store = newStore();
     await store.hydrate();
     await store.hydrate();
-    expect(exec.calls).toHaveLength(2);
+    expect(exec.calls).toHaveLength(5);
+  });
+
+  it('skips the charge unique index when duplicate charge ids are already stored', async () => {
+    const chargeId = 'chg-do-not-log';
+    exec.duplicateGroups = 2;
+    exec.rows = [
+      {
+        container: 'ledger',
+        id: 'sp1',
+        doc: {
+          id: 'sp1',
+          type: 'starsPurchase',
+          telegramPaymentChargeId: chargeId,
+          payload: 'secret-body',
+        },
+      },
+      {
+        container: 'ledger',
+        id: 'sp2',
+        doc: {
+          id: 'sp2',
+          type: 'starsPurchase',
+          telegramPaymentChargeId: chargeId,
+          payload: 'secret-body',
+        },
+      },
+    ];
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((message?: unknown) => {
+      lines.push(String(message));
+    });
+    try {
+      const store = newStore();
+      await expect(store.hydrate()).resolves.toBeUndefined();
+      expect(store.count('ledger')).toBe(2);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(exec.calls.map((call) => call.text)).not.toContain(STARS_CHARGE_UNIQUE_INDEX_SQL);
+    expect(exec.calls.map((call) => call.text)).toContain(STARS_SUBSCRIPTION_CHARGE_UNIQUE_INDEX_SQL);
+    expect(exec.calls.some((call) => call.text === 'SELECT container, id, doc FROM documents')).toBe(true);
+    const skipped = lines.find((line) => line.includes('documents_stars_charge_uidx'));
+    expect(skipped).toContain('2');
+    expect(lines.join('\n')).not.toContain(chargeId);
+    expect(lines.join('\n')).not.toContain('sp1');
+    expect(lines.join('\n')).not.toContain('secret-body');
+  });
+});
+
+describe('starsChargeDuplicateCount', () => {
+  it('reads the group count and treats a missing value as zero', () => {
+    expect(starsChargeDuplicateCount([{ duplicate_groups: 4 }])).toBe(4);
+    expect(starsChargeDuplicateCount([{ duplicate_groups: '2' }])).toBe(2);
+    expect(starsChargeDuplicateCount([])).toBe(0);
+    expect(starsChargeDuplicateCount([{ duplicate_groups: null }])).toBe(0);
   });
 });
 
@@ -252,7 +328,7 @@ describe('dirty tracking', () => {
     const store = newStore();
     await store.hydrate();
 
-    // No setImmediate has fired yet — flush() must still drain this write,
+    // No setImmediate has fired yet. flush() must still drain this write,
     // which is what the SIGTERM handler in index.ts relies on.
     store.upsert('logs', { id: 'l1' });
     await store.flush();
@@ -290,7 +366,7 @@ describe('compareAndSwapRefreshToken', () => {
         const usedAtJson = (values as unknown[])[3] as string;
         const row = this.docs.get(id);
         // Mirror the WHERE clause: no row matched when the hash differs or
-        // the token is already consumed/revoked — that is the loser branch
+        // the token is already consumed/revoked. That is the loser branch
         // a second concurrent UPDATE takes once the row lock is released.
         if (
           !row ||
@@ -339,7 +415,7 @@ describe('compareAndSwapRefreshToken', () => {
 
   it('two concurrent rotations on one token: exactly one succeeds, loser gets undefined', async () => {
     const { store } = casStore();
-    // Concurrent calls — the fake serializes on the emulated row lock, same
+    // Concurrent calls. The fake serializes on the emulated row lock, same
     // as Postgres serializes the second UPDATE behind the first's lock.
     const [first, second] = await Promise.all([
       store.compareAndSwapRefreshToken(tokenDoc.id, 'hash-abc', '2026-08-17T00:00:00.000Z'),
@@ -382,6 +458,42 @@ describe('connection string safety', () => {
 
   it('rejects malformed URLs as insecure', () => {
     expect(isSecureConnectionString('not-a-url')).toBe(false);
+  });
+
+  it('treats a Cloud SQL unix socket as local and a public IP as remote', () => {
+    const socket =
+      'postgres://azf:pw@/aquazerofit?host=/cloudsql/aquazerofit:australia-southeast1:azf-pg';
+    expect(isLoopbackConnectionString(socket)).toBe(false);
+    expect(usesLocalDatabaseTransport(socket)).toBe(true);
+    expect(isSecureConnectionString(socket)).toBe(true);
+    expect(databaseSslOption(socket, {})).toBeUndefined();
+
+    const encoded =
+      'postgres://azf:pw@/aquazerofit?host=%2Fcloudsql%2Faquazerofit%3Aaustralia-southeast1%3Aazf-pg';
+    expect(usesLocalDatabaseTransport(encoded)).toBe(true);
+    expect(isSecureConnectionString(encoded)).toBe(true);
+
+    const remote = 'postgres://u:p@35.189.27.65:5432/aquazerofit';
+    expect(usesLocalDatabaseTransport(remote)).toBe(false);
+    expect(isSecureConnectionString(remote)).toBe(false);
+    expect(databaseSslOption(remote, {})).toBe(true);
+
+    expect(usesLocalDatabaseTransport('postgres://u:p@db.example.com/azf?host=/tmp/pg.sock')).toBe(
+      false,
+    );
+    expect(isSecureConnectionString('postgres://u:p@db.example.com/azf?host=/tmp/pg.sock')).toBe(
+      false,
+    );
+    expect(
+      usesLocalDatabaseTransport(
+        'postgres://u:p@/aquazerofit?host=/cloudsql/aquazerofit:australia-southeast1:../azf-pg',
+      ),
+    ).toBe(false);
+    expect(
+      usesLocalDatabaseTransport(
+        'postgres://azf:pw@localhost/aquazerofit?host=/cloudsql/aquazerofit:australia-southeast1:azf-pg',
+      ),
+    ).toBe(true);
   });
 
   it('connect() refuses an insecure off-host URL before touching the network', async () => {

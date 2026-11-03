@@ -8,7 +8,7 @@
  * to answer it. That refusal is what this file adds.
  *
  * Behind a TLS-terminating ingress (Azure Container Apps, App Service, Front
- * Door, Replit) the socket reaching Node is plaintext on every request, so
+ * Door, managed PaaS) the socket reaching Node is plaintext on every request, so
  * `req.secure` alone would redirect forever. Express derives `req.secure` from
  * X-Forwarded-Proto only for hops covered by `trust proxy`, which app.ts sets
  * from config.trustProxy — so `req.secure` is the correct signal here provided
@@ -72,6 +72,37 @@ export const enforceHttps: RequestHandler = (req: Request, res: Response, next: 
   }
   res.redirect(308, `https://${host}${req.originalUrl}`);
 };
+
+/**
+ * 301 `www.<canonical host>` to the canonical origin, so the site has one URL
+ * for search engines, shared links and cookies.
+ *
+ * The canonical origin is APP_PUBLIC_URL — already the app's public origin for
+ * mail links — so no host is hardcoded: with APP_PUBLIC_URL=https://example.com,
+ * www.example.com redirects there, and any other host is left alone.
+ *
+ * GET/HEAD only. A 301 lets clients turn a POST into a GET, and anything else
+ * is an API call from a page that is already loaded, which loses nothing by
+ * being answered where it landed. Mounted ahead of enforceHttps so plaintext
+ * www lands on the https origin in one hop; the plaintext-exempt paths stay
+ * put, because an ACME challenge for the www certificate must be answered on
+ * www itself.
+ */
+export const redirectWwwToCanonical: RequestHandler = (req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (isPlaintextExempt(req.path)) return next();
+  const canonical = canonicalOrigin();
+  if (!canonical || req.hostname?.toLowerCase() !== `www.${canonical.hostname}`) return next();
+  res.redirect(301, `${canonical.origin}${req.originalUrl}`);
+};
+
+function canonicalOrigin(): URL | null {
+  try {
+    return new URL(config.appPublicUrl);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Runtime check that TRUST_PROXY describes the real deployment.

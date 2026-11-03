@@ -1,5 +1,5 @@
 /**
- * Workout Library — pixel reference: Figma workout_library.
+ * Workout Library. Pixel reference: Figma workout_library.
  * Weekly plan strip (GET /plans/current), Today's Workout hero
  * (GET /workouts/today), server-driven exercise search with pagination
  * (GET /exercises?search=&category=&muscle=&equipment=&limit=&offset=),
@@ -18,11 +18,12 @@ import {
 import {
   EQUIPMENT,
   type Exercise,
-  type TrainingPlan,
   type WorkoutSession,
 } from '@aquazerofit/shared';
 import { api, ApiError, mediaUrl } from '@/lib/api';
-import { todayWorkoutQuery, unwrapWorkoutSession } from '@/lib/queries';
+import { asList, orNull } from '@/lib/envelopes';
+import { queryKeys, todayWorkoutQuery, unwrapWorkoutSession } from '@/lib/queries';
+import { cacheGeneratedPlan, currentPlanQuery } from '@/lib/trainingPlanCache';
 import { EQUIPMENT_ICONS, EQUIPMENT_LABELS } from '@/lib/equipmentMeta';
 import { normalizeExercisesPage } from '@/lib/contracts';
 import { AppHeader } from '@/components/ui/AppHeader';
@@ -36,6 +37,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
 import { BottomSheet } from './BottomSheet';
+
+export { asList };
 
 const PAGE_SIZE = 24;
 
@@ -61,33 +64,6 @@ const MUSCLES = [
   { key: 'hamstrings', label: 'Hamstrings' },
   { key: 'calves', label: 'Calves' },
 ] as const;
-
-/** Treat NOT_FOUND as "no data yet" rather than an error. */
-async function orNull<T>(fn: () => Promise<T>): Promise<T | null> {
-  try {
-    return await fn();
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return null;
-    throw e;
-  }
-}
-
-export function asList<T>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === 'object' && Array.isArray((data as { items?: unknown }).items)) {
-    return (data as { items: T[] }).items;
-  }
-  return [];
-}
-
-/** /plans/current responds { plan }; accept both wrapped and bare shapes. */
-function unwrapPlan(data: unknown): TrainingPlan | null {
-  if (!data || typeof data !== 'object') return null;
-  const maybe = (data as { plan?: unknown }).plan ?? data;
-  return maybe && typeof maybe === 'object' && Array.isArray((maybe as TrainingPlan).days)
-    ? (maybe as TrainingPlan)
-    : null;
-}
 
 /**
  * /workouts/today responds { rest, focus, iteration, session }; session is
@@ -116,6 +92,12 @@ export function estimateKcal(session: WorkoutSession): number {
  * Paths arrive server-relative (`/uploads/...`), so they are resolved through
  * mediaUrl(): same origin by default, VITE_MEDIA_BASE_URL when the API and
  * the static site are hosted on different origins.
+ *
+ * CONTRACT: `className` must pin the box. Every call site passes either an
+ * `aspect-*` ratio or explicit `h-`/`w-` sizes. Imported wger media has no
+ * fixed intrinsic size, so width/height attributes here would be a guess; the
+ * caller's box is what actually keeps this out of the layout-shift budget.
+ * Always below the fold (a list or a detail panel), so it stays lazy.
  */
 export function ExerciseImage({
   src,
@@ -138,6 +120,7 @@ export function ExerciseImage({
       alt={presentation.alt}
       aria-hidden={presentation.ariaHidden}
       loading="lazy"
+      decoding="async"
       className={className}
       onError={() => setErrored(true)}
     />
@@ -197,7 +180,7 @@ function mondayOfThisWeek(): Date {
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 /**
- * Exercise detail sheet body — attribution (AQF-12, never omitted), media
+ * Exercise detail sheet body: attribution (AQF-12, never omitted), media
  * strip with SVG-icon fallback, and a variations strip when the exercise
  * belongs to a wger variation group.
  */
@@ -420,10 +403,7 @@ export default function WorkoutLibrary() {
     return () => window.clearTimeout(t);
   }, [search]);
 
-  const planQuery = useQuery({
-    queryKey: ['plan'],
-    queryFn: async () => unwrapPlan(await orNull(() => api<unknown>('/plans/current'))),
-  });
+  const planQuery = useQuery(currentPlanQuery);
 
   // Shared cache key ⇒ shared queryFn (raw envelope); carve with `select`.
   const todayQuery = useQuery({ ...todayWorkoutQuery, select: unwrapSession });
@@ -473,11 +453,15 @@ export default function WorkoutLibrary() {
 
   const generatePlan = useMutation({
     mutationFn: () =>
-      api<TrainingPlan>('/plans/generate', { method: 'POST', body: { daysPerWeek, focus } }),
-    onSuccess: () => {
+      api<unknown>('/plans/generate', { method: 'POST', body: { daysPerWeek, focus } }),
+    onSuccess: async (created) => {
+      // Drop an in-flight GET that still thinks there is no plan, then show
+      // the plan this response already contains. The refetch confirms it.
+      await queryClient.cancelQueries({ queryKey: queryKeys.plan });
+      cacheGeneratedPlan(queryClient, created);
       setGenerateOpen(false);
       toast.success('Your new training plan is ready');
-      void queryClient.invalidateQueries({ queryKey: ['plan'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.plan });
       void queryClient.invalidateQueries({ queryKey: ['workout'] });
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Plan generation failed'),
@@ -538,7 +522,7 @@ export default function WorkoutLibrary() {
                         : isToday
                           ? 'border-2 border-primary text-primary shadow-[0_0_15px_rgba(138,235,255,0.3)]'
                           : day.isRest
-                            ? 'bg-surface-container text-on-surface-variant/50'
+                            ? 'bg-surface-container text-outline'
                             : 'bg-surface-container text-on-surface-variant'
                     }`}
                   >

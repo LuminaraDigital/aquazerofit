@@ -14,17 +14,24 @@
 import { Router, type Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../platform/auth';
+import { localeOf } from '../../platform/locale';
 import { AppError } from '../../platform/errors';
-import { chatMessageSchema, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
+import { chatMessageSchema, localDateSchema, WELLNESS_DISCLAIMER, portionCorrectionWorthRemembering } from '@aquazerofit/shared';
 import type { Allergen, ChatMessage, ChatSession, Food, MealLogItem, MealType, User } from '@aquazerofit/shared';
 import { complete, stream, type GatewayResult } from '../ai/gateway';
-import { preAsync, post as postGuardrail, refusalMessageFor } from '../ai/guardrails';
+import {
+  preAsync,
+  post as postGuardrail,
+  refusalMessageFor,
+  type GuardrailDecision,
+} from '../ai/guardrails';
 import { warnOnStyle } from '../ai/styleLint';
-import { creditLedger } from '../ai/creditLedger';
+import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { assertLaneAllowed } from '../ai/tierPolicy';
 import { systemMessagesFor } from '../ai/persona';
 import { activeCoachFor } from '../coaches/service';
-import { asyncHandler, deleteDoc, getUser, localToday, newId, nowIso, readProfile, sleep, upsertDoc, whereDocs, byIdDoc } from '../ai/util';
+import { todayFor } from '../../platform/dates';
+import { asyncHandler, deleteDoc, getUser, newId, nowIso, readProfile, sleep, upsertDoc, whereDocs, byIdDoc } from '../ai/util';
 import { hasConsent } from '../me/service';
 // Deliberate team-boundary exception, and the point of the feature: chat-native
 // logging must produce the SAME meal-log row as the food tab, written by the
@@ -32,8 +39,10 @@ import { hasConsent } from '../me/service';
 // idempotency and the source field to drift.
 import { createMealLog } from '../logs/service';
 import { extractMemoryFromTurn } from '../memory/extraction';
+import { getRememberedPortionGrams, rememberPortionCorrection } from '../memory/service';
 import { buildHistoryMessages } from './history';
 import {
+  applyRememberedPortions,
   buildDraftItems,
   CHAT_MEAL_DRAFT_TYPE,
   draftNotes,
@@ -48,6 +57,7 @@ import {
   type ChatMealItem,
 } from './mealDraft';
 import { gatherChatContext, gatherChatContextDenied } from './tools';
+import { enforceCoachGrounding, groundingOverrideMessage, redactGroundingHistory } from './grounding';
 
 export const chatRouter = Router();
 chatRouter.use(requireAuth);
@@ -178,7 +188,7 @@ chatRouter.post(
 
     const parsed = chatMessageSchema.safeParse(req.body);
     if (!parsed.success) {
-      throw new AppError('VALIDATION_FAILED', 'Message content is required (1–4000 characters).', {
+      throw new AppError('VALIDATION_FAILED', 'Message content is required (1-4000 characters).', {
         issues: parsed.error.issues,
       });
     }
@@ -186,64 +196,90 @@ chatRouter.post(
 
     // --- Admission: tier lane + credits (before headers → JSON error envelope)
     assertLaneAllowed(user.tier, 'chatFast');
-    const reservationId = await creditLedger.reserve(user.id, 'chatTurn');
+    const reservationId = await creditLedger.reserve(user.id, 'chatTurn', user.tier);
 
-    // Persist the user message regardless of guardrail outcome (audit trail).
-    const decision = await preAsync(content, { userId: user.id });
-    const userMessage: ChatMessage = {
-      id: newId('cm'),
-      sessionId,
-      userId: user.id,
-      type: 'chatMessage',
-      role: 'user',
-      content,
-      guardrail: { blocked: decision.blocked, category: decision.blocked ? decision.category : null },
-      createdAt: nowIso(),
-    };
-    await upsertDoc('ai', userMessage);
-
-    // Session title from the first user message.
-    if (session.title === 'New conversation') {
-      session.title = content.length > 42 ? `${content.slice(0, 42).trimEnd()}…` : content;
-    }
-    session.updatedAt = nowIso();
-    await upsertDoc('ai', session);
-
-    // --- From here on we speak SSE.
-    openStream(res);
+    // Everything from here to the model call is fallible, and the
+    // reservation is already held. A throw from preAsync, either upsertDoc
+    // or the refusal write used to escape with the credits still reserved -
+    // and once openStream() has run the headers are SSE, so the JSON error
+    // handler could not answer either and the connection simply hung. The
+    // catch below returns the credits either way, and answers in whichever
+    // protocol this request is already speaking.
+    // Declared out here, assigned inside the guard: the streaming half below
+    // still needs them, and the catch either rethrows or returns, so they are
+    // always assigned by the time anything reads them.
+    const locale = localeOf(req);
+    let decision!: GuardrailDecision;
+    let userMessage!: ChatMessage;
     let clientGone = false;
-    req.on('close', () => {
-      clientGone = true;
-    });
 
-    if (decision.blocked) {
-      // Supportive refusal: no model call, credits returned, audit already logged.
-      await creditLedger.release(reservationId);
-      const refusal: ChatMessage = {
+    try {
+
+      // Persist the user message regardless of guardrail outcome (audit trail).
+      // The locale rides along so a crisis refusal names a line the user can
+      // actually ring (Accept-Language; see platform/locale.ts).
+      decision = await preAsync(content, { userId: user.id, locale });
+      userMessage = {
         id: newId('cm'),
         sessionId,
         userId: user.id,
         type: 'chatMessage',
-        role: 'assistant',
-        content: decision.message ?? refusalMessageFor(decision.category),
-        guardrail: { blocked: true, category: decision.category },
+        role: 'user',
+        content,
+        guardrail: { blocked: decision.blocked, category: decision.blocked ? decision.category : null },
         createdAt: nowIso(),
       };
-      await upsertDoc('ai', refusal);
-      sendFrame(res, { type: 'error', code: 'SAFETY_INPUT', message: refusal.content });
+      await upsertDoc('ai', userMessage);
+
+      // Session title from the first user message.
+      if (session.title === 'New conversation') {
+        session.title = content.length > 42 ? `${content.slice(0, 42).trimEnd()}…` : content;
+      }
+      session.updatedAt = nowIso();
+      await upsertDoc('ai', session);
+
+      // --- From here on we speak SSE.
+      openStream(res);
+      req.on('close', () => {
+        clientGone = true;
+      });
+
+      if (decision.blocked) {
+        // Supportive refusal: no model call, credits returned, audit already logged.
+        await creditLedger.release(reservationId);
+        const refusal: ChatMessage = {
+          id: newId('cm'),
+          sessionId,
+          userId: user.id,
+          type: 'chatMessage',
+          role: 'assistant',
+          content: decision.message ?? refusalMessageFor(decision.category, locale),
+          guardrail: { blocked: true, category: decision.category },
+          createdAt: nowIso(),
+        };
+        await upsertDoc('ai', refusal);
+        sendFrame(res, { type: 'error', code: 'SAFETY_INPUT', message: refusal.content });
+        res.end();
+        return;
+      }
+    } catch (err) {
+      await creditLedger.release(reservationId);
+      if (!res.headersSent) throw err;
+      // Already streaming: the error envelope is a frame, not a body.
+      sendFrame(res, { type: 'error', code: 'INTERNAL', message: 'The turn could not be completed.' });
       res.end();
       return;
     }
 
     try {
-      // --- Ground the model in real user data via tools — but ONLY with the
+      // --- Ground the model in real user data via tools - but ONLY with the
       // user's explicit aiPersonalisation consent. Without it, no profile or
       // log data enters model context and the coach answers generically.
       const localDate = typeof req.body?.localDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.localDate)
         ? (req.body.localDate as string)
-        : localToday();
+        : todayFor(req);
       const consented = hasConsent(user.id, 'aiPersonalisation');
-      // Display name is identity, not wellness data — but greeting by name is
+      // Display name is identity, not wellness data - but greeting by name is
       // still personalisation, so it flows only with the same consent.
       const account = consented ? await byIdDoc<User>('users', user.id) : null;
       const { context, toolCalls } = consented
@@ -251,58 +287,95 @@ chatRouter.post(
         : gatherChatContextDenied();
 
       // Replay prior turns so the coach has conversational memory. The current
-      // user message is already persisted above — exclude it here and append
+      // user message is already persisted above - exclude it here and append
       // it explicitly as the final message. Guardrail-blocked messages are
-      // filtered inside buildHistoryMessages.
+      // filtered inside buildHistoryMessages. With personalisation off, an
+      // earlier assistant reply that quotes nutrition or plan figures is
+      // replaced before replay, so this turn cannot copy it.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const priorMessages = await whereDocs<ChatMessage>('ai', (d: any) => {
         return d?.sessionId === sessionId && d?.type === 'chatMessage' && d?.userId === user.id && d?.id !== userMessage.id;
       });
-      const history = buildHistoryMessages(priorMessages);
+      const history = redactGroundingHistory(buildHistoryMessages(priorMessages), context);
+      // After history, immediately before the question: the spot a stale
+      // "log is empty" reply would otherwise occupy.
+      const groundingOverride = groundingOverrideMessage(context);
 
       // The user's selected coach supplies a voice block ahead of P-07; the
       // rules still come last and still win. See `ai/persona.ts` for why that
       // ordering is the safety-relevant part rather than a stylistic one.
       const coach = activeCoachFor(user.id);
       // --- Stream the reply using real SSE from provider (AI-02)
+      // Consent off holds tokens until grounding has run. The Android client
+      // paints each token as the finished bubble until history reloads, so a
+      // quote of an earlier meal total must never be the text that lands.
       let fullText = '';
+      const heldTokens: string[] = [];
       const streamResult = await stream(
         'chatFast',
-        [...systemMessagesFor(coach), ...history, { role: 'user', content }],
+        [
+          ...systemMessagesFor(coach),
+          ...history,
+          ...(groundingOverride ? [groundingOverride] : []),
+          { role: 'user', content },
+        ],
         {
           context: context as unknown as Record<string, unknown>,
           promptId: 'P-07',
           coachId: coach.id,
           onToken: (token) => {
-            if (clientGone) return;
             fullText += token;
+            if (!consented) {
+              heldTokens.push(token);
+              return;
+            }
+            if (clientGone) return;
             sendFrame(res, { type: 'token', token });
           },
         },
       );
 
-      // Consume the stream and get the final result
-      let finalResult: GatewayResult | null = null;
-      try {
-        for await (const _token of streamResult) {
-          // Tokens already sent via onToken callback
-          // streamResult will return the final GatewayResult when done
+      // Drive the iterator by hand. `for await...of` DISCARDS an async
+      // generator's return value, and here the return value is the whole
+      // point: `stream()` is declared `AsyncGenerator<string, GatewayResult>`
+      // and that GatewayResult carries `meta.degraded` - which decides whether
+      // this turn is billed - plus the provider/model provenance recorded on
+      // the persisted message.
+      //
+      // What this replaces: a for-await loop that threw the result away,
+      // followed by a read of `iterator._finalResult`, a property nothing in
+      // gateway.ts ever sets. It therefore always fell through to a synthesised
+      // meta with `degraded: false` and `provider: 'unknown'`. Two consequences,
+      // both live: every turn answered by the offline fallback after real
+      // providers failed was billed anyway - against the invariant in
+      // CONTRIBUTING.md that degraded output is never charged for - and every
+      // stored ChatMessage.ai recorded 'unknown' provenance on the app's
+      // highest-volume AI lane.
+      //
+      // There is deliberately no try/catch around this loop. The old one was
+      // empty - commented "Generator exhausted", which is not what a throw
+      // means - so an AI_UNAVAILABLE raised with every provider down was
+      // swallowed, an empty assistant message was persisted, and the turn was
+      // charged for. Letting it propagate reaches the handler that releases the
+      // reservation and sends a real error frame.
+      const iterator = streamResult[Symbol.asyncIterator]();
+      let finalResult: GatewayResult;
+      for (;;) {
+        const step = await iterator.next();
+        if (step.done) {
+          finalResult = step.value;
+          break;
         }
-      } catch (e) {
-        // Generator exhausted, get the return value
-      }
-      // Get the return value from the async generator
-      const iterator = streamResult as any;
-      if (iterator._finalResult) {
-        finalResult = iterator._finalResult;
-      } else {
-        // Fallback: construct from fullText
-        finalResult = { text: fullText, meta: { provider: 'unknown', model: 'unknown', promptVersion: '', generatedAt: new Date().toISOString(), degraded: false } } as GatewayResult;
+        // Consent-on tokens already went out through onToken. Consent-off
+        // tokens are held until the reply is checked below.
       }
 
       // finalResult is guaranteed to be non-null here due to fallback
       const result = {
-        text: fullText || finalResult!.text,
+        // Streamed tokens may still have said the log was empty, or quoted a
+        // meal total from an earlier turn. The stored reply is the one the
+        // next turn replays, so it has to be the corrected one.
+        text: enforceCoachGrounding(fullText || finalResult!.text, context),
         meta: finalResult!.meta,
       };
 
@@ -310,7 +383,7 @@ chatRouter.post(
       const outCheck = postGuardrail(result.text, { userId: user.id });
       if (outCheck.blocked) {
         await creditLedger.release(reservationId);
-        const safeText = refusalMessageFor(outCheck.category);
+        const safeText = refusalMessageFor(outCheck.category, locale);
         const blockedMessage: ChatMessage = {
           id: newId('cm'),
           sessionId,
@@ -347,17 +420,14 @@ chatRouter.post(
         createdAt: nowIso(),
       };
       await upsertDoc('ai', assistantMessage);
-      // Real providers failed and the gateway fell back to offline templates —
-      // do not charge. Keyless mock (no providers configured) keeps degraded
-      // false and bills normally per product rules.
-      if (result.meta.degraded) {
-        await creditLedger.release(reservationId);
-      } else {
-        await creditLedger.commit(reservationId);
-      }
+      // Real providers failed and the gateway fell back to offline templates -
+      // do not charge. The keyless mock (no providers configured) is degraded
+      // too in production ('no_provider'), so it is not charged there either;
+      // only in development and tests does it bill, where it IS the product.
+      await settleReservation(reservationId, result.meta.degraded !== true);
 
       // Memory write-back (Phase 2): stage suggested facts from this turn.
-      // Fire-and-forget with the same consent gate — never delays the stream,
+      // Fire-and-forget with the same consent gate - never delays the stream,
       // never runs on guardrail-blocked turns (both paths returned above), and
       // extractMemoryFromTurn swallows its own failures (best-effort, like the
       // guardrails audit write).
@@ -372,17 +442,25 @@ chatRouter.post(
       }
 
       if (!clientGone) {
+        if (!consented) {
+          const chunks =
+            result.text === fullText && heldTokens.length > 0 ? heldTokens : [result.text];
+          for (const token of chunks) {
+            if (token.length === 0) continue;
+            sendFrame(res, { type: 'token', token });
+          }
+        }
         sendFrame(res, { type: 'done', message: assistantMessage });
       }
       res.end();
     } catch (err) {
       await creditLedger.release(reservationId);
-      // Headers are already SSE — degrade gracefully in-band (AQF-09 §5).
+      // Headers are already SSE - degrade gracefully in-band (AQF-09 §5).
       sendFrame(res, {
         type: 'error',
         code: 'AI_UNAVAILABLE',
         message:
-          'The coach is temporarily unavailable. Your logs, dashboard and plans all still work — please try again in a moment.',
+          'The coach is temporarily unavailable. Your logs, dashboard and plans all still work - please try again in a moment.',
       });
       res.end();
       if (!(err instanceof AppError)) {
@@ -398,12 +476,12 @@ chatRouter.post(
 //
 // Why endpoints rather than a tool in the chat tool executor: the executor's
 // tools are read-only grounding reads that ALL run, unconditionally, before a
-// single completion — there is no tool-calling loop for a model to invoke a
+// single completion - there is no tool-calling loop for a model to invoke a
 // write with, and a write-capable entry in gatherChatContext would fire on
 // every turn. More decisively, FR-013 needs a round trip (propose → the user
 // reads it → the user confirms), and the turn endpoint is a one-way SSE stream
 // that has already ended by the time the user could answer. So this mirrors the
-// vision lane's shape exactly — a proposal resource, then an explicit confirm —
+// vision lane's shape exactly - a proposal resource, then an explicit confirm -
 // which is also the shape the confirmation UI already knows how to render.
 //
 // Consent: this lane follows the vision lane rather than the chat lane. The only
@@ -415,12 +493,11 @@ chatRouter.post(
 // Billing: chatTurn. It is a chat turn's worth of model work on the chat
 // surface, and CREDIT_COSTS lives in packages/shared, which this lane does not
 // own. The reservation settles at draft time, not at confirm time, so that
-// rejecting a wrong proposal never costs less than accepting a right one —
+// rejecting a wrong proposal never costs less than accepting a right one -
 // billing must not put a thumb on the scale of the safety gate.
 // ---------------------------------------------------------------------------
 
 const mealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
-const localDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'localDate must be YYYY-MM-DD');
 
 const createMealDraftSchema = z.object({
   text: z.string().trim().min(1).max(MAX_SOURCE_TEXT_LENGTH),
@@ -475,14 +552,14 @@ chatRouter.post(
     const user = getUser(req);
     const parsed = createMealDraftSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
-      throw new AppError('VALIDATION_FAILED', `Describe what you ate (1–${MAX_SOURCE_TEXT_LENGTH} characters).`, {
+      throw new AppError('VALIDATION_FAILED', `Describe what you ate (1-${MAX_SOURCE_TEXT_LENGTH} characters).`, {
         issues: parsed.error.issues,
       });
     }
     const { text, mealType: requestedMealType, localDate: requestedDate } = parsed.data;
-    const localDate = requestedDate ?? localToday();
+    const localDate = requestedDate ?? todayFor(req);
 
-    // The session is a display association only — a draft is valid without one.
+    // The session is a display association only - a draft is valid without one.
     let sessionId: string | null = null;
     if (parsed.data.sessionId) {
       const session = await byIdDoc<ChatSession>('ai', parsed.data.sessionId);
@@ -491,13 +568,14 @@ chatRouter.post(
 
     // --- Admission: lane, then credits.
     assertLaneAllowed(user.tier, 'planStructured');
-    const reservationId = await creditLedger.reserve(user.id, 'chatTurn');
+    const reservationId = await creditLedger.reserve(user.id, 'chatTurn', user.tier);
 
     try {
       // --- Input guardrail. A meal description is user text like any other.
-      const decision = await preAsync(text, { userId: user.id });
+      const locale = localeOf(req);
+      const decision = await preAsync(text, { userId: user.id, locale });
       if (decision.blocked) {
-        throw new AppError('SAFETY_INPUT', decision.message ?? refusalMessageFor(decision.category), {
+        throw new AppError('SAFETY_INPUT', decision.message ?? refusalMessageFor(decision.category, locale), {
           category: decision.category,
         });
       }
@@ -511,7 +589,7 @@ chatRouter.post(
       let { items: candidates, mealType: modelMealType } = parseExtraction(result.json);
 
       // A provider that returns 200 with unusable JSON is not a gateway
-      // failure, so nothing upstream catches it — and with no keys at all the
+      // failure, so nothing upstream catches it - and with no keys at all the
       // offline engine has no P-12 branch and answers `{}`. Either way the user
       // typed a readable sentence and would get an empty card. Fall back to the
       // deterministic segmenter, which emits no nutrition figure of its own:
@@ -532,7 +610,11 @@ chatRouter.post(
 
       const { allergies, consented } = await allergiesFor(user.id);
       const foods = await loadFoodCorpus();
-      const items = buildDraftItems(candidates, foods, allergies);
+      const items = applyRememberedPortions(
+        buildDraftItems(candidates, foods, allergies),
+        foods,
+        (foodId) => getRememberedPortionGrams(user.id, foodId),
+      );
       const allergyCheck: ChatMealDraft['allergyCheck'] = consented ? 'applied' : 'skippedNoConsent';
 
       const draft: ChatMealDraft = {
@@ -560,22 +642,18 @@ chatRouter.post(
       // Offline-template output after real providers failed is not a model
       // answer the user should pay for; neither is a proposal with nothing in
       // it. Same stance as the chat, recommendation and vision lanes.
-      if (result.meta.degraded || items.length === 0) {
-        await creditLedger.release(reservationId);
-      } else {
-        await creditLedger.commit(reservationId);
-      }
+      await settleReservation(reservationId, !(result.meta.degraded || items.length === 0));
 
       res.status(201).json({ draft });
     } catch (err) {
       await creditLedger.release(reservationId);
       if (err instanceof AppError) throw err;
-      // Error hygiene: internals to the server log only — the client envelope
+      // Error hygiene: internals to the server log only - the client envelope
       // never carries err.message/cause.
       console.error('[chat] meal extraction failed', err);
       throw new AppError(
         'AI_UNAVAILABLE',
-        'Reading meals from text is temporarily unavailable — you can still log this meal manually.',
+        'Reading meals from text is temporarily unavailable - you can still log this meal manually.',
       );
     }
   }),
@@ -675,11 +753,16 @@ chatRouter.post(
         });
       }
 
-      // Nutrition is recomputed from the corpus record here, at write time —
+      // Nutrition is recomputed from the corpus record here, at write time -
       // never read back from the draft and never taken from the client.
       const grams = Math.round(selection.grams ?? match.grams);
       const nutrition = nutritionFor(food, grams);
       logItems.push({ foodId: food.id, name: food.name, grams, ...nutrition });
+
+      const shownGrams = Math.round(match.grams);
+      if (portionCorrectionWorthRemembering(shownGrams, grams)) {
+        rememberPortionCorrection(user.id, selection.foodId, grams);
+      }
 
       if (match.allergenConflicts.length > 0) {
         conflicts.push({
@@ -693,7 +776,7 @@ chatRouter.post(
 
     // A declared allergy must be seen and acknowledged, not merely displayed.
     // The user is logging what they already ate, so this never refuses outright
-    // — it refuses to let the tap that logs it also be the tap that dismisses
+    // - it refuses to let the tap that logs it also be the tap that dismisses
     // the warning.
     if (conflicts.length > 0 && acknowledgeAllergens !== true) {
       throw new AppError(

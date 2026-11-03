@@ -2,23 +2,20 @@
  * Small shared helpers for the AI-owned modules (ai, chat, vision, recommendations).
  * Kept local to avoid cross-team file conflicts; platform owns the global
  * express Request augmentation, so we read req.user through getUser().
+ *
+ * Date helpers and asyncHandler live in platform (SSOT); re-exported here so
+ * existing AI-lane imports keep working.
  */
-import type { Request, Response, NextFunction, RequestHandler } from 'express';
-import { AppError } from '../../platform/errors';
+import crypto from 'node:crypto';
+import { computeTargets } from '../me/targets';
+import type { Request } from 'express';
+import { AppError, asyncHandler } from '../../platform/errors';
+import { localToday } from '../../platform/dates';
 import { store } from '../../platform/store';
-import {
-  ACTIVITY_FACTORS,
-  FAT_KCAL_FRACTION_MIN,
-  KCAL_FLOOR,
-  KCAL_PER_G,
-  KCAL_PER_KG,
-  PROTEIN_G_PER_KG,
-  WATER_ML_MAX,
-  WATER_ML_MIN,
-  WATER_ML_PER_KG,
-  WEEKLY_LOSS_FRACTION,
-} from '@aquazerofit/shared';
 import type { UserRole, UserTier, WellnessProfile } from '@aquazerofit/shared';
+
+export { asyncHandler };
+export { localToday };
 
 export interface RequestUser {
   id: string;
@@ -35,33 +32,18 @@ export function getUser(req: Request): RequestUser {
   return user;
 }
 
-/** Express 4 does not catch async errors — every async route goes through this. */
-export function asyncHandler(
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>,
-): RequestHandler {
-  return (req, res, next) => {
-    fn(req, res, next).catch(next);
-  };
-}
-
-let idCounter = 0;
+/**
+ * Ids for chat sessions, messages and meal-log rows.
+ *
+ * Unguessable: crypto.randomUUID, not a timestamp plus a counter. Prefix uses
+ * underscore (`cm_…`) so these stay distinct from store.newId's hyphen form.
+ */
 export function newId(prefix: string): string {
-  idCounter = (idCounter + 1) % 1_679_616; // 36^4
-  return `${prefix}_${Date.now().toString(36)}${idCounter.toString(36).padStart(4, '0')}${Math.random()
-    .toString(36)
-    .slice(2, 6)}`;
+  return `${prefix}_${crypto.randomUUID()}`;
 }
 
 export function nowIso(): string {
   return new Date().toISOString();
-}
-
-export function localToday(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -108,12 +90,6 @@ export async function deleteDoc(container: string, id: string): Promise<void> {
   await c.delete(id);
 }
 
-// ---------------------------------------------------------------------------
-// Deterministic target derivation (fallback duplicate of TargetCalculator —
-// deliberately duplicated per the team boundary so the AI lane never imports
-// another team's service; formulas come from shared constants, AQF-09 §2.2).
-// ---------------------------------------------------------------------------
-
 export interface TargetsLike {
   kcalTarget: number;
   proteinG: number;
@@ -130,34 +106,18 @@ const DEFAULT_TARGETS: TargetsLike = {
   waterMl: 2000,
 };
 
+/**
+ * The coach's view of a user's targets - the SAME numbers the dashboard shows.
+ * Delegates to `computeTargets` so coach chat and the profile screen cannot drift.
+ */
 export function deriveTargetsFromProfile(profile: WellnessProfile): TargetsLike {
-  const { weightKg, heightCm, age, sex, goal, activityLevel } = profile;
-  const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
-  const bmr = sex === 'male' ? base + 5 : base - 161; // 'unspecified' uses the conservative female offset
-  const tdee = bmr * (ACTIVITY_FACTORS[activityLevel] ?? ACTIVITY_FACTORS.moderate);
-
-  let kcalTarget = tdee;
-  if (goal === 'lose') {
-    const weeklyLossKg = weightKg * WEEKLY_LOSS_FRACTION.max;
-    kcalTarget = tdee - (weeklyLossKg * KCAL_PER_KG) / 7;
-  } else if (goal === 'gain') {
-    kcalTarget = tdee + 250;
-  }
-  const floor = KCAL_FLOOR[sex] ?? KCAL_FLOOR.unspecified;
-  if (kcalTarget < floor) kcalTarget = floor; // safety clamp (FR-031)
-
-  const proteinG = weightKg * (PROTEIN_G_PER_KG[goal] ?? PROTEIN_G_PER_KG.maintain);
-  const fatG = (kcalTarget * FAT_KCAL_FRACTION_MIN) / KCAL_PER_G.fat;
-  const carbsKcal = Math.max(0, kcalTarget - proteinG * KCAL_PER_G.protein - fatG * KCAL_PER_G.fat);
-  const carbsG = carbsKcal / KCAL_PER_G.carbs;
-  const waterMl = Math.min(WATER_ML_MAX, Math.max(WATER_ML_MIN, weightKg * WATER_ML_PER_KG));
-
+  const targets = computeTargets(profile);
   return {
-    kcalTarget: Math.round(kcalTarget),
-    proteinG: Math.round(proteinG),
-    carbsG: Math.round(carbsG),
-    fatG: Math.round(fatG),
-    waterMl: Math.round(waterMl),
+    kcalTarget: targets.kcalTarget,
+    proteinG: targets.proteinG,
+    carbsG: targets.carbsG,
+    fatG: targets.fatG,
+    waterMl: targets.waterMl,
   };
 }
 

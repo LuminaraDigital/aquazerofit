@@ -53,6 +53,25 @@ const SOURCES = {
   uthman: ['Uthman Nurmakhmedov', 'uthman'],
   sanzo: ['Sanzō', 'Sanzo', 'sanzo'],
   mataemon: ['Mataemon Aoki', 'mataemon'],
+  carlos: ['Carlos Mendez', 'Carlos_Mendez', 'carlos'],
+  craig: ['Craig Beast', 'Craig_Beast', 'craig'],
+  danial: ['Danial Nickal', 'Danial_Nickal', 'Daniel_Nickal', 'danial'],
+  dmitry: ['Dmitry Volkov', 'Dmitry_Volkov', 'dmitry'],
+  fabio: ['Fabio Guedes', 'Fabio_Guedes', 'fabio'],
+  frank: ['Frank Mason', 'Frank_Mason', 'frank'],
+  gaius: ['Gaius Marcus', 'Gaius_Marcus', 'gaius'],
+  george: ['George Saint', 'George_Saint', 'george'],
+  kwon: ['Kwon Won-Ri', 'Kwon_Won_Ri', 'kwon'],
+  mike: ['Mike Takayama', 'Mike_Takayama', 'mike'],
+  paul: ['Paul Thomas', 'Paul_Thomas', 'paul'],
+  randall: ['Randall Stevens', 'Randall_Stevens', 'randall'],
+  reinier: ['Reinier Jansen', 'Reinier_Jansen', 'reinier'],
+  rolando: ['Rolando Fitch', 'Rolando_Fitch', 'rolando'],
+  ryoto: ['Ryoto Katou', 'Ry_to_Katou', 'Ryoto_Katou', 'ryoto'],
+  sergio: ['Sergio Newton', 'Sergio_Newton', 'sergio'],
+  terry: ['Terry Crawford', 'Terry_Crawford', 'terry'],
+  usman: ['Usman Sergei Magomedov', 'Usman_Sergei_Magomedov', 'usman'],
+  zhang: ['Zhang Kai', 'Zhang_Kai', 'zhang'],
 };
 
 /**
@@ -104,15 +123,130 @@ const sourceDir = process.argv[2]
   ? path.resolve(process.argv[2])
   : path.join(process.env.USERPROFILE ?? process.env.HOME ?? '.', 'Downloads');
 
-/** Case- and extension-insensitive lookup over the source directory. */
+function normalizeName(str) {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/** Case-, accent-, and delimiter-insensitive lookup over recursive source directory files. */
 function findSource(files, candidates) {
-  for (const candidate of candidates) {
-    const match = files.find(
-      (file) => path.parse(file).name.toLowerCase() === candidate.toLowerCase(),
-    );
-    if (match) return match;
+  const normCandidates = candidates.map(normalizeName);
+  for (const file of files) {
+    const base = path.parse(file).name;
+    const normBase = normalizeName(base);
+    if (normCandidates.some(c => normBase === c || normBase.startsWith(c + ' ') || normBase.endsWith(' ' + c))) {
+      return file;
+    }
   }
   return null;
+}
+
+/**
+ * Strip contiguous solid white or black studio backdrops to transparent alpha
+ * with soft edge de-fringing, while preserving already-transparent inputs.
+ */
+async function stripBackdropToAlpha(inputBuffer) {
+  const { data, info } = await sharp(inputBuffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width: w, height: h } = info;
+  const buf = Buffer.from(data);
+
+  // If corners are already transparent, keep existing alpha channel.
+  const cornerIdx = [0, (w - 1) * 4, (h - 1) * w * 4, ((h - 1) * w + (w - 1)) * 4];
+  const transparentCorners = cornerIdx.filter((idx) => buf[idx + 3] < 16).length;
+  if (transparentCorners >= 2) {
+    return sharp(buf, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+  }
+
+  const isBlack = buf[0] < 30 && buf[1] < 30 && buf[2] < 30;
+  const bg = isBlack ? [0, 0, 0] : [255, 255, 255];
+  const tolHard = 22;
+  const tolSoft = 52;
+
+  const distFromBg = (idx) =>
+    Math.max(
+      Math.abs(buf[idx] - bg[0]),
+      Math.abs(buf[idx + 1] - bg[1]),
+      Math.abs(buf[idx + 2] - bg[2]),
+    );
+
+  const visited = new Uint8Array(w * h);
+  const queue = new Int32Array(w * h);
+  let head = 0;
+  let tail = 0;
+
+  const trySeed = (x, y) => {
+    const p = y * w + x;
+    if (visited[p]) return;
+    if (distFromBg(p * 4) <= tolHard) {
+      visited[p] = 1;
+      queue[tail++] = p;
+    }
+  };
+
+  for (let x = 0; x < w; x++) {
+    trySeed(x, 0);
+    trySeed(x, h - 1);
+  }
+  for (let y = 0; y < h; y++) {
+    trySeed(0, y);
+    trySeed(w - 1, y);
+  }
+
+  while (head < tail) {
+    const p = queue[head++];
+    const x = p % w;
+    const y = (p - x) / w;
+    if (x > 0) trySeed(x - 1, y);
+    if (x + 1 < w) trySeed(x + 1, y);
+    if (y > 0) trySeed(x, y - 1);
+    if (y + 1 < h) trySeed(x, y + 1);
+  }
+
+  // Clear contiguous background and softly feather/de-fringe 1-2px boundary pixels.
+  for (let p = 0; p < w * h; p++) {
+    if (visited[p]) {
+      const idx = p * 4;
+      buf[idx] = 0;
+      buf[idx + 1] = 0;
+      buf[idx + 2] = 0;
+      buf[idx + 3] = 0;
+    }
+  }
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const p = y * w + x;
+      if (visited[p]) continue;
+      const touchesBg =
+        (x > 0 && visited[p - 1]) ||
+        (x + 1 < w && visited[p + 1]) ||
+        (y > 0 && visited[p - w]) ||
+        (y + 1 < h && visited[p + w]);
+      if (!touchesBg) continue;
+      const idx = p * 4;
+      const d = distFromBg(idx);
+      if (d < tolSoft) {
+        const alpha = Math.max(0, Math.min(1, (d - tolHard * 0.5) / (tolSoft - tolHard * 0.5)));
+        buf[idx + 3] = Math.round(alpha * 255);
+        if (alpha > 0.05 && alpha < 0.98) {
+          for (let c = 0; c < 3; c++) {
+            const unpremult = (buf[idx + c] - (1 - alpha) * bg[c]) / alpha;
+            buf[idx + c] = Math.max(0, Math.min(255, Math.round(unpremult)));
+          }
+        }
+      }
+    }
+  }
+
+  return sharp(buf, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
 }
 
 async function buildCoach(id, files) {
@@ -126,19 +260,17 @@ async function buildCoach(id, files) {
   await mkdir(outDir, { recursive: true });
   const input = path.join(sourceDir, file);
 
-  // Trim the white margin once and work from the figure's own bounding box.
-  // `flatten` first because several renders are PNGs with transparency, and
-  // sharp trims against the top-left pixel — transparent there means it trims
-  // nothing at all and every fraction below silently mismeasures.
-  const trimmed = await sharp(input)
-    .flatten({ background: '#ffffff' })
-    .trim({ background: '#ffffff', threshold: 12 })
+  // Strip any solid backdrop to transparent alpha, then trim transparent margins
+  // so every fraction below is measured from the figure's own bounding box.
+  const transparentPng = await stripBackdropToAlpha(input);
+  const trimmed = await sharp(transparentPng)
+    .trim({ threshold: 12 })
     .toBuffer({ resolveWithObject: true });
   const { width, height } = trimmed.info;
 
   await sharp(trimmed.data)
     .resize({ height: PORTRAIT_HEIGHT, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: 82 })
+    .webp({ quality: 82, alphaQuality: 90 })
     .toFile(path.join(outDir, 'portrait.webp'));
 
   // Square head crop. Every value is clamped into the image: a squarer source
@@ -155,7 +287,7 @@ async function buildCoach(id, files) {
   await sharp(trimmed.data)
     .extract({ left, top, width: side, height: side })
     .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: 'cover' })
-    .webp({ quality: 86 })
+    .webp({ quality: 86, alphaQuality: 90 })
     .toFile(path.join(outDir, 'avatar.webp'));
 
   const variant = await buildVariant(id, files, outDir);
@@ -174,14 +306,14 @@ async function buildVariant(id, files, outDir) {
   const file = findSource(files, [name]);
   if (!file) return false;
 
-  const trimmed = await sharp(path.join(sourceDir, file))
-    .flatten({ background: '#ffffff' })
-    .trim({ background: '#ffffff', threshold: 12 })
+  const transparentPng = await stripBackdropToAlpha(path.join(sourceDir, file));
+  const trimmed = await sharp(transparentPng)
+    .trim({ threshold: 12 })
     .toBuffer({ resolveWithObject: true });
 
   await sharp(trimmed.data)
     .resize({ height: PORTRAIT_HEIGHT, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: 82 })
+    .webp({ quality: 82, alphaQuality: 90 })
     .toFile(path.join(outDir, 'variant.webp'));
 
   return true;
@@ -190,7 +322,7 @@ async function buildVariant(id, files, outDir) {
 async function main() {
   let files;
   try {
-    files = await readdir(sourceDir);
+    files = await readdir(sourceDir, { recursive: true });
   } catch {
     console.error(`Source directory not readable: ${sourceDir}`);
     process.exit(1);

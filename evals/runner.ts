@@ -240,7 +240,20 @@ void (async () => {
           result.draft.days.flatMap((d) => d.slots.flatMap((s) => s.entries.map((e) => e.id))),
         );
         const checks: [boolean, string][] = [
-          [result.draft.days.length === (c.daysPerWeek ?? 3), 'day count'],
+          // A draft is a full calendar week with `daysPerWeek` training days
+          // inside it. This used to check `days.length === daysPerWeek`, the
+          // same misreading that made the whole lane unusable in production —
+          // and because this gate agreed with the broken one, the evals went
+          // green on drafts the app would always throw away.
+          [result.draft.days.length === 7, 'day count (a week is seven days)'],
+          [
+            result.draft.days.filter((d) => !d.isRest).length === (c.daysPerWeek ?? 3),
+            'training-day count',
+          ],
+          [
+            result.draft.days.every((d) => !d.isRest || d.slots.length === 0),
+            'rest days carry no slots',
+          ],
           [
             result.draft.days.every((d) =>
               d.slots.every((s) => s.entries.every((e) => poolIds.has(e.exerciseId))),

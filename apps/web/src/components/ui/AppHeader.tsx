@@ -29,7 +29,14 @@ export function AppHeader({
   const navigate = useNavigate();
 
   return (
-    <header className="sticky top-0 z-40 glass-blur border-b border-outline-variant/40">
+    <header
+      className="sticky top-0 z-40 glass-blur border-b border-outline-variant/40"
+      style={{
+        paddingTop: 'var(--azf-header-safe-top, 0px)',
+        paddingLeft: 'var(--azf-header-safe-left, 0px)',
+        paddingRight: 'var(--azf-header-safe-right, 0px)',
+      }}
+    >
       <div className="mx-auto max-w-md flex items-center justify-between px-container-margin py-3.5 gap-3">
         {back ? (
           <div className="flex items-center gap-2 min-w-0">

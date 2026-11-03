@@ -205,7 +205,7 @@ function Step({ step, index }: { step: StepSpec; index: number }) {
           </div>
 
           {step.note && (
-            <p className="mt-4 flex gap-3 rounded-2xl border border-primary/20 bg-primary/[0.05] px-4 py-3 text-[13px] leading-relaxed text-on-surface-variant/80">
+            <p className="mt-4 flex gap-3 rounded-2xl border border-primary/20 bg-primary/[0.05] px-4 py-3 text-[13px] leading-relaxed text-on-surface-variant">
               <span
                 className="material-symbols-outlined shrink-0 text-[18px] text-primary"
                 aria-hidden="true"
@@ -273,7 +273,7 @@ export default function HowItWorksPage() {
                   >
                     {String(i + 1).padStart(2, '0')}
                   </span>
-                  <span className="text-sm text-on-surface-variant/80">{step.title}</span>
+                  <span className="text-sm text-on-surface-variant">{step.title}</span>
                 </a>
               </li>
             ))}

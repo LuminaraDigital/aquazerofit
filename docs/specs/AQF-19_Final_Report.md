@@ -1170,8 +1170,6 @@ OpenJS Foundation. (n.d.). *npm workspaces*. https://docs.npmjs.com/cli/using-np
 
 PostgreSQL Global Development Group. (n.d.). *PostgreSQL*. https://www.postgresql.org/
 
-Replit. (n.d.). *Deployments: Storage and persistence*. https://docs.replit.com/
-
 Tailwind Labs. (n.d.). *Tailwind CSS*. https://tailwindcss.com/
 
 TanStack. (n.d.). *TanStack Query*. https://tanstack.com/query/

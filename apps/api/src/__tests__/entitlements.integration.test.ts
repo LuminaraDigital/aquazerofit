@@ -1,16 +1,16 @@
 /**
- * GET /me/entitlements — what this account can do, and what is left today.
+ * GET /me/entitlements: what this account can do, and what is left today.
  *
  * The properties under test are the ones the plan surface reads literally. A
  * brand-new account must not report a zero balance (the daily grant is lazy, so
  * a naive read reports "you have nothing" to someone who simply has not started
- * yet), and nothing here may offer a way to change `tier` — a self-serve tier
+ * yet), and nothing here may offer a way to change `tier`. A self-serve tier
  * flip with no payment behind it is an entitlement any caller could grant
  * themselves.
  */
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS } from '@aquazerofit/shared';
+import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS, PREMIUM_TIER_DAILY_CREDITS } from '@aquazerofit/shared';
 import {
   bindIsolatedDataDir,
   createIsolatedDataDir,
@@ -64,11 +64,12 @@ describe('GET /me/entitlements', () => {
     expect(res.body.creditsRemaining).toBe(FREE_TIER_DAILY_CREDITS);
     expect(res.body.tier).toBe('free');
     expect(res.body.dailyCredits).toBe(FREE_TIER_DAILY_CREDITS);
+    expect(res.body.premiumDailyCredits).toBe(PREMIUM_TIER_DAILY_CREDITS);
     expect(res.body.costs).toEqual(CREDIT_COSTS);
-    expect(res.body.premiumLanes).toContain('insightBatch');
+    expect(res.body.premiumLanes).toEqual(['insightBatch']);
   });
 
-  it('is idempotent — repeated reads do not stack daily grants', async () => {
+  it('is idempotent: repeated reads do not stack daily grants', async () => {
     await request(app).get(`${base}/me/entitlements`).set(auth());
     await request(app).get(`${base}/me/entitlements`).set(auth());
     const res = await request(app).get(`${base}/me/entitlements`).set(auth());

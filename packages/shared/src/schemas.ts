@@ -2,7 +2,14 @@
  * Shared zod validation schemas (FE-11): the same schemas validate on the
  * client for inline feedback and on the server as the authoritative check.
  */
-import { z } from 'zod';
+import { config, z } from 'zod';
+
+// Zod 4 compiles schemas with `new Function` unless this is set. The Worker
+// CSP does not allow 'unsafe-eval', and the probe still reports a violation
+// when the exception is caught. The API runs in Node, where the JIT stays on.
+// This package's tsconfig has no DOM lib, so the check goes through globalThis.
+const browserGlobal = globalThis as { window?: unknown };
+if (browserGlobal.window !== undefined) config({ jitless: true });
 import {
   ALLERGENS,
   DIETARY_PREFERENCES,
@@ -10,14 +17,15 @@ import {
   GROWTH_EVENT_NAMES,
   MEMORY_FACT_CATEGORIES,
 } from './types';
-import { MEMORY_FACT_MAX_CHARS, RANGES } from './constants';
+import { MEMORY_FACT_MAX_CHARS, RANGES, TG_INIT_DATA_MAX_BYTES } from './constants';
 import { COACHES } from './coaches';
+import { containsProfanity, PROFANITY_MESSAGE } from './profanity';
 
 // ---------- primitives ----------
 
 /**
  * A real calendar date in YYYY-MM-DD. The regex alone let impossible dates
- * (2026-13-40) through — round-tripping through Date proves the components
+ * (2026-13-40) through - round-tripping through Date proves the components
  * describe a day that exists (UTC so no timezone can shift the day).
  */
 export const localDateSchema = z
@@ -43,7 +51,15 @@ export const passwordSchema = z
 export const registerSchema = z.object({
   email: z.string().email(),
   password: passwordSchema,
-  displayName: z.string().min(1).max(60).optional(),
+  // Filtered here as well as on displayNameSchema: these are two independent
+  // definitions, and leaving registration unfiltered would make signup the
+  // way in for exactly the name the rename path refuses.
+  displayName: z
+    .string()
+    .min(1)
+    .max(60)
+    .refine((v) => !containsProfanity(v), { message: PROFANITY_MESSAGE })
+    .optional(),
 });
 
 export const loginSchema = z.object({
@@ -61,10 +77,21 @@ export const passwordResetConfirmSchema = z.object({
   newPassword: passwordSchema,
 });
 
-export const telegramAuthSchema = z.object({ initData: z.string().min(10) });
+export const telegramAuthSchema = z.object({
+  initData: z.string().min(10).max(TG_INIT_DATA_MAX_BYTES),
+});
 
 /**
- * POST /me/credentials — a Telegram-provisioned account (no credentials record)
+ * POST /me/link-telegram. `confirm` must be true before an existing Telegram
+ * id is replaced. Without it, the call links only when this account has no
+ * Telegram id yet, or when the id is the same one again.
+ */
+export const linkTelegramSchema = telegramAuthSchema.extend({
+  confirm: z.boolean().optional(),
+});
+
+/**
+ * POST /me/credentials - a Telegram-provisioned account (no credentials record)
  * sets a real email + password so it can sign in on the web. Same password
  * policy as registration; the email replaces the synthetic tg-…@ placeholder.
  */
@@ -87,6 +114,7 @@ export const profileSchema = z.object({
   allergies: z.array(z.enum(ALLERGENS)).default([]),
   equipment: z.array(z.enum(EQUIPMENT)).default(['none']),
   unitPreference: z.enum(['metric', 'imperial']).default('metric'),
+  nutritionEmphasis: z.enum(['standard', 'protein_first']).default('standard'),
   targetWeightKg: z
     .number()
     .min(RANGES.weightKg.min)
@@ -248,7 +276,12 @@ export const chatMessageSchema = z.object({
  * "   " cannot become a display name via PATCH (registration falls back to the
  * email prefix instead, which PATCH has no equivalent for).
  */
-export const displayNameSchema = z.string().trim().min(1).max(60);
+export const displayNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(60)
+  .refine((v) => !containsProfanity(v), { message: PROFANITY_MESSAGE });
 
 /**
  * Loose IANA timezone check: the runtime's Intl database is the authority
@@ -288,7 +321,7 @@ export type AddMemoryFactInput = z.infer<typeof addMemoryFactSchema>;
 
 /**
  * PATCH on a fact: confirm/reject a suggestion or edit its wording. 'suggested'
- * is deliberately not settable — only the extraction pipeline creates
+ * is deliberately not settable - only the extraction pipeline creates
  * suggestions; a user touching a fact always resolves it.
  */
 export const updateMemoryFactSchema = z
@@ -308,6 +341,9 @@ export const consentsSchema = z.object({
   aiPersonalisation: z.boolean(),
   anonymisedAnalytics: z.boolean(),
   reminders: z.boolean(),
+  // Optional so a client built before this consent existed cannot withdraw it
+  // by omission: withdrawing erases photographs, so only an explicit false does.
+  foodPhotoTraining: z.boolean().optional(),
 });
 
 // ---------- query helpers ----------
@@ -347,7 +383,7 @@ export const growthEventSchema = z.object({
   /**
    * Derived from GROWTH_EVENT_NAMES rather than restated. The list used to be
    * written out twice, which meant a new event name added to the type passed
-   * typecheck on the client and was then rejected at 400 by the server — a
+   * typecheck on the client and was then rejected at 400 by the server - a
    * drift that only shows up in production telemetry going quiet.
    */
   name: z.enum(GROWTH_EVENT_NAMES),
@@ -436,3 +472,20 @@ export const diaryExportPayloadSchema = z.object({
   exportedAt: z.string().datetime({ offset: true }).optional(),
 });
 export type DiaryExportPayloadInput = z.infer<typeof diaryExportPayloadSchema>;
+
+// ---------- Fight Record (AZF-W3-05 §4.3) ----------
+
+/**
+ * The award the client actually displayed. Bounded so a junk body cannot be
+ * used to make the server scan with an arbitrarily long key; an id that does
+ * not belong to the caller is a silent no-op, not an error.
+ */
+export const ackBeltSchema = z.object({
+  awardId: z.string().min(1).max(40),
+});
+export type AckBeltInput = z.infer<typeof ackBeltSchema>;
+
+export const emojiStatusPreferenceSchema = z.object({
+  enabled: z.boolean(),
+});
+export type EmojiStatusPreferenceInput = z.infer<typeof emojiStatusPreferenceSchema>;

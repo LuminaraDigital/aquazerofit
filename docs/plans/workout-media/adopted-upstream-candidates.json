@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "purpose": "UNREVIEWED candidate mappings from seed exercises currently on category fallback art onto already-mirrored, already-attributed wger images. Nothing in this file is approved and nothing in it is live. It is a review queue: a qualified human must confirm each image is safe and correct form guidance before any entry is copied into apps/api/src/data/media/adopted-upstream-manifest.json (docs/plans/workout-media/plan.md:32, docs/plans/workout-media/todo.md:49). The absence of a reviewedAt field is the signal that no form-safety sign-off has happened.",
+  "attributionSource": "apps/api/assets/exercises/import-attribution.wger.json",
+  "status": "pending-form-safety-review",
+  "fileRoot": "apps/api/assets/exercises/",
+  "notes": [
+    "Every files path below was checked against the bytes on disk and exists.",
+    "licence, licenceAuthor and isAiGenerated are copied verbatim from the attribution record; nothing is inferred.",
+    "bytes is the on-disk size. The Android library list renders these at 56dp but Coil downloads the full asset first, so anything over ~600 KB carries the oversized-for-list-thumbnail concern and needs a downscaled derivative before it ships.",
+    "19 of the 37 fallback exercises have no defensible candidate and are deliberately absent; see adopted-upstream-candidates.md for the list and the reason for each."
+  ],
+  "entries": [
+    {
+      "exerciseId": "ex-calf-raise",
+      "wgerUuid": "58ca3e51-ea64-4771-a74a-a74d29f5c40c",
+      "wgerExerciseName": "Double Leg Calf Raise",
+      "files": [
+        "58ca3e51-ea64-4771-a74a-a74d29f5c40c/53d4fabe-c994-4907-873f-8d82813a9832.png"
+      ],
+      "note": "Anatomical render from behind, flat and raised positions side by side; bodyweight, which matches the seed equipment. Preferred over the lighter Standing Calf Raises photographs (7ce443b6, 4.5 KB) because those show a lifter holding dumbbells and are only 225 px wide.",
+      "confidence": "high",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "erikocobra",
+      "bytes": 326757,
+      "concerns": "Image has the caption 'Two Leg Heel Raise' burned into the artwork, which will not match the seed name shown beside it."
+    },
+    {
+      "exerciseId": "ex-db-single-arm-row",
+      "wgerUuid": "94a5c406-7bcd-47f3-9687-bdf92a763932",
+      "wgerExerciseName": "Bent Over Dumbbell Rows",
+      "files": [
+        "94a5c406-7bcd-47f3-9687-bdf92a763932/a751a438-ae2d-4751-8d61-cef0e9292174.png"
+      ],
+      "note": "Line drawing, knee and hand braced on a flat bench, one dumbbell rowed to the hip; start and finish in one frame. Matches the seed's bench-braced single-arm row and its dumbbells plus bench equipment. Light at 27 KB.",
+      "confidence": "high",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "Franpol",
+      "bytes": 27846,
+      "concerns": "The upstream name says bent-over rows but the artwork is unmistakably a unilateral bench-supported row, so it belongs to this seed and NOT to ex-db-bent-over-row. Verify the depiction before trusting the name."
+    },
+    {
+      "exerciseId": "ex-db-bicep-curl",
+      "wgerUuid": "1ae6a28d-10e7-4ecf-af4f-905f8193e2c6",
+      "wgerExerciseName": "Biceps Curls With Dumbbell",
+      "files": [
+        "1ae6a28d-10e7-4ecf-af4f-905f8193e2c6/13fbda16-5ef6-4f48-b58c-954c3078001c.png"
+      ],
+      "note": "Standing line drawing, elbows pinned at the ribs, supinated grip. The lighter of the record's two near-identical frames (114 KB against 123 KB).",
+      "confidence": "high",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 3",
+      "licenceAuthor": "Everkinetic",
+      "bytes": 114031,
+      "concerns": "Depicts an alternating single-arm curl; the seed describes curling both dumbbells."
+    },
+    {
+      "exerciseId": "ex-db-hammer-curl",
+      "wgerUuid": "c0d9fe98-f4fe-49f3-8037-05e1984e7d2d",
+      "wgerExerciseName": "Hammer Curls",
+      "files": [
+        "c0d9fe98-f4fe-49f3-8037-05e1984e7d2d/75382eaf-468f-4c21-8710-6bf475d8ecc2.png"
+      ],
+      "note": "Standing line drawing with the neutral palms-facing grip that defines the movement. The lighter of the record's two frames (111 KB against 126 KB).",
+      "confidence": "high",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 3",
+      "licenceAuthor": "Everkinetic",
+      "bytes": 111214
+    },
+    {
+      "exerciseId": "ex-db-shoulder-press",
+      "wgerUuid": "87affa4b-395b-437c-9581-2bd20ea5aa7c",
+      "wgerExerciseName": "Shoulder Press, Dumbbells",
+      "files": [
+        "87affa4b-395b-437c-9581-2bd20ea5aa7c/0aecd2f4-3016-4813-b3c0-6a708ae7069a.png"
+      ],
+      "note": "Line drawing at the bottom of the press, dumbbells at shoulder height, torso upright against a bench back.",
+      "confidence": "high",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 3",
+      "licenceAuthor": "Everkinetic",
+      "bytes": 232980,
+      "concerns": "Shows the seated variation against an upright bench; the seed says standing or seated and lists dumbbells only, so a bench appears that the equipment list does not."
+    },
+    {
+      "exerciseId": "ex-band-glute-kickback",
+      "wgerUuid": "4221c8af-b3ca-4a53-9176-bd66e46d10f2",
+      "wgerExerciseName": "rubber band glute kickback",
+      "files": [
+        "4221c8af-b3ca-4a53-9176-bd66e46d10f2/a851fe9d-771f-44da-82f0-799e02ae3fd1.jpg"
+      ],
+      "note": "Photograph on all fours with a loop band around the working leg, driving back to full extension. The only band-specific match in the mirrored corpus, and by far the lightest candidate here at 7 KB.",
+      "confidence": "high",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "wger community contributors",
+      "bytes": 7399,
+      "concerns": "Only 263 px wide, so it is fine on a 56dp thumbnail but will look soft on a detail screen."
+    },
+    {
+      "exerciseId": "ex-high-knees",
+      "wgerUuid": "db5bd076-2f1d-4b72-9be9-610e5c3f5724",
+      "wgerExerciseName": "High knees",
+      "files": [
+        "db5bd076-2f1d-4b72-9be9-610e5c3f5724/16245344-9957-4a24-8d61-f9939ed5f964.png"
+      ],
+      "note": "Clean two-frame line drawing, knee driven to hip height with the arm pumping, motion arrows. Preferred over Marching High Knees (fad49a13) and High Knee Jumps (3edbb63e) because both of those are flagged AI-generated and this one is not.",
+      "confidence": "high",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "wger community contributors",
+      "bytes": 3159237,
+      "concerns": "oversized-for-list-thumbnail"
+    },
+    {
+      "exerciseId": "ex-wall-sit",
+      "wgerUuid": "06cb77ba-e56d-4422-bc14-77cc367c9fd8",
+      "wgerExerciseName": "Isometric Squat to Failure",
+      "files": [
+        "06cb77ba-e56d-4422-bc14-77cc367c9fd8/4ef77069-beb2-4504-a4f3-b181d5f35212.png"
+      ],
+      "note": "Illustration of a wall-supported isometric hold: back flat to the wall, thighs parallel, knees over the ankles. Depicts exactly what the seed describes even though the upstream name does not say wall sit.",
+      "confidence": "high",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "Tierrasverdes",
+      "bytes": 3912472,
+      "concerns": "oversized-for-list-thumbnail; the depicted lifter holds the arms straight out in front, which the seed does not describe; upstream name (Isometric Squat to Failure) will not match the seed name if it is ever surfaced."
+    },
+    {
+      "exerciseId": "ex-bodyweight-squat",
+      "wgerUuid": "2398e14f-02a6-4fdc-9f69-029e52dfe033",
+      "wgerExerciseName": "Slow Squat",
+      "files": [
+        "2398e14f-02a6-4fdc-9f69-029e52dfe033/db285682-1ab3-4be0-ae00-5117ecce1ee6.png"
+      ],
+      "note": "Two-frame line drawing, standing and bottom position, arms reaching forward for counterbalance, no load. Preferred over Box squat (151434a5) which is a barbell back squat to a box.",
+      "confidence": "medium",
+      "isAiGenerated": true,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "wger community contributors",
+      "bytes": 3189595,
+      "concerns": "oversized-for-list-thumbnail; upstream flags this as AI-generated, so confidence is capped at medium and it needs a human to confirm the depth and knee tracking are safe to present as form guidance."
+    },
+    {
+      "exerciseId": "ex-step-up",
+      "wgerUuid": "9e6dae29-5d03-440a-bdf1-2cb25a5179c2",
+      "wgerExerciseName": "Step-ups",
+      "files": [
+        "9e6dae29-5d03-440a-bdf1-2cb25a5179c2/f9377a7e-eb58-4cca-b805-2d36863aeb03.png"
+      ],
+      "note": "Two-frame line drawing, foot planted on a flat bench and drive up, then the controlled step down. Bench matches the seed equipment.",
+      "confidence": "medium",
+      "isAiGenerated": true,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "wger community contributors",
+      "bytes": 3460092,
+      "concerns": "oversized-for-list-thumbnail; upstream flags this as AI-generated, so confidence is capped at medium."
+    },
+    {
+      "exerciseId": "ex-pike-push-up",
+      "wgerUuid": "3b96a05b-9705-48da-b43e-6e098234bb35",
+      "wgerExerciseName": "Pike Push Ups",
+      "files": [
+        "3b96a05b-9705-48da-b43e-6e098234bb35/447f3c17-405f-46e0-b138-65c2a8caaab0.png"
+      ],
+      "note": "Two-frame line drawing, hips high in the pike and the crown of the head lowered towards the floor.",
+      "confidence": "medium",
+      "isAiGenerated": true,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "wger community contributors",
+      "bytes": 2413452,
+      "concerns": "oversized-for-list-thumbnail; upstream flags this as AI-generated, so confidence is capped at medium. Head-below-hands loading makes neck position worth a careful look before this is shown as guidance."
+    },
+    {
+      "exerciseId": "ex-push-up",
+      "wgerUuid": "f5b84269-18af-4464-a61f-b767cbcd81dc",
+      "wgerExerciseName": "Push-Up",
+      "files": [
+        "f5b84269-18af-4464-a61f-b767cbcd81dc/a6a9e561-3965-45c6-9f2b-ee671e1a3a45.png"
+      ],
+      "note": "Stylised illustration of the top of a push-up with a straight line from head to heels. The only whole-corpus image of the plain push-up; Clap Push-UP, Hindu Pushups and Finger Pushup are all different movements.",
+      "confidence": "medium",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "Settebello",
+      "bytes": 2457879,
+      "concerns": "oversized-for-list-thumbnail; single frame only (top position, no bottom of the rep); heavily stylised science-fiction interior background that does not match the rest of the library's visual language. The rendering style reads as synthetic even though the attribution record does not flag it AI-generated - a reviewer applying the plan's AI-image rule should decide explicitly, not assume the flag settles it."
+    },
+    {
+      "exerciseId": "ex-diamond-push-up",
+      "wgerUuid": "44cfa56c-d8c2-4f2c-8b5a-f29810fd60e7",
+      "wgerExerciseName": "Close-grip Press-ups",
+      "files": [
+        "44cfa56c-d8c2-4f2c-8b5a-f29810fd60e7/b2ee8d9b-0480-4992-8494-c223b37c2696.jpg"
+      ],
+      "note": "Photograph, bottom and top of a narrow-hand press-up in one frame, elbows tracking back along the ribs as the seed describes. Light at 20 KB.",
+      "confidence": "medium",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "philip",
+      "bytes": 20130,
+      "concerns": "Hands are close-grip but not touching, so it does not show the diamond or triangle hand position the seed name promises."
+    },
+    {
+      "exerciseId": "ex-bulgarian-split-squat",
+      "wgerUuid": "7ce489d2-1948-46de-aa80-277b2ca737aa",
+      "wgerExerciseName": "Bulgarian split squats left",
+      "files": [
+        "7ce489d2-1948-46de-aa80-277b2ca737aa/6283b258-a4d7-4833-84f7-a38987022d3d.png"
+      ],
+      "note": "Anatomical render, rear foot elevated on a flat bench, back knee dropping straight down. Preferred over Bulgarian Squat with Dumbbells (60d2c34b), which is lighter at 5 KB but only 275 px wide.",
+      "confidence": "medium",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "Franpol",
+      "bytes": 12637,
+      "concerns": "Lifter holds dumbbells; the seed lists a bench only, so the image adds load the exercise does not call for. Spanish muscle labels are burned into the artwork. Upstream name specifies the left side only."
+    },
+    {
+      "exerciseId": "ex-walking-lunge",
+      "wgerUuid": "dcc6e237-a8bb-4eca-bbc5-7fb852636f6a",
+      "wgerExerciseName": "Dumbbell Lunges Walking",
+      "files": [
+        "dcc6e237-a8bb-4eca-bbc5-7fb852636f6a/52c4434e-b5a2-4fce-af61-d997b510438a.png"
+      ],
+      "note": "Line drawing at the bottom of the lunge, back knee towards the floor, front shin near vertical. Preferred over Lunges (3284fd27) which is heavier at 81 KB and carries a third-party FitnessVolt watermark; this is the lightest of the record's five frames at 37 KB.",
+      "confidence": "medium",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 3",
+      "licenceAuthor": "Everkinetic",
+      "bytes": 36721,
+      "concerns": "Lifter holds dumbbells; the seed is bodyweight (equipment 'none'). Single static frame, so it does not convey the walking stride the seed describes."
+    },
+    {
+      "exerciseId": "ex-db-reverse-fly",
+      "wgerUuid": "3f93459a-d06e-465c-85db-2137da759440",
+      "wgerExerciseName": "Rear Delt Raises",
+      "files": [
+        "3f93459a-d06e-465c-85db-2137da759440/ad724e5c-b1ed-49e8-9279-a17545b0dd0b.png"
+      ],
+      "note": "Line drawing, torso hinged forward over an incline bench, arms opening wide with a slight elbow bend. Chosen over Incline Bench Reverse Fly (70c99a4e), which is lighter at 34 KB but shows a fully prone lifter lying face-down rather than the hinged standing position the seed describes.",
+      "confidence": "medium",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "cshep442",
+      "bytes": 51876,
+      "concerns": "Chest is supported on a bench; the seed describes a free hinged-forward standing position and lists dumbbells only. Reviewer should decide whether the supported version teaches the wrong setup."
+    },
+    {
+      "exerciseId": "ex-db-bent-over-row",
+      "wgerUuid": "51a2d520-b510-4b6e-bd65-9fc40365e8de",
+      "wgerExerciseName": "Incline Chest-Supported Dumbbell Row",
+      "files": [
+        "51a2d520-b510-4b6e-bd65-9fc40365e8de/e7262f70-7512-408a-8d00-4c499ef632fc.jpg"
+      ],
+      "note": "Anatomical render, bottom and top of a bilateral dumbbell row at roughly the forty-five degree torso angle the seed specifies, back muscles highlighted. Bent Over Rowing (4af6dbd9) and Bent Over Rowing Reverse (2f0ddf9a) were rejected because both are barbell movements.",
+      "confidence": "medium",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "carlos3c",
+      "bytes": 30935,
+      "concerns": "Chest is supported on an incline bench, so it does not show the unsupported hinge and flat-back bracing that is the main coaching point of the seed. Adds a bench the seed equipment list does not include."
+    },
+    {
+      "exerciseId": "ex-skater-jump",
+      "wgerUuid": "45e44940-d4a0-4c66-8cbb-7afe785d5610",
+      "wgerExerciseName": "Lateral Push Off",
+      "files": [
+        "45e44940-d4a0-4c66-8cbb-7afe785d5610/d8372291-6725-452a-9711-6321c061e354.jpg"
+      ],
+      "note": "Photograph of a lateral bound off one leg - the right movement plane, and the only lateral-bounding image in the corpus. Included so a reviewer can rule it in or out rather than because it is good; low confidence is deliberate.",
+      "confidence": "low",
+      "isAiGenerated": false,
+      "licence": "CC-BY-SA 4",
+      "licenceAuthor": "cleen",
+      "bytes": 12221,
+      "concerns": "Low-resolution video still (480x360) with heavy gym clutter behind the athlete; cords or straps run across the floor to the athlete, so he may be doing a resisted push-off rather than a free skater bound; only the push-off instant is shown, not the soft single-leg landing that is the seed's safety point. Recommend rejecting unless a reviewer can confirm there is no band tether."
+    }
+  ]
+}

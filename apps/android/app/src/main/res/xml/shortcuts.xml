@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Long-press shortcuts on the launcher icon.
+
+  Three, because the launcher shows at most four and the fourth would be
+  filler. They are the three things a user of a daily-habit app opens it to do
+  and then closes it again: log a meal, start the day's session, log a weigh-in.
+  Everything else on the bottom bar is something you browse, not something you
+  finish in ten seconds.
+
+  Each destination is an existing NavKey — NutritionKey, WorkoutLibraryKey,
+  LogWeightKey — named through the SHORTCUT_DESTINATION extra rather than by
+  class, so nothing here has to know how navigation is assembled.
+  WorkoutLibraryKey and not WorkoutSessionKey: that key needs a session id, and
+  a static shortcut baked at build time cannot know today's.
+
+  targetPackage is the literal applicationId because manifest placeholders are
+  not substituted into res/xml. There is no applicationIdSuffix on any build
+  type; adding one would mean revisiting this file.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="log_meal"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_meal"
+        android:shortcutShortLabel="@string/shortcut_log_meal_short"
+        android:shortcutLongLabel="@string/shortcut_log_meal_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="fit.aquazero.app"
+            android:targetClass="fit.aquazero.app.MainActivity">
+            <extra
+                android:name="fit.aquazero.app.extra.SHORTCUT_DESTINATION"
+                android:value="nutrition" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="today_workout"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_workout"
+        android:shortcutShortLabel="@string/shortcut_workout_short"
+        android:shortcutLongLabel="@string/shortcut_workout_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="fit.aquazero.app"
+            android:targetClass="fit.aquazero.app.MainActivity">
+            <extra
+                android:name="fit.aquazero.app.extra.SHORTCUT_DESTINATION"
+                android:value="workouts" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="log_weight"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_weight"
+        android:shortcutShortLabel="@string/shortcut_log_weight_short"
+        android:shortcutLongLabel="@string/shortcut_log_weight_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="fit.aquazero.app"
+            android:targetClass="fit.aquazero.app.MainActivity">
+            <extra
+                android:name="fit.aquazero.app.extra.SHORTCUT_DESTINATION"
+                android:value="log_weight" />
+        </intent>
+    </shortcut>
+
+</shortcuts>

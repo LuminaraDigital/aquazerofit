@@ -98,9 +98,6 @@ export default function CoachSelect() {
           <h1 className="font-heading font-semibold tracking-tight text-3xl text-on-surface leading-tight">
             Your corner
           </h1>
-          <p className="text-sm text-on-surface-variant/80 mt-1.5 leading-relaxed">
-            Every coach gives the same safe, measured advice. What changes is who is saying it.
-          </p>
         </section>
 
         {roster.isPending && (
@@ -122,7 +119,7 @@ export default function CoachSelect() {
           <>
             <GlassCard className="p-card-padding mb-5">
               <LevelBar experience={roster.data.experience} />
-              <p className="text-xs text-on-surface-variant/70 mt-2.5 leading-relaxed">
+              <p className="text-xs text-on-surface-variant mt-2.5 leading-relaxed">
                 You earn XP for logging, training, hydrating and resting — never for eating less.
               </p>
             </GlassCard>
@@ -164,7 +161,7 @@ export default function CoachSelect() {
                       )}
                       {!unlocked && (
                         <span
-                          className="absolute top-2 right-2 material-symbols-outlined text-[16px] text-on-surface-variant/80"
+                          className="absolute top-2 right-2 material-symbols-outlined text-[16px] text-on-surface-variant"
                           aria-hidden="true"
                         >
                           lock
@@ -201,7 +198,7 @@ export default function CoachSelect() {
                           </PrimaryButton>
                         ) : (
                           <div className="space-y-1.5">
-                            <p className="text-[11px] text-on-surface-variant/80 text-center">
+                            <p className="text-[11px] text-on-surface-variant text-center">
                               {coach.unlock.kind === 'earned' ? coach.unlock.label : ''}
                             </p>
                             {entitlement?.starsPrice != null && roster.data.starsAvailable && (

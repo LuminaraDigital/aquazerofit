@@ -149,12 +149,16 @@
             { "order": 1, "entries": [ { "id": "se-3-1", "exerciseId": "ex_jumping_jack", "sets": 3, "reps": 30, "restSeconds": 45 } ] },
             { "order": 2, "entries": [ { "id": "se-3-2", "exerciseId": "ex_dead_bug", "sets": 3, "reps": 12, "restSeconds": 45 } ] }
           ]
-        }
+        },
+        { "order": 4, "focus": "Rest", "isRest": true, "slots": [] },
+        { "order": 5, "focus": "Rest", "isRest": true, "slots": [] },
+        { "order": 6, "focus": "Rest", "isRest": true, "slots": [] },
+        { "order": 7, "focus": "Rest", "isRest": true, "slots": [] }
       ],
       "progressionRules": [
         { "slotEntryId": "se-1-1", "kind": "reps", "iteration": 2, "value": 12, "op": "replace", "requires": ["reps"] }
       ],
-      "rationale": "Three conservative full-body days with bodyweight loads and room to recover between sessions. wger exercise descriptions remain CC-BY-SA; their attribution is preserved in the app."
+      "rationale": "A seven-day week with three conservative full-body training days on bodyweight loads and four rest days between them. wger exercise descriptions remain CC-BY-SA; their attribution is preserved in the app."
     }
   },
   "cases": [
@@ -268,7 +272,7 @@
     {
       "id": "plan-11",
       "kind": "plan",
-      "note": "daysPerWeek boundary 7: seven-day draft via the mock provider (beginner rest-day rule applies).",
+      "note": "daysPerWeek boundary 7: every one of the seven days is a training day, so the week carries no rest day.",
       "profile": "beginner",
       "pool": "bodyweight",
       "daysPerWeek": 7,

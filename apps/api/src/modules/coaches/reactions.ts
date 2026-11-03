@@ -54,11 +54,54 @@ function reaction(
   };
 }
 
-/** Achievement ids earned as of now, in definition order. */
-export function earnedAchievementIds(summary: ProgressSummary): string[] {
-  return summary.achievements
-    .filter((a) => a.earnedAt !== null)
-    .map((a) => a.definition.id);
+// `earnedAchievementIds(summary)` used to live here and is deliberately gone.
+// It answered "everything this user has earned", and the acknowledgement used
+// it to decide what had been *shown* — two different questions whose answers
+// only coincide when nothing was truncated and no time passed. Delivery is now
+// recorded by the read (see [recordDelivery]); if you find yourself wanting
+// this helper back, the question you actually have is what was displayed.
+
+/**
+ * Does a level-up or rank-up headline this card?
+ *
+ * Both branches in [buildReactions] require `experience.level > seenLevel` —
+ * a rank-up is a level-up that also crossed a rank boundary — so this single
+ * predicate decides whether the headline consumes one of the three slots.
+ */
+function hasHeadline(state: CoachState, experience: ExperienceStatus): boolean {
+  return experience.level > state.seenLevel;
+}
+
+/**
+ * The achievements this card will ACTUALLY show, newest first.
+ *
+ * Shared by [buildReactions] and [acknowledgeReactions] so the two cannot
+ * disagree about what was delivered. They used to: the builder emitted at most
+ * `REACTION_LIMIT` achievements and then truncated the whole card again after
+ * the headline had already taken a slot, while the ack marked *every earned
+ * achievement* seen. Anything squeezed out by that second truncation was burned
+ * without ever being rendered — and on a new account that is the common case,
+ * not an edge one: finishing onboarding, logging a meal, weighing in and
+ * completing a workout earns four at once and levels the user to 2, so the
+ * headline takes a slot and two achievements are silently marked delivered.
+ *
+ * Deriving the emitted set from the same function the builder uses is what
+ * makes that class of bug unrepresentable, rather than fixed once.
+ */
+export function emittedAchievements(
+  state: CoachState,
+  experience: ExperienceStatus,
+  summary: ProgressSummary,
+): ProgressSummary['achievements'] {
+  const room = REACTION_LIMIT - (hasHeadline(state, experience) ? 1 : 0);
+  if (room <= 0) return [];
+  const seen = new Set(state.seenAchievementIds);
+  const fresh = summary.achievements.filter(
+    (a) => a.earnedAt !== null && !seen.has(a.definition.id),
+  );
+  // Newest first, so a backfill that awards several at once leads with the one
+  // the user most likely just earned.
+  return fresh.slice(-room).reverse();
 }
 
 /**
@@ -87,13 +130,7 @@ export function buildReactions(
     out.push(reaction(coach, 'levelUp', { n: experience.level }));
   }
 
-  const seen = new Set(state.seenAchievementIds);
-  const fresh = summary.achievements.filter(
-    (a) => a.earnedAt !== null && !seen.has(a.definition.id),
-  );
-  // Newest first, so a backfill that awards several at once leads with the one
-  // the user most likely just earned.
-  for (const item of fresh.slice(-REACTION_LIMIT).reverse()) {
+  for (const item of emittedAchievements(state, experience, summary)) {
     out.push(reaction(coach, 'achievement', { name: item.definition.name }));
   }
 
@@ -113,18 +150,66 @@ export function buildReactions(
 }
 
 /**
- * Mark everything in `reactions` as delivered. Mutates and returns the state
- * for the caller to persist; separated from `buildReactions` so that reading
- * the dashboard is a pure read and only an explicit acknowledgement writes.
- * An unacknowledged reaction is one the user did not see, and should reappear.
+ * Record what this card put on screen, so the acknowledgement can mark exactly
+ * that and nothing else. Called by the read; mutates and returns the state for
+ * the caller to persist.
+ *
+ * Writing on a read looks wrong and is not: the read still consumes nothing,
+ * a retry overwrites this with the same value, and no reaction becomes "seen"
+ * until the client acknowledges. What it removes is the ack's need to guess.
  */
-export function acknowledgeReactions(
+export function recordDelivery(
   state: CoachState,
   experience: ExperienceStatus,
   summary: ProgressSummary,
 ): CoachState {
-  state.seenLevel = Math.max(state.seenLevel, experience.level);
-  state.seenRankId = experience.rank.id;
-  state.seenAchievementIds = earnedAchievementIds(summary);
+  const headline = hasHeadline(state, experience);
+  state.pendingDelivery = {
+    level: headline ? experience.level : null,
+    rankId: headline && experience.rank.id !== state.seenRankId ? experience.rank.id : null,
+    achievementIds: emittedAchievements(state, experience, summary).map((a) => a.definition.id),
+  };
+  return state;
+}
+
+/**
+ * Mark what was actually delivered as seen. Mutates and returns the state for
+ * the caller to persist; separated from [buildReactions] so that reading the
+ * dashboard consumes nothing and only an explicit acknowledgement writes.
+ * An unacknowledged reaction is one the user did not see, and should reappear.
+ *
+ * This reads [CoachState.pendingDelivery] rather than re-deriving from live
+ * activity. Re-deriving was the bug: the ack runs after the user has looked at
+ * the card, and by then the set of earned achievements has moved — an outbox
+ * draining behind the celebration overlay is the ordinary case, not a race
+ * nobody hits. The ack then marked the *new* achievements seen and left the
+ * displayed one unseen, burning several at once.
+ *
+ * No pending record means nothing was displayed to acknowledge, so nothing is
+ * marked. That is the safe direction: a reaction that reappears is recoverable,
+ * one that was burned is gone for good.
+ */
+export function acknowledgeReactions(state: CoachState): CoachState {
+  const delivered = state.pendingDelivery;
+  if (!delivered) return state;
+
+  // Union, never replace. Achievements are derived rather than stored, so
+  // deleting a meal log un-earns `ach-first-meal`; a replace dropped it from
+  // the seen set and let it celebrate a second time when it was re-earned.
+  // Once seen, always seen, which is what "seen" has to mean. The set is
+  // bounded by the achievement catalogue, so it cannot grow without limit.
+  state.seenAchievementIds = [
+    ...new Set([...state.seenAchievementIds, ...delivered.achievementIds]),
+  ];
+  // Both only when a headline was actually rendered. `seenRankId` used to be
+  // assigned unconditionally, which rewound as well as advanced: XP is folded
+  // from live activity so the level can fall, while `seenLevel` is a high-water
+  // mark that never does. An ack taken in that state wrote the lower rank back,
+  // and the rank-up was then permanently burned.
+  if (delivered.rankId !== null) state.seenRankId = delivered.rankId;
+  if (delivered.level !== null) {
+    state.seenLevel = Math.max(state.seenLevel, delivered.level);
+  }
+  state.pendingDelivery = undefined;
   return state;
 }

@@ -39,6 +39,13 @@ const libraryQuerySchema = z.object({
 
 const LIBRARY_PARAMS = ['search', 'category', 'muscle', 'equipment', 'limit', 'offset', 'respectProfile'];
 
+/**
+ * Ceiling on the legacy no-params array response. Deliberately the same 200 the
+ * paginated `limit` allows, so the legacy shape is never the more generous of
+ * the two.
+ */
+const LEGACY_ARRAY_MAX = 200;
+
 const statsQuerySchema = z.object({
   weeks: z.coerce.number().int().min(1).max(52).default(8),
 });
@@ -94,7 +101,17 @@ function handleLibrary(req: Request, res: Response): void {
   const hasParams = LIBRARY_PARAMS.some((key) => req.query[key] !== undefined);
   const userId = userIdOf(req);
   if (!hasParams) {
-    res.json(queryExercises({}).items);
+    // Capped, not unbounded. This branch used to serialize the entire corpus
+    // into one array on every call — fine at 51 exercises, and roughly 862
+    // after the wger import, with the Everkinetic and RepDB imports on top of
+    // that. The ceiling matches the paginated `limit` maximum, so no caller can
+    // get more from the legacy shape than from the supported one.
+    //
+    // The array shape has no field to advertise a total or a next offset, which
+    // is exactly why it is legacy: a client that needs the whole corpus has to
+    // pass limit/offset and read the envelope. The only such client today is
+    // Android's CatalogRepository.refreshExercises, which already pages.
+    res.json(queryExercises({}).items.slice(0, LEGACY_ARRAY_MAX));
     return;
   }
   const limit = query.limit ?? 50;

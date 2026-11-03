@@ -9,13 +9,15 @@ import { useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { tokenStore } from '../../lib/api';
 import { getTelegramInitData, haptic, isTMA } from '../../lib/telegram';
+import { useTelegramMainAction } from '../../lib/useTelegramChrome';
 import { useAuthActions } from '../../lib/queries';
 import { useTelegramAutoLogin } from '../../lib/useTelegramAutoLogin';
-import { PageSpinner } from '../../components/ui/PageSpinner';
+import { AuthGateSkeleton } from '../../components/ui/Skeleton';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SecondaryButton } from '../../components/ui/SecondaryButton';
 import { ToastProvider, useToast } from '../../components/ui/Toast';
 import { AppBackground } from '../../components/layout/AppBackground';
+import { fetchPriorityHigh } from '../../lib/fetchPriority';
 
 const SLIDES = [
   {
@@ -47,7 +49,16 @@ function WelcomeInner() {
   const [tgLoading, setTgLoading] = useState(false);
 
   const autoLoginPending = useTelegramAutoLogin();
-  if (autoLoginPending) return <PageSpinner />;
+  const nativeContinue = useTelegramMainAction(
+    isTMA() && !autoLoginPending
+      ? {
+          text: 'Continue',
+          onClick: () => void onTelegram(),
+          enabled: !tgLoading,
+        }
+      : null,
+  );
+  if (autoLoginPending) return <AuthGateSkeleton />;
 
   function onScroll() {
     const el = carouselRef.current;
@@ -62,7 +73,7 @@ function WelcomeInner() {
     try {
       await telegramLogin(initData);
       haptic('success');
-      // The Mini App's whole point is arriving with nothing to fill in — a new
+      // The Mini App's whole point is arriving with nothing to fill in - a new
       // account lands on the first-run home, not on a form.
       navigate('/', { replace: true });
     } catch {
@@ -78,11 +89,23 @@ function WelcomeInner() {
       {/* Background atmosphere - WebGL aurora + hatch + vignette */}
       <AppBackground />
 
-      <main className="relative z-10 flex-1 flex flex-col max-w-md w-full mx-auto px-container-margin pt-10 pb-8">
+      <main
+        className="relative z-10 flex-1 flex flex-col max-w-md w-full mx-auto px-container-margin pb-8"
+        style={{ paddingTop: 'calc(2.5rem + var(--azf-header-safe-top, 0px))' }}
+      >
         {/* Brand header */}
         <div className="flex justify-center mb-section-gap reveal">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="" className="w-9 h-9 object-contain" aria-hidden="true" />
+            <img
+              src="/logo.png"
+              alt=""
+              width={359}
+              height={376}
+              loading="eager"
+              decoding="async"
+              className="w-9 h-9 object-contain"
+              aria-hidden="true"
+            />
             <span className="font-heading font-extrabold tracking-tight text-2xl text-primary">
               AquaZeroFit
             </span>
@@ -119,9 +142,16 @@ function WelcomeInner() {
                       </span>
                     </div>
                   ) : (
+                    // Only the first slide carries the logo, and that slide is
+                    // what the carousel opens on - this is the LCP element.
                     <img
                       src="/logo.png"
                       alt="AquaZeroFit logo"
+                      width={359}
+                      height={376}
+                      loading="eager"
+                      decoding="async"
+                      {...fetchPriorityHigh()}
                       className="relative z-10 w-full h-full object-contain"
                     />
                   )}
@@ -129,7 +159,7 @@ function WelcomeInner() {
                 <h1 className="font-heading font-semibold text-[26px] leading-[1.2] text-on-surface mb-3 max-w-xs mx-auto tracking-tight">
                   {slide.title}
                 </h1>
-                <p className="text-on-surface-variant/70 text-[15px] max-w-xs leading-relaxed">
+                <p className="text-on-surface-variant text-[15px] max-w-xs leading-relaxed">
                   {slide.subtitle}
                 </p>
               </div>
@@ -157,7 +187,7 @@ function WelcomeInner() {
           <SecondaryButton onClick={() => navigate('/sign-in')}>
             I already have an account
           </SecondaryButton>
-          {isTMA() && (
+          {isTMA() && !nativeContinue && (
             <SecondaryButton onClick={() => void onTelegram()} loading={tgLoading}>
               <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
                 send

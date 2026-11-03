@@ -22,6 +22,7 @@ import { AquaMascot } from '@/components/brand/AquaMascot';
 import { ShareMoment } from '@/components/share/ShareMoment';
 import type { ShareCardPayload } from '@/lib/shareCard';
 import { buildShareUrl, inviteRefFromUserId } from '@/lib/attribution';
+import { ANDROID_PLAY_STORE_URL, isAndroidMobileBrowser, joinChallengeUrl } from '@/lib/challenges';
 import { trackGrowth } from '@/lib/growth';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { AppBackground } from '@/components/layout/AppBackground';
@@ -43,7 +44,9 @@ export default function Challenges() {
   const me = useMe();
   const [params] = useSearchParams();
   const [kind, setKind] = useState<BuddyChallengeKind>('logging_streak');
-  const [joinCode, setJoinCode] = useState(() => (params.get('challenge') ?? '').toUpperCase());
+  const [joinCode, setJoinCode] = useState(() =>
+    (params.get('challenge') ?? params.get('code') ?? '').toUpperCase(),
+  );
   const [share, setShare] = useState<ShareCardPayload | null>(null);
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
@@ -104,6 +107,8 @@ export default function Challenges() {
   };
 
   const challenges = listQuery.data ?? [];
+  const showAndroidAppBanner = isAndroidMobileBrowser();
+  const deepLinkCode = joinCode.trim().length >= 4 ? joinCode.trim() : null;
   const invitePreview = useMemo(() => {
     if (!me.data) return null;
     return buildShareUrl('/welcome', {
@@ -127,6 +132,36 @@ export default function Challenges() {
               keep each other honest for two weeks.
             </p>
           </div>
+
+          {showAndroidAppBanner && (
+            <GlassCard className="mt-4 space-y-3 p-4">
+              <h2 className="font-heading text-base text-on-surface">Get the Android app</h2>
+              <p className="text-sm leading-relaxed text-on-surface-variant">
+                Open huddle invites in AquaZeroFit with App Links. Install from Google Play for
+                guided workouts, meal trust, and the full daily energy loop.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <PrimaryButton
+                  className="!w-full sm:!w-auto"
+                  onClick={() => {
+                    window.location.href = ANDROID_PLAY_STORE_URL;
+                  }}
+                >
+                  Install on Google Play
+                </PrimaryButton>
+                {deepLinkCode && (
+                  <SecondaryButton
+                    className="!w-full sm:!w-auto"
+                    onClick={() => {
+                      window.location.href = joinChallengeUrl(deepLinkCode);
+                    }}
+                  >
+                    Open invite link
+                  </SecondaryButton>
+                )}
+              </div>
+            </GlassCard>
+          )}
 
           <GlassCard className="mt-5 space-y-4 p-4">
             <h2 className="font-heading text-lg text-on-surface">Start a huddle</h2>

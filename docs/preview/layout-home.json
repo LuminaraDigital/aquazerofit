@@ -1,0 +1,252 @@
+[
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[997,227]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Open settings",
+    "center": "[996,226]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[108,2277]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[324,2271]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[540,2271]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[756,2271]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[972,2271]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "scrollable"
+    ],
+    "center": "[540,1193]",
+    "bounds": "[0,260][1080,2127]",
+    "key": 3506402
+  },
+  {
+    "text": "HOME",
+    "center": "[556,201]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[964,2011]",
+    "key": 3506402
+  },
+  {
+    "text": "Home",
+    "center": "[108,2313]",
+    "key": 3506402
+  },
+  {
+    "text": "Nutrition",
+    "center": "[324,2313]",
+    "key": 3506402
+  },
+  {
+    "text": "Workouts",
+    "center": "[540,2313]",
+    "key": 3506402
+  },
+  {
+    "text": "Progress",
+    "center": "[756,2313]",
+    "key": 3506402
+  },
+  {
+    "text": "Coach",
+    "center": "[972,2313]",
+    "key": 3506402
+  },
+  {
+    "text": "Monday, 31 August",
+    "center": "[214,364]",
+    "key": 3506402
+  },
+  {
+    "text": "Hey, Alex",
+    "center": "[197,443]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[911,442]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Scan a meal with your camera",
+    "center": "[964,2011]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Home",
+    "center": "[108,2251]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Nutrition",
+    "center": "[324,2251]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Workouts",
+    "center": "[540,2251]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Progress",
+    "center": "[756,2251]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Coach",
+    "center": "[972,2251]",
+    "key": 3506402
+  },
+  {
+    "text": "NUTRITION",
+    "center": "[209,659]",
+    "key": 3506402
+  },
+  {
+    "text": "Daily goal",
+    "center": "[182,713]",
+    "key": 3506402
+  },
+  {
+    "text": "CONSUMED",
+    "center": "[893,647]",
+    "key": 3506402
+  },
+  {
+    "text": "1,514",
+    "center": "[932,689]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Daily calories: 1,514 of 2,089 kilocalories consumed",
+    "center": "[540,1014]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Protein: 111 of 171 grams",
+    "center": "[540,1335]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Carbs: 163 of 247 grams",
+    "center": "[540,1451]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Fat: 48 of 46 grams",
+    "center": "[540,1567]",
+    "key": 3506402
+  },
+  {
+    "text": "HYDRATION",
+    "center": "[492,1788]",
+    "key": 3506402
+  },
+  {
+    "text": "2.2L / 2.8L",
+    "center": "[884,1788]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Water intake 2200 of 2825 millilitres",
+    "center": "[540,1891]",
+    "key": 3506402
+  },
+  {
+    "interactions": [
+      "clickable",
+      "focusable"
+    ],
+    "center": "[540,2035]",
+    "key": 3506402
+  },
+  {
+    "text": "PROTEIN",
+    "center": "[467,1313]",
+    "key": 3506402
+  },
+  {
+    "text": "111 / 171g",
+    "center": "[901,1316]",
+    "key": 3506402
+  },
+  {
+    "text": "CARBS",
+    "center": "[451,1429]",
+    "key": 3506402
+  },
+  {
+    "text": "163 / 247g",
+    "center": "[885,1432]",
+    "key": 3506402
+  },
+  {
+    "text": "FAT",
+    "center": "[465,1545]",
+    "key": 3506402
+  },
+  {
+    "text": "48 / 46g",
+    "center": "[899,1548]",
+    "key": 3506402
+  },
+  {
+    "content-desc": "Log 250 millilitres of water",
+    "center": "[540,2035]",
+    "key": 3506402
+  },
+  {
+    "text": "Log 250ml",
+    "center": "[540,2035]",
+    "key": 3506402
+  }
+]

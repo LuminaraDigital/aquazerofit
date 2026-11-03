@@ -1,0 +1,46 @@
+name: Branch Safety
+
+# Enforces the promotion path: feature/* -> staging -> main.
+# PRs into main must come from staging. Direct pushes to main are refused by
+# GitHub branch protection (see docs/BRANCHING_AND_STAGING.md); this workflow
+# is the CI-side twin of that rule for pull requests.
+on:
+  pull_request:
+    branches: [main, staging]
+
+permissions:
+  contents: read
+
+jobs:
+  promote-path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Enforce staging -> main promotion
+        if: github.base_ref == 'main'
+        run: |
+          HEAD="${{ github.head_ref }}"
+          if [ "$HEAD" != "staging" ]; then
+            echo "::error::PRs into main must come from the staging branch (got '$HEAD')."
+            echo "::error::Merge feature work into staging first, validate there, then open staging -> main."
+            exit 1
+          fi
+          echo "Promotion path ok: staging -> main"
+
+      - name: Allow feature and hotfix into staging
+        if: github.base_ref == 'staging'
+        run: |
+          HEAD="${{ github.head_ref }}"
+          case "$HEAD" in
+            feature/*|fix/*|hotfix/*|chore/*|dependabot/*|renovate/*)
+              echo "Staging intake ok: $HEAD -> staging"
+              ;;
+            main)
+              echo "::error::Do not open main -> staging PRs. Cherry-pick or revert forward instead."
+              exit 1
+              ;;
+            *)
+              echo "::warning::Unexpected source branch '$HEAD'. Prefer feature/*, fix/*, or hotfix/*."
+              echo "Allowing for now so Dependabot-style branches are not blocked without a rename."
+              ;;
+          esac

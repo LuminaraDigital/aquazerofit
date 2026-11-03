@@ -3,24 +3,76 @@
  * The plan page exists because the weekly-insight footnote had nowhere to send
  * a free-tier user. Two things about it are worth failing a build over.
  *
- * First, it must state the account's real position — the tier and the credit
- * balance — rather than a value proposition, so the numbers come from the API
+ * First, it must state the account's real position - the tier and the credit
+ * balance - rather than a value proposition, so the numbers come from the API
  * fixture and are asserted as rendered.
  *
- * Second, and the reason this file is emphatic about it: there is no payment
- * provider in this product. So there must be no purchase control, and nothing
- * that changes `tier`. A button wired to nothing is worse than an honest
+ * Second, and the reason this file is emphatic about it: a purchase control
+ * appears only when the deployment can actually take a payment, with Stripe's
+ * price on it. Otherwise there is no purchase control at all, and nothing here
+ * ever changes `tier`. A button wired to nothing is worse than an honest
  * sentence, and a self-serve tier flip with no payment behind it would be a
  * vulnerability rather than a placeholder.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { CREDIT_COSTS, FREE_TIER_DAILY_CREDITS } from '@aquazerofit/shared';
-import type { Entitlements } from '@/lib/queries';
+import {
+  CREDIT_COSTS,
+  FREE_TIER_DAILY_CREDITS,
+  MAX_BANKED_CREDITS,
+  PREMIUM_TIER_DAILY_CREDITS,
+} from '@aquazerofit/shared';
+import { ApiError } from '@/lib/api';
+import type { BillingConfig, Entitlements } from '@/lib/queries';
 
-const mocks = vi.hoisted(() => ({ useEntitlements: vi.fn() }));
-vi.mock('@/lib/queries', () => ({ useEntitlements: mocks.useEntitlements }));
+const mocks = vi.hoisted(() => ({
+  useEntitlements: vi.fn(),
+  useBillingConfig: vi.fn(),
+  startCheckout: vi.fn(),
+  // Overrides for the Stripe checkout mutation's state; idle unless a case says otherwise.
+  stripeCheckoutState: vi.fn((): Record<string, unknown> => ({})),
+  startStars: vi.fn(() => Promise.resolve({ invoiceLink: 'https://t.me/invoice/test', stars: 417 })),
+  openPortal: vi.fn(),
+  portalFailed: vi.fn(() => false),
+  // The sync hook's state for the session in the URL; idle unless a case says otherwise.
+  syncCheckout: vi.fn(
+    (_sessionId: string | null): { isError: boolean; isSuccess: boolean; data?: { tier: string } } => ({
+      isError: false,
+      isSuccess: false,
+    }),
+  ),
+  isTMA: vi.fn(() => false),
+  canPayWithStars: vi.fn(() => false),
+  openStarsInvoice: vi.fn(
+    (): Promise<'paid' | 'cancelled' | 'failed' | 'pending'> => Promise.resolve('cancelled'),
+  ),
+}));
+vi.mock('@/lib/queries', () => ({
+  queryKeys: { entitlements: ['entitlements'] },
+  useEntitlements: mocks.useEntitlements,
+  useBillingConfig: mocks.useBillingConfig,
+  useStartStripeCheckout: () => ({
+    mutate: mocks.startCheckout,
+    isPending: false,
+    isError: false,
+    error: null,
+    ...mocks.stripeCheckoutState(),
+  }),
+  useOpenStripePortal: () => ({ mutate: mocks.openPortal, isPending: false, isError: mocks.portalFailed() }),
+  useStripeCheckoutSync: mocks.syncCheckout,
+  useStartStarsSubscription: () => ({
+    mutateAsync: mocks.startStars,
+    isPending: false,
+    isError: false,
+  }),
+}));
+vi.mock('@/lib/telegram', () => ({
+  isTMA: mocks.isTMA,
+  canPayWithStars: mocks.canPayWithStars,
+  openStarsInvoice: mocks.openStarsInvoice,
+}));
 
 import Plan from './Plan';
 
@@ -30,9 +82,16 @@ const FREE: Entitlements = {
   creditsRemaining: 12,
   costs: { ...CREDIT_COSTS },
   premiumLanes: ['insightBatch'],
+  premiumDailyCredits: PREMIUM_TIER_DAILY_CREDITS,
 };
 
 const PREMIUM: Entitlements = { ...FREE, tier: 'premium', creditsRemaining: 47 };
+const STRIPE_SUBSCRIBER: Entitlements = { ...PREMIUM, billingSource: 'stripe' };
+
+const NO_STRIPE: BillingConfig = { stripe: { available: false, price: null } };
+const STRIPE: BillingConfig = {
+  stripe: { available: true, price: { amount: 999, currency: 'aud', interval: 'month' } },
+};
 
 interface QueryState {
   data?: Entitlements;
@@ -40,7 +99,7 @@ interface QueryState {
   isError?: boolean;
 }
 
-function renderWith(state: QueryState) {
+function renderWith(state: QueryState, billing: BillingConfig = NO_STRIPE, url = '/plan') {
   mocks.useEntitlements.mockReturnValue({
     data: undefined,
     isLoading: false,
@@ -48,22 +107,33 @@ function renderWith(state: QueryState) {
     refetch: vi.fn(),
     ...state,
   });
+  mocks.useBillingConfig.mockReturnValue({ data: billing, isLoading: false });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={['/plan']}>
-      <Routes>
-        <Route path="/plan" element={<Plan />} />
-        <Route path="/progress" element={<p>progress</p>} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[url]}>
+        <Routes>
+          <Route path="/plan" element={<Plan />} />
+          <Route path="/progress" element={<p>progress</p>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mocks.isTMA.mockReturnValue(false);
+  mocks.canPayWithStars.mockReturnValue(false);
+  mocks.openStarsInvoice.mockResolvedValue('cancelled');
+  mocks.syncCheckout.mockReset();
+  mocks.syncCheckout.mockImplementation(() => ({ isError: false, isSuccess: false }));
+  mocks.stripeCheckoutState.mockReturnValue({});
+  mocks.portalFailed.mockReturnValue(false);
 });
 
-describe('plan page — free tier', () => {
+describe('plan page - free tier', () => {
   it('leads with the account position: tier and the credits actually available', () => {
     renderWith({ data: FREE });
 
@@ -72,15 +142,38 @@ describe('plan page — free tier', () => {
     expect(screen.getByText(/AI credits available/i)).toBeTruthy();
     // The daily top-up is stated as its own number, not folded into "12 of 50".
     expect(
-      screen.getByText(new RegExp(`adds ${FREE_TIER_DAILY_CREDITS} credits`, 'i')),
+      screen.getByText(new RegExp(`tops your balance up by ${FREE_TIER_DAILY_CREDITS} credits`, 'i')),
     ).toBeTruthy();
+  });
+
+  /*
+   * The ceiling is server-sent and optional, so the copy has two correct
+   * forms and the wrong one is a lie either way round: promising unlimited
+   * carry-over to a user whose balance stops at 100, or naming a ceiling to a
+   * user on an older API that has none. Both branches are pinned.
+   */
+  it('names the carry-over ceiling when the API sends one', () => {
+    renderWith({ data: { ...FREE, maxBankedCredits: MAX_BANKED_CREDITS } });
+
+    expect(
+      screen.getByText(new RegExp(`up to a maximum of ${MAX_BANKED_CREDITS}`, 'i')),
+    ).toBeTruthy();
+  });
+
+  it('falls back to the unlimited carry-over wording when the API omits the ceiling', () => {
+    renderWith({ data: FREE });
+
+    expect(screen.getByText(/anything you do not spend carries over/i)).toBeTruthy();
   });
 
   it('describes premium from the lanes the API reports, and claims nothing more', () => {
     renderWith({ data: FREE });
 
     expect(screen.getByRole('heading', { name: /a coach-written weekly note/i })).toBeTruthy();
-    expect(screen.getByText('Premium')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: /meal photo analysis/i })).toBeNull();
+    expect(screen.getAllByText('Premium')).toHaveLength(1);
+    expect(screen.getByText(new RegExp(`${PREMIUM_TIER_DAILY_CREDITS} AI credits a day`, 'i'))).toBeTruthy();
+    expect(screen.getByText(/that is a cap/i)).toBeTruthy();
     expect(screen.getByText(/that is the whole difference today/i)).toBeTruthy();
   });
 
@@ -91,17 +184,17 @@ describe('plan page — free tier', () => {
     expect(chat).not.toBeNull();
     expect(within(chat as HTMLElement).getByText(`${CREDIT_COSTS.chatTurn} credit`)).toBeTruthy();
 
-    const photo = screen.getByText('Meal photo analysis').closest('div');
+    const photo = screen.getByText('Meal photo analysis', { selector: 'dt' }).closest('div');
     expect(within(photo as HTMLElement).getByText(`${CREDIT_COSTS.mealPhoto} credits`)).toBeTruthy();
   });
 
-  it('says the purchase step does not exist instead of faking one', () => {
+  it('says the purchase step is not available instead of faking one when payment is not configured', () => {
     const { container } = renderWith({ data: FREE });
 
-    expect(screen.getByRole('heading', { name: /upgrading is not available yet/i })).toBeTruthy();
-    expect(screen.getByText(/payment is not built yet/i)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /upgrading is not available here yet/i })).toBeTruthy();
+    expect(screen.getByText(/you cannot buy premium from this screen yet/i)).toBeTruthy();
 
-    // No checkout affordance of any kind — not even a disabled one.
+    // No checkout affordance of any kind - not even a disabled one.
     for (const role of ['button', 'link'] as const) {
       expect(
         screen.queryByRole(role, { name: /upgrade|buy|subscribe|checkout|go premium|pay/i }),
@@ -112,17 +205,34 @@ describe('plan page — free tier', () => {
   });
 });
 
-describe('plan page — premium tier', () => {
+describe('plan page - premium tier', () => {
   it('shows the position and what is switched on, not a sales page', () => {
     renderWith({ data: PREMIUM });
 
     expect(screen.getByText('Premium')).toBeTruthy();
     expect(screen.getByText('47')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /what premium gives you/i })).toBeTruthy();
-    expect(screen.getByText('On')).toBeTruthy();
+    expect(screen.getAllByText('On')).toHaveLength(1);
 
-    expect(screen.queryByText(/upgrading is not available yet/i)).toBeNull();
-    expect(screen.queryByText(/payment is not built yet/i)).toBeNull();
+    expect(screen.queryByText(/upgrading is not available/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
+  });
+
+  it('is never offered a second subscription, even where checkout is available', () => {
+    renderWith({ data: PREMIUM }, STRIPE);
+
+    expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
+  });
+
+  it('does not offer Stars to an account that is already premium', () => {
+    mocks.isTMA.mockReturnValue(true);
+    mocks.canPayWithStars.mockReturnValue(true);
+    renderWith(
+      { data: PREMIUM },
+      { stars: { available: true, price: 417, periodSeconds: 2_592_000 } },
+    );
+
+    expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
   });
 
   it('still prices credits, because credits are spent on premium too', () => {
@@ -133,12 +243,12 @@ describe('plan page — premium tier', () => {
   });
 });
 
-describe('plan page — non-content states', () => {
+describe('plan page - non-content states', () => {
   it('shows skeletons while the entitlements request is in flight', () => {
     const { container } = renderWith({ isLoading: true });
 
     expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
-    expect(screen.queryByText(/upgrading is not available yet/i)).toBeNull();
+    expect(screen.queryByText(/upgrading is not available/i)).toBeNull();
   });
 
   it('offers a retry rather than an empty page when the request fails', () => {
@@ -146,5 +256,195 @@ describe('plan page — non-content states', () => {
 
     expect(screen.getByRole('alert')).toBeTruthy();
     expect(screen.getByRole('button', { name: /try again/i })).toBeTruthy();
+  });
+});
+
+describe('plan page - Stripe checkout', () => {
+  it("offers Subscribe with Stripe's price on the button, and opens checkout when pressed", () => {
+    renderWith({ data: FREE }, STRIPE);
+
+    const subscribe = screen.getByRole('button', { name: /subscribe for .*9\.99 \/ month/i });
+    expect(screen.queryByText(/upgrading is not available/i)).toBeNull();
+
+    fireEvent.click(subscribe);
+    expect(mocks.startCheckout).toHaveBeenCalledTimes(1);
+    expect(mocks.startCheckout).toHaveBeenCalledWith('month');
+  });
+
+  it('offers annual checkout at A$79.99 when that plan is open', () => {
+    const both: BillingConfig = {
+      stripe: {
+        available: true,
+        price: { amount: 999, currency: 'aud', interval: 'month' },
+        plans: [
+          { interval: 'month', amount: 999, currency: 'aud', available: true },
+          { interval: 'year', amount: 7999, currency: 'aud', available: true },
+        ],
+      },
+    };
+    renderWith({ data: FREE }, both);
+
+    fireEvent.click(screen.getByRole('button', { name: /subscribe for .*79\.99 \/ year/i }));
+    expect(mocks.startCheckout).toHaveBeenCalledWith('year');
+    expect(screen.getByRole('button', { name: /subscribe for .*9\.99 \/ month/i })).toBeTruthy();
+  });
+
+  it('hides annual checkout when that plan is listed but not open', () => {
+    const monthlyOnly: BillingConfig = {
+      stripe: {
+        available: true,
+        price: { amount: 999, currency: 'aud', interval: 'month' },
+        plans: [
+          { interval: 'month', amount: 999, currency: 'aud', available: true },
+          { interval: 'year', amount: 7999, currency: 'aud', available: false },
+        ],
+      },
+    };
+    renderWith({ data: FREE }, monthlyOnly);
+
+    expect(screen.getByRole('button', { name: /subscribe for .*9\.99 \/ month/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /year/i })).toBeNull();
+  });
+
+  it("gives the server's reason when checkout is refused, rather than asking for a retry that cannot work", () => {
+    mocks.stripeCheckoutState.mockReturnValue({
+      isError: true,
+      error: new ApiError(409, {
+        code: 'CONFLICT',
+        message: 'This account already has a card subscription. Contact Support to update or cancel it.',
+      }),
+    });
+    renderWith({ data: FREE }, STRIPE);
+
+    expect(screen.getByText(/already has a card subscription/i)).toBeTruthy();
+    expect(screen.queryByText(/try again in a moment/i)).toBeNull();
+  });
+
+  it('keeps the retry wording for a checkout that failed for any other reason', () => {
+    mocks.stripeCheckoutState.mockReturnValue({
+      isError: true,
+      error: new ApiError(503, { code: 'PAYMENT_UNAVAILABLE', message: 'Could not reach Stripe.' }),
+    });
+    renderWith({ data: FREE }, STRIPE);
+
+    expect(screen.getByText(/could not open checkout\. nothing was charged/i)).toBeTruthy();
+  });
+
+  it('tells a buyer they can cancel from this page, not by contacting Support', () => {
+    renderWith({ data: FREE }, STRIPE);
+
+    expect(screen.getByText(/cancel any time from this page/i)).toBeTruthy();
+    expect(screen.queryByText(/to cancel, contact/i)).toBeNull();
+  });
+
+  it('keeps Stripe out of the Telegram Mini App, where Telegram requires Stars', () => {
+    mocks.isTMA.mockReturnValueOnce(true);
+    renderWith({ data: FREE }, STRIPE);
+
+    expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
+    expect(screen.getByRole('heading', { name: /upgrading is not available here yet/i })).toBeTruthy();
+  });
+
+  it('settles the session Stripe sends the buyer back with', () => {
+    renderWith({ data: FREE }, STRIPE, '/plan?checkout=success&session_id=cs_test_abc');
+
+    expect(mocks.syncCheckout).toHaveBeenCalledWith('cs_test_abc');
+    expect(screen.getByRole('status').textContent).toMatch(/confirming your payment/i);
+  });
+
+  it('says premium is on once the server has confirmed the payment', () => {
+    mocks.syncCheckout.mockReturnValue({ isError: false, isSuccess: true, data: { tier: 'premium' } });
+    renderWith({ data: FREE }, STRIPE, '/plan?checkout=success&session_id=cs_test_abc');
+
+    expect(screen.getByRole('status').textContent).toMatch(/payment received. premium is on/i);
+  });
+
+  it('says so plainly when the payment could not be confirmed, rather than spinning', () => {
+    mocks.syncCheckout.mockReturnValue({ isError: true, isSuccess: false });
+    renderWith({ data: FREE }, STRIPE, '/plan?checkout=success&session_id=cs_test_abc');
+
+    expect(screen.getByRole('status').textContent).toMatch(/could not confirm this checkout yet/i);
+  });
+
+  it('opens a Stars invoice in the Mini App at the price the API sent', async () => {
+    mocks.isTMA.mockReturnValue(true);
+    mocks.canPayWithStars.mockReturnValue(true);
+    mocks.openStarsInvoice.mockResolvedValue('paid');
+    const stars: BillingConfig = {
+      stripe: { available: true, price: { amount: 999, currency: 'aud', interval: 'month' } },
+      stars: { available: true, price: 417, periodSeconds: 2_592_000 },
+    };
+    renderWith({ data: FREE }, stars);
+
+    expect(screen.queryByRole('button', { name: /9\.99/i })).toBeNull();
+    expect(screen.getAllByText(/30 days/i).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /subscribe for 417 stars/i }));
+
+    expect(await screen.findByText(/payment received/i)).toBeTruthy();
+    expect(mocks.startStars).toHaveBeenCalledTimes(1);
+    expect(mocks.openStarsInvoice).toHaveBeenCalledWith('https://t.me/invoice/test');
+  });
+
+  it('keeps the not-available card when Stars has no price, even inside Telegram', () => {
+    mocks.isTMA.mockReturnValue(true);
+    mocks.canPayWithStars.mockReturnValue(true);
+    renderWith({ data: FREE }, { stars: { available: false, price: null, periodSeconds: null } });
+
+    expect(screen.getByRole('heading', { name: /upgrading is not available here yet/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /subscribe/i })).toBeNull();
+  });
+
+  it('says nothing was charged when the buyer backs out of checkout', () => {
+    renderWith({ data: FREE }, STRIPE, '/plan?checkout=cancelled');
+
+    expect(screen.getByRole('status').textContent).toMatch(/nothing was charged/i);
+    expect(mocks.syncCheckout.mock.calls.every(([sessionId]) => sessionId === null)).toBe(true);
+  });
+});
+
+describe('plan page - managing a Stripe subscription', () => {
+  it("lets a Stripe subscriber manage or cancel, opening Stripe's billing portal", () => {
+    renderWith({ data: STRIPE_SUBSCRIBER }, STRIPE);
+
+    fireEvent.click(screen.getByRole('button', { name: /manage or cancel subscription/i }));
+    expect(mocks.openPortal).toHaveBeenCalledTimes(1);
+    // There is something to do here now, so the page does not say otherwise.
+    expect(screen.queryByText(/nothing to do here/i)).toBeNull();
+  });
+
+  it('tells a Play subscriber to cancel in the Play Store', () => {
+    renderWith(
+      { data: { ...PREMIUM, billingSource: 'play', activeBillingSources: ['play'] } },
+      STRIPE,
+    );
+
+    expect(screen.getByText(/cancel it in the play store/i)).toBeTruthy();
+    expect(screen.getByRole('link', { name: /manage subscription in google play/i }).getAttribute('href')).toBe(
+      'https://play.google.com/store/account/subscriptions?package=fit.aquazero.app',
+    );
+    expect(screen.queryByRole('button', { name: /manage or cancel/i })).toBeNull();
+    expect(screen.queryByText(/nothing to do here/i)).toBeNull();
+  });
+
+  it('offers no portal to premium that Stripe is not billing', () => {
+    for (const billingSource of ['play', 'admin', null, undefined] as const) {
+      renderWith({ data: { ...PREMIUM, billingSource } }, STRIPE);
+      expect(screen.queryByRole('button', { name: /manage or cancel/i })).toBeNull();
+      cleanup();
+    }
+  });
+
+  it('keeps the portal out of the Telegram Mini App', () => {
+    mocks.isTMA.mockReturnValue(true);
+    renderWith({ data: STRIPE_SUBSCRIBER }, STRIPE);
+
+    expect(screen.queryByRole('button', { name: /manage or cancel/i })).toBeNull();
+  });
+
+  it('says plainly when the billing page could not be opened', () => {
+    mocks.portalFailed.mockReturnValue(true);
+    renderWith({ data: STRIPE_SUBSCRIBER }, STRIPE);
+
+    expect(screen.getByRole('alert').textContent).toMatch(/could not open .*nothing has changed/i);
   });
 });

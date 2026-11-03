@@ -15,18 +15,12 @@ import {
   type WorkoutSession,
 } from '@aquazerofit/shared';
 import { AppError } from '../../platform/errors';
+import { addDays, processLocalToday } from '../../platform/dates';
 import { getStore, newId } from '../../platform/store';
 import { mealLogsForDate } from '../logs/service';
+import { containsProfanity } from '@aquazerofit/shared';
 
-function todayIsoDate(): string {
-  return new Date().toLocaleDateString('en-CA');
-}
-
-function addDays(isoDate: string, days: number): string {
-  const d = new Date(`${isoDate}T12:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toLocaleDateString('en-CA');
-}
+const todayIsoDate = processLocalToday;
 
 function datesInclusive(from: string, to: string): string[] {
   const out: string[] = [];
@@ -40,7 +34,13 @@ function datesInclusive(from: string, to: string): string[] {
 
 function displayNameFor(userId: string): string {
   const user = getStore().byId<User>('users', userId);
-  return user?.displayName?.trim() || 'Aqua buddy';
+  const name = user?.displayName?.trim();
+  if (!name) return 'Aqua buddy';
+  // Retroactive cover. Every huddle response re-resolves member names through
+  // here (see toPublicMemberNames), so filtering at this one point masks names
+  // that were stored before the filter existed — on web and Android alike —
+  // without a migration over the user table.
+  return containsProfanity(name) ? 'Aqua buddy' : name;
 }
 
 /**
@@ -157,8 +157,10 @@ export function getChallenge(id: string, userId: string): BuddyChallenge {
   if (!raw || raw.type !== 'buddyChallenge') {
     throw new AppError('NOT_FOUND', 'Challenge not found');
   }
+  // A non-member gets the same 404 as a missing id, so the endpoint never
+  // confirms that someone else's huddle exists (house style for owned data).
   if (!raw.members.some((m: BuddyChallengeMember) => m.userId === userId)) {
-    throw new AppError('FORBIDDEN', 'You are not a member of this challenge');
+    throw new AppError('NOT_FOUND', 'Challenge not found');
   }
   const refreshed = refreshStatus(raw);
   if (refreshed !== raw) getStore().upsert('logs', refreshed);
@@ -311,9 +313,4 @@ export function removeUserFromChallenges(userId: string): number {
     });
   }
   return affected.length;
-}
-
-export function inviteRefForUser(userId: string): string {
-  // Short stable invite token derived from id (not secret; for attribution only).
-  return userId.replace(/-/g, '').slice(0, 10);
 }

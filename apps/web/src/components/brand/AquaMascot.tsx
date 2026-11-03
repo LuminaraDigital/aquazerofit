@@ -23,6 +23,10 @@ const CROP_CLASS: Record<MascotCrop, string> = {
   full: 'object-contain object-bottom',
 };
 
+/** Intrinsic size of every pose file (public/akin-*.jpg). */
+const POSE_W = 682;
+const POSE_H = 1024;
+
 function poseUrl(pose: AkinPose = 'idle'): string {
   return AQUA_CHARACTER.poses[pose].url;
 }
@@ -55,11 +59,18 @@ export function AquaMascot({
         ? 'rounded-2xl'
         : '';
 
+  // Always a small badge beside a heading (sm/md/lg) or a decorative hero
+  // ornament, never the LCP element — the landing hero uses AkinStage. Lazy is
+  // therefore free: an in-viewport instance is still fetched immediately.
   return (
     <img
       src={poseUrl(pose)}
       alt={decorative ? '' : label}
       aria-hidden={decorative || undefined}
+      width={POSE_W}
+      height={POSE_H}
+      loading="lazy"
+      decoding="async"
       className={`${SIZE[size]} ${CROP_CLASS[frame]} ${round} bg-black/40 ${className}`}
       draggable={false}
     />

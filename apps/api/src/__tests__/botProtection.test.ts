@@ -18,12 +18,24 @@ import {
   assertHuman,
   captchaConfig,
   captchaTokenOf,
+  integrityTokenOf,
+  isAndroidClient,
+  verifyPlayIntegrity,
   verifyTurnstileToken,
 } from '../platform/botProtection';
+import { config } from '../platform/config';
 import type { AppError } from '../platform/errors';
 
 const ORIGINAL_SECRET = process.env.TURNSTILE_SECRET_KEY;
 const ORIGINAL_SITE = process.env.TURNSTILE_SITE_KEY;
+const MOBILE_KEYS = [
+  'AUTH_ALLOW_CAPTCHALESS_MOBILE',
+  'PLAY_INTEGRITY_ENABLED',
+  'PLAY_INTEGRITY_PACKAGE_NAME',
+] as const;
+const ORIGINAL_MOBILE = Object.fromEntries(
+  MOBILE_KEYS.map((k) => [k, process.env[k]]),
+) as Record<(typeof MOBILE_KEYS)[number], string | undefined>;
 
 /** Enforcement needs BOTH keys — see config.botProtectionEnabled. */
 function configureTurnstile(): void {
@@ -52,6 +64,7 @@ function stubVerify(payload: unknown, ok = true) {
 beforeEach(() => {
   delete process.env.TURNSTILE_SECRET_KEY;
   delete process.env.TURNSTILE_SITE_KEY;
+  for (const k of MOBILE_KEYS) delete process.env[k];
 });
 
 afterEach(() => {
@@ -59,6 +72,10 @@ afterEach(() => {
   else process.env.TURNSTILE_SECRET_KEY = ORIGINAL_SECRET;
   if (ORIGINAL_SITE === undefined) delete process.env.TURNSTILE_SITE_KEY;
   else process.env.TURNSTILE_SITE_KEY = ORIGINAL_SITE;
+  for (const k of MOBILE_KEYS) {
+    if (ORIGINAL_MOBILE[k] === undefined) delete process.env[k];
+    else process.env[k] = ORIGINAL_MOBILE[k];
+  }
   vi.restoreAllMocks();
 });
 
@@ -190,6 +207,167 @@ describe('assertHuman when configured', () => {
     expect(body).toContain('secret=test-secret');
     expect(body).toContain('response=good');
     expect(body).toContain('remoteip=198.51.100.4');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Native Android registration path
+// ---------------------------------------------------------------------------
+//
+// The Android app cannot render a Turnstile widget. The escape hatch below is
+// a GLOBAL bypass — `X-Client` is a header anybody can type — so the tests
+// that matter are the negative ones: it is off unless explicitly switched on,
+// it does not extend to a caller that did not claim to be Android, and the
+// Play Integrity seam cannot make the gate weaker than it already is.
+
+describe('isAndroidClient / integrityTokenOf', () => {
+  it('recognises the client header case-insensitively', () => {
+    expect(isAndroidClient(fakeRequest({ headers: { 'x-client': 'android' } }))).toBe(true);
+    expect(isAndroidClient(fakeRequest({ headers: { 'x-client': ' Android ' } }))).toBe(true);
+  });
+
+  it('is false for every other caller, including one that sent nothing', () => {
+    expect(isAndroidClient(fakeRequest())).toBe(false);
+    expect(isAndroidClient(fakeRequest({ headers: { 'x-client': 'web' } }))).toBe(false);
+    expect(isAndroidClient(fakeRequest({ headers: { 'x-client': 'android-ish' } }))).toBe(false);
+  });
+
+  it('reads the integrity token from the body, beside captchaToken', () => {
+    expect(integrityTokenOf(fakeRequest({ body: { integrityToken: ' tok ' } }))).toBe('tok');
+    expect(integrityTokenOf(fakeRequest({ body: { captchaToken: 'c' } }))).toBe('');
+    expect(integrityTokenOf(fakeRequest())).toBe('');
+  });
+});
+
+describe('verifyPlayIntegrity (seam, config-gated off)', () => {
+  it('reports not-configured when the feature is off', async () => {
+    await expect(verifyPlayIntegrity('any-token')).resolves.toEqual({
+      ok: false,
+      reason: 'not-configured',
+    });
+  });
+
+  it('stays off when the flag is set but the package name is not', () => {
+    // A verdict validated against the wrong package is not a check, so both
+    // halves are required before anything runs.
+    process.env.PLAY_INTEGRITY_ENABLED = 'true';
+    expect(config.playIntegrityEnabled).toBe(false);
+  });
+
+  it('reports missing-token once configured but handed nothing', async () => {
+    process.env.PLAY_INTEGRITY_ENABLED = 'true';
+    process.env.PLAY_INTEGRITY_PACKAGE_NAME = 'fit.aquazero.app';
+    expect(config.playIntegrityEnabled).toBe(true);
+    await expect(verifyPlayIntegrity('')).resolves.toEqual({ ok: false, reason: 'missing-token' });
+  });
+
+  it('never passes a caller on its own while the decoder is unwired', async () => {
+    process.env.PLAY_INTEGRITY_ENABLED = 'true';
+    process.env.PLAY_INTEGRITY_PACKAGE_NAME = 'fit.aquazero.app';
+    const result = await verifyPlayIntegrity('a-token-nothing-has-checked');
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe('assertHuman on the mobile path', () => {
+  beforeEach(configureTurnstile);
+
+  it('lets an Android client through with no captcha when the flag is set', async () => {
+    process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = 'true';
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    await expect(
+      assertHuman(fakeRequest({ headers: { 'x-client': 'android' }, body: {} }), 'register'),
+    ).resolves.toBeUndefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('still demands a captcha from an Android client when the flag is unset', async () => {
+    // The default. Turnstile keys configured and no flag means the gate holds,
+    // whatever header the caller typed.
+    await expect(
+      assertHuman(fakeRequest({ headers: { 'x-client': 'android' }, body: {} }), 'register'),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+      details: { fieldErrors: { captchaToken: 'Verification challenge is required.' } },
+    });
+  });
+
+  it('never exempts a non-android client, even with the flag set', async () => {
+    process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = 'true';
+    const callers: Record<string, string>[] = [{}, { 'x-client': 'web' }, { 'x-client': 'ios' }];
+    for (const headers of callers) {
+      await expect(assertHuman(fakeRequest({ headers, body: {} }), 'register')).rejects.toMatchObject(
+        { code: 'VALIDATION_FAILED' },
+      );
+    }
+  });
+
+  it('applies to password reset as well as register', async () => {
+    process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = 'true';
+    await expect(
+      assertHuman(fakeRequest({ headers: { 'x-client': 'android' }, body: {} }), 'password-reset'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('still verifies a captcha token an Android client did supply', async () => {
+    // The flag waives a challenge that cannot be solved; it does not waive one
+    // that was attempted and failed.
+    process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = 'true';
+    stubVerify({ success: false, 'error-codes': ['invalid-input-response'] });
+    await expect(
+      assertHuman(
+        fakeRequest({ headers: { 'x-client': 'android' }, body: { captchaToken: 'bad' } }),
+        'register',
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+  });
+
+  it('falls through to Turnstile when an integrity token cannot be verified', async () => {
+    // The seam must never be a way in. An unconfigured or failing verdict
+    // leaves the caller facing exactly the gate they would have faced anyway.
+    process.env.PLAY_INTEGRITY_ENABLED = 'true';
+    process.env.PLAY_INTEGRITY_PACKAGE_NAME = 'fit.aquazero.app';
+    await expect(
+      assertHuman(
+        fakeRequest({ headers: { 'x-client': 'android' }, body: { integrityToken: 'tok' } }),
+        'register',
+      ),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+      details: { fieldErrors: { captchaToken: 'Verification challenge is required.' } },
+    });
+  });
+
+  it('accepts an integrity-token request that also solves the captcha', async () => {
+    process.env.PLAY_INTEGRITY_ENABLED = 'true';
+    process.env.PLAY_INTEGRITY_PACKAGE_NAME = 'fit.aquazero.app';
+    stubVerify({ success: true });
+    await expect(
+      assertHuman(
+        fakeRequest({
+          headers: { 'x-client': 'android' },
+          body: { integrityToken: 'tok', captchaToken: 'good' },
+        }),
+        'register',
+      ),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('config.authAllowCaptchalessMobile', () => {
+  it('is off unless explicitly enabled', () => {
+    expect(config.authAllowCaptchalessMobile).toBe(false);
+    process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = 'false';
+    expect(config.authAllowCaptchalessMobile).toBe(false);
+    process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = 'yes';
+    expect(config.authAllowCaptchalessMobile).toBe(false);
+  });
+
+  it('accepts the two spellings an operator would reach for', () => {
+    process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = 'true';
+    expect(config.authAllowCaptchalessMobile).toBe(true);
+    process.env.AUTH_ALLOW_CAPTCHALESS_MOBILE = '1';
+    expect(config.authAllowCaptchalessMobile).toBe(true);
   });
 });
 

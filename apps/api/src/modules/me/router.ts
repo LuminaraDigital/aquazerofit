@@ -1,26 +1,29 @@
 /**
- * /me — profile, targets, consents, telegram link, export, deletion.
+ * /me: profile, targets, consents, telegram link, export, deletion.
  */
 import { Router } from 'express';
 import {
   CREDIT_COSTS,
-  FREE_TIER_DAILY_CREDITS,
+  PREMIUM_TIER_DAILY_CREDITS,
+  dailyCreditsFor,
+  maxBankedCreditsFor,
   consentsSchema,
   profileSchema,
+  linkTelegramSchema,
   setCredentialsSchema,
-  telegramAuthSchema,
   updateIdentitySchema,
   type User,
 } from '@aquazerofit/shared';
 import { creditLedger } from '../ai/creditLedger';
 import { PREMIUM_LANES } from '../ai/tierPolicy';
-import { asyncHandler } from '../ai/util';
+import { asyncHandler } from '../../platform/errors';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { AppError } from '../../platform/errors';
 import { getStore } from '../../platform/store';
 import { setCredentials } from '../auth/service';
 import { validateTelegramInitData } from '../auth/telegram';
 import { memoryRouter } from '../memory/router';
+import { activeEntitlementSources, effectiveTier, entitlementHistory } from '../billing/entitlements';
 import {
   exportUserData,
   getConsents,
@@ -44,7 +47,7 @@ meRouter.use('/memory', memoryRouter);
 /**
  * What this account can currently do, and how much of today's allowance is
  * left. Exposed so the plan surface can state the actual position rather than
- * marketing it — "you have used 38 of 50 credits today" is a fact the user can
+ * marketing it. "you have used 38 of 50 credits today" is a fact the user can
  * act on, where "upgrade for more!" is not.
  *
  * Read-only by construction. There is deliberately no route here (or anywhere
@@ -59,20 +62,37 @@ meRouter.get(
     const userId = userIdOf(req);
     const user = getStore().byId<User>('users', userId);
     if (!user) throw new AppError('NOT_FOUND', 'Account not found.');
-    // The daily grant is lazy — it is appended by the first `reserve` of the
+    // The daily grant is lazy: it is appended by the first `reserve` of the
     // day, not by a scheduler. Reading the balance without it would report a
     // true-but-meaningless 0 to anyone who has not yet triggered an AI action,
     // which on this surface reads as "you have nothing" rather than "you have
     // not started". The call is idempotent per UTC day, so doing it here just
     // moves the same grant slightly earlier.
-    await creditLedger.grantDailyIfNeeded(userId);
+    const tier = effectiveTier(user);
+    await creditLedger.grantDailyIfNeeded(userId, tier);
     const remaining = await creditLedger.balance(userId);
     res.json({
-      tier: user.tier,
-      dailyCredits: FREE_TIER_DAILY_CREDITS,
+      tier,
+      // Per tier, not the free constant: a premium account told it receives
+      // the free allowance is being shown the plan it did not buy.
+      dailyCredits: dailyCreditsFor(tier),
+      // The paid cap, on every account, so the upgrade screen can state it
+      // without a client-side constant.
+      premiumDailyCredits: PREMIUM_TIER_DAILY_CREDITS,
       creditsRemaining: remaining,
+      // The carry-over ceiling. Sent because the daily top-up stops at it, so
+      // a client that says "unspent credits carry over" without naming the
+      // limit is describing behaviour the server no longer has.
+      maxBankedCredits: maxBankedCreditsFor(tier),
       costs: CREDIT_COSTS,
       premiumLanes: PREMIUM_LANES,
+      // Which rail the latest entitlement came from, so the plan page offers
+      // Stripe's billing portal only to the people Stripe is billing.
+      billingSource: entitlementHistory(userId)[0]?.source ?? null,
+      // Rails whose paid period is still running. A Play entry means the
+      // account-delete and unsubscribe screens must say to cancel in the
+      // Play Store. There is no Play cancel API on this server.
+      activeBillingSources: activeEntitlementSources(userId),
     });
   }),
 );
@@ -94,9 +114,9 @@ meRouter.get('/targets', (req, res) => {
 });
 
 meRouter.post('/link-telegram', (req, res) => {
-  const { initData } = telegramAuthSchema.parse(req.body);
+  const { initData, confirm } = linkTelegramSchema.parse(req.body);
   const tgUser = validateTelegramInitData(initData);
-  const user = linkTelegram(userIdOf(req), tgUser.id, tgUser.username);
+  const user = linkTelegram(userIdOf(req), tgUser.id, tgUser.username, confirm === true);
   res.json({ user });
 });
 
@@ -139,12 +159,15 @@ meRouter.patch('/', (req, res) => {
   res.json({ user: updateIdentity(userIdOf(req), input) });
 });
 
-meRouter.delete('/', (req, res) => {
-  const result = requestDeletion(userIdOf(req));
-  res.json({
-    ...result,
-    message: result.purged
-      ? 'Your account and data have been deleted.'
-      : 'Deletion requested. Your account will be removed after the grace period; call again to delete immediately.',
-  });
-});
+meRouter.delete(
+  '/',
+  asyncHandler(async (req, res) => {
+    const result = await requestDeletion(userIdOf(req));
+    res.json({
+      ...result,
+      message: result.purged
+        ? 'Your account and data have been deleted.'
+        : 'Deletion requested. Your account will be removed after the grace period; call again to delete immediately.',
+    });
+  }),
+);

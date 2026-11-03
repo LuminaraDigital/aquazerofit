@@ -81,10 +81,18 @@ it('releases the chat reservation when meta.degraded is true', async () => {
   expect(res.status).toBe(200);
   expect(res.text).toContain('"type":"done"');
 
+  // The invariant, from CONTRIBUTING.md: a turn answered by the offline
+  // fallback after real providers failed is NOT charged for. The balance must
+  // come back to where it started — reserved, then released, net zero.
+  //
+  // This assertion previously read `toBe(before - 1)`, with a comment saying
+  // to "update test to match actual behavior". It was matching a defect: the
+  // streaming lane read the gateway's result from `iterator._finalResult`, a
+  // property nothing ever set, so `meta.degraded` was always false and every
+  // degraded turn was billed. A test rewritten to accept a broken invariant
+  // is worse than no test, because the suite then certifies the breakage.
   const after = await creditLedger.balance(userId);
-  // Current behavior: with degraded=true, the reservation is released but the net effect
-  // appears to be -1 from the reserve. Update test to match actual behavior.
-  expect(after).toBe(before - 1);
+  expect(after).toBe(before);
 
   const ledger = getStore().where('ledger', (d) => (d as { userId?: string }).userId === userId);
   const reserveTx = ledger.find((d) => (d as { reason?: string }).reason === 'reserve:chatTurn');
@@ -94,7 +102,83 @@ it('releases the chat reservation when meta.degraded is true', async () => {
 
   const settlement = ledger.filter((d) => (d as { reservationId?: string }).reservationId === reservationId);
   expect(settlement.some((d) => (d as { kind?: string }).kind === 'release')).toBe(true);
-  // Current behavior: both release and commit are created when degraded
-  expect(settlement.some((d) => (d as { kind?: string }).kind === 'commit')).toBe(true);
+  // Exactly one settlement, and it is the release. A commit alongside it would
+  // mean the user was charged for degraded output.
+  expect(settlement.some((d) => (d as { kind?: string }).kind === 'commit')).toBe(false);
   expect(CREDIT_COSTS.chatTurn).toBe(1);
+});
+
+it('keeps an answer cut off mid-stream as it stood, unbilled, with nothing appended', async () => {
+  // The provider starts answering, then the connection drops (or the chat
+  // deadline aborts a long generation). Part of the answer has already gone
+  // to the user; the provider's next attempt would succeed and, before this,
+  // was streamed after it and billed as a whole answer.
+  resetProviderCircuits();
+  const encoder = new TextEncoder();
+  let streams = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: { body: string }) => {
+      if ((JSON.parse(init.body) as { stream?: boolean }).stream !== true) {
+        return { ok: false, status: 503, headers: { get: (): null => null } };
+      }
+      streams += 1;
+      const frames = (streams === 1 ? ['Half ', 'an answer'] : ['A second answer.']).map(
+        (content) => `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`,
+      );
+      const breaks = streams === 1;
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (): null => null },
+        body: new ReadableStream<Uint8Array>({
+          pull(controller) {
+            const next = frames.shift();
+            if (next !== undefined) controller.enqueue(encoder.encode(next));
+            else if (breaks) controller.error(new Error('terminated'));
+            else controller.close();
+          },
+        }),
+      };
+    }),
+  );
+  await creditLedger.grantDailyIfNeeded(userId);
+  const before = await creditLedger.balance(userId);
+
+  const res = await request(app)
+    .post(`${base}/chat/sessions/${sessionId}/messages`)
+    .set(auth())
+    .send({ content: 'Plan my training for the week.' });
+
+  expect(res.status).toBe(200);
+  expect(res.text).not.toContain('A second answer.');
+  expect(await creditLedger.balance(userId)).toBe(before);
+  const replies = getStore()
+    .where(
+      'ai',
+      (d) =>
+        (d as { type?: string }).type === 'chatMessage' &&
+        (d as { userId?: string }).userId === userId &&
+        (d as { role?: string }).role === 'assistant',
+    )
+    .sort((a, b) => String((a as { createdAt?: string }).createdAt).localeCompare(String((b as { createdAt?: string }).createdAt)));
+  expect((replies.at(-1) as { content?: string }).content).toBe('Half an answer');
+});
+
+it('records the real provider on the persisted message, not "unknown"', async () => {
+  // The same discarded return value carried provider/model provenance. Every
+  // stored assistant message on this lane recorded 'unknown', which made the
+  // per-message AI provenance record useless exactly where volume is highest.
+  const messages = getStore().where(
+    'ai',
+    (d) =>
+      (d as { type?: string }).type === 'chatMessage' &&
+      (d as { userId?: string }).userId === userId &&
+      (d as { role?: string }).role === 'assistant',
+  );
+  expect(messages.length).toBeGreaterThan(0);
+  for (const message of messages) {
+    const ai = (message as { ai?: { provider?: string } }).ai;
+    expect(ai?.provider).not.toBe('unknown');
+  }
 });

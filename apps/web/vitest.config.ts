@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
  * A test config that does not depend on the working directory.
  *
  * `vite.config.ts` carries the `@` and `@aquazerofit/shared` aliases, and
- * Vitest only picks it up when it resolves this package as the project root —
+ * Vitest only picks it up when it resolves this package as the project root  - 
  * which happens when the suite is run from `apps/web`, and not when it is run
  * from the repository root as `vitest run apps/web`. In that second form four
  * files fail with `Failed to resolve import "@/components/ui/GlassCard"`,
@@ -13,7 +13,7 @@ import { defineConfig } from 'vitest/config';
  * reader looking in the wrong place entirely.
  *
  * `npm run test` happens to use the working form (it runs per workspace), so
- * this is not currently breaking CI — it is a trap laid for whoever next wires
+ * this is not currently breaking CI - it is a trap laid for whoever next wires
  * the web suite into a root-level command. Declaring the aliases here makes
  * both invocations work, so the trap cannot spring.
  */
@@ -28,13 +28,19 @@ export default defineConfig({
   },
   test: {
     /**
-     * A ratchet set just under the measured figure (statements 36.9%,
-     * branches 75.1%, functions 41.4%), so coverage cannot silently fall.
+     * A ratchet set just under the measured figure (statements 45.22%,
+     * branches 43.25%, functions 43.87%, lines 47.28% on Vitest 4.1), so
+     * coverage cannot silently fall.
+     *
+     * The branch floor moved from 72 to 40 with the Vitest 4 coverage
+     * remapper. The previous 75.1% figure came from v8-to-istanbul, which
+     * counted JSX branches the AST remapper does not. Statement and function
+     * coverage rose under the same reporter, and those floors stayed.
      *
      * The statement number is genuinely low and the threshold is honest about
      * that rather than flattering: the web suite concentrates on logic that
-     * can be wrong — the auth gate, routing, the token store, targets and
-     * consistency maths, the Telegram theme bridge — while most of the
+     * can be wrong - the auth gate, routing, the token store, targets and
+     * consistency maths, the Telegram theme bridge - while most of the
      * remaining lines are presentational JSX that a snapshot would "cover"
      * without asserting anything true. The branch figure is the one worth
      * reading, and it is the one closest to the API's.
@@ -45,7 +51,7 @@ export default defineConfig({
       exclude: ['src/**/*.test.{ts,tsx}', 'src/main.tsx', '**/*.d.ts', 'dist/**', 'vite-plugins/**'],
       thresholds: {
         statements: 34,
-        branches: 72,
+        branches: 40,
         functions: 38,
         lines: 34,
       },

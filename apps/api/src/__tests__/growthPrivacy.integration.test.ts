@@ -94,7 +94,7 @@ describe('account erasure reaches buddy challenges', () => {
     expect(joined.status).toBe(200);
     expect(challengeByCode(code)?.members).toHaveLength(2);
 
-    purgeUser(doomed.id);
+    await purgeUser(doomed.id);
 
     const after = challengeByCode(code);
     expect(after).toBeDefined();
@@ -110,7 +110,7 @@ describe('account erasure reaches buddy challenges', () => {
     const code = await createHuddle(solo);
     expect(challengeByCode(code)).toBeDefined();
 
-    purgeUser(solo.id);
+    await purgeUser(solo.id);
 
     expect(challengeByCode(code)).toBeUndefined();
   });
@@ -136,7 +136,7 @@ describe('growth telemetry anonymisation', () => {
     expect(before?.userId).toBe(tracked.id);
     expect(before?.attribution.ref).toBe('inviter123');
 
-    purgeUser(tracked.id);
+    await purgeUser(tracked.id);
 
     const after = getStore().byId<GrowthEvent>('audit', eventId);
     expect(after).toBeDefined();

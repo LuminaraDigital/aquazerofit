@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget-picker preview.
+
+     A drawn likeness of the real layout rather than the app icon: the picker
+     is where a user decides whether the widget is worth a home-screen slot,
+     and a logo tells them nothing about what it shows. Proportions match
+     today_widget_info's 250x110dp so the picker's scaling does not distort it.
+
+     Colours are DESIGN.md's, matching WidgetTheme: SurfaceContainer card,
+     OnSurface and OnSurfaceVariant text bars, Primary progress fill over the
+     RingTrack track, PrimaryContainer action pill. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="250dp"
+    android:height="110dp"
+    android:viewportWidth="250"
+    android:viewportHeight="110">
+    <path
+        android:fillColor="#1A2122"
+        android:pathData="M20,0 h210 a20,20 0 0 1 20,20 v70 a20,20 0 0 1 -20,20 h-210 a20,20 0 0 1 -20,-20 v-70 a20,20 0 0 1 20,-20 z" />
+    <!-- Calorie headline and workout status. -->
+    <path
+        android:fillColor="#DDE4E5"
+        android:pathData="M16,22 h96 v11 h-96 z" />
+    <path
+        android:fillColor="#45DFA4"
+        android:pathData="M166,24 h68 v7 h-68 z" />
+    <!-- Progress bar: track, then fill. -->
+    <path
+        android:fillColor="#1E4C74"
+        android:pathData="M16,43 h218 v6 h-218 z" />
+    <path
+        android:fillColor="#8AEBFF"
+        android:pathData="M16,43 h134 v6 h-134 z" />
+    <!-- Hydration total and the one-tap water pill. -->
+    <path
+        android:fillColor="#DDE4E5"
+        android:pathData="M16,72 h72 v10 h-72 z" />
+    <path
+        android:fillColor="#22D3EE"
+        android:pathData="M172,60 h62 a17,17 0 0 1 0,34 h-62 a17,17 0 0 1 0,-34 z" />
+    <path
+        android:fillColor="#005763"
+        android:pathData="M186,73 h34 v8 h-34 z" />
+</vector>

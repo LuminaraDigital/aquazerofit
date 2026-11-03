@@ -9,18 +9,21 @@
 import express from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { assertTrustProxyHeaders, enforceHttps, resetProxyWarning } from '../platform/https';
+import { assertTrustProxyHeaders, enforceHttps, redirectWwwToCanonical, resetProxyWarning } from '../platform/https';
 import { redactUrl } from '../platform/telemetry';
 import { secureEquals } from '../platform/auth';
 
 const ORIGINAL_FORCE_HTTPS = process.env.FORCE_HTTPS;
 const ORIGINAL_TRUST_PROXY = process.env.TRUST_PROXY;
+const ORIGINAL_APP_PUBLIC_URL = process.env.APP_PUBLIC_URL;
 
 afterEach(() => {
   if (ORIGINAL_FORCE_HTTPS === undefined) delete process.env.FORCE_HTTPS;
   else process.env.FORCE_HTTPS = ORIGINAL_FORCE_HTTPS;
   if (ORIGINAL_TRUST_PROXY === undefined) delete process.env.TRUST_PROXY;
   else process.env.TRUST_PROXY = ORIGINAL_TRUST_PROXY;
+  if (ORIGINAL_APP_PUBLIC_URL === undefined) delete process.env.APP_PUBLIC_URL;
+  else process.env.APP_PUBLIC_URL = ORIGINAL_APP_PUBLIC_URL;
   resetProxyWarning();
   vi.restoreAllMocks();
 });
@@ -84,6 +87,74 @@ describe('enforceHttps', () => {
       .set('Host', 'app.aquazerofit.com')
       .set('X-Forwarded-Proto', 'https');
     expect(res.status).toBe(308);
+  });
+});
+
+describe('redirectWwwToCanonical', () => {
+  function appWithCanonical() {
+    const app = express();
+    app.set('trust proxy', 1);
+    app.use(redirectWwwToCanonical);
+    app.use(enforceHttps);
+    app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+    app.get('/google-play', (_req, res) => res.json({ ok: true }));
+    app.post('/api/v1/auth/login', (_req, res) => res.json({ ok: true }));
+    return app;
+  }
+
+  beforeEach(() => {
+    process.env.APP_PUBLIC_URL = 'https://aquazerofit.com';
+    process.env.FORCE_HTTPS = 'false';
+  });
+
+  it('301s www to the APP_PUBLIC_URL origin, keeping path and query', async () => {
+    const res = await request(appWithCanonical()).get('/google-play?ref=play').set('Host', 'www.aquazerofit.com');
+    expect(res.status).toBe(301);
+    expect(res.headers.location).toBe('https://aquazerofit.com/google-play?ref=play');
+  });
+
+  it('matches the host case-insensitively and through a trusted X-Forwarded-Host', async () => {
+    const res = await request(appWithCanonical())
+      .get('/')
+      .set('Host', 'internal:8080')
+      .set('X-Forwarded-Host', 'WWW.AquaZeroFit.com');
+    expect(res.status).toBe(301);
+    expect(res.headers.location).toBe('https://aquazerofit.com/');
+  });
+
+  it('takes plaintext www straight to the https origin in one hop', async () => {
+    process.env.FORCE_HTTPS = 'true';
+    const res = await request(appWithCanonical()).get('/google-play').set('Host', 'www.aquazerofit.com');
+    expect(res.status).toBe(301);
+    expect(res.headers.location).toBe('https://aquazerofit.com/google-play');
+  });
+
+  it('serves the canonical host and unrelated hosts normally', async () => {
+    const app = appWithCanonical();
+    expect((await request(app).get('/google-play').set('Host', 'aquazerofit.com')).status).toBe(200);
+    expect((await request(app).get('/google-play').set('Host', 'www.example.com')).status).toBe(200);
+  });
+
+  it('follows APP_PUBLIC_URL rather than a hardcoded domain', async () => {
+    process.env.APP_PUBLIC_URL = 'https://app.example.com';
+    const app = appWithCanonical();
+    expect((await request(app).get('/').set('Host', 'www.aquazerofit.com')).status).toBe(404);
+    const res = await request(app).get('/').set('Host', 'www.app.example.com');
+    expect(res.headers.location).toBe('https://app.example.com/');
+  });
+
+  it('answers non-GET requests and plaintext-exempt paths where they landed', async () => {
+    const app = appWithCanonical();
+    const post = await request(app).post('/api/v1/auth/login').set('Host', 'www.aquazerofit.com').send({});
+    expect(post.status).toBe(200);
+    const health = await request(app).get('/health').set('Host', 'www.aquazerofit.com');
+    expect(health.status).toBe(200);
+  });
+
+  it('does nothing when APP_PUBLIC_URL is not a URL', async () => {
+    process.env.APP_PUBLIC_URL = 'not a url';
+    const res = await request(appWithCanonical()).get('/google-play').set('Host', 'www.aquazerofit.com');
+    expect(res.status).toBe(200);
   });
 });
 

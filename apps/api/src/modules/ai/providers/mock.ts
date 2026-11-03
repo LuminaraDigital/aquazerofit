@@ -1,5 +1,5 @@
 /**
- * Deterministic, context-aware template engine — the offline provider.
+ * Deterministic, context-aware template engine - the offline provider.
  *
  * The whole product must work with zero API keys (AQF-10 principle 5), so this
  * engine produces genuinely useful answers grounded ONLY in the tool data the
@@ -8,12 +8,17 @@
  * produce identical output (evaluable) while different inputs feel alive.
  *
  * Models identify/interpret/explain; CODE calculates: this engine never
- * invents numbers — every figure in its output comes from supplied context.
+ * invents numbers - every figure in its output comes from supplied context.
  */
 import { CONSISTENCY_STEADY_DAYS, type ConsistencyState, type ModelGroup } from '@aquazerofit/shared';
 import { coachById } from '@aquazerofit/shared';
 import { personaHints } from '../prompts';
 import { classify } from '../guardrails';
+import {
+  foodNameSentence,
+  hasNutritionIntake,
+  PERSONALISATION_OFF_REPLY,
+} from '../../chat/grounding';
 
 // ---------------------------------------------------------------------------
 // Deterministic seeding
@@ -34,8 +39,13 @@ function pick<T>(options: readonly T[], seed: number, salt: number): T {
 }
 
 // ---------------------------------------------------------------------------
-// Context contracts (populated by chat tools / routers — real store data)
+// Context contracts (populated by chat tools / routers - real store data)
 // ---------------------------------------------------------------------------
+
+export interface MockNutritionFood {
+  name: string;
+  mealType: string;
+}
 
 export interface MockNutritionContext {
   kcalTarget: number;
@@ -46,6 +56,8 @@ export interface MockNutritionContext {
   fatG: { consumed: number; target: number };
   waterMl: { consumed: number; target: number };
   mealsLogged: number;
+  /** Named items from today's meal logs. Absent when the day has none. */
+  foods?: MockNutritionFood[];
 }
 
 export interface MockWorkoutContext {
@@ -93,6 +105,11 @@ export interface MockMemoryContext {
 }
 
 export interface MockChatContext {
+  /**
+   * `off` means logs were not fetched. Null nutrition in that case is not an
+   * empty day. Absent means an older caller that only passed the tool payload.
+   */
+  personalisation?: 'on' | 'off';
   userName?: string;
   nutrition?: MockNutritionContext | null;
   workout?: MockWorkoutContext | null;
@@ -109,8 +126,8 @@ export interface MockVisionCandidate {
 }
 
 export interface MockVisionContext {
-  seedKey: string;
-  candidates: MockVisionCandidate[];
+  seedKey?: string;
+  candidates?: MockVisionCandidate[];
   /** AI-04: Optional image data acknowledgment for dev parity.
    * Real providers receive image bytes; mock acknowledges the structure. */
   imageBase64?: string;
@@ -143,7 +160,7 @@ export interface MockResult {
 }
 
 // ---------------------------------------------------------------------------
-// Chat lane — grounded wellness answers
+// Chat lane - grounded wellness answers
 // ---------------------------------------------------------------------------
 
 const OPENERS = [
@@ -241,7 +258,7 @@ function progressLines(p: MockProgressContext | null | undefined, seed: number):
   }
   // Consistency is narrated from the window count, never the consecutive run.
   // The old copy fired only when the run exceeded one day, so a user who missed
-  // yesterday got silence at the exact moment encouragement matters most — and
+  // yesterday got silence at the exact moment encouragement matters most - and
   // "showing up daily" framed anything short of perfect as falling short.
   // Every state gets a line, and none of them describe a loss.
   const window = `${p.activeDays} of the last ${p.windowDays} days`;
@@ -305,13 +322,17 @@ function detectIntent(message: string): Intent {
 
 /**
  * Who the offline engine speaks as. The selected coach when one is known,
- * otherwise the P-07 hints — so a keyless demo still sounds like the character
+ * otherwise the P-07 hints - so a keyless demo still sounds like the character
  * the user picked rather than like the default for everyone.
  */
 function personaFor(coachId: string | undefined): { name: string; tone: string } {
   const coach = coachById(coachId);
   if (coach) return { name: coach.name.split(' ')[0]!, tone: coach.voice.word.toLowerCase() };
   return personaHints();
+}
+
+function personalisationOff(ctx: MockChatContext): boolean {
+  return ctx.personalisation === 'off';
 }
 
 function chatReply(messages: MockMessage[], ctx: MockChatContext, coachId?: string): string {
@@ -325,11 +346,24 @@ function chatReply(messages: MockMessage[], ctx: MockChatContext, coachId?: stri
 
   switch (intent) {
     case 'nutrition':
+      if (personalisationOff(ctx)) {
+        parts.push(PERSONALISATION_OFF_REPLY);
+        break;
+      }
       parts.push(pick(OPENERS, seed, 3));
-      if (ctx.nutrition) parts.push(...nutritionLines(ctx.nutrition, seed));
-      else parts.push('You haven’t logged anything yet today. Once you do, I can track your budget in real time.');
+      if (ctx.nutrition && hasNutritionIntake(ctx.nutrition)) {
+        parts.push(...nutritionLines(ctx.nutrition, seed));
+        const foods = foodNameSentence(ctx.nutrition);
+        if (foods) parts.push(foods);
+      } else {
+        parts.push('You haven’t logged anything yet today. Once you do, I can track your budget in real time.');
+      }
       break;
     case 'water': {
+      if (personalisationOff(ctx)) {
+        parts.push(PERSONALISATION_OFF_REPLY);
+        break;
+      }
       const w = ctx.nutrition?.waterMl;
       parts.push(
         w
@@ -341,9 +375,17 @@ function chatReply(messages: MockMessage[], ctx: MockChatContext, coachId?: stri
       break;
     }
     case 'workout':
+      if (personalisationOff(ctx)) {
+        parts.push(PERSONALISATION_OFF_REPLY);
+        break;
+      }
       parts.push(...workoutLines(ctx.workout, seed));
       break;
     case 'plan':
+      if (personalisationOff(ctx)) {
+        parts.push(PERSONALISATION_OFF_REPLY);
+        break;
+      }
       parts.push(
         ctx.plan
           ? `You’re on “${ctx.plan.name}”, ${ctx.plan.daysPerWeek} training days a week.`
@@ -352,11 +394,19 @@ function chatReply(messages: MockMessage[], ctx: MockChatContext, coachId?: stri
       parts.push(...workoutLines(ctx.workout, seed));
       break;
     case 'progress':
+      if (personalisationOff(ctx)) {
+        parts.push(PERSONALISATION_OFF_REPLY);
+        break;
+      }
       parts.push(...progressLines(ctx.progress, seed));
       break;
     case 'greeting':
     case 'general':
     default: {
+      if (personalisationOff(ctx)) {
+        parts.push(`${hello}I’m ${persona.name}, your wellness coach. ${PERSONALISATION_OFF_REPLY}`);
+        break;
+      }
       parts.push(`${hello}I’m ${persona.name}, your wellness coach. ${pick(OPENERS, seed, 5)}`);
       if (ctx.nutrition) {
         parts.push(
@@ -364,6 +414,8 @@ function chatReply(messages: MockMessage[], ctx: MockChatContext, coachId?: stri
             ? `Food: ${r(ctx.nutrition.kcalConsumed)} / ${r(ctx.nutrition.kcalTarget)} kcal logged (${r(ctx.nutrition.kcalRemaining)} kcal left).`
             : `Food: ${r(ctx.nutrition.kcalConsumed)} kcal logged, a touch over your ${r(ctx.nutrition.kcalTarget)} kcal target.`,
         );
+        const foods = foodNameSentence(ctx.nutrition);
+        if (foods) parts.push(foods);
       }
       const wl = workoutLines(ctx.workout, seed);
       if (wl.length) parts.push(wl[0] as string);
@@ -380,55 +432,76 @@ function chatReply(messages: MockMessage[], ctx: MockChatContext, coachId?: stri
 }
 
 // ---------------------------------------------------------------------------
-// Vision lane — identification only; calories are computed by CODE upstream
+// Vision lane - identification only; calories are computed by CODE upstream
 // ---------------------------------------------------------------------------
 
-interface MockVisionPrediction {
-  foodId: string;
+interface MockVisionItem {
   name: string;
+  portion: string;
   estimatedGrams: number;
   confidence: number;
 }
 
-function visionIdentify(ctx: MockVisionContext): { predictions: MockVisionPrediction[] } {
-  const candidates = ctx.candidates;
-  if (candidates.length === 0) return { predictions: [] };
-  
-  // AI-04: Acknowledge image parameter for dev parity
-  // In real providers, image bytes are sent; here we log receipt and use seed for determinism
+/**
+ * Names the offline engine can hand to the catalog matcher. They are ordinary
+ * food words, not nutrition. The keyless product still gets a review list.
+ * A degraded fallback discards this list before the user sees it.
+ */
+const OFFLINE_VISION_ITEMS: MockVisionItem[] = [
+  { name: 'chicken breast', portion: 'one small fillet', estimatedGrams: 120, confidence: 0.8 },
+  { name: 'white rice', portion: 'one cup cooked', estimatedGrams: 158, confidence: 0.74 },
+  { name: 'broccoli', portion: 'one cup chopped', estimatedGrams: 91, confidence: 0.7 },
+  { name: 'egg', portion: 'one egg', estimatedGrams: 50, confidence: 0.77 },
+];
+
+function visionIdentify(ctx: MockVisionContext): { items: MockVisionItem[] } {
+  const fromCandidates: MockVisionItem[] = (ctx.candidates ?? [])
+    .filter((food) => typeof food.name === 'string' && food.name.length > 0)
+    .map((food) => ({
+      name: food.name,
+      portion: food.commonServings?.[0]?.label ?? 'one serving',
+      estimatedGrams:
+        food.commonServings?.[0]?.grams && food.commonServings[0].grams > 0
+          ? food.commonServings[0].grams
+          : 100,
+      confidence: 0.7,
+    }));
+  const pool = fromCandidates.length > 0 ? fromCandidates : OFFLINE_VISION_ITEMS;
+  if (pool.length === 0) return { items: [] };
+
+  // AI-04: Acknowledge image parameter for dev parity.
+  // Real providers receive image bytes. The mock only uses them to vary the seed.
   const hasImage = !!(ctx.imageBase64 || ctx.imageHash);
-  const seedInput = hasImage 
+  const seedInput = hasImage
     ? `${ctx.seedKey}|img:${ctx.imageHash ?? 'b64'}${ctx.imageBase64?.slice(0, 32) ?? ''}`
     : ctx.seedKey;
-  const seed = fnv1a(seedInput);
-  
-  const count = Math.min(candidates.length, 2 + (seed % 3)); // 2–4 foods
-  const predictions: MockVisionPrediction[] = [];
+  const seed = fnv1a(seedInput || 'meal');
+
+  const count = Math.min(pool.length, 2 + (seed % 3));
+  const items: MockVisionItem[] = [];
   const used = new Set<number>();
   for (let i = 0; i < count; i += 1) {
-    let idx = (seed >>> (i * 5)) % candidates.length;
+    let idx = (seed >>> (i * 5)) % pool.length;
     let guard = 0;
-    while (used.has(idx) && guard < candidates.length) {
-      idx = (idx + 7) % candidates.length;
+    while (used.has(idx) && guard < pool.length) {
+      idx = (idx + 7) % pool.length;
       guard += 1;
     }
     used.add(idx);
-    const food = candidates[idx] as MockVisionCandidate;
-    const serving = food.commonServings?.[0]?.grams;
-    const grams = serving && serving > 0 ? serving : 80 + ((seed >>> (i * 3)) % 23) * 10; // 80–300 g
-    const confidence = 0.55 + (((seed >>> (i * 4)) % 41) / 100); // 0.55–0.95
-    predictions.push({
-      foodId: food.id,
+    const food = pool[idx] as MockVisionItem;
+    const confidence = Math.min(0.95, food.confidence + (((seed >>> (i * 4)) % 11) / 100));
+    items.push({
       name: food.name,
-      estimatedGrams: Math.round(grams),
+      portion: food.portion,
+      estimatedGrams: Math.round(food.estimatedGrams),
       confidence: Math.round(confidence * 100) / 100,
     });
   }
-  return { predictions };
+  return { items };
 }
 
 // ---------------------------------------------------------------------------
-// Structured lane — rank meal candidates by fit to remaining macros
+// Structured lane - rank meal candidates by fit to remaining macros
 // ---------------------------------------------------------------------------
 
 function rankRecommendations(ctx: MockRecommendationContext): {
@@ -462,7 +535,7 @@ function rankRecommendations(ctx: MockRecommendationContext): {
 }
 
 // ---------------------------------------------------------------------------
-// Plan lanes (P-05 plan generation / P-06 exercise swap) — deterministic
+// Plan lanes (P-05 plan generation / P-06 exercise swap) - deterministic
 // offline versions so plan features work with zero keys and in evals.
 // The mock only arranges the caller-supplied pool; planEngine.ts re-validates
 // its output through the exact same deterministic gate as a real provider.
@@ -506,10 +579,13 @@ const FOCUS_BY_CATEGORY: Record<string, string> = {
 
 /**
  * Offline P-05 draft: rotates the pool deterministically (FNV-1a seeded),
- * prescribes by experience level, prescribes NO external load (weightKg null —
+ * prescribes by experience level, prescribes NO external load (weightKg null -
  * the conservative default), and emits simple replace-op progression rules.
- * Beginners training 4+ days get every 4th day off (AQF-11 recovery rule).
+ * Emits a full seven-day week with `daysPerWeek` training days spaced through
+ * it (AQF-11 recovery rule) - see the distribution note in the loop.
  */
+const DAYS_IN_WEEK = 7;
+
 function planDraftOffline(ctx: MockPlanGenContext): Record<string, unknown> {
   const pool = [...ctx.pool].sort((a, b) => a.id.localeCompare(b.id));
   if (pool.length === 0 || !Number.isInteger(ctx.daysPerWeek) || ctx.daysPerWeek < 1 || ctx.daysPerWeek > 7) {
@@ -526,9 +602,29 @@ function planDraftOffline(ctx: MockPlanGenContext): Record<string, unknown> {
   const progressionRules: Record<string, unknown>[] = [];
   const perDay = Math.min(4, Math.max(2, Math.ceil(usable.length / ctx.daysPerWeek)));
 
-  for (let day = 1; day <= ctx.daysPerWeek; day += 1) {
-    const isRest = experience === 'beginner' && ctx.daysPerWeek >= 4 && day % 4 === 0;
-    if (isRest) {
+  /*
+   * Seven days, of which exactly `daysPerWeek` are training days.
+   *
+   * This loop used to run to `ctx.daysPerWeek` and then mark every fourth of
+   * THOSE as rest, so it emitted too few days and too few training days at
+   * once. Both gates that consume this draft require a full week with exactly
+   * `daysPerWeek` non-rest, so nothing it produced was ever accepted - and
+   * since the offline engine is what every keyless deployment and every eval
+   * run uses, that was the common case rather than an edge one.
+   *
+   * The rest days are chosen by Bresenham distribution rather than a modulo
+   * rule: `(d - 1) * daysPerWeek % 7 < daysPerWeek` selects exactly
+   * `daysPerWeek` of the seven and spreads them, starting on day 1. That
+   * replaces the old beginner recovery rule, which met AQF-11 by quietly
+   * handing a beginner fewer sessions than they asked for; spacing the
+   * sessions achieves the same recovery without silently changing the
+   * request, and `generatePlanSchema` caps the field at 6, so a week always
+   * carries at least one rest day.
+   */
+  const isTrainingDay = (d: number): boolean => ((d - 1) * ctx.daysPerWeek) % DAYS_IN_WEEK < ctx.daysPerWeek;
+
+  for (let day = 1; day <= DAYS_IN_WEEK; day += 1) {
+    if (!isTrainingDay(day)) {
       days.push({ order: day, focus: 'Rest', isRest: true, slots: [] });
       continue;
     }
@@ -608,7 +704,7 @@ function swapSuggestionOffline(ctx: MockSwapContext): Record<string, unknown> {
 
 
 // ---------------------------------------------------------------------------
-// Insight lane — summarise supplied statistics only (P-08 contract)
+// Insight lane - summarise supplied statistics only (P-08 contract)
 // ---------------------------------------------------------------------------
 
 function insightSummary(context: Record<string, unknown>): string {
@@ -632,7 +728,7 @@ function insightSummary(context: Record<string, unknown>): string {
 }
 
 // ---------------------------------------------------------------------------
-// Memory lanes (P-10 extraction / P-11 summary) — deterministic offline
+// Memory lanes (P-10 extraction / P-11 summary) - deterministic offline
 // versions so the memory pipeline works with zero keys and in tests.
 // ---------------------------------------------------------------------------
 
@@ -643,7 +739,7 @@ interface MockExtractedFact {
 
 /**
  * P-10 offline extractor: a few conservative patterns over the USER's message
- * only (never the coach reply — P-10 known failure mode). Deterministic:
+ * only (never the coach reply - P-10 known failure mode). Deterministic:
  * identical input always yields identical facts. Most messages yield [].
  */
 export function extractMemoryFactsOffline(userMessage: string): { facts: MockExtractedFact[] } {
@@ -687,7 +783,7 @@ export interface MockOptions {
 
 export function mockComplete(task: ModelGroup, messages: MockMessage[], opts: MockOptions = {}): MockResult {
   const context = opts.context ?? {};
-  // Memory prompts ride the cheap lane but have their own contracts — dispatch
+  // Memory prompts ride the cheap lane but have their own contracts - dispatch
   // on promptId before the lane default (P-09 classifier) applies.
   if (opts.promptId === 'P-10') {
     const userMessage =
@@ -703,7 +799,7 @@ export function mockComplete(task: ModelGroup, messages: MockMessage[], opts: Mo
       : [];
     return { text: summariseMemoryOffline(confirmedFacts) };
   }
-  // P-05/P-06 ride planStructured/chatFast but have their own contracts —
+  // P-05/P-06 ride planStructured/chatFast but have their own contracts -
   // dispatch on promptId before the lane defaults apply.
   if (opts.promptId === 'P-05' && Array.isArray((context as { pool?: unknown[] }).pool)) {
     const json = planDraftOffline(context as unknown as MockPlanGenContext);
@@ -723,7 +819,12 @@ export function mockComplete(task: ModelGroup, messages: MockMessage[], opts: Mo
       return { text };
     }
     case 'visionPrimary': {
-      const json = visionIdentify(context as unknown as MockVisionContext);
+      const ctx = context as unknown as MockVisionContext;
+      const userText = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
+      const json = visionIdentify({
+        ...ctx,
+        seedKey: ctx.seedKey || userText || 'meal',
+      });
       return { text: JSON.stringify(json), json };
     }
     case 'planStructured': {

@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ====================================================================
-   Design tokens — the single binding point for the palette.
+   Design tokens - the single binding point for the palette.
 
    Values are space-separated sRGB channels, not hex, because that is the
    only form Tailwind can compose an alpha modifier against
@@ -13,10 +13,10 @@
    Everything below is the literal value the "Modern Aquatic Wellness"
    palette shipped with, so the browser target is unchanged by the
    indirection. Inside Telegram, lib/telegram.ts overwrites a *subset* of
-   these on :root at runtime — see the NEUTRALS/BRAND split there.
+   these on :root at runtime - see the NEUTRALS/BRAND split there.
    ==================================================================== */
 :root {
-  /* Neutrals — bound to the Telegram host when it is dark enough to keep
+  /* Neutrals - bound to the Telegram host when it is dark enough to keep
      the fixed brand foregrounds at WCAG AA. */
   --azf-surface: 14 20 22;
   --azf-surface-dim: 14 20 22;
@@ -31,7 +31,7 @@
   --azf-outline: 133 147 151;
   --azf-outline-variant: 60 73 76;
 
-  /* Brand — never bound to a host theme. These are the product's identity
+  /* Brand - never bound to a host theme. These are the product's identity
      (aqua / mint / coral) and the pairs they are used with; letting a chat
      client repaint them would make AquaZeroFit unrecognisable. */
   --azf-surface-tint: 47 217 244;
@@ -51,6 +51,21 @@
   --azf-on-error: 105 0 5;
   --azf-error-container: 147 0 10;
   --azf-on-error-container: 255 218 214;
+  /* Semantic status ramps: success aliases the secondary (mint) brand pair;
+     warning is a dedicated amber ramp; info aliases the primary (aqua) pair.
+     Components must use these roles, never raw Tailwind palette greens/reds. */
+  --azf-success: 69 223 164;
+  --azf-on-success: 0 56 37;
+  --azf-success-container: 0 189 133;
+  --azf-on-success-container: 0 69 46;
+  --azf-warning: 255 196 90;
+  --azf-on-warning: 48 32 0;
+  --azf-warning-container: 102 68 0;
+  --azf-on-warning-container: 255 220 160;
+  --azf-info: 138 235 255;
+  --azf-on-info: 0 54 62;
+  --azf-info-container: 34 211 238;
+  --azf-on-info-container: 0 87 99;
   --azf-primary-fixed-dim: 47 217 244;
   --azf-secondary-fixed-dim: 69 223 164;
   --azf-tertiary-fixed-dim: 255 178 185;
@@ -144,11 +159,75 @@ body {
 
 /* Inside a bound Telegram theme the host's background colour is the one the
    user chose, and an opaque full-screen aurora would hide it completely.
-   The shader stays — it is brand — but drops to a texture the host colour
+   The shader stays - it is brand - but drops to a texture the host colour
    can read through. Only ever set when lib/telegram.ts actually bound a
    theme, so the browser target never sees this rule apply. */
 html[data-tg-theme] .azf-bg-canvas {
   opacity: 0.3;
+}
+
+/* Static stand-in for the aurora when WebGL is gated inside Telegram
+   (Android, light scheme, low memory, low core count, reduced motion).
+   The class is never applied outside a Mini App. */
+.azf-bg-static {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 70% at 15% -10%, rgba(47, 217, 244, 0.22), transparent 55%),
+    radial-gradient(90% 50% at 100% 0%, rgba(69, 223, 164, 0.14), transparent 48%),
+    rgb(var(--azf-surface));
+}
+
+html[data-tg-theme='light'] .azf-bg-static {
+  background:
+    radial-gradient(120% 70% at 15% -10%, rgba(15, 111, 130, 0.18), transparent 55%),
+    radial-gradient(90% 50% at 100% 0%, rgba(4, 120, 87, 0.12), transparent 48%),
+    rgb(var(--azf-surface));
+}
+
+/* CTA label. Defaults to the shipped ink (#001f25). A light Mini App theme
+   sets --azf-cta-text so the same buttons stay readable on the darkened ramp. */
+.azf-cta-text {
+  color: var(--azf-cta-text, #001f25);
+}
+
+/* Mini App viewport and safe areas. The variables exist only under
+   html.tg-active, which lib/telegram.ts sets when initData is present.
+   Outside Telegram these rules do not match. */
+html.tg-active {
+  --azf-header-safe-top: calc(
+    var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)
+  );
+  --azf-header-safe-right: calc(
+    var(--tg-safe-area-inset-right, 0px) + var(--tg-content-safe-area-inset-right, 0px)
+  );
+  --azf-header-safe-left: calc(
+    var(--tg-safe-area-inset-left, 0px) + var(--tg-content-safe-area-inset-left, 0px)
+  );
+  --azf-nav-safe-bottom: calc(
+    var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px)
+  );
+  --azf-nav-safe-right: calc(
+    var(--tg-safe-area-inset-right, 0px) + var(--tg-content-safe-area-inset-right, 0px)
+  );
+  --azf-nav-safe-left: calc(
+    var(--tg-safe-area-inset-left, 0px) + var(--tg-content-safe-area-inset-left, 0px)
+  );
+  --azf-viewport-height: var(--tg-viewport-stable-height, 100dvh);
+}
+
+html.tg-active,
+html.tg-active body,
+html.tg-active #root {
+  min-height: var(--azf-viewport-height);
+}
+
+html.tg-active .min-h-screen {
+  min-height: var(--azf-viewport-height);
 }
 
 /* App content sits above all background layers */
@@ -203,16 +282,20 @@ html[data-tg-theme] .azf-bg-canvas {
 
   /* ---- CTA gradient with inner light ---- */
   .cta-gradient {
-    background: linear-gradient(135deg, #2fd9f4 0%, #45dfa4 100%);
+    background: linear-gradient(
+      135deg,
+      rgb(var(--azf-surface-tint)) 0%,
+      rgb(var(--azf-secondary)) 100%
+    );
     box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.25) inset,
-      0 4px 12px -4px rgba(47, 217, 244, 0.35);
+      0 1px 0 0 rgb(255 255 255 / 0.25) inset,
+      0 4px 12px -4px rgb(var(--azf-surface-tint) / 0.35);
   }
 
   .cta-gradient:active:not(:disabled) {
     box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.12) inset,
-      0 2px 6px -2px rgba(47, 217, 244, 0.2);
+      0 1px 0 0 rgb(255 255 255 / 0.12) inset,
+      0 2px 6px -2px rgb(var(--azf-surface-tint) / 0.2);
   }
 
   .heading-display {
@@ -235,11 +318,15 @@ html[data-tg-theme] .azf-bg-canvas {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
   }
 
+  html.tg-active .safe-bottom {
+    padding-bottom: calc(var(--azf-nav-safe-bottom, env(safe-area-inset-bottom, 0px)) + 5.5rem);
+  }
+
   /* ---- Deep-link target highlight ----
      Applied by pages/settings/useHashTarget.ts when a `#id` deep link lands
      on a section, then removed. A single monotonic fade rather than a pulse:
      a repeating flash is a vestibular and photosensitivity hazard and reads
-     as an error. Brand aqua, deliberately not the coral/error tone — nothing
+     as an error. Brand aqua, deliberately not the coral/error tone - nothing
      has gone wrong, the user is just being shown where they asked to go.
      Colour is never the only signal: the hook also moves focus to the
      section, so assistive tech announces the arrival. */
@@ -435,7 +522,12 @@ html[data-tg-theme] .azf-bg-canvas {
   }
 
   .lp-gradient-text {
-    background: linear-gradient(120deg, #8aebff 0%, #2fd9f4 42%, #45dfa4 100%);
+    background: linear-gradient(
+      120deg,
+      rgb(var(--azf-primary)) 0%,
+      rgb(var(--azf-surface-tint)) 42%,
+      rgb(var(--azf-secondary)) 100%
+    );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -605,4 +697,77 @@ html[data-tg-theme] .azf-bg-canvas {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer {
+      animation: none;
+      background: rgb(var(--azf-surface-container-high) / 0.7);
+    }
+  }
+}
+
+/* Light Mini App surfaces.
+   The glass cards are tuned for a dark ocean: translucent fills, a 7% white
+   edge, and brand inks at partial alpha. On a white host those same rules
+   drop body text and the macro fills under WCAG AA. These overrides apply
+   only while a light Telegram theme is bound. Dark hosts and the browser
+   keep the glass system above. */
+html[data-tg-theme='light'] .card-hero,
+html[data-tg-theme='light'] .glass-card,
+html[data-tg-theme='light'] .card-compact {
+  background: #ffffff;
+  background-image: none;
+  border: 1px solid rgb(var(--azf-outline));
+  box-shadow:
+    0 1px 2px rgb(23 29 31 / 0.08),
+    0 14px 32px -18px rgb(23 29 31 / 0.38);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-tg-theme='light'] .glass-blur {
+  background: rgb(var(--azf-surface));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-tg-theme='light'] {
+  --azf-ring-aqua: rgb(var(--azf-primary));
+  --azf-ring-green: rgb(var(--azf-secondary));
+  --azf-ring-coral: rgb(var(--azf-tertiary-container));
+  --azf-ring-navy: rgb(var(--azf-primary));
+  --azf-ring-track: rgb(var(--azf-outline));
+  --azf-coach-ink: rgb(var(--azf-primary));
+  --azf-coach-chip: rgb(var(--azf-primary) / 0.12);
+}
+
+/* Partial-alpha text utilities are how the dark theme quiets inactive labels.
+   On either bound host the 60% mix falls under 4.5:1. Restore the full token,
+   which the theme binder already lifts to AA. The browser target is untouched. */
+html[data-tg-theme] .text-on-surface-variant\/40,
+html[data-tg-theme] .text-on-surface-variant\/60,
+html[data-tg-theme] .text-on-surface-variant\/75 {
+  color: rgb(var(--azf-on-surface-variant));
+}
+
+html[data-tg-theme='light'] .text-primary\/60,
+html[data-tg-theme='light'] .text-primary\/70,
+html[data-tg-theme='light'] .text-primary\/80,
+html[data-tg-theme='light'] .text-primary\/90 {
+  color: rgb(var(--azf-primary));
+}
+
+html[data-tg-theme='light'] .text-secondary\/60,
+html[data-tg-theme='light'] .text-secondary\/80 {
+  color: rgb(var(--azf-secondary));
+}
+
+html[data-tg-theme='light'] [role='progressbar'] {
+  background-color: rgb(var(--azf-outline-variant));
+}
+
+/* Macro percentages dim the whole glyph with opacity. 75% of the hint colour
+   on a light pill is about 3:1. Full opacity keeps the AA hint token. */
+html[data-tg-theme='light'] .tabular-nums.opacity-75 {
+  opacity: 1;
 }

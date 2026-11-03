@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "fit.aquazero.app",
+      "sha256_cert_fingerprints": [
+        "AD:0A:15:F4:73:6A:74:0C:D5:B5:CA:96:1A:FC:46:0F:FD:BB:ED:3E:B3:6D:76:18:F9:20:AB:60:F2:BB:8B:E5"
+      ]
+    }
+  }
+]

@@ -2,7 +2,7 @@
  * Shared chrome for the public marketing surface (landing page + /features).
  *
  * Kept in one place deliberately: the moment a second marketing route exists,
- * a copied header and footer start drifting — different nav items, a stale
+ * a copied header and footer start drifting - different nav items, a stale
  * copyright line, one CTA updated and the other not. Both pages render these.
  */
 import { Link } from 'react-router-dom';
@@ -32,6 +32,7 @@ const FOOTER_PRODUCT: Array<{ label: string; to?: string; href?: string }> = [
   { label: 'How it works', to: '/how-it-works' },
   { label: 'Aqua Coach', to: '/aqua-coach' },
   { label: 'Safety', to: '/safety' },
+  { label: 'Android app', to: '/google-play' },
   { label: 'Screens', href: '#screens' },
   { label: 'Sign in', to: '/sign-in' },
 ];
@@ -42,7 +43,7 @@ const FOOTER_PRODUCT: Array<{ label: string; to?: string; href?: string }> = [
  *
  * The target is `/`, which now serves the marketing page in place for
  * signed-out web visitors. It used to be `/landing`, because `/` redirected
- * there and a <Navigate> drops the fragment — everyone clicking "Safety" from
+ * there and a <Navigate> drops the fragment - everyone clicking "Safety" from
  * /features arrived at the top of the page instead. Serving marketing at `/`
  * removed the redirect, and with it that bug.
  */
@@ -81,7 +82,7 @@ export function CtaButton({
  * The conversion button: hand the visitor to the Mini App.
  *
  * A plain `<a>` rather than a router Link, because the destination is another
- * origin entirely — this is the one control on the marketing site whose job is
+ * origin entirely - this is the one control on the marketing site whose job is
  * to leave it.
  *
  * The href is built at render from stored attribution, so whatever brought the
@@ -98,7 +99,7 @@ export function TelegramCta({
 }: {
   children?: React.ReactNode;
   variant?: 'primary' | 'ghost';
-  /** Which CTA on the page this is — the only way to tell them apart later. */
+  /** Which CTA on the page this is - the only way to tell them apart later. */
   placement: string;
   className?: string;
 }) {
@@ -123,8 +124,8 @@ export function TelegramCta({
 
 /**
  * The browser path, for the segment whose network or workplace blocks
- * Telegram. It is a real, complete route into the same product — not a
- * consolation prize — and it is tracked separately so that segment shows up in
+ * Telegram. It is a real, complete route into the same product - not a
+ * consolation prize - and it is tracked separately so that segment shows up in
  * the funnel instead of bouncing silently.
  */
 export function WebFallbackLink({
@@ -158,7 +159,17 @@ export function TopBar({ onLanding = false }: { onLanding?: boolean }) {
           aria-label="Primary"
         >
           <Link to="/" className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="" className="h-8 w-8 object-contain" aria-hidden="true" />
+            {/* Fixed top bar - in the viewport from the first paint. */}
+            <img
+              src="/logo.png"
+              alt=""
+              width={359}
+              height={376}
+              loading="eager"
+              decoding="async"
+              className="h-8 w-8 object-contain"
+              aria-hidden="true"
+            />
             <span className="font-heading text-lg font-extrabold tracking-tight text-primary">
               AquaZeroFit
             </span>
@@ -169,7 +180,7 @@ export function TopBar({ onLanding = false }: { onLanding?: boolean }) {
               <li key={link.href}>
                 <a
                   href={sectionHref(link.href, onLanding)}
-                  className="text-sm text-on-surface-variant/70 transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                  className="text-sm text-on-surface-variant transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
                 >
                   {link.label}
                 </a>
@@ -214,21 +225,31 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
       <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="" className="h-8 w-8 object-contain" aria-hidden="true" />
+            {/* Footer sits below a long landing page - defer it. */}
+            <img
+              src="/logo.png"
+              alt=""
+              width={359}
+              height={376}
+              loading="lazy"
+              decoding="async"
+              className="h-8 w-8 object-contain"
+              aria-hidden="true"
+            />
             <span className="font-heading text-lg font-extrabold tracking-tight text-primary">
               AquaZeroFit
             </span>
           </div>
-          <p className="mt-4 max-w-sm text-[13px] leading-relaxed text-on-surface-variant/70">
+          <p className="mt-4 max-w-sm text-[13px] leading-relaxed text-on-surface-variant">
             {WELLNESS_DISCLAIMER}
           </p>
         </div>
 
         <div>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/70">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
             Product
           </h2>
-          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant/70">
+          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant">
             {FOOTER_PRODUCT.map((item) => (
               <li key={item.label}>
                 {item.to ? (
@@ -249,13 +270,15 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
         </div>
 
         <div>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/70">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
             Legal
           </h2>
-          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant/70">
+          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant">
             {[
               { to: '/privacy', label: 'Privacy notice' },
+              { to: '/google-play/privacy-policy', label: 'Google Play privacy policy' },
               { to: '/terms', label: 'Terms of use' },
+              { to: '/refund', label: 'Refunds' },
               { to: '/support', label: 'Support' },
             ].map((item) => (
               <li key={item.to}>
@@ -268,10 +291,10 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
         </div>
 
         <div>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant/70">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
             Project
           </h2>
-          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant/70">
+          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant">
             <li>
               <a
                 href={SOURCE_CODE_URL}
@@ -306,7 +329,7 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
         </div>
       </div>
 
-      <div className="mt-12 flex flex-col gap-3 border-t border-white/5 py-8 text-[12px] text-on-surface-variant/70 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-12 flex flex-col gap-3 border-t border-white/5 py-8 text-[12px] text-on-surface-variant sm:flex-row sm:items-center sm:justify-between">
         <p>Copyright (C) 2026 AquaZero. Free software under the GNU AGPL v3.</p>
         <p className="uppercase tracking-[0.18em]">General wellness support only</p>
       </div>

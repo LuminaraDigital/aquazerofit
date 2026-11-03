@@ -36,8 +36,9 @@ and covered by tests:
 - **The credit ledger is append-only.** Balances are derived by folding
   transactions; never cache a counter or mutate a transaction.
 - **Never bill a user for degraded AI output.** When real providers fail and
-  the gateway falls back to offline templates it sets `meta.degraded`; paid
-  lanes must release the reservation rather than commit it.
+  the gateway falls back to offline templates, or a production deployment has
+  no provider configured at all, it sets `meta.degraded`; paid lanes must
+  release the reservation rather than commit it.
 - **Attribution fields (`licence`, `licenceAuthor`, `sourceId`) are never
   stripped** from imported content records.
 - **No AGPL/GPL source from upstream projects is vendored.** wger is integrated

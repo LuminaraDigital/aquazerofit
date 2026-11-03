@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * REGRESSION GUARD — the weekly insight card sends people to
+ * REGRESSION GUARD: the weekly insight card sends people to
  * /settings#privacy-consents to turn AI personalisation on. React Router does
  * not act on fragments, and the target section does not exist during the first
  * render (Settings shows a spinner until the profile query resolves), so the
@@ -52,6 +52,7 @@ vi.mock('../../lib/queries', () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  useEntitlements: () => ({ data: { tier: 'free' } }),
   useConsents: () => ({
     data: {
       wellnessDataProcessing: true,

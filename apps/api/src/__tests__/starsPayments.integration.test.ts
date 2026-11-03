@@ -149,6 +149,16 @@ describe('rejected payments', () => {
     expect(purchasesFor('uthman')).toHaveLength(0);
   });
 
+  it('answers /paysupport with 200 and grants nothing', async () => {
+    const before = purchasesFor('ogun').length;
+    const res = await request(app)
+      .post(`${base}/telegram/webhook`)
+      .set({ 'X-Telegram-Bot-Api-Secret-Token': SECRET })
+      .send({ message: { text: '/paysupport@AquaZeroFitBot', chat: { id: 42 } } });
+    expect(res.status).toBe(200);
+    expect(purchasesFor('ogun')).toHaveLength(before);
+  });
+
   it('acknowledges an unrelated update without doing anything', async () => {
     const res = await request(app)
       .post(`${base}/telegram/webhook`)

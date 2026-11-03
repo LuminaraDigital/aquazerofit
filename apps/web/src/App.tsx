@@ -1,9 +1,16 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import {
+  useTelegramBackButton,
+  useTelegramHostChrome,
+  useTelegramVerticalSwipes,
+} from './lib/useTelegramChrome';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
+import { ScrollToTop } from './components/layout/ScrollToTop';
 import { RequireAuth, RequireTargets, useProfileGate } from './components/layout/RequireAuth';
-import { PageSpinner } from './components/ui/PageSpinner';
+import { RouteFallbackSkeleton } from './components/ui/Skeleton';
+import { IntroVideo } from './components/brand/IntroVideo';
 
 const Landing = lazy(() => import('./pages/landing/Landing'));
 const FeaturesPage = lazy(() => import('./pages/landing/Features'));
@@ -12,12 +19,24 @@ const HowItWorksPage = lazy(() => import('./pages/landing/HowItWorks'));
    signed-in chat screen and must not be shadowed. */
 const AquaCoachPage = lazy(() => import('./pages/landing/AquaCoach'));
 const SafetyPage = lazy(() => import('./pages/landing/Safety'));
+const GooglePlayPage = lazy(() => import('./pages/landing/GooglePlay'));
 const PrivacyPage = lazy(() => import('./pages/legal/Privacy'));
+/* The privacy-policy URL declared in Play Console; keep the path stable. */
+const GooglePlayPrivacyPage = lazy(() => import('./pages/legal/GooglePlayPrivacy'));
 const TermsPage = lazy(() => import('./pages/legal/Terms'));
+const RefundPage = lazy(() => import('./pages/legal/Refund'));
 const SupportPage = lazy(() => import('./pages/legal/Support'));
+/* Public account-deletion instructions. Play requires this reachable WITHOUT the
+   app installed and without signing in, so it sits with the legal pages rather
+   than behind RequireAuth. */
+const AccountDeletionPage = lazy(() => import('./pages/legal/AccountDeletion'));
+/* Turnstile challenge surface for the native Android client's WebView. Public
+   and session-less by necessity: it serves registration and password reset,
+   both of which happen before an account exists. */
+const MobileCaptchaPage = lazy(() => import('./pages/auth/MobileCaptcha'));
 const Welcome = lazy(() => import('./pages/auth/Welcome'));
 const SignIn = lazy(() => import('./pages/auth/SignIn'));
-/* Wellness essentials — asked when a target is wanted, not before the app opens. */
+/* Wellness essentials - asked when a target is wanted, not before the app opens. */
 const Setup = lazy(() => import('./pages/auth/Setup'));
 const FirstRun = lazy(() => import('./pages/auth/FirstRun'));
 
@@ -37,6 +56,7 @@ const LogWeight = lazy(() => import('./pages/progress/LogWeight'));
 const Coach = lazy(() => import('./pages/coach/Coach'));
 const CoachSelect = lazy(() => import('./pages/coach/CoachSelect'));
 const Challenges = lazy(() => import('./pages/challenges/Challenges'));
+const FightRecord = lazy(() => import('./pages/fightRecord/FightRecord'));
 
 const PlanPage = lazy(() => import('./pages/upgrade/Plan'));
 
@@ -46,8 +66,8 @@ const Memory = lazy(() => import('./pages/settings/Memory'));
 
 /**
  * `/` is the app's front door for everyone, which means it has to work before
- * the account has a wellness profile. The dashboard cannot — it is built around
- * a calorie ring — so an account without essentials gets the first-run home
+ * the account has a wellness profile. The dashboard cannot - it is built around
+ * a calorie ring - so an account without essentials gets the first-run home
  * instead. Nobody is redirected out of the app to a form.
  */
 function HomeRoute() {
@@ -57,8 +77,8 @@ function HomeRoute() {
 
 /**
  * `/landing` was the marketing page's own URL before `/` started serving it
- * directly. It stays as a permanent alias — the address is in the wild, in
- * shared links and in anything already indexed — and forwards to the canonical
+ * directly. It stays as a permanent alias - the address is in the wild, in
+ * shared links and in anything already indexed - and forwards to the canonical
  * `/`, carrying the fragment across so `/landing#safety` still arrives at the
  * safety section rather than at the top of the page.
  */
@@ -67,27 +87,43 @@ function LandingAlias() {
   return <Navigate to={{ pathname: '/', hash, search }} replace />;
 }
 
+function TelegramChrome() {
+  useTelegramHostChrome();
+  useTelegramBackButton();
+  useTelegramVerticalSwipes();
+  return null;
+}
+
 export default function App() {
   // Last-resort boundary for screens outside AppLayout (auth, settings,
-  // capture flows) — AppLayout has its own so the bottom nav survives there.
+  // capture flows) - AppLayout has its own so the bottom nav survives there.
   const { pathname } = useLocation();
   return (
+    <>
+    <TelegramChrome />
+    <IntroVideo />
+    <ScrollToTop />
     <ErrorBoundary resetKey={pathname}>
-      <Suspense fallback={<PageSpinner />}>
+      <Suspense fallback={<RouteFallbackSkeleton />}>
         <Routes>
         <Route path="/landing" element={<LandingAlias />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/how-it-works" element={<HowItWorksPage />} />
         <Route path="/aqua-coach" element={<AquaCoachPage />} />
         <Route path="/safety" element={<SafetyPage />} />
+        <Route path="/google-play" element={<GooglePlayPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/google-play/privacy-policy" element={<GooglePlayPrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/refund" element={<RefundPage />} />
         <Route path="/support" element={<SupportPage />} />
+        <Route path="/account/deletion" element={<AccountDeletionPage />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/sign-in" element={<SignIn />} />
+        <Route path="/mobile/captcha" element={<MobileCaptchaPage />} />
 
         {/* `publicIndex` makes `/` the marketing front door for signed-out web
-            visitors while leaving it the app's home for everyone else — see
+            visitors while leaving it the app's home for everyone else - see
             RequireAuth. Cold traffic and crawlers land on the canonical URL
             with no redirect in between. */}
         <Route element={<RequireAuth publicIndex={<Landing />} />}>
@@ -133,9 +169,10 @@ export default function App() {
           <Route path="/workouts/:id" element={<WorkoutDetail />} />
           <Route path="/progress/log-weight" element={<LogWeight />} />
           <Route path="/challenges" element={<Challenges />} />
+          <Route path="/fight-record" element={<FightRecord />} />
           {/* Character select renders its own header and nav, like /settings. */}
           <Route path="/coach/select" element={<CoachSelect />} />
-          {/* Renders its own header and nav, so it sits outside AppLayout —
+          {/* Renders its own header and nav, so it sits outside AppLayout -
               same as /settings. Deliberately NOT behind RequireTargets: what
               your plan allows does not depend on having entered a height. */}
           <Route path="/plan" element={<PlanPage />} />
@@ -148,5 +185,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </ErrorBoundary>
+    </>
   );
 }

@@ -17,16 +17,22 @@ import {
 } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ChatMessage, ChatSession, ChatToolCall, MealType } from '@aquazerofit/shared';
+import type { ChatMessage, ChatSession, ChatToolCall, DailyNutrition, MealType } from '@aquazerofit/shared';
 import { AQUA_CHARACTER, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
 import { api, ApiError, streamChat } from '@/lib/api';
-import { useCoachRoster, type CoachCardData } from '@/lib/queries';
+import { asList } from '@/lib/envelopes';
+import { todayLocalDate } from '@/lib/format';
+import { useDraftPersistence } from '@/lib/useDraftPersistence';
+import { useTelegramUnsavedEdits } from '@/lib/useTelegramChrome';
+import { trackFirstValueMeal } from '@/lib/retention';
+import { queryKeys, useCoachRoster, type CoachCardData } from '@/lib/queries';
+import { currentPlanQuery } from '@/lib/trainingPlanCache';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Chip } from '@/components/ui/Chip';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { CoachSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
 import { BottomSheet } from '@/pages/training/BottomSheet';
@@ -35,6 +41,16 @@ import { CoachAvatar } from '@/components/coach/CoachAvatar';
 import { AkinStage } from '@/components/brand/AkinStage';
 import { MealDraftCard } from './MealDraftCard';
 import type { ChatMealDraft, ConfirmSelection } from './mealDraft';
+import {
+  countLoggedMeals,
+  freshenCoachText,
+  isChatMessage,
+  reconcileToolSummaries,
+  snapshotSuppressed,
+  upsertChatMessage,
+  type CoachLiveSnapshot,
+} from './snapshot';
+import { pinThreadToLatest } from './threadScroll';
 
 const SUGGESTED_PROMPTS = [
   'What should I eat tonight?',
@@ -44,12 +60,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 /** The user's own calendar day, which is the day a meal belongs to. */
-function localToday(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
-}
+const localToday = todayLocalDate;
 
 const TOOL_LABELS: Record<string, string> = {
   getTodayNutrition: "Today's nutrition",
@@ -137,21 +148,9 @@ function timeOf(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-/** Accept bare arrays and the API's { items } / { sessions } / { messages } envelopes. */
-function asList<T>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === 'object') {
-    const record = data as Record<string, unknown>;
-    for (const key of ['items', 'sessions', 'messages']) {
-      if (Array.isArray(record[key])) return record[key] as T[];
-    }
-  }
-  return [];
-}
-
 /**
  * Byline above each assistant turn. Shows the user's selected coach, falling
- * back to the Aqua mascot before the roster query resolves — the alternative
+ * back to the Aqua mascot before the roster query resolves - the alternative
  * (an empty slot that pops in) makes the first paint of every conversation
  * flicker on the slowest connections, which is where it is most visible.
  */
@@ -197,8 +196,8 @@ export default function Coach() {
   // already warm by the time the chat mounts.
   const roster = useCoachRoster();
   const activeCoach = roster.data?.roster.find((c) => c.id === roster.data?.activeCoachId);
-  // Every user-facing mention of "who you are talking to" — composer label,
-  // typing indicator, live-region announcements, empty-state greeting — names
+  // Every user-facing mention of "who you are talking to" - composer label,
+  // typing indicator, live-region announcements, empty-state greeting - names
   // the ACTIVE coach, falling back to the default character until the roster
   // loads. The message bubbles already did this (AssistantByline).
   const coachName = activeCoach ? activeCoach.name.split(' ')[0] : AQUA_CHARACTER.name;
@@ -213,13 +212,26 @@ export default function Coach() {
   const [clearOpen, setClearOpen] = useState(false);
   const [liveNote, setLiveNote] = useState('');
   const [draft, setDraft] = useState<ChatMealDraft | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
   const creatingRef = useRef(false);
+
+  const onRestoreComposer = useCallback((stored: string) => {
+    setInput(stored);
+  }, []);
+  const { clear: clearComposerDraft } = useDraftPersistence({
+    storageKey: 'azf_coach_composer_v1',
+    value: input,
+    enabled: !streaming,
+    isDirty: (v) => v.trim().length > 0,
+    surface: 'coach',
+    onRestore: onRestoreComposer,
+  });
+  useTelegramUnsavedEdits(input.trim().length > 0);
 
   // ---- session bootstrap ----
   const sessionsQuery = useQuery({
     queryKey: ['chat', 'sessions'],
-    queryFn: async () => asList<ChatSession>(await api<unknown>('/chat/sessions')),
+    queryFn: async () =>
+      asList<ChatSession>(await api<unknown>('/chat/sessions'), ['items', 'sessions']),
   });
 
   const createSession = useMutation({
@@ -246,7 +258,10 @@ export default function Coach() {
   const messagesQuery = useQuery({
     queryKey: ['chat', 'messages', sessionId],
     queryFn: async () =>
-      asList<ChatMessage>(await api<unknown>(`/chat/sessions/${sessionId}/messages`)),
+      asList<ChatMessage>(
+        await api<unknown>(`/chat/sessions/${sessionId}/messages`),
+        ['items', 'messages'],
+      ),
     enabled: sessionId !== '',
   });
   const messages = useMemo(() => messagesQuery.data ?? [], [messagesQuery.data]);
@@ -266,10 +281,45 @@ export default function Coach() {
     if (latest) setDraft(latest);
   }, [pendingDrafts.data, draft]);
 
+  // Today's logs and the current plan, when the rest of the app already has
+  // them. Used only to stop the latest reply showing "0 meals" / "no plan"
+  // after the user just logged one. Missing cache stays on the server text.
+  const today = localToday();
+  const dailyQuery = useQuery({
+    queryKey: queryKeys.nutritionDaily(today),
+    queryFn: () => api<DailyNutrition>('/analytics/nutrition/daily', { query: { date: today } }),
+  });
+  const planQuery = useQuery(currentPlanQuery);
+  const liveSnapshot = useMemo<CoachLiveSnapshot | null>(() => {
+    const daily = dailyQuery.data;
+    const planName = planQuery.data?.name ?? null;
+    if (!daily && !planName) return null;
+    return {
+      kcalConsumed: daily?.kcalConsumed ?? 0,
+      kcalTarget: daily?.kcalTarget ?? 0,
+      meals: countLoggedMeals(daily?.meals),
+      waterMl: daily?.waterMl.consumed ?? 0,
+      planName,
+    };
+  }, [dailyQuery.data, planQuery.data]);
+
+  const orderedMessages = useMemo(
+    () => [...messages].sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0)),
+    [messages],
+  );
+  const latestAssistantId = useMemo(() => {
+    for (let i = orderedMessages.length - 1; i >= 0; i -= 1) {
+      if (orderedMessages[i]?.role === 'assistant') return orderedMessages[i]?.id ?? null;
+    }
+    return null;
+  }, [orderedMessages]);
+
   // ---- scroll to latest ----
+  // After paint, so a route-change scroll-to-top (useLayoutEffect on the
+  // shell) cannot put the thread back at the previous screen's offset.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages.length, streamText, pendingUser, frames.length, draft]);
+    pinThreadToLatest();
+  }, [orderedMessages.length, streamText, pendingUser, frames.length, draft, streaming]);
 
   // ---- send / stream ----
   const send = useCallback(
@@ -277,14 +327,20 @@ export default function Coach() {
       const text = content.trim();
       if (!text || streaming || !sessionId) return;
       setInput('');
+      clearComposerDraft();
       setPendingUser(text);
       setStreaming(true);
       setStreamText('');
       setLiveNote(`${coachName} is replying`);
       try {
-        await streamChat(sessionId, text, (token) => {
+        const finalMessage = await streamChat(sessionId, text, (token) => {
           setStreamText((s) => s + token);
         });
+        if (isChatMessage(finalMessage)) {
+          queryClient.setQueryData<ChatMessage[]>(['chat', 'messages', sessionId], (prev) =>
+            upsertChatMessage(prev ?? [], finalMessage),
+          );
+        }
         setLiveNote(`${coachName} has replied`);
         await queryClient.invalidateQueries({ queryKey: ['chat', 'messages', sessionId] });
         void queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] });
@@ -310,7 +366,7 @@ export default function Coach() {
         setPendingUser(null);
       }
     },
-    [sessionId, streaming, queryClient, coachName],
+    [sessionId, streaming, queryClient, coachName, clearComposerDraft],
   );
 
   // ---- chat-native logging: propose → confirm ----
@@ -322,6 +378,7 @@ export default function Coach() {
       }),
     onSuccess: (data) => {
       setInput('');
+      clearComposerDraft();
       setDraft(data.draft);
       void queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
     },
@@ -343,11 +400,13 @@ export default function Coach() {
       }),
     onSuccess: async (data) => {
       setDraft(null);
+      trackFirstValueMeal('coach_confirm');
       toast.success(`Logged ${Math.round(data.mealLog.totalKcal)} kcal`);
       await queryClient.invalidateQueries({ queryKey: ['chat', 'meal-drafts'] });
       // The dashboard and food log read the same rows this just wrote.
       void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
-      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.progress });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutToday });
     },
     onError: (e) =>
       toast.error(e instanceof ApiError ? e.message : 'Could not log that meal. Please try again.'),
@@ -465,13 +524,9 @@ export default function Coach() {
       </div>
 
       {/* ---- message list ---- */}
-      <main className="flex flex-1 flex-col gap-5 px-container-margin py-5" aria-label="Conversation with Aqua Coach">
+      <main className="flex flex-1 flex-col gap-5 px-container-margin pb-16 py-5" aria-label="Conversation with Aqua Coach">
         {sessionsQuery.isPending || (sessionId !== '' && messagesQuery.isPending) ? (
-          <div className="space-y-4">
-            <Skeleton className="h-20 w-3/4 rounded-card" />
-            <Skeleton className="ml-auto h-14 w-2/3 rounded-card" />
-            <Skeleton className="h-24 w-3/4 rounded-card" />
-          </div>
+          <CoachSkeleton />
         ) : sessionsQuery.isError ? (
           <ErrorState
             message="Could not open the coach."
@@ -521,8 +576,12 @@ export default function Coach() {
               </div>
             )}
 
-            {messages.map((m) =>
-              m.role === 'user' ? (
+            {orderedMessages.map((m) => {
+              const isLatest = m.id === latestAssistantId;
+              const live = isLatest && !snapshotSuppressed(m.toolCalls) ? liveSnapshot : null;
+              const toolCalls = reconcileToolSummaries(m.toolCalls, live);
+              const content = live ? freshenCoachText(m.content, live) : m.content;
+              return m.role === 'user' ? (
                 <div key={m.id} className="flex max-w-[85%] flex-col gap-1 self-end">
                   <div className="cta-gradient rounded-card rounded-br-md p-4 text-on-primary shadow-lg">
                     <p className="text-base leading-relaxed">{m.content}</p>
@@ -582,15 +641,15 @@ export default function Coach() {
                         spa
                       </span>
                     )}
-                    {renderMarkdown(m.content)}
-                    {m.toolCalls && m.toolCalls.length > 0 && <ToolCards toolCalls={m.toolCalls} />}
+                    {renderMarkdown(content)}
+                    {toolCalls && toolCalls.length > 0 && <ToolCards toolCalls={toolCalls} />}
                   </div>
                   <span className="px-2 text-xs text-on-surface-variant tabular-nums">
                     {timeOf(m.createdAt)}
                   </span>
                 </div>
-              ),
-            )}
+              );
+            })}
 
             {/* optimistic user bubble while streaming */}
             {pendingUser && (
@@ -667,7 +726,6 @@ export default function Coach() {
           </div>
         )}
 
-        <div ref={endRef} />
       </main>
 
       {/* ---- clear conversation confirm sheet ---- */}
@@ -693,7 +751,7 @@ export default function Coach() {
       </BottomSheet>
 
       {/* ---- input bar - sits above the bottom nav ---- */}
-      <div className="sticky bottom-0 z-30 bg-gradient-to-t from-surface via-surface to-transparent px-container-margin pb-20 pt-2">
+      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md bg-gradient-to-t from-surface via-surface to-transparent px-container-margin pb-20 pt-2">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -712,7 +770,7 @@ export default function Coach() {
             value={input}
             disabled={streaming || sessionId === ''}
             onChange={(e) => setInput(e.target.value)}
-            className="flex-1 border-none bg-transparent px-2 text-base text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:ring-0 disabled:opacity-60"
+            className="flex-1 border-none bg-transparent px-2 text-base text-on-surface placeholder:text-outline focus:outline-none focus:ring-0 disabled:opacity-60"
           />
           {/* Logging is a separate, explicit action rather than something the
               coach infers from a chat turn: guessing "I ate X" from a sentence

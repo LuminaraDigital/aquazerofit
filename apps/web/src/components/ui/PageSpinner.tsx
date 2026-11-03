@@ -13,7 +13,7 @@ export function PageSpinner() {
           <span className="material-symbols-outlined text-[22px] text-primary">water_drop</span>
         </span>
       </div>
-      <span className="text-xs text-on-surface-variant/50 uppercase tracking-widest">Loading</span>
+      <span className="text-xs text-outline uppercase tracking-widest">Loading</span>
     </div>
   );
 }

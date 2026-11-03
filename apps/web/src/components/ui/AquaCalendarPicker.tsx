@@ -163,7 +163,7 @@ export function AquaCalendarPicker({
         {/* Days of week header */}
         <div className="grid grid-cols-7 gap-1 text-center mb-2">
           {weekHeaders.map((w) => (
-            <span key={w} className="text-xs font-bold text-on-surface-variant/80 uppercase">
+            <span key={w} className="text-xs font-bold text-on-surface-variant uppercase">
               {w}
             </span>
           ))}
@@ -204,19 +204,19 @@ export function AquaCalendarPicker({
                   {status.targetMet && (
                     <span
                       title="Target Met"
-                      className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_#10b981]"
+                      className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_4px_rgb(var(--azf-success)/0.7)]"
                     />
                   )}
                   {status.logged && (
                     <span
                       title="Logged"
-                      className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_#2fd9f4]"
+                      className="w-1.5 h-1.5 rounded-full bg-info shadow-[0_0_4px_rgb(var(--azf-info)/0.7)]"
                     />
                   )}
                   {status.streak && (
                     <span
                       title="Streak Maintained"
-                      className="material-symbols-outlined text-[10px] text-amber-400"
+                      className="material-symbols-outlined text-[10px] text-warning"
                       aria-hidden="true"
                     >
                       local_fire_department
@@ -231,15 +231,15 @@ export function AquaCalendarPicker({
         {/* Legend */}
         <div className="mt-4 pt-3 border-t border-outline-variant/40 flex items-center justify-around text-[11px] text-on-surface-variant">
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_4px_#10b981]" />
+            <span className="w-2 h-2 rounded-full bg-success shadow-[0_0_4px_rgb(var(--azf-success)/0.7)]" />
             <span>Target Met</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_4px_#2fd9f4]" />
+            <span className="w-2 h-2 rounded-full bg-info shadow-[0_0_4px_rgb(var(--azf-info)/0.7)]" />
             <span>Logged</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[12px] text-amber-400">
+            <span className="material-symbols-outlined text-[12px] text-warning">
               local_fire_department
             </span>
             <span>Streak</span>

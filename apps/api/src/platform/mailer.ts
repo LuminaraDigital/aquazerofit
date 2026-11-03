@@ -36,6 +36,21 @@ export interface MailMessage {
 
 export type MailProvider = 'resend' | 'console' | 'memory';
 
+/**
+ * A domain this project does not own, on which seeded and synthetic
+ * (tg-…@telegram., fb-…@firebase.) accounts were nonetheless given addresses.
+ * A recovery message has to reach the account holder and nobody here receives
+ * that domain's mail, so nothing is sent there and no account that can be
+ * recovered by email is created there.
+ */
+export const UNOWNED_EMAIL_DOMAIN = 'aquazero.fit';
+
+/** True for an address on UNOWNED_EMAIL_DOMAIN or any subdomain of it. */
+export function isUnownedEmailDomain(email: string): boolean {
+  const domain = email.trim().toLowerCase().split('@').pop() ?? '';
+  return domain === UNOWNED_EMAIL_DOMAIN || domain.endsWith(`.${UNOWNED_EMAIL_DOMAIN}`);
+}
+
 /** Captured messages under the `memory` transport. Test-only. */
 const outbox: MailMessage[] = [];
 
@@ -83,6 +98,11 @@ async function sendViaResend(msg: MailMessage): Promise<void> {
  * failure to the requester would leak whether the account exists.
  */
 export async function sendMail(msg: MailMessage): Promise<void> {
+  // A password-reset link sent there is an account handed to the domain's
+  // buyer. Refused here, not per caller, so no future mail can leak either.
+  if (isUnownedEmailDomain(msg.to)) {
+    throw new Error(`Refusing to send to ${UNOWNED_EMAIL_DOMAIN}, a domain nobody has registered`);
+  }
   switch (resolveMailProvider()) {
     case 'memory':
       outbox.push(msg);

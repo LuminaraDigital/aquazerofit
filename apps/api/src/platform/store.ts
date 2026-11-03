@@ -7,15 +7,24 @@
  * so a burst of writes can never interleave and corrupt the backing copy.
  *
  * Two backings share that memory layer:
- *   - JsonStore    — one JSON file per container under config.dataDir. Local
+ *   - JsonStore    - one JSON file per container under config.dataDir. Local
  *                    dev and the whole test suite run on this.
- *   - PostgresStore — a single `documents` table (see ./pgStore). Selected when
- *                    DATABASE_URL is present outside tests, because Replit's
- *                    published filesystem is wiped on every publish.
+ *   - PostgresStore - a single `documents` table (see ./pgStore). Selected when
+ *                    DATABASE_URL is present outside tests, because the managed
+ *                    host's filesystem is wiped on every deploy.
  *
  * The synchronous read API is the reason for the split: getStore() is called
  * from ~77 sites and converting them to async is a separate piece of work.
  * Only the persistence backing changes here.
+ *
+ * READ PATH. `where()` materialises the whole container and scans it, which is
+ * fine for containers that are read whole and hopeless for the ones that are
+ * read a slice at a time. The `logs` container is the latter: it holds every
+ * meal, water, weight, workout-session, buddy-challenge and idempotency record
+ * for every user, and "one user's meals on one day" walked all of it. Hence
+ * SECONDARY_INDEXES below - maintained in-process, exact-match on a composite
+ * key, and always re-checked against the caller's predicate so an index that
+ * ever went wrong can only ever be slow, never wrong. See whereIndexed().
  *
  * AZF_DATA_DIR overrides the data directory (used by integration tests).
  */
@@ -77,9 +86,150 @@ export function newId(prefix?: string): string {
   return prefix ? `${prefix}-${id}` : id;
 }
 
+// ----- secondary indexes -----
+
+/**
+ * Compose an index key from its parts.
+ *
+ * The parts are escaped before joining because an unescaped delimiter is how
+ * composite keys collide: ('a|b', 'c') and ('a', 'b|c') would produce the same
+ * string and one user's day would answer for another's. Nothing we index today
+ * can contain a pipe (ids are UUIDs, dates are YYYY-MM-DD, types are literals),
+ * but a key builder that is only correct because of what its callers happen to
+ * pass is a trap for the next caller. The escape makes it injective outright.
+ */
+export function indexKey(...parts: string[]): string {
+  return parts.map((p) => p.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')).join('|');
+}
+
+/**
+ * One maintained lookup over one container.
+ *
+ * `key` returns undefined for a document the index does not cover - that
+ * document simply is not filed, and a lookup can never return it. Every doc in
+ * the `logs` container that is not a user-dated record (there are none today,
+ * but nothing enforces that) falls out this way rather than being filed under
+ * a half-formed key.
+ */
+export interface SecondaryIndexSpec {
+  readonly name: string;
+  readonly container: ContainerName;
+  readonly key: (doc: StoredDoc) => string | undefined;
+  /**
+   * When set, a second document in this container with the same key is
+   * rejected by upsert. Hydration still loads whatever is already on disk:
+   * a boot must not crash because a historical duplicate exists. The Postgres
+   * unique index is what stops that duplicate from being written again.
+   */
+  readonly unique?: boolean;
+}
+
+/** Thrown by upsert when a unique secondary index already holds another id. */
+export class DuplicateIndexError extends Error {
+  readonly index: string;
+  readonly key: string;
+
+  constructor(index: string, key: string) {
+    super(`Duplicate value for unique index ${index}`);
+    this.name = 'DuplicateIndexError';
+    this.index = index;
+    this.key = key;
+  }
+}
+
+/** Shape the log indexes read. Everything is optional: docs are opaque here. */
+interface UserDatedDoc extends StoredDoc {
+  type?: unknown;
+  userId?: unknown;
+  localDate?: unknown;
+}
+
+/** Exact-match index: one user, one record type, one local date. */
+export const LOGS_BY_USER_TYPE_DATE = 'logs.userId+type+localDate';
+
+/**
+ * Coarser index: one user, one record type, all dates.
+ *
+ * This exists because weightLogsInRange asks a RANGE question, and a hash
+ * index on an exact composite key cannot answer one - you would have to
+ * enumerate every date in the range and probe each, which is wrong the moment
+ * a caller asks for an open-ended or very wide window. Scanning this bucket
+ * instead is honest: it is O(that user's weight logs) rather than O(every log
+ * of every user), which is the reduction that actually mattered.
+ */
+export const LOGS_BY_USER_TYPE = 'logs.userId+type';
+
+function userTypeDateKey(doc: StoredDoc): string | undefined {
+  const d = doc as UserDatedDoc;
+  if (typeof d.userId !== 'string' || typeof d.type !== 'string') return undefined;
+  if (typeof d.localDate !== 'string') return undefined;
+  return indexKey(d.userId, d.type, d.localDate);
+}
+
+function userTypeKey(doc: StoredDoc): string | undefined {
+  const d = doc as UserDatedDoc;
+  if (typeof d.userId !== 'string' || typeof d.type !== 'string') return undefined;
+  return indexKey(d.userId, d.type);
+}
+
+/**
+ * Stars purchases and Stars subscription charges, one row per Telegram charge
+ * id. Unique. A charge id is one payment, so the two document types share the
+ * key. Refunds are excluded: they name the same charge and must not collide
+ * with the payment they reverse.
+ */
+export const LEDGER_BY_STARS_CHARGE = 'ledger.starsPurchase.telegramPaymentChargeId';
+
+function starsChargeKey(doc: StoredDoc): string | undefined {
+  const d = doc as { type?: unknown; telegramPaymentChargeId?: unknown };
+  if (d.type !== 'starsPurchase' && d.type !== 'starsSubscriptionPayment') return undefined;
+  if (typeof d.telegramPaymentChargeId !== 'string' || d.telegramPaymentChargeId.length === 0) {
+    return undefined;
+  }
+  return indexKey(d.telegramPaymentChargeId);
+}
+
+/**
+ * Declared indexes, built by every backing at construction.
+ *
+ * The log indexes exist because those reads are hot. The Stars charge index
+ * exists because a second purchase with the same charge id is a double credit,
+ * and the check has to be a key lookup rather than a scan that a later edit
+ * could forget. The Postgres unique index in pgStore is the durable copy of
+ * the same rule.
+ */
+export const SECONDARY_INDEXES: readonly SecondaryIndexSpec[] = [
+  { name: LOGS_BY_USER_TYPE_DATE, container: 'logs', key: userTypeDateKey },
+  { name: LOGS_BY_USER_TYPE, container: 'logs', key: userTypeKey },
+  {
+    name: LEDGER_BY_STARS_CHARGE,
+    container: 'ledger',
+    key: starsChargeKey,
+    unique: true,
+  },
+];
+
+/** Runtime state of one declared index. */
+interface SecondaryIndex {
+  readonly spec: SecondaryIndexSpec;
+  /** key -> the ids currently filed under it. */
+  readonly buckets: Map<string, Set<string>>;
+  /**
+   * id -> the key it was last filed under.
+   *
+   * This is what makes an UPDATE THAT CHANGES THE KEY correct, and it is the
+   * whole reason the index does not re-derive the old key from the old
+   * document: by the time upsert() runs, the caller may already hold a
+   * document that differs from the filed one, and re-deriving would remove the
+   * wrong bucket entry and strand the old one forever. Remembering where we
+   * actually put it cannot be wrong.
+   */
+  readonly filedAs: Map<string, string>;
+}
+
 /**
  * In-memory working set + the write-coalescing machinery. Subclasses supply
- * only `persist()` — how a batch of dirty ids reaches durable storage.
+ * only `persist()` - how a batch of dirty ids reaches durable storage.
  *
  * Deliberately declares every *instance* member the concrete stores need, so
  * that JsonStore adds none of its own. That keeps `MemoryBackedStore` and
@@ -98,11 +248,22 @@ export abstract class MemoryBackedStore {
   private dirty = new Map<ContainerName, ContainerDelta>();
   private writeQueue: Promise<void> = Promise.resolve();
   private flushScheduled = false;
+  /** container -> index name -> index. Empty for containers with no indexes. */
+  private readonly indexes = new Map<ContainerName, Map<string, SecondaryIndex>>();
 
   protected constructor(dataDir: string) {
     this.dataDir = dataDir;
     fs.mkdirSync(this.dataDir, { recursive: true });
     for (const name of CONTAINERS) this.data.set(name, new Map());
+    // Built before any hydration so every path into memory - JsonStore's
+    // constructor, PostgresStore.hydrate(), and every later write - files
+    // through the same maintenance code. An index that is attached after the
+    // fact is an index that is already missing rows.
+    for (const spec of SECONDARY_INDEXES) {
+      let forContainer = this.indexes.get(spec.container);
+      if (!forContainer) this.indexes.set(spec.container, (forContainer = new Map()));
+      forContainer.set(spec.name, { spec, buckets: new Map(), filedAs: new Map() });
+    }
   }
 
   protected container(name: ContainerName): Map<string, StoredDoc> {
@@ -115,8 +276,78 @@ export abstract class MemoryBackedStore {
   protected hydrateContainer(name: ContainerName, docs: Iterable<StoredDoc>): void {
     const map = this.container(name);
     for (const doc of docs) {
-      if (doc && typeof doc.id === 'string') map.set(doc.id, doc);
+      if (doc && typeof doc.id === 'string') {
+        map.set(doc.id, doc);
+        this.indexPut(name, doc);
+      }
     }
+  }
+
+  /**
+   * Write a document into memory and its indexes WITHOUT marking it dirty.
+   *
+   * For the one caller that has already durably written the change itself and
+   * must only reconcile the local copy: compareAndSwapRefreshToken, which
+   * updates the row in Postgres and then folds the result back in. Going
+   * through here rather than `container(name).set(...)` is what stops that
+   * path from silently bypassing index maintenance if `users` is ever indexed.
+   */
+  protected setWithoutDirty(name: ContainerName, doc: StoredDoc): void {
+    this.container(name).set(doc.id, doc);
+    this.indexPut(name, doc);
+  }
+
+  // ----- index maintenance -----
+
+  /**
+   * File (or re-file) one document in every index over its container.
+   *
+   * The re-file case is the one that matters: when the extracted key changes,
+   * the id must leave its OLD bucket. Dropping that step is the classic
+   * secondary-index bug - the stale entry stays behind and the old key keeps
+   * answering with a document that no longer belongs to it.
+   */
+  private indexPut(name: ContainerName, doc: StoredDoc): void {
+    const forContainer = this.indexes.get(name);
+    if (!forContainer) return;
+    for (const index of forContainer.values()) {
+      const next = index.spec.key(doc);
+      const previous = index.filedAs.get(doc.id);
+      if (previous === next) continue;
+      if (previous !== undefined) this.detach(index, previous, doc.id);
+      if (next === undefined) {
+        index.filedAs.delete(doc.id);
+      } else {
+        index.filedAs.set(doc.id, next);
+        let bucket = index.buckets.get(next);
+        if (!bucket) index.buckets.set(next, (bucket = new Set()));
+        bucket.add(doc.id);
+      }
+    }
+  }
+
+  /** Remove one id from every index over its container. */
+  private indexDrop(name: ContainerName, id: string): void {
+    const forContainer = this.indexes.get(name);
+    if (!forContainer) return;
+    for (const index of forContainer.values()) {
+      const previous = index.filedAs.get(id);
+      if (previous === undefined) continue;
+      this.detach(index, previous, id);
+      index.filedAs.delete(id);
+    }
+  }
+
+  /**
+   * Drop an id from one bucket, dropping the bucket itself when it empties -
+   * otherwise a long-lived process accumulates one empty Set per key it has
+   * ever seen, which for a per-user-per-day key is unbounded growth.
+   */
+  private detach(index: SecondaryIndex, key: string, id: string): void {
+    const bucket = index.buckets.get(key);
+    if (!bucket) return;
+    bucket.delete(id);
+    if (bucket.size === 0) index.buckets.delete(key);
   }
 
   // ----- synchronous read/write API (unchanged contract) -----
@@ -140,22 +371,112 @@ export abstract class MemoryBackedStore {
     return undefined;
   }
 
+  /**
+   * Indexed equivalent of `where()`: the documents filed under `key` in
+   * `index` that also satisfy `pred`.
+   *
+   * TWO SAFETY PROPERTIES, both deliberate, because this serves health data
+   * and a wrong total is worse than a slow one:
+   *
+   *  1. `pred` is applied to every candidate the index returns. The index
+   *     narrows the search; the predicate decides the answer. So the result is
+   *     always a SUBSET of what `where(name, pred)` would return - an index
+   *     that somehow over-files can only cost time, never change an answer.
+   *  2. An index that is not declared for this container is not an error; the
+   *     call degrades to the full scan it replaced. Deleting a line from
+   *     SECONDARY_INDEXES makes the app slower, not wrong.
+   *
+   * What neither property covers is an index that UNDER-files - a document
+   * that should be in the bucket and is not. That is the only failure mode
+   * left, and it is exactly what the maintenance in indexPut/indexDrop and the
+   * tests in __tests__/storeIndexes.test.ts exist to rule out.
+   *
+   * `pred` must be the same predicate the unindexed call would have used, so
+   * the two are interchangeable at the call site.
+   */
+  whereIndexed<T extends StoredDoc>(
+    name: ContainerName,
+    index: string,
+    key: string,
+    pred: (doc: T) => boolean,
+  ): T[] {
+    const found = this.indexes.get(name)?.get(index);
+    if (!found) return this.where<T>(name, pred);
+    const ids = found.buckets.get(key);
+    if (!ids) return [];
+    const container = this.container(name);
+    const out: T[] = [];
+    for (const id of ids) {
+      const doc = container.get(id) as T | undefined;
+      if (doc && pred(doc)) out.push(doc);
+    }
+    return out;
+  }
+
+  /** True when `index` is declared over `name`. */
+  hasIndex(name: ContainerName, index: string): boolean {
+    return this.indexes.get(name)?.has(index) === true;
+  }
+
+  /**
+   * Raw contents of one index bucket, unfiltered by any predicate.
+   *
+   * Exposed so tests can assert on the index itself rather than on what
+   * whereIndexed's predicate re-check happens to hide: a stale entry left by a
+   * key change is invisible through whereIndexed and plainly visible here.
+   */
+  indexedIds(name: ContainerName, index: string, key: string): string[] {
+    const bucket = this.indexes.get(name)?.get(index)?.buckets.get(key);
+    return bucket ? [...bucket] : [];
+  }
+
+  /**
+   * Refuse a write that would put a second id under a unique index key.
+   * Same-id updates are allowed: that is an edit of the row that already
+   * owns the key, not a second credit.
+   */
+  private assertUnique(name: ContainerName, doc: StoredDoc): void {
+    const forContainer = this.indexes.get(name);
+    if (!forContainer) return;
+    for (const index of forContainer.values()) {
+      if (!index.spec.unique) continue;
+      const next = index.spec.key(doc);
+      if (next === undefined) continue;
+      const bucket = index.buckets.get(next);
+      if (!bucket) continue;
+      for (const id of bucket) {
+        if (id !== doc.id) throw new DuplicateIndexError(index.spec.name, next);
+      }
+    }
+  }
+
   upsert<T extends StoredDoc>(name: ContainerName, doc: T): T {
+    this.assertUnique(name, doc);
     this.container(name).set(doc.id, doc);
+    // Before markDirty, so a persist() that reads memory can never observe a
+    // document whose index entry has not caught up.
+    this.indexPut(name, doc);
     this.markDirty(name, doc.id, 'write');
     return doc;
   }
 
   delete(name: ContainerName, id: string): boolean {
     const removed = this.container(name).delete(id);
-    if (removed) this.markDirty(name, id, 'delete');
+    if (removed) {
+      this.indexDrop(name, id);
+      this.markDirty(name, id, 'delete');
+    }
     return removed;
   }
 
   deleteWhere<T extends StoredDoc>(name: ContainerName, pred: (doc: T) => boolean): number {
+    // Still a full scan: deleteWhere takes an arbitrary predicate that no
+    // single index can answer, and it is a sweep/erasure path rather than a
+    // request path. Correctness over cleverness here.
     const doomed = this.where<T>(name, pred).map((d) => d.id);
     for (const id of doomed) {
       this.container(name).delete(id);
+      this.indexDrop(name, id);
       this.markDirty(name, id, 'delete');
     }
     return doomed.length;
@@ -202,7 +523,7 @@ export abstract class MemoryBackedStore {
       .catch((err) => {
         // eslint-disable-next-line no-console
         console.error('[store] flush failed', err);
-        // Re-mark the failed batch dirty so the next flush retries it —
+        // Re-mark the failed batch dirty so the next flush retries it -
         // otherwise these ids are only re-persisted if they happen to change
         // again, which under per-id backing (Postgres) loses them on restart.
         // Merge UNDER any newer dirt: changes recorded since the failure are
@@ -228,7 +549,7 @@ export abstract class MemoryBackedStore {
   /**
    * Write one coalesced batch of dirty ids to the backing store.
    *
-   * Internal hook — callers use flush(). It is public rather than protected
+   * Internal hook - callers use flush(). It is public rather than protected
    * only because TypeScript compares an overridden *protected* member
    * nominally: with `protected persist()` re-declared in each subclass,
    * MemoryBackedStore would stop being assignable to JsonStore and every call
@@ -239,7 +560,12 @@ export abstract class MemoryBackedStore {
 
   /** Await all pending writes (tests, graceful shutdown, seed script). */
   async flush(): Promise<void> {
-    if (this.dirty.size > 0) this.enqueueFlush();
+    const seed = pendingSeeds.get(this);
+    if (seed) await seed;
+    while (this.dirty.size > 0) {
+      this.enqueueFlush();
+      await this.writeQueue;
+    }
     await this.writeQueue;
   }
 
@@ -258,7 +584,7 @@ export abstract class MemoryBackedStore {
     if (rec.tokenHash !== tokenHash) return undefined;
     if (rec.usedAt !== null || rec.revokedAt !== null) return undefined;
     const updated = { ...rec, usedAt };
-    this.container('users').set(tokenId, updated);
+    this.setWithoutDirty('users', updated);
     this.markDirty('users', tokenId, 'write');
     return updated;
   }
@@ -267,7 +593,7 @@ export abstract class MemoryBackedStore {
 /**
  * Local JSON persistence: one file per container under dataDir. Writes go
  * through a tmp file + rename so a crash mid-write cannot truncate a
- * container. Adds no instance members of its own — see MemoryBackedStore.
+ * container. Adds no instance members of its own - see MemoryBackedStore.
  */
 export class JsonStore extends MemoryBackedStore {
   constructor(dataDir: string) {
@@ -358,6 +684,7 @@ export const store = {
 };
 
 let singleton: MemoryBackedStore | null = null;
+const pendingSeeds = new WeakMap<MemoryBackedStore, Promise<void>>();
 
 /**
  * Postgres is used only when an operator actually provisioned a database, and
@@ -376,15 +703,30 @@ export async function initStore(): Promise<MemoryBackedStore> {
   if (singleton) return singleton;
   if (!postgresEnabled()) return getStore();
 
-  // Imported lazily so `pg` is never loaded — nor required to be installed —
+  // Imported lazily so `pg` is never loaded - nor required to be installed -
   // in the file-backed dev/test path.
   const { PostgresStore } = await import('./pgStore');
-  const pg = await PostgresStore.connect(process.env.DATABASE_URL!.trim(), config.dataDir);
+  // DATABASE_URL_ALLOW_INSECURE_SSL opts out of TLS enforcement for hosts that
+  // are not loopback but ARE trusted private networks: the canonical case is a
+  // docker-compose stack whose api and db share an isolated bridge network
+  // (hostname 'db', no host port published). It must never be set when
+  // DATABASE_URL points off this machine.
+  const allowInsecureSsl = process.env.DATABASE_URL_ALLOW_INSECURE_SSL === 'true';
+  if (allowInsecureSsl) {
+    console.warn(
+      '[store] DATABASE_URL_ALLOW_INSECURE_SSL=true: plaintext Postgres accepted. ' +
+        'Set this only on an isolated private network (e.g. a docker-compose bridge); ' +
+        'never for a database reachable from the public internet.',
+    );
+  }
+  const pg = await PostgresStore.connect(process.env.DATABASE_URL!.trim(), config.dataDir, {
+    allowInsecureSsl,
+  });
   await pg.hydrate();
   singleton = pg;
   // Seed after hydration, never before: seedIfNeeded's own emptiness checks
   // are only meaningful once the existing rows are in memory.
-  seedIfNeeded(pg);
+  pendingSeeds.set(pg, seedIfNeeded(pg));
   return pg;
 }
 
@@ -410,7 +752,7 @@ export function describeStoreInitFailure(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
   switch (code) {
     case 'ECONNREFUSED':
-      return `Postgres refused the connection (${message}). The server behind DATABASE_URL is not accepting connections — check that the database is running and the host and port are right.`;
+      return `Postgres refused the connection (${message}). The server behind DATABASE_URL is not accepting connections - check that the database is running and the host and port are right.`;
     case 'ENOTFOUND':
     case 'EAI_AGAIN':
       return `The Postgres host in DATABASE_URL could not be resolved (${message}). Check the hostname for typos and that DNS is reachable from this process.`;
@@ -419,7 +761,7 @@ export function describeStoreInitFailure(err: unknown): string {
       return `The connection to Postgres timed out or was dropped (${message}). Check network access and firewall rules between this process and the database.`;
     case '28P01':
     case '28000':
-      return `Postgres rejected the credentials in DATABASE_URL (${message}). Check the username and password — authentication failed.`;
+      return `Postgres rejected the credentials in DATABASE_URL (${message}). Check the username and password - authentication failed.`;
     case '3D000':
       return `The database named in DATABASE_URL does not exist (${message}). Create it, or fix the database name in the connection string.`;
     case '57P03':
@@ -432,8 +774,8 @@ export function describeStoreInitFailure(err: unknown): string {
 /**
  * Synchronous store access. Under the file backing this still constructs and
  * seeds lazily on first call (unchanged). Under the Postgres backing there is
- * nothing safe to return before hydration — an empty store would look like a
- * brand new database and re-seed over live data — so it throws instead.
+ * nothing safe to return before hydration - an empty store would look like a
+ * brand new database and re-seed over live data - so it throws instead.
  */
 export function getStore(): MemoryBackedStore {
   if (postgresEnabled()) {
@@ -449,7 +791,7 @@ export function getStore(): MemoryBackedStore {
   if (!singleton || singleton.dataDir !== dir) {
     const json = new JsonStore(dir);
     singleton = json;
-    seedIfNeeded(json);
+    pendingSeeds.set(json, seedIfNeeded(json));
   }
   return singleton;
 }

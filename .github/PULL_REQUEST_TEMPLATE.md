@@ -1,3 +1,5 @@
+<!-- Open this against `staging`. The only pull request that targets `main` is the promotion from `staging`. See docs/BRANCHING_AND_STAGING.md. -->
+
 ## What and why
 
 <!-- What changes, and what problem it solves. Link the issue if there is one. -->

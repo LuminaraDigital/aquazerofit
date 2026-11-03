@@ -1,5 +1,5 @@
 /**
- * /auth — register, login, refresh (rotation + family revocation), logout,
+ * /auth - register, login, refresh (rotation + family revocation), logout,
  * Telegram launch-data sign-in (AQF-07 §2).
  */
 import { Router } from 'express';
@@ -13,6 +13,7 @@ import {
 } from '@aquazerofit/shared';
 import { z } from 'zod';
 import { verifyAccess } from '../../platform/auth';
+import { clientIpForRateLimit } from '../../platform/clientIp';
 import { assertHuman, captchaConfig } from '../../platform/botProtection';
 import { asyncHandler } from '../../platform/errors';
 import {
@@ -24,18 +25,28 @@ import {
   requestPasswordReset,
   telegramAuth,
 } from './service';
+import { firebaseSession } from './firebaseUsers';
+import { verifyFirebaseIdToken, isFirebaseAdminConfigured } from '../../platform/firebaseAdmin';
 import {
   clearRefreshCookie,
   resolveRefreshToken,
   setRefreshCookie,
 } from './cookies';
 import { AppError } from '../../platform/errors';
+import { mfaRouter } from '../mfa/router';
 import type { AuthResponse } from '@aquazerofit/shared';
 
 export const authRouter = Router();
 
 /**
- * Bot-protection discovery. Public and unauthenticated by necessity — it is
+ * Second-factor enrolment and step-up (/auth/mfa/*). Mounted here rather than
+ * as its own top-level module so it inherits the strict /auth rate lane, which
+ * is the correct lane for a surface where codes are submitted.
+ */
+authRouter.use('/mfa', mfaRouter);
+
+/**
+ * Bot-protection discovery. Public and unauthenticated by necessity - it is
  * read before anyone has an account, and the site key it returns is public by
  * design (Cloudflare scopes it to the hostnames on the widget).
  *
@@ -107,8 +118,36 @@ authRouter.post('/logout', (req, res) => {
 
 authRouter.post('/telegram', (req, res) => {
   const { initData } = telegramAuthSchema.parse(req.body);
-  sendAuth(req, res, telegramAuth(initData, req.ip));
+  sendAuth(req, res, telegramAuth(initData, clientIpForRateLimit(req)));
 });
+
+/**
+ * Web Firebase Auth session bootstrap. Client signs in with the Firebase SDK,
+ * then POSTs here with Authorization: Bearer <ID_TOKEN>. Hydrates / links the
+ * local User document and returns { user }. Protected API calls continue to
+ * send the same Firebase ID token; this route only materialises the public
+ * user envelope for the client cache.
+ */
+authRouter.post(
+  '/firebase/session',
+  asyncHandler(async (req, res) => {
+    if (!isFirebaseAdminConfigured()) {
+      throw new AppError(
+        'AUTH_INVALID',
+        'Firebase Auth is not configured on this server',
+      );
+    }
+    const header = req.headers.authorization;
+    if (!header?.startsWith('Bearer ')) {
+      throw new AppError('AUTH_REQUIRED', 'Firebase ID token required');
+    }
+    const identity = await verifyFirebaseIdToken(header.slice(7));
+    if (!identity) {
+      throw new AppError('AUTH_INVALID', 'Firebase ID token required');
+    }
+    res.json(firebaseSession(identity, req.ip));
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Password reset (frozen contract). Both endpoints sit on the strict /auth

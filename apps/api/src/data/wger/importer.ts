@@ -27,6 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  DEFAULT_SUPPORT_EMAIL,
   wgerDeletionLogEntrySchema,
   wgerExerciseInfoSchema,
   wgerLicenceSchema,
@@ -57,7 +58,7 @@ import {
 
 const WGER_API_BASE = 'https://wger.de/api/v2';
 /** Identifying User-Agent — polite clients announce themselves. */
-const USER_AGENT = 'AquaZeroFit-ETL/1.0 (+https://aquazero.fit; contact: dev@aquazero.fit)';
+const USER_AGENT = `AquaZeroFit-ETL/1.0 (+https://aquazerofit.com; contact: ${DEFAULT_SUPPORT_EMAIL})`;
 const ENGLISH_LANGUAGE_ID = 2;
 const PAGE_LIMIT = 200;
 const API_MIN_INTERVAL_MS = 600;

@@ -1,0 +1,13 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/LuminaraDigital/aquazerofit/security/policy
+    about: >-
+      Do not open a public issue. Vulnerabilities are disclosed privately
+      through GitHub's private vulnerability reporting — see SECURITY.md for
+      scope and the known, accepted trade-offs.
+  - name: Contributing guide
+    url: https://github.com/LuminaraDigital/aquazerofit/blob/HEAD/CONTRIBUTING.md
+    about: >-
+      Setup, the `npm run verify` gate, and the product invariants that will get
+      a change rejected regardless of how it is written.

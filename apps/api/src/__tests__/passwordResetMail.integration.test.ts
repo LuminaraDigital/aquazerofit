@@ -97,6 +97,29 @@ describe('password reset delivery', () => {
     expect(drainOutbox()).toHaveLength(0);
   });
 
+  it('sends nothing to an account on the aquazero.fit domain', async () => {
+    // Telegram and Firebase accounts get synthetic addresses there, and the
+    // seeded accounts lived there. This project does not own the domain, so
+    // a reset link sent there would not reach the account holder.
+    const email = 'tg-4242@telegram.aquazero.fit';
+    getStore().upsert('users', {
+      id: 'usr-tg-4242',
+      email,
+      emailVerified: false,
+      role: 'user',
+      tier: 'free',
+      displayName: 'Telegram user',
+      createdAt: new Date().toISOString(),
+      deletionRequestedAt: null,
+    });
+
+    const res = await request(app).post(`${base}/auth/password-reset/request`).send({ email });
+
+    expect(res.status).toBe(202);
+    await flushDelivery();
+    expect(drainOutbox()).toHaveLength(0);
+  });
+
   it('does not fail the request when the transport is down', async () => {
     process.env.MAIL_PROVIDER = 'resend';
     process.env.RESEND_API_KEY = 're_test_key';
@@ -143,6 +166,16 @@ describe('mail transport selection', () => {
     expect(body.to).toEqual(['someone@example.com']);
     expect(body.subject).toBe('Hi');
     delete process.env.RESEND_API_KEY;
+  });
+
+  it('refuses any recipient on aquazero.fit, whatever the transport', async () => {
+    for (const to of ['admin@aquazero.fit', 'Demo@AquaZero.Fit', 'fb-1@firebase.aquazero.fit']) {
+      await expect(sendMail({ to, subject: 's', text: 't' })).rejects.toThrow(/aquazero\.fit/);
+    }
+    expect(drainOutbox()).toHaveLength(0);
+    // A lookalike that merely ends in the same letters is someone else's domain.
+    await sendMail({ to: 'a@notaquazero.fit', subject: 's', text: 't' });
+    expect(drainOutbox()).toHaveLength(1);
   });
 
   it('surfaces a provider rejection to the caller', async () => {

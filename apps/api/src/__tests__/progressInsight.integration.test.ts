@@ -1,5 +1,5 @@
 /**
- * GET /progress/insight — the P-08 progress-intelligence lane.
+ * GET /progress/insight: the P-08 progress-intelligence lane.
  *
  * The properties under test are the ones that decide whether this feature helps
  * or hurts: a brand-new user must get an encouraging 200 rather than an error
@@ -7,6 +7,9 @@
  * dashboard load in the same week must not bill again, and a free-tier user
  * must get the insight rather than a 403.
  */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CREDIT_COSTS } from '@aquazerofit/shared';
@@ -26,9 +29,10 @@ const savedAzfDataDir = process.env.AZF_DATA_DIR;
 const savedProviderEnv = saveProviderEnv();
 const dataDir = createIsolatedDataDir('azf-insight-');
 bindIsolatedDataDir(dataDir);
-// No provider keys: the gateway lands on the offline engine by design, which
-// keeps meta.degraded false and therefore bills normally (the keyless mock IS
-// the product). That is the path this suite asserts billing against.
+// No provider keys: outside production the gateway lands on the offline engine
+// by design, which keeps meta.degraded false and therefore bills normally (the
+// keyless mock IS the product). That is the path this suite asserts billing
+// against; production marks the same answer degraded and does not bill it.
 clearProviderEnv();
 
 const { createApp } = await import('../app');
@@ -36,7 +40,7 @@ const { getStore } = await import('../platform/store');
 const app = createApp();
 const base = '/api/v1';
 
-/** Today in UTC — no X-Timezone header is sent, so todayFor() resolves to UTC. */
+/** Today in UTC. No X-Timezone header is sent, so todayFor() resolves to UTC. */
 const today = new Date().toISOString().slice(0, 10);
 const day = (offset: number): string => addDays(today, offset);
 
@@ -162,7 +166,7 @@ beforeAll(async () => {
   logWorkout(premium.userId, day(-1)); // 2 this period
   // --- Previous 7-day window (T-13 .. T-7): one workout, one weigh-in, spread
   // across two distinct days. Both logs sat on day(-8) originally, which left
-  // the window with a single active day — below the floor at which a count
+  // the window with a single active day, below the floor at which a count
   // comparison means anything, so the comparisons under test were correctly
   // suppressed. Two active days is the minimum that earns a comparison; the
   // asserted deltas are unchanged either way.
@@ -188,17 +192,26 @@ function ledgerRowsFor(userId: string): unknown[] {
 }
 
 describe('GET /progress/insight', () => {
+  it('keeps the insight module free of em dashes and en dashes', () => {
+    const source = fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), '../modules/progress/insight.ts'),
+      'utf8',
+    );
+    expect(source).not.toMatch(/\u2014|\u2013/);
+  });
+
   it('gives a brand-new user the "keep logging" insight, not an error', async () => {
     const res = await request(app).get(`${base}/progress/insight`).set(auth(fresh));
 
     expect(res.status).toBe(200);
     const insight = res.body.insight as ProgressInsight;
-    expect(insight.narrative).toBe('Keep logging — insights appear once there is enough data.');
+    expect(insight.narrative).toBe('Keep logging: insights appear once there is enough data.');
+    expect(insight.narrative).not.toMatch(/\u2014|\u2013/);
     expect(insight.ai.provider).toBe('deterministic');
     expect(insight.ai.model).toBe('insufficient-data');
     expect(insight.stats.weighInsCount).toBe(0);
     expect(insight.stats.workoutsCompleted).toBe(0);
-    // Never billed, and never persisted — the moment they log, the insight must
+    // Never billed, and never persisted. The moment they log, the insight must
     // be recomputed rather than served from a stale "keep logging" cache.
     expect(ledgerRowsFor(fresh.userId)).toHaveLength(0);
     expect(getStore().where('ai', (d) => (d as { userId?: string }).userId === fresh.userId)).toHaveLength(0);
@@ -295,6 +308,7 @@ describe('GET /progress/insight', () => {
     expect(insight.stats.workoutsCompleted).toBe(1);
     // The deterministic narration is a real narration, not a placeholder.
     expect(insight.narrative).toContain('0.2 kg');
+    expect(insight.narrative).not.toMatch(/\u2014|\u2013/);
     expect(insight.narrative.split('.').filter((s) => s.trim().length > 0).length).toBeGreaterThan(1);
     // Premium gating never costs a free user a credit.
     expect(ledgerRowsFor(free.userId)).toHaveLength(0);
@@ -337,7 +351,7 @@ describe('GET /progress/insight', () => {
     for (const metric of ['workouts', 'logging'] as const) {
       const change = changes.find((c) => c.metric === metric);
       expect(change).toBeDefined();
-      // The current value is still reported — nothing is hidden.
+      // The current value is still reported. Nothing is hidden.
       expect(change?.delta).toBeNull();
       expect(change?.direction).toBe('steady');
       expect(change?.label).not.toMatch(/fewer|more than the previous/i);
@@ -349,7 +363,7 @@ describe('GET /progress/insight', () => {
 
   it('reports a periodStart that actually covers the window the stats describe', async () => {
     // periodStart originally carried the current week's Monday, which is the
-    // cache bucket rather than the described window — on a Friday that labels a
+    // cache bucket rather than the described window. On a Friday that labels a
     // Saturday-to-Friday window as starting on the Monday, and the size of the
     // error changes with the weekday. The two concepts are now separate, and
     // this pins the user-facing one: the window ends today and is periodDays

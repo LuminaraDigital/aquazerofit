@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { DailyNutrition, MealType } from '@aquazerofit/shared';
 import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/queries';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { MetricCard } from '@/components/ui/MetricCard';
@@ -51,7 +52,7 @@ export default function MealPlan() {
   const startedRef = useRef(false);
 
   const dailyQuery = useQuery({
-    queryKey: ['nutrition', 'daily', today],
+    queryKey: queryKeys.nutritionDaily(today),
     queryFn: () => api<DailyNutrition>('/analytics/nutrition/daily', { query: { date: today } }),
   });
   const daily = dailyQuery.data;
@@ -92,7 +93,11 @@ export default function MealPlan() {
 
   const logRec = useMutation({
     mutationFn: (id: string) =>
-      api(`/recommendations/${id}/log`, { method: 'POST', idempotencyKey: newIdempotencyKey() }),
+      api(`/recommendations/${id}/log`, {
+        method: 'POST',
+        body: { localDate: today },
+        idempotencyKey: newIdempotencyKey(),
+      }),
     onSuccess: (_data, id) => {
       show('Added to your log');
       setSlots((s) => {
@@ -105,7 +110,7 @@ export default function MealPlan() {
       void queryClient.invalidateQueries({ queryKey: ['nutrition'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
-    onError: () => show('Could not log that meal — please try again'),
+    onError: () => show('Could not log that meal - please try again'),
   });
 
   const sendFeedback = useMutation({
@@ -129,9 +134,8 @@ export default function MealPlan() {
         <section className="mb-6 flex justify-between items-end">
           <div>
             <h1 className="font-heading font-semibold uppercase tracking-[0.03em] text-3xl text-on-surface">
-              Your AI Meal Plan
+              Meal plan
             </h1>
-            <p className="text-base text-on-surface-variant">Fueling your aquatic performance.</p>
           </div>
           <button
             type="button"

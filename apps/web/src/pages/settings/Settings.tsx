@@ -8,6 +8,7 @@ import { SOURCE_CODE_URL, WELLNESS_DISCLAIMER, type ProfileInput } from '@aquaze
 import { api } from '../../lib/api';
 import { formatMonthYear, todayLocalDate } from '../../lib/format';
 import { haptic } from '../../lib/telegram';
+import { hasActivePlaySubscription } from '../../lib/billing';
 import {
   useAuthActions,
   useConsents,
@@ -80,6 +81,7 @@ export default function Settings() {
   // leave or to exercise them. So the failure is scoped to the one section
   // that genuinely depends on the profile, and everything else renders.
   const profileUnavailable = isError && !profile;
+  const playSubscription = hasActivePlaySubscription(entitlements);
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'AquaZeroFit member';
   const initial = displayName.charAt(0).toUpperCase();
@@ -97,7 +99,12 @@ export default function Settings() {
   }
 
   async function toggleConsent(
-    key: 'wellnessDataProcessing' | 'aiPersonalisation' | 'anonymisedAnalytics' | 'reminders',
+    key:
+      | 'wellnessDataProcessing'
+      | 'aiPersonalisation'
+      | 'anonymisedAnalytics'
+      | 'reminders'
+      | 'foodPhotoTraining',
     value: boolean,
   ) {
     if (!consents) return;
@@ -415,6 +422,12 @@ export default function Settings() {
                     checked: consents.anonymisedAnalytics,
                   },
                   {
+                    key: 'foodPhotoTraining',
+                    label: 'Food photo training',
+                    body: 'Keep your confirmed meal photos for up to 2 years to improve food recognition. Optional. Turning this off deletes them.',
+                    checked: consents.foodPhotoTraining === true,
+                  },
+                  {
                     key: 'reminders',
                     label: 'Reminders',
                     body: 'Master switch for all reminders.',
@@ -515,6 +528,12 @@ export default function Settings() {
               Deleting your account removes your profile, logs and plans after a short grace
               period. This cannot be undone.
             </p>
+            {playSubscription && (
+              <p className="text-xs text-on-surface-variant" role="note">
+                You have a Google Play subscription. Deleting this account does not cancel it.
+                Cancel it in the Play Store, or Google will keep billing you.
+              </p>
+            )}
             <SecondaryButton
               onClick={() => setConfirmDelete(true)}
               className="border-coral text-coral hover:bg-coral/10 min-h-[48px]"
@@ -585,6 +604,9 @@ export default function Settings() {
             <p className="text-sm text-on-surface-variant">
               Your profile, meal logs, weight history and training plans will be permanently
               removed after the grace period. Consider exporting your data first.
+              {playSubscription
+                ? ' Your Google Play subscription is not cancelled by this. Cancel it in the Play Store.'
+                : ''}
             </p>
             <div className="space-y-2">
               <PrimaryButton

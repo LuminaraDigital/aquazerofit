@@ -55,7 +55,7 @@ import kotlin.math.roundToInt
 /**
  * The AI meal plan: four suggestions built around what is left of today.
  *
- * Online-only, and honest about it — when nothing can be fetched the screen
+ * Online-only, and honest about it. When nothing can be fetched the screen
  * says the suggestions come from the server rather than showing four identical
  * failures. Below the plan sits the cached recipe library, which does work
  * offline, so the screen still has something to offer with no connection.
@@ -311,7 +311,7 @@ private fun SlotCard(
             }
             slot.failed || slot.recommendation == null -> {
                 Text(
-                    text = stringResource(R.string.meal_plan_slot_failed),
+                    text = stringResource(slot.failureMessageRes),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

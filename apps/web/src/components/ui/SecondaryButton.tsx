@@ -2,6 +2,11 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 interface SecondaryButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
+  /**
+   * Stretch to the row. Inline actions (a pill beside a label) pass false so
+   * `w-full` cannot overflow the label and paint on top of it.
+   */
+  fullWidth?: boolean;
   children: ReactNode;
 }
 
@@ -11,6 +16,7 @@ interface SecondaryButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  */
 export function SecondaryButton({
   loading = false,
+  fullWidth = true,
   disabled,
   children,
   className = '',
@@ -18,12 +24,13 @@ export function SecondaryButton({
   ...rest
 }: SecondaryButtonProps) {
   const isDisabled = disabled || loading;
+  const widthClass = fullWidth ? 'w-full' : 'w-auto shrink-0';
   return (
     <button
       type={type}
       disabled={isDisabled}
       aria-busy={loading || undefined}
-      className={`w-full min-h-[52px] rounded-2xl border border-primary/60 bg-transparent font-heading font-semibold uppercase tracking-[0.04em] text-sm text-primary transition-all hover:bg-primary/8 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 px-6 ${className}`}
+      className={`${widthClass} min-h-[52px] rounded-2xl border border-primary/60 bg-transparent font-heading font-semibold uppercase tracking-[0.04em] text-sm text-primary transition-all hover:bg-primary/8 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 px-6 ${className}`}
       {...rest}
     >
       {loading && (

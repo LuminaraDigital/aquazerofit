@@ -54,5 +54,11 @@ export interface ConsentState {
   aiPersonalisation: boolean;
   anonymisedAnalytics: boolean;
   reminders: boolean;
+  /**
+   * Keep confirmed meal photographs to train food recognition. Separate from
+   * aiPersonalisation because it outlives the feature the user asked for, and
+   * never a condition of using it. Absent on documents that predate it.
+   */
+  foodPhotoTraining?: boolean;
   updatedAt: string;
 }

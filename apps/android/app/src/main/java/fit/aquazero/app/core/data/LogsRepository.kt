@@ -19,10 +19,12 @@ import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.model.CreateMealLogRequest
 import fit.aquazero.app.core.model.CreateWaterLogRequest
 import fit.aquazero.app.core.model.CreateWeightLogRequest
+import fit.aquazero.app.core.model.MealLogDto
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -78,6 +80,18 @@ class LogsRepository @Inject constructor(
             kcalBurned = kcalBurnedFromSession(session),
         )
     }
+
+    /** Which meal slots already hold a log on [localDate]. */
+    fun mealTypesLogged(localDate: String): Flow<Set<MealType>> =
+        logsDao.mealLogsForDate(localDate).map { logs ->
+            logs.mapNotNull { log ->
+                MealType.entries.firstOrNull { it.name.equals(log.mealType, ignoreCase = true) }
+            }.toSet()
+        }
+
+    /** Days between [from] and [to], inclusive, with anything logged on this device. */
+    fun loggedDates(from: String, to: String): Flow<Set<String>> =
+        logsDao.loggedDates(from, to).map { it.toSet() }
 
     // ----- optimistic writes -----
 
@@ -192,6 +206,11 @@ class LogsRepository @Inject constructor(
         logsDao.upsertMealLog(row.copy(deleted = true, syncState = SyncState.PENDING))
         outboxRepository.enqueueDelete(OutboxEntityTypes.MEAL_LOG, localId)
         syncScheduler.requestSync()
+    }
+
+    /** Cache a meal log created directly on the server (e.g. confirmed chat draft). */
+    suspend fun cacheServerMealLog(dto: MealLogDto) {
+        logsDao.upsertMealLog(MealReconciler.serverRowFor(dto))
     }
 
     private fun mealTypeName(mealType: MealType): String = when (mealType) {

@@ -57,6 +57,15 @@ object AzfMotion {
     /** Press scale applied to interactive surfaces. */
     const val PressScale: Float = 0.97f
 
+    /** Duration of a state confirmation, such as a tick or a tab lighting up. */
+    const val ConfirmDurationMs: Int = 220
+
+    /** Enter duration of a screen change. */
+    const val ScreenEnterMs: Int = 280
+
+    /** Exit duration of a screen change, about 30% faster than the enter. */
+    const val ScreenExitMs: Int = 190
+
     /** Standard reveal spec (fade + rise). */
     fun <T> revealSpec(): FiniteAnimationSpec<T> =
         tween(durationMillis = RevealDurationMs, easing = RevealEasing)

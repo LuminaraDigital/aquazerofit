@@ -19,6 +19,7 @@ class ConsentUpdatesTest {
         aiPersonalisation = true,
         anonymisedAnalytics = true,
         reminders = true,
+        foodPhotoTraining = true,
     )
 
     @Test
@@ -28,6 +29,18 @@ class ConsentUpdatesTest {
         assertTrue(update.wellnessDataProcessing)
         assertTrue(update.aiPersonalisation)
         assertTrue(update.anonymisedAnalytics)
+        assertTrue(update.foodPhotoTraining)
+    }
+
+    @Test
+    fun `food photo training addresses only its own bit`() {
+        val on = ConsentUpdates.with(ConsentEntity(userId = "me"), ConsentKey.FOOD_PHOTO_TRAINING, value = true)
+        assertTrue(on.foodPhotoTraining)
+        assertFalse(on.wellnessDataProcessing || on.aiPersonalisation || on.anonymisedAnalytics || on.reminders)
+
+        val off = ConsentUpdates.with(allOn, ConsentKey.FOOD_PHOTO_TRAINING, value = false)
+        assertFalse(off.foodPhotoTraining)
+        assertTrue(off.wellnessDataProcessing && off.aiPersonalisation && off.anonymisedAnalytics && off.reminders)
     }
 
     @Test

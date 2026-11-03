@@ -31,6 +31,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import type { AuditEvent } from '@aquazerofit/shared';
 import { config } from './config';
 import { seedIfNeeded } from '../data/seed';
 import {
@@ -284,35 +285,56 @@ export abstract class MemoryBackedStore {
     const map = this.container(name);
     for (const doc of docs) {
       if (doc && typeof doc.id === 'string') {
-        let hydrated = doc;
-        if (name === 'audit' && isChainedAuditDoc(doc)) {
-          if (typeof doc.seq === 'number' && typeof doc.hash === 'string') {
-            if (doc.seq > this.auditChainSeq) {
-              this.auditChainSeq = doc.seq;
-              this.auditChainHeadHash = doc.hash;
-            }
-          } else if (doc.seq === undefined) {
-            const seq = this.auditChainSeq + 1;
-            const prevHash = this.auditChainHeadHash;
-            const hash = computeAuditEventHash({
-              seq,
-              prevHash,
-              id: doc.id,
-              type: doc.type,
-              action: doc.action,
-              createdAt: doc.createdAt,
-            });
-            this.auditChainSeq = seq;
-            this.auditChainHeadHash = hash;
-            hydrated = { ...doc, seq, prevHash, hash } as StoredDoc;
-          }
-        }
-        map.set(hydrated.id, hydrated);
-        this.indexPut(name, hydrated);
+        map.set(doc.id, doc);
+        this.indexPut(name, doc);
       }
     }
+    if (name === 'audit') this.adoptAuditChain(map);
   }
 
+  /**
+   * Resume the audit hash chain after hydration (EN-4.2).
+   *
+   * The head is the highest persisted seq. Rows written before the chain
+   * existed have no seq; they are stamped AFTER the head in a deterministic
+   * (createdAt, id) order, because Postgres returns rows in arbitrary order and
+   * the stamp must come out identical on every boot. They are marked dirty so
+   * the stamp is persisted: later events chain onto it, so it must not be
+   * recomputed differently on the next restart.
+   */
+  private adoptAuditChain(map: Map<string, StoredDoc>): void {
+    const legacy: (StoredDoc & AuditEvent)[] = [];
+    for (const doc of map.values()) {
+      if (!isChainedAuditDoc(doc)) continue;
+      if (typeof doc.seq === 'number' && typeof doc.hash === 'string') {
+        if (doc.seq > this.auditChainSeq) {
+          this.auditChainSeq = doc.seq;
+          this.auditChainHeadHash = doc.hash;
+        }
+      } else if (doc.seq === undefined) {
+        legacy.push(doc);
+      }
+    }
+    legacy.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+    for (const doc of legacy) {
+      const seq = this.auditChainSeq + 1;
+      const prevHash = this.auditChainHeadHash;
+      const hash = computeAuditEventHash({
+        seq,
+        prevHash,
+        id: doc.id,
+        type: doc.type,
+        action: doc.action,
+        createdAt: doc.createdAt,
+      });
+      this.auditChainSeq = seq;
+      this.auditChainHeadHash = hash;
+      const stamped = { ...doc, seq, prevHash, hash } as StoredDoc;
+      map.set(doc.id, stamped);
+      this.indexPut('audit', stamped);
+      this.markDirty('audit', doc.id, 'write');
+    }
+  }
   /**
    * Write a document into memory and its indexes WITHOUT marking it dirty.
    *

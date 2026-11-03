@@ -131,6 +131,7 @@ class DeviceSecurityController private constructor(
         initialState = DeviceSecurityState(),
     ) {
         refreshRestrictions()
+        onColdStart()
     }
 
     /** In-memory constructor for unit and Compose UI tests. */
@@ -239,6 +240,15 @@ class DeviceSecurityController private constructor(
         lockRequired = true
         suppressPromptUntilStopped = true
         return false
+    }
+
+    /**
+     * The process just started, so any background timer from a previous
+     * process is gone. Without this latch, the OS killing the app in the
+     * background would silently skip the lock on the next launch.
+     */
+    internal fun onColdStart() {
+        if (_state.value.effectiveAppLockEnabled) lockRequired = true
     }
 
     private fun clearLockSession() {

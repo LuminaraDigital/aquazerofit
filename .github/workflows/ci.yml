@@ -58,6 +58,21 @@ jobs:
       - name: Safety eval gate
         run: npm run eval
 
+      # The Cloudflare edge Worker (proxy, secret stripping, CSP nonces) ships
+      # to every web user but sits outside the npm workspaces, so
+      # `test:coverage` never ran it. Its tests use node:test with type
+      # stripping, which needs Node 22.6+ (the rest of the repo stays on 20).
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '22'
+
+      - name: Edge Worker tests
+        run: npm test --prefix cloudflare
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '20'
+
       - name: Build
         run: npm run build
 

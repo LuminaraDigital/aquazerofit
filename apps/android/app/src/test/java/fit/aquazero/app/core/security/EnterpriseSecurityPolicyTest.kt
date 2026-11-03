@@ -131,6 +131,21 @@ class EnterpriseSecurityPolicyTest {
     }
 
     @Test
+    fun `DeviceSecurityController locks a cold start when app lock is enabled`() {
+        val controller = DeviceSecurityController(DeviceSecurityState(userAppLockEnabled = true))
+        controller.onColdStart()
+
+        // No background timestamp exists after process death, yet the lock still applies.
+        assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 1_000L, isDeviceSecure = true))
+        assertTrue(controller.onUnlockPromptResult(unlocked = true))
+        assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 2_000L, isDeviceSecure = true))
+
+        val off = DeviceSecurityController(DeviceSecurityState())
+        off.onColdStart()
+        assertFalse(off.shouldLaunchUnlockPrompt(nowElapsedMs = 1_000L, isDeviceSecure = true))
+    }
+
+    @Test
     fun `DeviceSecurityController updates user toggles and MDM overrides`() {
         val controller = DeviceSecurityController()
         assertFalse(controller.state.value.effectiveAppLockEnabled)

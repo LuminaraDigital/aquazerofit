@@ -68,3 +68,9 @@ Keep `azf.db` on standard SQLite via `AndroidSQLiteDriver` protected by OS File-
 ### Decision
 - **Production builds (`release`):** Trust `<certificates src="system" />` only.
 - **Enterprise network guidance:** Enterprise IT administrators deploying AquaZeroFit behind a TLS-inspecting proxy must add `aquazerofit.com` to the proxy's SSL/TLS inspection bypass list.
+
+## Known limits of managed configuration (reviewed 2026-11-03)
+
+- **\llowed_email_domain\ is a client-side, MDM-only restriction.** The Android app enforces it on sign-in, registration and password reset. The API, web app and Telegram do not, so it is a device-policy convenience and not a server-side tenancy control (that is EN-3.1).
+- **App lock fails open on devices with no secure screen lock**, because there is no credential to ask for. It latches on every cold start and after the background timeout, and survives a cancelled prompt and rotation.
+- **App content is composed behind the unlock prompt.** The system credential screen covers it, but a hard guarantee would gate \setContent\ while the lock is latched.

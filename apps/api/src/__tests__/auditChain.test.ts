@@ -166,4 +166,50 @@ describe('tamper-evident audit hash chain (EN-4.2)', () => {
     expect(strippedResult.brokenAtId).toBe(first.id);
     expect(strippedResult.reason).toContain('Missing hash chain fields');
   });
+
+  it('stamps legacy rows deterministically after the persisted head, and persists the stamp', async () => {
+    auditDataAccess('usr-1', 'consents.update', {});
+    await getStore().flush();
+    const stamped = getStore().all<AuditEvent>('audit').find((d) => d.seq === 1)!;
+
+    // Simulate a store written before the chain existed: legacy rows, listed
+    // in an order that differs from their creation order.
+    const legacy = (id: string, createdAt: string) => ({
+      id,
+      userId: 'usr-1',
+      type: 'authEvent',
+      action: 'login.succeeded',
+      createdAt,
+    });
+    fs.writeFileSync(
+      path.join(tempDir, 'audit.json'),
+      JSON.stringify([
+        legacy('aud-late', '2026-01-02T00:00:00.000Z'),
+        stamped,
+        legacy('aud-early', '2026-01-01T00:00:00.000Z'),
+      ]),
+    );
+
+    const boot = () => {
+      resetStoreSingletonForTests();
+      return getStore()
+        .all<AuditEvent>('audit')
+        .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
+        .map((d) => [d.id, d.seq, d.hash]);
+    };
+    const first = boot();
+    const second = boot();
+
+    expect(first).toEqual(second);
+    expect(first.map((r) => r[1])).toEqual([1, 2, 3]);
+    expect(first[0][0]).toBe(stamped.id);
+    expect(first[1][0]).toBe('aud-early');
+    expect(first[2][0]).toBe('aud-late');
+    expect(verifyAuditChain().valid).toBe(true);
+
+    // The stamp was marked dirty, so it reaches disk.
+    await getStore().flush();
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tempDir, 'audit.json'), 'utf8')) as AuditEvent[];
+    expect(onDisk.every((d) => typeof d.seq === 'number')).toBe(true);
+  });
 });

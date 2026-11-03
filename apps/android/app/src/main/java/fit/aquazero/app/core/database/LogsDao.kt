@@ -15,6 +15,16 @@ interface LogsDao {
     @Upsert
     suspend fun upsertMealLog(log: MealLogEntity)
 
+    /** Days inside the range with a meal or water on this device. */
+    @Query(
+        """
+        SELECT localDate FROM meal_logs WHERE localDate BETWEEN :from AND :to AND deleted = 0
+        UNION
+        SELECT localDate FROM water_logs WHERE localDate BETWEEN :from AND :to
+        """,
+    )
+    fun loggedDates(from: String, to: String): Flow<List<String>>
+
     @Query("SELECT * FROM meal_logs WHERE localDate = :localDate AND deleted = 0 ORDER BY loggedAt")
     fun mealLogsForDate(localDate: String): Flow<List<MealLogEntity>>
 

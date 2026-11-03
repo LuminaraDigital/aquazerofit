@@ -1,21 +1,17 @@
 package fit.aquazero.app.feature.nutrition
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,12 +26,11 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
+import fit.aquazero.app.core.designsystem.AquaAura
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.ErrorState
-import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.revealOnEnter
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealType
@@ -155,129 +150,103 @@ fun NutritionContent(
     onScanBarcode: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            AzfAppHeader(title = stringResource(R.string.screen_nutrition).uppercase())
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onCaptureMeal,
-                containerColor = LocalAzfExtended.current.primaryFixedDim,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(56.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.PhotoCamera,
-                    contentDescription = stringResource(R.string.fab_capture_meal),
-                )
-            }
-        },
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(
-                    PaddingValues(
-                        start = AzfSpacing.ContainerMargin,
-                        end = AzfSpacing.ContainerMargin,
-                        top = AzfSpacing.ElementGapMedium,
-                        bottom = AzfSpacing.SectionGap,
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        AquaAura()
+        Column(modifier = Modifier.fillMaxSize()) {
+            AzfAppHeader(title = stringResource(R.string.screen_nutrition))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(
+                        PaddingValues(
+                            start = AzfSpacing.ContainerMargin,
+                            end = AzfSpacing.ContainerMargin,
+                            bottom = AzfSpacing.Gutter,
+                        ),
                     ),
-                ),
-        ) {
-            DaySwitcher(
-                selectedDate = state.selectedDate,
-                isToday = state.isToday,
-                onShiftDay = onShiftDay,
-                onOpenCalendar = onOpenCalendar,
-                onBackToToday = { onSelectDate(state.today) },
-                modifier = Modifier.revealOnEnter(0),
-            )
+            ) {
+                DaySwitcher(
+                    selectedDate = state.selectedDate,
+                    isToday = state.isToday,
+                    onShiftDay = onShiftDay,
+                    onOpenCalendar = onOpenCalendar,
+                    onBackToToday = { onSelectDate(state.today) },
+                    modifier = Modifier.revealOnEnter(0),
+                )
 
-            Spacer(Modifier.height(AzfSpacing.Gutter))
+                Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
 
-            when {
-                state.phase == NutritionPhase.Error && !state.hasContent -> {
-                    ErrorState(
-                        title = stringResource(R.string.nutrition_error_title),
-                        message = stringResource(R.string.nutrition_error_message),
-                        retryLabel = stringResource(R.string.action_retry),
-                        onRetry = onRetry,
-                    )
-                }
+                when {
+                    state.phase == NutritionPhase.Error && !state.hasContent -> {
+                        ErrorState(
+                            title = stringResource(R.string.nutrition_error_title),
+                            message = stringResource(R.string.nutrition_error_message),
+                            retryLabel = stringResource(R.string.action_retry),
+                            onRetry = onRetry,
+                        )
+                    }
 
-                state.nutrition == null -> {
-                    CardSkeleton(height = 280.dp, modifier = Modifier.revealOnEnter(1))
-                    Spacer(Modifier.height(AzfSpacing.Gutter))
-                    CardSkeleton(height = 180.dp, modifier = Modifier.revealOnEnter(2))
-                    Spacer(Modifier.height(AzfSpacing.Gutter))
-                    CardSkeleton(height = 180.dp, modifier = Modifier.revealOnEnter(3))
-                }
+                    state.nutrition == null -> {
+                        CardSkeleton(height = 240.dp, modifier = Modifier.revealOnEnter(1))
+                        Spacer(Modifier.height(AzfSpacing.Gutter))
+                        CardSkeleton(height = 96.dp, modifier = Modifier.revealOnEnter(2))
+                        Spacer(Modifier.height(AzfSpacing.Gutter))
+                        CardSkeleton(height = 180.dp, modifier = Modifier.revealOnEnter(3))
+                    }
 
-                else -> {
-                    CaloriesRemainingCard(
-                        nutrition = state.nutrition,
-                        kcalBurned = state.kcalBurned,
-                        modifier = Modifier.revealOnEnter(1),
-                    )
-                    Spacer(Modifier.height(AzfSpacing.Gutter))
+                    else -> {
+                        CaloriesRemainingCard(
+                            nutrition = state.nutrition,
+                            kcalBurned = state.kcalBurned,
+                            modifier = Modifier.revealOnEnter(1),
+                        )
+                        Spacer(Modifier.height(AzfSpacing.Gutter))
 
-                    MacroCard(
-                        nutrition = state.nutrition,
-                        modifier = Modifier.revealOnEnter(2),
-                    )
-                    Spacer(Modifier.height(AzfSpacing.Gutter))
+                        QuickActions(
+                            copying = state.copying,
+                            barcodeEnabled = onScanBarcode != null,
+                            onCaptureMeal = onCaptureMeal,
+                            onScanBarcode = { onScanBarcode?.invoke() },
+                            onCopyPrevious = onCopyPrevious,
+                            onMealPlan = onMealPlan,
+                            modifier = Modifier.revealOnEnter(2),
+                        )
+                        Spacer(Modifier.height(AzfSpacing.Gutter))
 
-                    HydrationCard(
-                        consumedMl = state.waterConsumedMl,
-                        targetMl = state.nutrition.waterTargetMl,
-                        pending = state.waterPending,
-                        onLogWater = onLogWater,
-                        modifier = Modifier.revealOnEnter(3),
-                    )
-                    Spacer(Modifier.height(AzfSpacing.Gutter))
+                        MealTimeline(
+                            state = state,
+                            onAddFood = onAddFood,
+                            onStartEditing = onStartEditing,
+                            onDeleteMeal = onDeleteMeal,
+                        )
+                        Spacer(Modifier.height(AzfSpacing.Gutter))
 
-                    MicronutrientCard(
-                        micros = state.micronutrients,
-                        expanded = state.microsExpanded,
-                        onToggle = onToggleMicros,
-                        modifier = Modifier.revealOnEnter(4),
-                    )
-                    Spacer(Modifier.height(AzfSpacing.Gutter))
+                        HydrationCard(
+                            consumedMl = state.waterConsumedMl,
+                            targetMl = state.nutrition.waterTargetMl,
+                            pending = state.waterPending,
+                            onLogWater = onLogWater,
+                            modifier = Modifier.revealOnEnter(4),
+                        )
+                        Spacer(Modifier.height(AzfSpacing.Gutter))
 
-                    QuickActions(
-                        copying = state.copying,
-                        barcodeEnabled = onScanBarcode != null,
-                        onCaptureMeal = onCaptureMeal,
-                        onScanBarcode = { onScanBarcode?.invoke() },
-                        onCopyPrevious = onCopyPrevious,
-                        onMealPlan = onMealPlan,
-                        modifier = Modifier.revealOnEnter(5),
-                    )
-                    Spacer(Modifier.height(AzfSpacing.SectionGap))
+                        MicronutrientCard(
+                            micros = state.micronutrients,
+                            expanded = state.microsExpanded,
+                            onToggle = onToggleMicros,
+                            modifier = Modifier.revealOnEnter(4),
+                        )
+                        Spacer(Modifier.height(AzfSpacing.SectionGap))
 
-                    MealTimeline(
-                        state = state,
-                        onAddFood = onAddFood,
-                        onStartEditing = onStartEditing,
-                        onDeleteMeal = onDeleteMeal,
-                    )
-                    Spacer(Modifier.height(AzfSpacing.SectionGap))
-
-                    WeeklyKcalBars(
-                        trend = state.kcalTrend,
-                        selectedDate = state.selectedDate,
-                        loading = state.trendLoading,
-                    )
+                        WeeklyKcalBars(
+                            trend = state.kcalTrend,
+                            selectedDate = state.selectedDate,
+                            loading = state.trendLoading,
+                        )
+                    }
                 }
             }
-
-            // Clears the FAB and the bottom bar.
-            Spacer(Modifier.height(96.dp))
         }
     }
 
@@ -322,36 +291,11 @@ private fun MealTimeline(
     onStartEditing: (String) -> Unit,
     onDeleteMeal: (String) -> Unit,
 ) {
-    Column(modifier = Modifier.revealOnEnter(6)) {
-        Text(
-            text = stringResource(R.string.timeline_title).uppercase(),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
-
-        if (state.loggedCount == 0) {
-            EmptyState(
-                title = stringResource(R.string.timeline_empty_title),
-                message = stringResource(
-                    if (state.isToday) R.string.timeline_empty_today else R.string.timeline_empty_past,
-                ),
-                actionLabel = if (state.isToday) {
-                    stringResource(R.string.timeline_add_meal)
-                } else {
-                    null
-                },
-                onAction = if (state.isToday) {
-                    { onAddFood(NutritionFormat.mealTypeForNow()) }
-                } else {
-                    null
-                },
-            )
-            Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
-        }
-
-        NutritionFormat.MEAL_TYPES.forEachIndexed { index, mealType ->
-            if (index > 0) Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
+    Column(
+        modifier = Modifier.revealOnEnter(3),
+        verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
+    ) {
+        NutritionFormat.MEAL_TYPES.forEach { mealType ->
             MealSection(
                 mealType = mealType,
                 logs = state.meals[mealType].orEmpty(),

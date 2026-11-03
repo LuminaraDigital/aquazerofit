@@ -1,5 +1,5 @@
 /**
- * Adaptive readiness — Protect / Maintain / Progress (AQF-09 §2.4 extension).
+ * Adaptive readiness: Protect / Maintain / Progress (AQF-09 §2.4 extension).
  *
  * Why this module is pure code with no model in it: readiness decides the
  * working volume the user is then asked to actually perform. The project
@@ -10,7 +10,7 @@
  *
  * Why `protect` is not a demotion: a hard week is the ordinary case, not a
  * failure state. Holding someone to a plan built for a week they did not get
- * is how a plan gets abandoned — generic, unyielding programmes are a leading
+ * is how a plan gets abandoned. Generic, unyielding programmes are a leading
  * cause of health-app churn. Protect quietly takes load off on the user's
  * behalf, and every string in this file is written to read that way. Nothing
  * here may frame a quiet week as a shortfall.
@@ -39,17 +39,17 @@ import { targetsId, type TargetsDoc } from '../me/service';
  * it is dropped and the remainder is renormalised, so a user is never scored
  * down for data the app never had.
  *
- *  completion 45 — did the prescribed training actually happen? The only
+ *  completion 45: did the prescribed training actually happen? The only
  *                  signal that measures the thing readiness modulates, so it
  *                  carries the most weight.
- *  logging     25 — did the user show up in the app at all? A broad, low-effort
+ *  logging     25: did the user show up in the app at all? A broad, low-effort
  *                  proxy for the week going to plan; deliberately weaker than
  *                  completion because opening the app is not training.
- *  recency     20 — is the run still going? Weighted separately from `logging`
+ *  recency     20: is the run still going? Weighted separately from `logging`
  *                  precisely so that four quiet days in a row read worse than
  *                  four quiet days scattered through the week: the first is a
  *                  run that has stopped, the second is a normal week.
- *  intake      10 — is fuelling stable? Smallest weight on purpose. It is the
+ *  intake      10: is fuelling stable? Smallest weight on purpose. It is the
  *                  noisiest signal and the one most easily turned into food
  *                  moralising, so it may nudge the band but never decide it.
  */
@@ -74,7 +74,7 @@ const RECENCY_ZERO_AT_GAP_DAYS = 4;
  * Intake deviation, as a fraction of target, at which the intake component
  * reaches zero. Applied to the absolute deviation: eating well under target
  * costs exactly as much as eating well over it. Under-eating is never scored
- * as virtue — that is the disordered-eating pattern this product must not
+ * as virtue. That is the disordered-eating pattern this product must not
  * reward.
  */
 const INTAKE_ZERO_AT_DEVIATION = 0.3;
@@ -85,13 +85,13 @@ const INTAKE_MIN_LOGGED_DAYS = 2;
 
 const HEADLINES: Record<ReadinessMode, string> = {
   protect:
-    'Lighter week ahead — we have eased the volume so you can get back into rhythm.',
-  maintain: 'Steady week — your plan carries on exactly as it is.',
-  progress: 'Strong rhythm — we have nudged this week up a notch.',
+    'Lighter week ahead: we have eased the volume so you can get back into rhythm.',
+  maintain: 'Steady week: your plan carries on exactly as it is.',
+  progress: 'Strong rhythm: we have nudged this week up a notch.',
 };
 
 const COLD_START_HEADLINE =
-  'Fresh start — your plan stays as built while we get to know your week.';
+  'Fresh start: your plan stays as built while we get to know your week.';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -218,7 +218,7 @@ function daysSinceLastCheckIn(activeDates: Set<string>, today: string, periodDay
 
 interface Component {
   weight: number;
-  /** 0–1 contribution of this component. */
+  /** 0-1 contribution of this component. */
   fraction: number;
   signal: ReadinessSignal;
 }

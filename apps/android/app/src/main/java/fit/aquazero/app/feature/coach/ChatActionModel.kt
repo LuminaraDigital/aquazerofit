@@ -33,49 +33,28 @@ sealed interface ChatAction {
 }
 
 /**
- * Intelligent parser that extracts actionable triggers from coach conversational responses.
+ * Chips under a coach reply.
+ *
+ * Food chips are not inferred from prose. A reply of "I don't have your data
+ * for today yet" was parsed as a meal named "your data for today yet", and
+ * tapping it spent a credit on a draft the user never asked to log. Meal
+ * logging stays on the composer button. Water stays, and only when the reply
+ * names a glass or a millilitre amount.
  */
 object ChatActionExtractor {
 
     fun extractActions(text: String, messageId: String): List<ChatAction> {
-        val actions = mutableListOf<ChatAction>()
-
-        // 1. Check for water hydration recommendations
-        val waterMatch = WATER_REGEX.find(text)
-        if (waterMatch != null) {
-            val amount = waterMatch.groupValues[1].toIntOrNull() ?: 250
-            actions.add(ChatAction.LogWater(id = "water-$messageId-$amount", amountMl = amount))
-        }
-
-        // 2. Check for explicit food / snack recommendations
-        val snackMatch = SNACK_REGEX.find(text)
-        if (snackMatch != null) {
-            val foodQuery = snackMatch.groupValues[1].trim()
-            if (foodQuery.isNotEmpty() && !foodQuery.equals("water", ignoreCase = true) && foodQuery.length in 4..35) {
-                actions.add(ChatAction.LogMealDraft(id = "meal-$messageId-${foodQuery.hashCode()}", query = foodQuery))
-            }
-        }
-
-        return actions.distinctBy { it.id }.take(2)
+        val waterMatch = WATER_REGEX.find(text) ?: return emptyList()
+        val amount = waterMatch.groupValues[1].toIntOrNull() ?: 250
+        return listOf(ChatAction.LogWater(id = "water-$messageId-$amount", amountMl = amount))
     }
 }
 
 /**
- * Compiled once, not once per message.
- *
- * `extractActions` runs on every assistant turn, and `Regex(...)` compiles its
- * pattern on construction — so building these inside the function paid for a
- * fresh compile of both patterns on each turn. The snack pattern is joined
- * from three parts because it exceeds the line limit as a single literal; the
- * seams sit between the verb group, the food capture, and the protein tail.
+ * Compiled once, not once per message. `Regex(...)` compiles on construction,
+ * and `extractActions` runs on every assistant turn.
  */
 private val WATER_REGEX = Regex(
     "(?i)(?:drink|log|have|grab)\\s*" +
         "(?:a\\s*glass\\s*of\\s*water|(\\d{2,4})\\s*ml\\s*(?:of\\s*)?water)",
-)
-
-private val SNACK_REGEX = Regex(
-    "(?i)(?:suggest|try|have|eat|snack on|grab)\\s+(?:some\\s+)?" +
-        "([A-Za-z0-9\\s]{4,30}?)" +
-        "(?:\\s*(?:for|with|to get|around)\\s+(\\d{2,3})\\s*g?\\s*(?:of\\s*)?protein|\\.|,|!)",
 )

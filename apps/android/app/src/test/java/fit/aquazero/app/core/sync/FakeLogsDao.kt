@@ -29,6 +29,8 @@ internal class FakeLogsDao : LogsDao {
         meals[log.localId] = log
     }
 
+    override fun loggedDates(from: String, to: String): Flow<List<String>> = flowOf(emptyList())
+
     override fun mealLogsForDate(localDate: String): Flow<List<MealLogEntity>> = flowOf(mealsOn(localDate))
 
     override suspend fun mealLogsForDateOnce(localDate: String): List<MealLogEntity> = mealsOn(localDate)

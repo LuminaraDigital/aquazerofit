@@ -1,5 +1,7 @@
 package fit.aquazero.app.feature.training
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,28 +17,35 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.SelfImprovement
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -52,10 +61,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.SubcomposeAsyncImage
 import fit.aquazero.app.R
 import fit.aquazero.app.core.database.ExerciseThumbnail
+import fit.aquazero.app.core.designsystem.AquaAura
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfChip
+import fit.aquazero.app.core.designsystem.AzfColors
+import fit.aquazero.app.core.designsystem.AzfHeroSurface
+import fit.aquazero.app.core.designsystem.AzfMotion
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
@@ -70,6 +83,7 @@ import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.currentLocale
+import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.designsystem.revealOnEnter
 import fit.aquazero.app.core.model.Equipment
 import fit.aquazero.app.core.model.PlanDayDto
@@ -78,7 +92,7 @@ import java.time.LocalDate
 import java.time.format.TextStyle as JavaTextStyle
 
 /**
- * Workout library — the Workouts tab.
+ * Workout library - the Workouts tab.
  *
  * Weekly plan strip, today's hero with the resolved prescription rendered
  * exactly as the web renders it ("3 × 8–10 @ 40 kg • RiR 2 • 90s rest"), a
@@ -151,198 +165,209 @@ private fun WorkoutLibraryContent(
     onGenerate: () -> Unit,
     onRetry: () -> Unit,
 ) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
+    var filtersOpen by rememberSaveable { mutableStateOf(false) }
+    val activeFilters = listOf(state.filters.muscle, state.filters.equipment).count(String::isNotEmpty)
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        AquaAura()
+        Column(modifier = Modifier.fillMaxSize()) {
             AzfAppHeader(title = stringResource(R.string.screen_workouts), onBack = null)
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = AzfSpacing.ContainerMargin,
-                end = AzfSpacing.ContainerMargin,
-                bottom = AzfSpacing.SectionGap,
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item(key = "readiness") {
-                ReadinessChip(
-                    readiness = state.readiness,
-                    loading = state.readinessLoading,
-                    modifier = Modifier.revealOnEnter(0),
-                )
-            }
-            // ---------- weekly plan strip ----------
-            item(key = "plan-header") {
-                SectionHeader(
-                    title = stringResource(R.string.training_this_week),
-                    trailing = state.plan?.let {
-                        stringResource(R.string.training_training_days, state.trainingDays)
-                    },
-                    modifier = Modifier.revealOnEnter(0),
-                )
-            }
-            item(key = "plan-strip") {
-                when {
-                    state.loadingPlan -> Skeleton(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(88.dp),
-                        shape = AzfShapes.Card,
-                    )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = AzfSpacing.ContainerMargin,
+                    end = AzfSpacing.ContainerMargin,
+                    bottom = AzfSpacing.SectionGap,
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // ---------- today's workout hero ----------
+                item(key = "today") {
+                    when {
+                        state.loadingToday -> Skeleton(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp),
+                            shape = AzfShapes.Card,
+                        )
 
-                    state.plan != null -> PlanWeekStrip(
-                        days = state.planDays,
-                        todayCompleted = state.todayCompleted,
-                        modifier = Modifier.revealOnEnter(1),
-                    )
+                        state.todaySession != null -> {
+                            val sessionId = state.todaySession.id
+                            TodayHeroCard(
+                                state = state,
+                                onStart = { onStartSession(sessionId) },
+                                modifier = Modifier.revealOnEnter(2),
+                            )
+                        }
 
-                    state.planError -> ErrorState(
-                        title = stringResource(R.string.training_plan_error_title),
-                        message = stringResource(R.string.training_plan_error_body),
-                        retryLabel = stringResource(R.string.training_refresh),
-                        onRetry = onRetry,
-                    )
+                        showTodaySessionError(
+                            todayError = state.todayError,
+                            hasPlan = state.plan != null,
+                            planError = state.planError,
+                        ) -> ErrorState(
+                            title = stringResource(R.string.session_error_title),
+                            message = stringResource(R.string.session_error_body),
+                            retryLabel = stringResource(R.string.training_refresh),
+                            onRetry = onRetry,
+                        )
 
-                    else -> EmptyState(
-                        title = stringResource(R.string.training_plan_empty_title),
-                        message = stringResource(R.string.training_plan_empty_body),
-                        actionLabel = stringResource(R.string.training_generate_plan),
-                        onAction = onOpenGenerate,
+                        state.plan != null -> RestDayCard(modifier = Modifier.revealOnEnter(2))
+
+                        else -> Spacer(modifier = Modifier.height(0.dp))
+                    }
+                }
+
+                // ---------- weekly plan strip ----------
+                item(key = "plan-header") {
+                    SectionHeader(
+                        title = stringResource(R.string.training_this_week),
+                        trailing = state.plan?.let {
+                            stringResource(R.string.training_training_days, state.trainingDays)
+                        },
+                        modifier = Modifier.revealOnEnter(0),
                     )
                 }
-            }
+                item(key = "plan-strip") {
+                    when {
+                        state.loadingPlan -> Skeleton(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(88.dp),
+                            shape = AzfShapes.Card,
+                        )
 
-            // ---------- today's workout hero ----------
-            item(key = "today") {
-                Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-                when {
-                    state.loadingToday -> Skeleton(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(220.dp),
-                        shape = AzfShapes.Card,
+                        state.plan != null -> PlanWeekStrip(
+                            days = state.planDays,
+                            startDate = state.plan.startDate,
+                            todayCompleted = state.todayCompleted,
+                            modifier = Modifier.revealOnEnter(1),
+                        )
+
+                        state.planError -> ErrorState(
+                            title = stringResource(R.string.training_plan_error_title),
+                            message = stringResource(R.string.training_plan_error_body),
+                            retryLabel = stringResource(R.string.training_refresh),
+                            onRetry = onRetry,
+                        )
+
+                        else -> EmptyState(
+                            title = stringResource(R.string.training_plan_empty_title),
+                            message = stringResource(R.string.training_plan_empty_body),
+                            actionLabel = stringResource(R.string.training_generate_plan),
+                            onAction = onOpenGenerate,
+                        )
+                    }
+                }
+
+                item(key = "readiness") {
+                    ReadinessChip(
+                        readiness = state.readiness,
+                        loading = state.readinessLoading,
+                        modifier = Modifier.revealOnEnter(0),
                     )
+                }
+                // ---------- exercise library ----------
+                item(key = "library-header") {
+                    Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
+                    SectionHeader(
+                        title = stringResource(R.string.training_library),
+                        trailing = stringResource(R.string.training_library_count, state.totalMatches),
+                    )
+                }
+                item(key = "library-search") {
+                    AzfTextField(
+                        value = state.filters.search,
+                        onValueChange = onSearchChange,
+                        label = stringResource(R.string.training_search_hint),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    )
+                }
+                item(key = "filter-category") {
+                    FilterChipRow(
+                        label = stringResource(R.string.training_filter_category),
+                        options = ExerciseFilters.categories.map { (key, res) ->
+                            key to stringResource(res)
+                        },
+                        selected = state.filters.category,
+                        onSelect = onCategoryChange,
+                    )
+                }
+                item(key = "filter-toggle") {
+                    FilterToggle(
+                        open = filtersOpen,
+                        activeCount = activeFilters,
+                        onClick = { filtersOpen = !filtersOpen },
+                    )
+                }
+                if (filtersOpen) {
+                    item(key = "filter-muscle") {
+                        FilterChipRow(
+                            label = stringResource(R.string.training_filter_muscle),
+                            options = ExerciseFilters.muscles.map { (key, res) ->
+                                key to stringResource(res)
+                            },
+                            selected = state.filters.muscle,
+                            onSelect = onMuscleChange,
+                        )
+                    }
+                    item(key = "filter-equipment") {
+                        FilterChipRow(
+                            label = stringResource(R.string.training_filter_equipment),
+                            options = buildList {
+                                add("" to stringResource(R.string.equipment_all))
+                                ExerciseFilters.equipment.forEach { eq ->
+                                    add(eq.name to stringResource(equipmentLabelRes(eq)))
+                                }
+                            },
+                            selected = state.filters.equipment,
+                            onSelect = onEquipmentChange,
+                        )
+                    }
+                }
 
-                    state.todaySession != null -> {
-                        val sessionId = state.todaySession.id
-                        TodayHeroCard(
-                            state = state,
-                            onStart = { onStartSession(sessionId) },
-                            modifier = Modifier.revealOnEnter(2),
+                when {
+                    state.loadingLibrary && state.exercises.isEmpty() -> items(
+                        count = 3,
+                        key = { "library-skeleton-$it" },
+                    ) {
+                        Skeleton(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(84.dp),
+                            shape = AzfShapes.Card,
                         )
                     }
 
-                    state.todayError -> ErrorState(
-                        title = stringResource(R.string.session_error_title),
-                        message = stringResource(R.string.session_error_body),
-                        retryLabel = stringResource(R.string.training_refresh),
-                        onRetry = onRetry,
-                    )
-
-                    state.plan != null -> RestDayCard(modifier = Modifier.revealOnEnter(2))
-
-                    else -> Spacer(modifier = Modifier.height(0.dp))
-                }
-            }
-
-            // ---------- exercise library ----------
-            item(key = "library-header") {
-                Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-                SectionHeader(
-                    title = stringResource(R.string.training_library),
-                    trailing = stringResource(R.string.training_library_count, state.totalMatches),
-                )
-            }
-            item(key = "library-search") {
-                AzfTextField(
-                    value = state.filters.search,
-                    onValueChange = onSearchChange,
-                    label = stringResource(R.string.training_search_hint),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                )
-            }
-            item(key = "filter-category") {
-                FilterChipRow(
-                    label = stringResource(R.string.training_filter_category),
-                    options = ExerciseFilters.categories.map { (key, res) ->
-                        key to stringResource(res)
-                    },
-                    selected = state.filters.category,
-                    onSelect = onCategoryChange,
-                )
-            }
-            item(key = "filter-muscle") {
-                FilterChipRow(
-                    label = stringResource(R.string.training_filter_muscle),
-                    options = ExerciseFilters.muscles.map { (key, res) ->
-                        key to stringResource(res)
-                    },
-                    selected = state.filters.muscle,
-                    onSelect = onMuscleChange,
-                )
-            }
-            item(key = "filter-equipment") {
-                FilterChipRow(
-                    label = stringResource(R.string.training_filter_equipment),
-                    options = buildList {
-                        add("" to stringResource(R.string.equipment_all))
-                        ExerciseFilters.equipment.forEach { eq ->
-                            add(eq.name to stringResource(equipmentLabelRes(eq)))
-                        }
-                    },
-                    selected = state.filters.equipment,
-                    onSelect = onEquipmentChange,
-                )
-            }
-
-            when {
-                state.loadingLibrary && state.exercises.isEmpty() -> items(
-                    count = 3,
-                    key = { "library-skeleton-$it" },
-                ) {
-                    Skeleton(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(84.dp),
-                        shape = AzfShapes.Card,
-                    )
-                }
-
-                state.exercises.isEmpty() && state.catalogEmpty -> item(key = "catalog-empty") {
-                    EmptyState(
-                        title = stringResource(R.string.training_catalog_empty_title),
-                        message = stringResource(R.string.training_catalog_empty_body),
-                        actionLabel = stringResource(R.string.training_refresh),
-                        onAction = onRetry,
-                    )
-                }
-
-                state.exercises.isEmpty() -> item(key = "library-empty") {
-                    EmptyState(
-                        title = stringResource(R.string.training_no_results_title),
-                        message = stringResource(R.string.training_no_results_body),
-                    )
-                }
-
-                else -> {
-                    items(state.exercises, key = { it.id }) { card ->
-                        ExerciseListCard(card = card, onClick = { onOpenDetail(card.id) })
+                    state.exercises.isEmpty() && state.catalogEmpty -> item(key = "catalog-empty") {
+                        EmptyState(
+                            title = stringResource(R.string.training_catalog_empty_title),
+                            message = stringResource(R.string.training_catalog_empty_body),
+                            actionLabel = stringResource(R.string.training_refresh),
+                            onAction = onRetry,
+                        )
                     }
-                    if (state.hasMore) {
-                        item(key = "library-more") {
-                            SecondaryButton(
-                                text = stringResource(
-                                    R.string.training_load_more,
-                                    state.exercises.size,
-                                    state.totalMatches,
-                                ),
-                                onClick = onLoadMore,
-                            )
+
+                    state.exercises.isEmpty() -> item(key = "library-empty") {
+                        EmptyState(
+                            title = stringResource(R.string.training_no_results_title),
+                            message = stringResource(R.string.training_no_results_body),
+                        )
+                    }
+
+                    else -> {
+                        items(state.exercises, key = { it.id }) { card ->
+                            ExerciseListCard(card = card, onClick = { onOpenDetail(card.id) })
+                        }
+                        if (state.hasMore) {
+                            item(key = "library-more") {
+                                SecondaryButton(
+                                    text = stringResource(
+                                        R.string.training_load_more,
+                                        state.exercises.size,
+                                        state.totalMatches,
+                                    ),
+                                    onClick = onLoadMore,
+                                )
+                            }
                         }
                     }
                 }
@@ -408,92 +433,87 @@ private fun SectionHeader(
 }
 
 /**
- * The week strip. Days are drawn from the plan document, dated from this
- * week's Monday, with today outlined and a completed session ticked.
+ * The week strip: this calendar week, Monday first, with each date resolved to
+ * its plan day through [PlanCalendar], today filled and a completed session
+ * ticked. Plans can start on any weekday, so list position is not a date.
  */
 @Composable
 private fun PlanWeekStrip(
     days: List<PlanDayDto>,
+    startDate: String,
     todayCompleted: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val monday = remember { LocalDate.now().with(DayOfWeek.MONDAY) }
     val todayIndex = LocalDate.now().dayOfWeek.value - 1
-    val accent = LocalAzfExtended.current.primaryFixedDim
     val todayWord = stringResource(R.string.training_day_today)
     val completedWord = stringResource(R.string.training_day_completed)
     val restWord = stringResource(R.string.training_day_rest)
     val locale = currentLocale()
 
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(AzfShapes.Card)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-                AzfShapes.Card,
-            )
-            .padding(AzfSpacing.ElementGapMedium),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        days.take(DAYS_IN_WEEK).forEachIndexed { index, day ->
+        for (index in 0 until DAYS_IN_WEEK) {
             val date = monday.plusDays(index.toLong())
+            val day = PlanCalendar.dayOn(days, startDate, date)
+            val isRest = day?.isRest == true
             val isToday = index == todayIndex
             val done = isToday && todayCompleted
             val stateWord = when {
                 done -> completedWord
                 isToday -> todayWord
-                day.isRest -> restWord
+                isRest -> restWord
                 else -> date.dayOfMonth.toString()
             }
             val dayLabel = stringResource(
                 R.string.training_week_day_cd,
-                day.focus.ifBlank { restWord },
+                day?.focus?.ifBlank { restWord } ?: restWord,
                 stateWord,
             )
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            val ink = if (isToday) AzfColors.OnPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+            Column(
+                modifier = Modifier
+                    .width(42.dp)
+                    .clip(AzfShapes.Pill)
+                    .then(
+                        if (isToday) {
+                            Modifier.background(LocalAzfExtended.current.ctaGradient)
+                        } else {
+                            Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        },
+                    )
+                    .semantics(mergeDescendants = true) { contentDescription = dayLabel }
+                    .padding(vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Text(
                     text = date.dayOfWeek.getDisplayName(JavaTextStyle.NARROW, locale),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (isToday) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ink,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(AzfShapes.Pill)
-                        .then(
-                            when {
-                                done -> Modifier.background(MaterialTheme.colorScheme.secondaryContainer)
-                                isToday -> Modifier.border(BorderStroke(2.dp, accent), AzfShapes.Pill)
-                                else -> Modifier.background(MaterialTheme.colorScheme.surfaceContainer)
-                            },
-                        )
-                        .semantics { contentDescription = dayLabel },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    when {
-                        done -> Icon(
-                            imageVector = Icons.Outlined.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(20.dp),
-                        )
+                when {
+                    done -> Icon(
+                        imageVector = Icons.Outlined.Check,
+                        contentDescription = null,
+                        tint = ink,
+                        modifier = Modifier.size(20.dp),
+                    )
 
-                        day.isRest -> Icon(
-                            imageVector = Icons.Outlined.SelfImprovement,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(18.dp),
-                        )
+                    isRest -> Icon(
+                        imageVector = Icons.Outlined.SelfImprovement,
+                        contentDescription = null,
+                        tint = ink.copy(alpha = 0.7f),
+                        modifier = Modifier.size(20.dp),
+                    )
 
-                        else -> Text(
-                            text = date.dayOfMonth.toString(),
-                            style = DataSmall,
-                            color = if (isToday) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    else -> Text(
+                        text = date.dayOfMonth.toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (isToday) ink else MaterialTheme.colorScheme.onSurface,
+                    )
                 }
             }
         }
@@ -508,7 +528,7 @@ private fun TodayHeroCard(
     modifier: Modifier = Modifier,
 ) {
     val session = state.todaySession ?: return
-    AzfCard(tier = AzfCardTier.Hero, modifier = modifier.fillMaxWidth()) {
+    AzfHeroSurface(modifier = modifier) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PillLabel(
                 text = stringResource(R.string.training_today),
@@ -553,21 +573,36 @@ private fun TodayHeroCard(
             )
         }
 
-        state.todayEntries.take(HERO_PREVIEW_ROWS).forEach { entry ->
+        state.todayEntries.take(HERO_PREVIEW_ROWS).forEachIndexed { index, entry ->
             Spacer(modifier = Modifier.height(12.dp))
-            Column {
-                Text(
-                    text = entry.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = TrainingFormat.targetLine(entry),
-                    style = DataSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = (index + 1).toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = LocalAzfExtended.current.primaryFixedDim,
+                    )
+                }
+                Column(modifier = Modifier.padding(start = 12.dp)) {
+                    Text(
+                        text = entry.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = TrainingFormat.targetLine(entry),
+                        style = DataSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
@@ -578,7 +613,7 @@ private fun TodayHeroCard(
 
 @Composable
 private fun RestDayCard(modifier: Modifier = Modifier) {
-    AzfCard(modifier = modifier.fillMaxWidth()) {
+    AzfHeroSurface(modifier = modifier) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -618,6 +653,49 @@ private fun PillLabel(text: String, color: androidx.compose.ui.graphics.Color) {
     )
 }
 
+/** Folds the secondary filters away; says how many are hiding while closed. */
+@Composable
+private fun FilterToggle(open: Boolean, activeCount: Int, onClick: () -> Unit) {
+    val reducedMotion = rememberReducedMotion()
+    val rotation by animateFloatAsState(
+        targetValue = if (open) 180f else 0f,
+        animationSpec = tween(if (reducedMotion) 0 else AzfMotion.ConfirmDurationMs),
+        label = "filterChevron",
+    )
+    Row(
+        modifier = Modifier
+            .clip(AzfShapes.Pill)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Tune,
+            contentDescription = null,
+            tint = LocalAzfExtended.current.primaryFixedDim,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = if (activeCount > 0) {
+                stringResource(R.string.training_filters_active, activeCount)
+            } else {
+                stringResource(R.string.training_filters)
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 6.dp),
+        )
+        Icon(
+            imageVector = Icons.Outlined.KeyboardArrowDown,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(18.dp)
+                .rotate(rotation),
+        )
+    }
+}
+
 @Composable
 private fun FilterChipRow(
     label: String,
@@ -638,8 +716,8 @@ private fun FilterChipRow(
 }
 
 /**
- * One library row. The attribution line is part of the card by construction —
- * there is no variant of this composable without it.
+ * One library row. The attribution line is part of the card by construction.
+ * There is no variant of this composable without it.
  */
 @Composable
 private fun ExerciseListCard(card: ExerciseCard, onClick: () -> Unit) {
@@ -658,7 +736,7 @@ private fun ExerciseListCard(card: ExerciseCard, onClick: () -> Unit) {
                 thumbnail = card.thumbnail,
                 exerciseName = card.name,
                 equipment = equipment.firstOrNull() ?: Equipment.NONE,
-                modifier = Modifier.size(56.dp),
+                modifier = Modifier.size(64.dp),
             )
             Column(
                 modifier = Modifier
@@ -683,8 +761,8 @@ private fun ExerciseListCard(card: ExerciseCard, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 // CC-BY-SA: required on every exercise card (plan §5.6).
-                // When the card renders media, the credit follows the image —
-                // the exercise says "wger.de community contributors" while the
+                // When the card renders media, the credit follows the image.
+                // The exercise says "wger.de community contributors" while the
                 // picture may be Everkinetic's, and the licence asks for the
                 // author of the work being reproduced.
                 ExerciseAttribution

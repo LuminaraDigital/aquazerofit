@@ -1,5 +1,9 @@
 package fit.aquazero.app.feature.settings
 
+import fit.aquazero.app.R
+import fit.aquazero.app.core.data.PlanPeriod
+import fit.aquazero.app.core.data.PremiumOffer
+import fit.aquazero.app.core.data.PremiumOffers
 import fit.aquazero.app.core.model.EntitlementsDto
 import fit.aquazero.app.core.model.UserTier
 import org.junit.Assert.assertEquals
@@ -49,6 +53,17 @@ class PlanUiStateTest {
     }
 
     @Test
+    fun `an active Play subscription is what the delete warning keys on`() {
+        val base = EntitlementsDto(tier = UserTier.PREMIUM, dailyCredits = 150, creditsRemaining = 150)
+        assertTrue(base.copy(activeBillingSources = listOf("play")).hasActivePlaySubscription())
+        assertFalse(base.copy(activeBillingSources = listOf("stripe")).hasActivePlaySubscription())
+        assertFalse(base.copy(activeBillingSources = emptyList(), billingSource = "play").hasActivePlaySubscription())
+        // A server that has not sent the list yet: the latest rail is the fallback.
+        assertTrue(base.copy(billingSource = "play").hasActivePlaySubscription())
+        assertFalse(base.copy(tier = UserTier.FREE, billingSource = "play").hasActivePlaySubscription())
+    }
+
+    @Test
     fun `the tier flag comes from the server, never from a local toggle`() {
         assertFalse(state(50, 10).premium)
         assertTrue(state(50, 10, tier = UserTier.PREMIUM).premium)
@@ -74,5 +89,39 @@ class PlanUiStateTest {
         )
         assertEquals(listOf("chatTurn", "mealPhoto", "planGeneration"), a.costRows.map { it.first })
         assertEquals(a.costRows, b.costRows)
+    }
+
+    @Test
+    fun `annual terms claim a free trial only when Play returned a zero-price phase`() {
+        val monthly = PremiumOffer(
+            productId = "azf_premium_monthly",
+            period = PlanPeriod.MONTHLY,
+            formattedPrice = "A$9.99",
+            priceAmountMicros = 9_990_000L,
+            currencyCode = "AUD",
+            hasFreeTrial = false,
+        )
+        val annualWithTrial = PremiumOffer(
+            productId = "azf_premium_annual",
+            period = PlanPeriod.ANNUAL,
+            formattedPrice = "A$79.99",
+            priceAmountMicros = 79_990_000L,
+            currencyCode = "AUD",
+            hasFreeTrial = true,
+        )
+        val annualWithoutTrial = annualWithTrial.copy(hasFreeTrial = false)
+
+        assertEquals(
+            R.string.plan_upgrade_terms_annual,
+            upgradeTermsRes(PremiumOffers(annual = annualWithTrial, monthly = monthly), PlanPeriod.ANNUAL),
+        )
+        assertEquals(
+            R.string.plan_upgrade_terms_annual_no_trial,
+            upgradeTermsRes(PremiumOffers(annual = annualWithoutTrial, monthly = monthly), PlanPeriod.ANNUAL),
+        )
+        assertEquals(
+            R.string.plan_upgrade_terms_monthly,
+            upgradeTermsRes(PremiumOffers(annual = annualWithTrial, monthly = monthly), PlanPeriod.MONTHLY),
+        )
     }
 }

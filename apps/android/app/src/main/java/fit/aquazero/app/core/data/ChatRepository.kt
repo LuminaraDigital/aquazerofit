@@ -86,9 +86,14 @@ class ChatRepository @Inject constructor(
             is ApiResult.Failure -> result
         }
 
-    /** Open the SSE streaming turn. */
-    fun stream(sessionId: String, content: String): Flow<ChatStreamEvent> =
-        streamClient.stream(sessionId, content)
+    /**
+     * Open the SSE streaming turn.
+     *
+     * [localDate] is required at the call site so a turn cannot silently
+     * fall back to the server's zone. The coach's nutrition tools key on it.
+     */
+    fun stream(sessionId: String, content: String, localDate: String): Flow<ChatStreamEvent> =
+        streamClient.stream(sessionId, content, localDate)
 
     /** Report an assistant message (Play AI-GC control). */
     suspend fun reportMessage(messageId: String): ApiResult<Unit> =

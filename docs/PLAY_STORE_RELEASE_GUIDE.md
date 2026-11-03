@@ -450,10 +450,10 @@ Until `verifyPlayIntegrity()` decodes Google tokens, these vars alone do not byp
 > Google **after** verification succeeds, the purchase is auto-refunded after three
 > days. A reviewer sees a paid subscription that never activates.
 >
-> Nor does the buy button hide itself. The server advertises
-> `GET /billing/config -> { play: { available } }` for exactly that purpose, but no
-> Android source reads it, so the offer renders regardless. Set these variables
-> before you invite anyone who will test billing.
+> The Android plan screen reads `GET /billing/config` and keeps the buy button
+> off while `play.available` is false, and also when that request fails. Set these
+> variables before you invite anyone who will test billing, then confirm the
+> unauthenticated config curl below returns `play.available: true`.
 
 This is a **server-configuration** prerequisite, not a client defect. The Android
 side degrades correctly: `feature/settings/PlanEntitlementsViewModel.kt` maps every
@@ -571,7 +571,7 @@ their account and starting again.
 
 ### What actually happened
 
-At purchase time the app hands Play an `obfuscatedExternalAccountId` — the
+At purchase time the app hands Play an `obfuscatedExternalAccountId` - the
 SHA-256 of the user id (`obfuscatedAccountIdFor`, `apps/api/src/modules/billing/play.ts:254`).
 Google stores it against the subscription and echoes it back on every
 verification for the life of that purchase. `POST /billing/play/verify` refuses
@@ -580,7 +580,7 @@ any purchase whose echoed identifier is not this caller's
 
 Delete the account and sign up again and the user gets a **new** user id, so a
 new hash. Google keeps echoing the old one. Every verification from the new
-account therefore mismatches — and there is no way for us to rewrite the
+account therefore mismatches - and there is no way for us to rewrite the
 identifier on a live purchase, so this does not heal with time, reinstalls, or
 retries.
 
@@ -602,14 +602,14 @@ the app keeps showing the free tier.
 
 | Where | What to look for |
 | :--- | :--- |
-| API logs | A `kind: "event"` line carrying `play_purchase_account_mismatch` with the **new** user's `userId` (emitted at `router.ts:86`). This is the confirming signal — it is emitted nowhere else. |
-| Not these | `play_purchase_not_entitling` means the subscription is on hold, paused or expired — a different problem with a different answer. `play_purchase_token_rebind_refused` means the bound account still exists, i.e. genuine sharing or a shared device. |
-| In the app | *"Google could not confirm that purchase, so it has not unlocked premium and we have not changed your plan…"* (`plan_upgrade_rejected`, `app/src/main/res/values/strings.xml:1238`), because `PURCHASE_INVALID` maps to HTTP 402 (`packages/shared/src/errors.ts:23`). The string now closes with *"If Google is still charging you for it, contact Support and we will work it out with you — it will not resolve on its own."* That is accurate for this case, and it is why the user is writing to you: it promises no refund and tells them to escalate. Answer with the resolution below rather than with reassurance. |
+| API logs | A `kind: "event"` line carrying `play_purchase_account_mismatch` with the **new** user's `userId` (emitted at `router.ts:86`). This is the confirming signal - it is emitted nowhere else. |
+| Not these | `play_purchase_not_entitling` means the subscription is on hold, paused or expired - a different problem with a different answer. `play_purchase_token_rebind_refused` means the bound account still exists, i.e. genuine sharing or a shared device. |
+| In the app | *"Google could not confirm that purchase, so it has not unlocked premium and we have not changed your plan…"* (`plan_upgrade_rejected`, `app/src/main/res/values/strings.xml:1238`), because `PURCHASE_INVALID` maps to HTTP 402 (`packages/shared/src/errors.ts:23`). The string now closes with *"If Google is still charging you for it, contact Support and we will work it out with you - it will not resolve on its own."* That is accurate for this case, and it is why the user is writing to you: it promises no refund and tells them to escalate. Answer with the resolution below rather than with reassurance. |
 | Play Console | Order management → the purchase. Its account identifier will not match the SHA-256 of the current user id. |
 
 ### Resolution
 
-There is no server-side grant that fixes this properly — granting premium by
+There is no server-side grant that fixes this properly - granting premium by
 hand leaves the user still paying Play for a subscription the app will never
 verify. The only clean path runs through Play:
 
@@ -621,22 +621,17 @@ verify. The only clean path runs through Play:
    stamped with the new user id's hash and verifies normally.
 
 A goodwill admin grant (§4D) is reasonable to cover the gap between steps 1 and
-3, with a `reason` naming this runbook — but it is a bridge, not the fix.
+3, with a `reason` naming this runbook - but it is a bridge, not the fix.
 
-### Known gap: the app does not warn before deletion
+### Account deletion does not cancel Play
 
-The in-app deletion flow says nothing about an active subscription. The danger
-zone at
-`apps/android/app/src/main/java/fit/aquazero/app/feature/settings/SettingsScreen.kt:685`
-renders `settings_delete_body`, `settings_delete_export_first` and
-`settings_delete_dialog_body`, and none of those strings
-(`apps/android/app/src/main/res/values/strings.xml:1056-1072`) mentions billing,
-premium or Play. Neither does the web deletion route.
-
-Closing this needs a change in that screen plus a new string alongside those —
-shown only when the account holds a live Play entitlement — telling the user to
-cancel in Play **first**. Until then the trap is reachable by any premium
-subscriber in two taps, and support carries it.
+There is no Play cancel API on this server. When `GET /me/entitlements` reports
+`play` in `activeBillingSources`, the Android settings screen and the web
+settings screen warn that deleting the account does not cancel the Play
+subscription, and that the person must cancel it in the Play Store. The plan
+screen shows the same warning and a link to Play subscription management only
+for that case. A premium account billed by Stripe or Stars does not get the
+Play warning.
 
 ---
 
@@ -644,7 +639,7 @@ subscriber in two taps, and support carries it.
 
 Everything Play Console requires before the **Submit** button unlocks for a
 first release, in roughly the order Console presents it. Each row either points
-at the section that already answers it, or is marked an **owner action** — a
+at the section that already answers it, or is marked an **owner action** - a
 decision or an upload with no code behind it.
 
 This section exists because the material above is organised by *system*
@@ -662,7 +657,7 @@ between those two orderings is where a submission stalls.
 | # | Requirement | Answer / where |
 | :--- | :--- | :--- |
 | 1 | Developer account verified, package `fit.aquazero.app` registered | **Owner action.** The package name is fixed (§1) and cannot change after the first upload. |
-| 2 | Play App Signing enrolled; upload key backed up | §2. Read the app signing SHA-256 out of Console afterwards — it differs from the upload key, and both §5F.2 (`assetlinks.json`) and the Firebase key restriction depend on it. |
+| 2 | Play App Signing enrolled; upload key backed up | §2. Read the app signing SHA-256 out of Console afterwards - it differs from the upload key, and both §5F.2 (`assetlinks.json`) and the Firebase key restriction depend on it. |
 | 3 | AAB built at target SDK 36 | §1, §3. |
 
 ### B. Store listing
@@ -671,10 +666,10 @@ between those two orderings is where a submission stalls.
 | :--- | :--- | :--- |
 | 4 | App category | **Health & Fitness** (`docs/ANDROID_IMPLEMENTATION_PLAN.md:225`). |
 | 5 | Contact details: support email (required), website, phone | **Owner action.** No support address exists anywhere in the repo. Whatever Console carries must be the address reachable from `https://aquazerofit.com/support`, which is what the app links users to (`ExternalLinks.kt:32`). |
-| 6 | Privacy policy URL | `https://aquazerofit.com/privacy` — `ExternalLinks.PRIVACY` (`ExternalLinks.kt:26`) resolved against `WEB_BASE_URL` (§5A); the route is served at `apps/web/src/App.tsx:91`. The app links to it in Settings, so a different URL in Console is a mismatch a reviewer can see. |
-| 7 | App icon — 512×512 32-bit PNG *(Google)* | **Owner action.** Not present in `docs/`; export from the launcher icon source. |
-| 8 | Feature graphic — 1024×500 *(Google)* | **Owner action.** No such asset exists in the repo. |
-| 9 | Phone screenshots — 2 to 8, 16:9 or 9:16 *(Google)* | `docs/screenshots/*.png` are 780×1688 (390×844 at 2×, per `tools/screenshots/optimise.mjs`), which satisfies the ratio and the size bounds. Draw from `03-dashboard`, `04-nutrition`, `05-capture-meal`, `07-coach`, `08-workouts`, `09-progress`. Re-capture on-device before upload (`ANDROID_IMPLEMENTATION_PLAN.md:225`). |
+| 6 | Privacy policy URL | `https://aquazerofit.com/privacy` - `ExternalLinks.PRIVACY` (`ExternalLinks.kt:26`) resolved against `WEB_BASE_URL` (§5A); the route is served at `apps/web/src/App.tsx:91`. The app links to it in Settings, so a different URL in Console is a mismatch a reviewer can see. |
+| 7 | App icon - 512×512 32-bit PNG *(Google)* | **Owner action.** Not present in `docs/`; export from the launcher icon source. |
+| 8 | Feature graphic - 1024×500 *(Google)* | **Owner action.** No such asset exists in the repo. |
+| 9 | Phone screenshots - 2 to 8, 16:9 or 9:16 *(Google)* | `docs/screenshots/*.png` are 780×1688 (390×844 at 2×, per `tools/screenshots/optimise.mjs`), which satisfies the ratio and the size bounds. Draw from `03-dashboard`, `04-nutrition`, `05-capture-meal`, `07-coach`, `08-workouts`, `09-progress`. Re-capture on-device before upload (`ANDROID_IMPLEMENTATION_PLAN.md:225`). |
 | 10 | Short and full description | **Owner action.** One hard constraint: **no medical claims anywhere in the copy** (`ANDROID_IMPLEMENTATION_PLAN.md:225`). That phrasing is what keeps the app out of the medical health-app regime in row 18. |
 
 ### C. App content declarations
@@ -682,13 +677,13 @@ between those two orderings is where a submission stalls.
 | # | Requirement | Answer / where |
 | :--- | :--- | :--- |
 | 11 | Privacy policy (App content's own copy of row 6) | Same URL as row 6. |
-| 12 | App access | **Restricted — sign-in required for everything.** Pre-created reviewer credentials are mandatory; §4D. Blocking. |
+| 12 | App access | **Restricted - sign-in required for everything.** Pre-created reviewer credentials are mandatory; §4D. Blocking. |
 | 13 | Ads | **No ads: declare none.** The four ad/attribution permissions Firebase merges in are stripped at merge time; §4C. |
-| 14 | Content rating (IARC) questionnaire | **Owner action** — it can only be answered in Console. Two repo facts it will need: the coach is an **AI chatbot** with an in-app report control (long-press a reply — `strings.xml:606-610`, `ChatRepository.kt:94`), and buddy challenges show other members' `displayName` and progress to each other (`ChallengeDtos.kt:7-11`) while carrying **no free-text user-to-user messaging**. Answer the "user interaction" questions from those two, not from a guess. |
-| 15 | Target audience and content | **Not designed for children.** The profile schema accepts ages from **16** upward (`packages/shared/src/constants.ts:50`, enforced at `packages/shared/src/schemas.ts:81`) and the privacy notice says so (`apps/web/src/pages/legal/Privacy.tsx`, §11 "Age"). Ticking any under-13 band pulls the app into the Families policy — do not. **Owner action:** the exact age bands. |
-| 16 | Data safety | §4A — the longest form and the one most likely to be filled in wrongly. Note in particular that Crash logs, Diagnostics and App interactions must all be declared **optional**, never omitted because they are off by default. |
+| 14 | Content rating (IARC) questionnaire | **Owner action** - it can only be answered in Console. Two repo facts it will need: the coach is an **AI chatbot** with an in-app report control (long-press a reply - `strings.xml:606-610`, `ChatRepository.kt:94`), and buddy challenges show other members' `displayName` and progress to each other (`ChallengeDtos.kt:7-11`) while carrying **no free-text user-to-user messaging**. Answer the "user interaction" questions from those two, not from a guess. |
+| 15 | Target audience and content | **Not designed for children.** The profile schema accepts ages from **16** upward (`packages/shared/src/constants.ts:50`, enforced at `packages/shared/src/schemas.ts:81`) and the privacy notice says so (`apps/web/src/pages/legal/Privacy.tsx`, §11 "Age"). Ticking any under-13 band pulls the app into the Families policy - do not. **Owner action:** the exact age bands. |
+| 16 | Data safety | §4A - the longest form and the one most likely to be filled in wrongly. Note in particular that Crash logs, Diagnostics and App interactions must all be declared **optional**, never omitted because they are off by default. |
 | 17 | Foreground service types | **One service, typed `health`** (`WorkoutLiveService`); §4E. Needs a screen recording, and any leftover `specialUse` draft deleted. |
-| 18 | Health apps declaration | Declare **"Activity and Fitness"** and **"Nutrition and Weight Management"** only — never a medical category (`ANDROID_IMPLEMENTATION_PLAN.md` Phase 8.4). Health Connect does ship: **four read types, no write type** — `READ_STEPS`, `READ_HEART_RATE`, `READ_SLEEP`, `READ_TOTAL_CALORIES_BURNED` (`AndroidManifest.xml:36-39`); §5F.5. Verify against the merged manifest, not against this list. |
+| 18 | Health apps declaration | Declare **"Activity and Fitness"** and **"Nutrition and Weight Management"** only - never a medical category (`ANDROID_IMPLEMENTATION_PLAN.md` Phase 8.4). Health Connect does ship: **four read types, no write type** - `READ_STEPS`, `READ_HEART_RATE`, `READ_SLEEP`, `READ_TOTAL_CALORIES_BURNED` (`AndroidManifest.xml:36-39`); §5F.5. Verify against the merged manifest, not against this list. |
 | 19 | Government apps | **No.** |
 | 20 | Financial features | **None of these.** Play Billing subscriptions are declared as in-app products (row 23), not as a financial feature. |
 | 21 | News apps | **No.** |
@@ -709,6 +704,6 @@ between those two orderings is where a submission stalls.
 | # | Requirement | Answer / where |
 | :--- | :--- | :--- |
 | 28 | Production backend configured and reachable | §5 in full. §5B (Turnstile) and §5D (boot secrets) are the ones that make sign-in fail for a reviewer; smoke test per §5E. |
-| 29 | Closed testing served before production | §6 and its checklist. §6 and `ANDROID_IMPLEMENTATION_PLAN.md:232` now agree on **12+ testers × 14 days** (they previously said 20 and 12). That figure is Google's rule for new **personal** developer accounts, which an organisation account may not face at all, and it is not traceable to anything in this repo. **Owner action:** confirm the current number in Console *(Google)* before recruiting — the plan's own Phase 8.1 already instructs a re-check of this regime. |
+| 29 | Closed testing served before production | §6 and its checklist. §6 and `ANDROID_IMPLEMENTATION_PLAN.md:232` now agree on **12+ testers × 14 days** (they previously said 20 and 12). That figure is Google's rule for new **personal** developer accounts, which an organisation account may not face at all, and it is not traceable to anything in this repo. **Owner action:** confirm the current number in Console *(Google)* before recruiting - the plan's own Phase 8.1 already instructs a re-check of this regime. |
 | 30 | Release notes and rollout percentage | §6. Staged: 10% → 25% → 50% → 100%. |
 | 31 | Version tag cut before the upload build | §3. `v<major>.<minor>.<patch>` on the default branch; CI validates it against `^v[0-9]+\.[0-9]+\.[0-9]+$` and derives `versionCode` from it. A bundle built without one carries `versionCode 1` and can be uploaded only once - the failure lands on your *second* release, not your first, which is why it belongs on this list. |

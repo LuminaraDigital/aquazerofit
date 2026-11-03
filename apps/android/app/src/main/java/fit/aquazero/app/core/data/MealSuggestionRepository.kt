@@ -1,6 +1,7 @@
 package fit.aquazero.app.core.data
 
 import fit.aquazero.app.core.common.LocalDates
+import fit.aquazero.app.core.database.LogsDao
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.MealLogDto
 import fit.aquazero.app.core.model.MealRecommendationDto
@@ -26,6 +27,7 @@ import javax.inject.Singleton
 @Singleton
 class MealSuggestionRepository @Inject constructor(
     private val suggestionsApi: SuggestionsApi,
+    private val logsDao: LogsDao,
 ) {
 
     /**
@@ -59,7 +61,11 @@ class MealSuggestionRepository @Inject constructor(
     ): ApiResult<MealLogDto> =
         safeCall {
             suggestionsApi.logSuggestion(recommendationId, LogSuggestionRequest(localDate))
-        }.map { it.mealLog }
+        }.map { it.mealLog }.also { result ->
+            if (result is ApiResult.Success) {
+                logsDao.upsertMealLog(MealReconciler.serverRowFor(result.data))
+            }
+        }
 
     /** Send an up/down signal into the evaluation loop. */
     suspend fun sendFeedback(

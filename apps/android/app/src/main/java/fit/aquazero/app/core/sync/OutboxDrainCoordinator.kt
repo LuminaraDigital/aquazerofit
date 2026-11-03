@@ -5,6 +5,8 @@ import fit.aquazero.app.core.data.SyncScheduler
 import fit.aquazero.app.core.database.LogsDao
 import fit.aquazero.app.core.network.api.LogsApi
 import fit.aquazero.app.core.telemetry.CrashReporter
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,16 +26,43 @@ class OutboxDrainCoordinator @Inject constructor(
     private val crashReporter: CrashReporter,
 ) {
 
+    private val drainMutex = Mutex()
+
+    /**
+     * Run a single serialized drain pass (shared between [SyncWorker] and
+     * foreground drains so two callers never concurrently claim the same
+     * `IN_FLIGHT` row).
+     */
+    internal suspend fun runDrainPass(): OutboxDrainer.DrainResult =
+        drainMutex.withLock { outboxDrainer().drain() }
+
     /**
      * Drain until nothing is pending or [maxPasses] is exhausted.
      *
      * @return how many ops are still QUEUED, IN_FLIGHT or FAILED.
      */
-    suspend fun drainForLogout(maxPasses: Int = MAX_LOGOUT_DRAIN_PASSES): Int {
+    suspend fun drainForLogout(maxPasses: Int = MAX_LOGOUT_DRAIN_PASSES): Int =
+        drainUntilSettled(maxPasses)
+
+    /**
+     * Push queued logs before a reader that only sees the server, such as
+     * the coach. An empty outbox returns immediately. Two passes is enough
+     * for a meal and a glass of water just written; a stuck op must not
+     * hold the composer.
+     */
+    suspend fun drainPending(maxPasses: Int = PENDING_DRAIN_PASSES): Int =
+        drainUntilSettled(maxPasses)
+
+    private suspend fun drainUntilSettled(maxPasses: Int): Int {
         repeat(maxPasses) {
-            val pending = outboxRepository.pendingCountOnce()
-            if (pending == 0) return 0
-            outboxDrainer().drain()
+            val settled = drainMutex.withLock {
+                if (outboxRepository.liveCountOnce() == 0) {
+                    true
+                } else {
+                    outboxDrainer().drain() == OutboxDrainer.DrainResult.SETTLED
+                }
+            }
+            if (settled) return outboxRepository.pendingCountOnce()
         }
         return outboxRepository.pendingCountOnce()
     }
@@ -52,5 +81,8 @@ class OutboxDrainCoordinator @Inject constructor(
          * without holding the sign-out button for minutes.
          */
         const val MAX_LOGOUT_DRAIN_PASSES = 8
+
+        /** Coach turns wait for this many drain attempts, then send anyway. */
+        const val PENDING_DRAIN_PASSES = 2
     }
 }

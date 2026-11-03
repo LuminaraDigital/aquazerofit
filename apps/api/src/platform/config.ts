@@ -513,9 +513,23 @@ export const config = {
     return process.env.STRIPE_SECRET_KEY?.trim() ?? '';
   },
 
-  /** The recurring Price premium is sold at. Its amount is read from Stripe. */
+  /**
+   * Recurring Price for monthly Premium (A$9.99 AUD). Production id:
+   * price_1UTzLC2KRdTmwWCnfblYV22F. Its amount is read from Stripe and must
+   * match the launch catalog before checkout is offered.
+   */
   get stripePriceId(): string {
     return process.env.STRIPE_PRICE_ID?.trim() ?? '';
+  },
+
+  /**
+   * Recurring Price for annual Premium (A$79.99 AUD per year). Live id:
+   * price_1UX1Ue2KRdTmwWCnbO3bW4eh, mounted as STRIPE_PRICE_ID_ANNUAL.
+   * Unset means annual checkout is not offered. The amount is still checked
+   * against the launch catalog before a session is opened.
+   */
+  get stripePriceIdAnnual(): string {
+    return process.env.STRIPE_PRICE_ID_ANNUAL?.trim() ?? '';
   },
 
   /**

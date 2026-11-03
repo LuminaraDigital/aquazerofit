@@ -48,6 +48,8 @@ export type TrendRange = '7d' | '30d' | '90d';
 export interface Entitlements {
   tier: UserTier;
   dailyCredits: number;
+  /** Paid daily cap, sent on every account so the upgrade screen can state it. */
+  premiumDailyCredits?: number;
   creditsRemaining: number;
   /**
    * Ceiling on a carried-over balance: the daily grant tops up toward this and
@@ -64,6 +66,11 @@ export interface Entitlements {
    * managed in Stripe's billing portal. Optional for APIs from before it.
    */
   billingSource?: 'play' | 'stripe' | 'stars' | 'admin' | null;
+  /**
+   * Rails whose paid period is still running. Present on current APIs.
+   * Absent means the server predates the field: fall back to billingSource.
+   */
+  activeBillingSources?: Array<'play' | 'stripe' | 'stars' | 'admin'> | null;
 }
 
 export const queryKeys = {
@@ -211,10 +218,22 @@ export function useEntitlements(): UseQueryResult<Entitlements | null> {
 
 /** GET /billing/config: which purchase rails this deployment can take, and their prices. */
 export interface BillingConfig {
+  /** False when the API cannot verify a Play purchase. The buy control stays off. */
+  play?: { available: boolean };
   stripe?: {
     available: boolean;
-    /** Minor units, e.g. 999 for $9.99. Null whenever `available` is false. */
+    /** Monthly price when monthly checkout is open. Null otherwise. */
     price: { amount: number; currency: string; interval: string } | null;
+    /**
+     * Launch catalog: monthly A$9.99 and annual A$79.99. `available` is true
+     * only for an interval whose Stripe Price id is set and matches.
+     */
+    plans?: Array<{
+      interval: 'month' | 'year';
+      amount: number;
+      currency: string;
+      available: boolean;
+    }>;
   };
   stars?: {
     available: boolean;
@@ -239,7 +258,11 @@ export function useBillingConfig(): UseQueryResult<BillingConfig> {
  */
 export function useStartStripeCheckout() {
   return useMutation({
-    mutationFn: () => api<{ url: string }>('/billing/stripe/checkout', { method: 'POST' }),
+    mutationFn: (interval: 'month' | 'year' = 'month') =>
+      api<{ url: string }>('/billing/stripe/checkout', {
+        method: 'POST',
+        body: { interval: interval ?? 'month' },
+      }),
     onSuccess: ({ url }) => window.location.assign(url),
   });
 }

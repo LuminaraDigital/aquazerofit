@@ -43,8 +43,8 @@ import kotlin.coroutines.resume
  * The purchase rules that do not need Play, Android or a network to decide.
  *
  * Pure by design, in the same spirit as [MealPhotoRules]: the one decision that
- * actually protects the user's money — *which* purchases still need the server
- * pass — is a plain function covered by JVM unit tests rather than something
+ * actually protects the user's money - *which* purchases still need the server
+ * pass - is a plain function covered by JVM unit tests rather than something
  * only reachable by driving a billing sandbox.
  */
 /** Subscription period options for premium plans. */
@@ -71,6 +71,15 @@ internal object PlayPurchaseRules {
     }
 
     /**
+     * Whether the buy button may be shown and a new purchase started.
+     *
+     * Null and false both mean the server cannot verify a Play purchase, or
+     * we could not read that fact. A button in that state takes money Google
+     * later refunds, because the app only acknowledges after verify succeeds.
+     */
+    fun allowPlayPurchase(serverAvailable: Boolean?): Boolean = serverAvailable == true
+
+    /**
      * Whether a purchase Play reported still has to go to our server.
      *
      * `acknowledged` is a reliable "the server has already granted this" marker
@@ -88,7 +97,7 @@ internal object PlayPurchaseRules {
     /**
      * Whether a purchase Play reported should be put to our server at all.
      *
-     * Every `PURCHASED` purchase, acknowledged or not — which is the one place
+     * Every `PURCHASED` purchase, acknowledged or not - which is the one place
      * this deliberately differs from [needsGranting]. Acknowledgement records
      * that *a* period was once granted; it says nothing about the period
      * running now. A subscription renews under the SAME purchase token, so an
@@ -108,8 +117,8 @@ internal object PlayPurchaseRules {
      * in `apps/api/src/modules/billing/play.ts` byte for byte: the server
      * compares what Google reports against its own recomputation, and rejects a
      * mismatch as somebody else's purchase. Drift here does not degrade
-     * gracefully — it rejects EVERY purchase, on every device, from the first
-     * one — and because the two sides are tested independently, nothing else
+     * gracefully - it rejects EVERY purchase, on every device, from the first
+     * one - and because the two sides are tested independently, nothing else
      * would notice.
      *
      * Extracted out of the repository purely so that invariant is reachable
@@ -165,16 +174,22 @@ data class PremiumOffers(
 
 /** Why an attempt to buy or restore the subscription did not end in an entitlement. */
 enum class BillingFailure {
-    /** Play billing is unusable here — no Play services, or an account that cannot transact. */
+    /** Play billing is unusable here - no Play services, or an account that cannot transact. */
     PLAY_UNAVAILABLE,
+
+    /** `GET /billing/config` says Play verify is off, or the config could not be read. */
+    SERVER_UNAVAILABLE,
 
     /** Play has no such product, or no offer on it. Usually a Play Console configuration gap. */
     PRODUCT_UNAVAILABLE,
 
-    /** `402 PURCHASE_INVALID` — Google rejected the token. Nothing to grant. */
+    /** `402 PURCHASE_INVALID` - Google rejected the token. Nothing to grant. */
     REJECTED,
 
-    /** `503 BILLING_UNAVAILABLE` — the server cannot verify anything at the moment. */
+    /** `409 CONFLICT` - the account is already premium on Stripe or Stars. */
+    ALREADY_PREMIUM,
+
+    /** `503 BILLING_UNAVAILABLE` - the server cannot verify anything at the moment. */
     VERIFY_UNAVAILABLE,
 
     /** No connection reached either Play or our server. */
@@ -189,7 +204,7 @@ sealed interface BillingOutcome {
     /** The server verified the purchase. The caller must now re-read entitlements. */
     data object Verified : BillingOutcome
 
-    /** The user backed out of Play's sheet. A decision, not a fault — never an error. */
+    /** The user backed out of Play's sheet. A decision, not a fault - never an error. */
     data object Cancelled : BillingOutcome
 
     /** No outstanding purchase on this account. */
@@ -210,7 +225,7 @@ sealed interface BillingOutcome {
  * device that fakes a purchase gets a token the server rejects, not an
  * entitlement.
  *
- * **Coaches are not sold through this, or through anything else** — see
+ * **Coaches are not sold through this, or through anything else** - see
  * [CoachesRepository]. The premium subscription is the only product.
  */
 @Singleton
@@ -258,7 +273,7 @@ class BillingRepository @Inject constructor(
         // a one-time product: PendingPurchasesParams.Builder.build() throws
         // IllegalArgumentException("Pending purchases for one-time products
         // must be supported.") without it, which would take the app down in
-        // this constructor — that is, at first injection, not at first purchase.
+        // this constructor - that is, at first injection, not at first purchase.
         // `enablePrepaidPlans()` is the half that is actually about
         // subscriptions, and covers a prepaid plan being added to the base plan
         // later without this line having to be remembered.
@@ -298,7 +313,7 @@ class BillingRepository @Inject constructor(
         return PremiumOffers(annual = annualOffer, monthly = monthlyOffer)
     }
 
-    /** Legacy single offer getter — defaults to annual if available, otherwise monthly. */
+    /** Legacy single offer getter - defaults to annual if available, otherwise monthly. */
     suspend fun premiumOffer(): PremiumOffer? {
         val offers = premiumOffers() ?: return null
         return offers.annual ?: offers.monthly
@@ -328,10 +343,27 @@ class BillingRepository @Inject constructor(
      * [BillingOutcome.Verified] to say the server granted something, not to say
      * what it granted.
      */
+
+    /**
+     * What `GET /billing/config` says about Play verify.
+     *
+     * False when the server says so and when the request fails. The buy
+     * button uses the same answer, so a purchase is not offered in a state
+     * where verify would answer 503.
+     */
+    suspend fun playVerifyAvailable(): Boolean =
+        when (val result = safeCall { billingApi.billingConfig() }) {
+            is ApiResult.Success -> PlayPurchaseRules.allowPlayPurchase(result.data.play.available)
+            is ApiResult.Failure -> false
+        }
+
     suspend fun purchasePremium(
         activity: Activity,
         period: PlanPeriod = PlanPeriod.ANNUAL,
     ): BillingOutcome = playGate.withLock {
+        if (!playVerifyAvailable()) {
+            return@withLock BillingOutcome.Failed(BillingFailure.SERVER_UNAVAILABLE)
+        }
         val connection = connect()
         if (connection.responseCode != BillingResponseCode.OK) {
             return@withLock BillingOutcome.Failed(playFailure(connection))
@@ -377,7 +409,7 @@ class BillingRepository @Inject constructor(
      * Settle anything Play is still holding for this account.
      *
      * **Not optional, and not a nicety.** It is the only recovery path for
-     * someone who paid and then closed the app — during the Play sheet, or
+     * someone who paid and then closed the app - during the Play sheet, or
      * after it while verification was failing. Without this call their money is
      * taken, the subscription is never acknowledged, and Google silently
      * refunds it three days later while the app has spent that time showing
@@ -404,7 +436,7 @@ class BillingRepository @Inject constructor(
     // ----- the ordering that matters -----
 
     /**
-     * Verify with our server, then — and only then — acknowledge to Google.
+     * Verify with our server, then - and only then - acknowledge to Google.
      *
      * Both orderings lose something when the pair does not complete, so the
      * choice is which loss is survivable:
@@ -412,7 +444,7 @@ class BillingRepository @Inject constructor(
      *  - Acknowledge first, verify second: acknowledging tells Google to keep
      *    the money. If the verify then fails, the user is paying for a
      *    subscription the server never granted, with nothing left to reverse
-     *    it — Google's auto-refund only applies to purchases that were *not*
+     *    it - Google's auto-refund only applies to purchases that were *not*
      *    acknowledged. That is a charge for nothing, and the app cannot fix it.
      *  - Verify first, acknowledge second: if the acknowledge fails, the user
      *    has the entitlement and Google still holds an unacknowledged purchase.
@@ -454,7 +486,7 @@ class BillingRepository @Inject constructor(
      *
      * Callers are screens, and screens go away. Awaiting a job that belongs to
      * [scope] means a cancelled caller stops *waiting* for the settlement
-     * rather than cancelling it half-done — which, between the verify and the
+     * rather than cancelling it half-done - which, between the verify and the
      * acknowledge, is the state that costs the user money.
      */
     private suspend fun settleOnOwnScope(purchases: List<Purchase>): BillingOutcome =
@@ -493,7 +525,7 @@ class BillingRepository @Inject constructor(
                     }
 
                     override fun onBillingServiceDisconnected() {
-                        // Not a retry hook — `enableAutoServiceReconnection`
+                        // Not a retry hook - `enableAutoServiceReconnection`
                         // re-binds on its own. Resumed here only to cover the
                         // bind dying before setup ever reported, which would
                         // otherwise park this caller for ever.
@@ -526,14 +558,14 @@ class BillingRepository @Inject constructor(
     /**
      * The one offer this app sells, chosen the same way every time.
      *
-     * This used to be two independent `firstOrNull()` calls — one to quote a
-     * price, one to charge it — and Play promises no order. The moment a second
+     * This used to be two independent `firstOrNull()` calls - one to quote a
+     * price, one to charge it - and Play promises no order. The moment a second
      * offer exists on the base plan (a launch promotion, a win-back), those two
      * picks can disagree and the screen advertises a price the sheet does not
      * charge. One deterministic choice, used by both, cannot.
      *
      * Cheapest recurring phase wins, since that is what the user pays every
-     * month after any intro period. Ties go to the offer with more phases —
+     * month after any intro period. Ties go to the offer with more phases -
      * that is the one carrying the trial or introductory price, so it is
      * strictly better for them. The offer token is a final tiebreak purely to
      * make the result stable rather than order-dependent.
@@ -555,7 +587,7 @@ class BillingRepository @Inject constructor(
      * Google's own purchase-fraud signals key on this, and it is what lets the
      * server tell "this user bought this subscription" from "this user was
      * handed somebody else's purchase token". It must not be the account id
-     * itself — Play stores it and shows it in the console — so the id is
+     * itself - Play stores it and shows it in the console - so the id is
      * hashed. SHA-256 hex is 64 characters, which is exactly Play's limit.
      *
      * Null when no account row is cached yet. The purchase still goes ahead:
@@ -588,7 +620,7 @@ class BillingRepository @Inject constructor(
         when (result.responseCode) {
             // Backing out of Play's sheet is a decision, not a fault.
             BillingResponseCode.USER_CANCELED -> BillingOutcome.Cancelled
-            // Already subscribed — on this account, or from another install.
+            // Already subscribed - on this account, or from another install.
             // The purchase exists, so the answer is to settle it, not to fail.
             BillingResponseCode.ITEM_ALREADY_OWNED -> settleOwned()
             else -> BillingOutcome.Failed(playFailure(result))
@@ -624,6 +656,7 @@ class BillingRepository @Inject constructor(
         failure is ApiResult.Failure.Network -> BillingFailure.OFFLINE
         failure !is ApiResult.Failure.Api -> BillingFailure.UNKNOWN
         failure.httpStatus == HTTP_PAYMENT_REQUIRED -> BillingFailure.REJECTED
+        failure.httpStatus == HTTP_CONFLICT -> BillingFailure.ALREADY_PREMIUM
         failure.httpStatus == HTTP_SERVICE_UNAVAILABLE -> BillingFailure.VERIFY_UNAVAILABLE
         else -> BillingFailure.UNKNOWN
     }
@@ -634,8 +667,8 @@ class BillingRepository @Inject constructor(
     /**
      * What Play reported, and the settlement already running for it.
      *
-     * [outcome] is null exactly when Play reported something other than OK —
-     * a cancellation or an error — so there is nothing to settle and
+     * [outcome] is null exactly when Play reported something other than OK -
+     * a cancellation or an error - so there is nothing to settle and
      * [outcomeFor] reads the result instead.
      */
     private data class PurchaseSettlement(
@@ -646,6 +679,9 @@ class BillingRepository @Inject constructor(
     private companion object {
         /** `402 PURCHASE_INVALID`. */
         const val HTTP_PAYMENT_REQUIRED = 402
+
+        /** `409 CONFLICT` - already premium on another rail. */
+        const val HTTP_CONFLICT = 409
 
         /** `503 BILLING_UNAVAILABLE`. */
         const val HTTP_SERVICE_UNAVAILABLE = 503

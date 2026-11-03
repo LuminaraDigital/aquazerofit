@@ -11,6 +11,7 @@ import fit.aquazero.app.core.data.BillingFailure
 import fit.aquazero.app.core.data.BillingOutcome
 import fit.aquazero.app.core.data.BillingRepository
 import fit.aquazero.app.core.data.PlanPeriod
+import fit.aquazero.app.core.data.PlayPurchaseRules
 import fit.aquazero.app.core.data.PremiumOffer
 import fit.aquazero.app.core.data.PremiumOffers
 import fit.aquazero.app.core.model.ApiResult
@@ -33,6 +34,11 @@ data class PlanUiState(
     val failed: Boolean = false,
     /** Available Play subscription offers. */
     val offers: PremiumOffers? = null,
+    /**
+     * `GET /billing/config` play.available. False until that read succeeds
+     * with available true, which keeps the buy button off in the meantime.
+     */
+    val playVerifyAvailable: Boolean = false,
     val selectedPeriod: PlanPeriod = PlanPeriod.ANNUAL,
     val offerLoading: Boolean = true,
     /** Play's sheet is open, or the purchase behind it is still being verified. */
@@ -47,7 +53,7 @@ data class PlanUiState(
      * Denominator for the credit bar, never smaller than the balance: unspent
      * credits bank up to the server's `maxBankedCredits`, which today is twice
      * a day's grant, so a saved-up balance must not overflow the track. The
-     * scale stays the daily grant rather than the ceiling — a full day's grant
+     * scale stays the daily grant rather than the ceiling - a full day's grant
      * reading as a half-empty bar would misreport a balance nothing is wrong
      * with.
      */
@@ -69,7 +75,7 @@ sealed interface PlanEvent {
 }
 
 /**
- * Your plan — tier, daily AI credits, what each AI action costs, and the one
+ * Your plan - tier, daily AI credits, what each AI action costs, and the one
  * thing this app sells.
  *
  * The premium subscription is bought through Google Play. Nothing here decides
@@ -78,7 +84,7 @@ sealed interface PlanEvent {
  * the client could make on its own would be an entitlement any caller could
  * grant themselves.
  *
- * Coach personas remain unpurchasable, here and everywhere — see
+ * Coach personas remain unpurchasable, here and everywhere - see
  * [fit.aquazero.app.feature.coach.CoachSelectViewModel]. What premium changes
  * is still rendered from the server's own `premiumLanes` and `costs` rather
  * than from a hand-written feature list, which is a claim that goes stale
@@ -144,8 +150,17 @@ class PlanEntitlementsViewModel @Inject constructor(
      */
     private fun loadOffers() {
         viewModelScope.launch {
-            val offers = billingRepository.premiumOffers()
-            _uiState.value = _uiState.value.copy(offers = offers, offerLoading = false)
+            val verifyAvailable = billingRepository.playVerifyAvailable()
+            val offers = if (PlayPurchaseRules.allowPlayPurchase(verifyAvailable)) {
+                billingRepository.premiumOffers()
+            } else {
+                null
+            }
+            _uiState.value = _uiState.value.copy(
+                offers = offers,
+                offerLoading = false,
+                playVerifyAvailable = verifyAvailable,
+            )
         }
     }
 
@@ -153,11 +168,17 @@ class PlanEntitlementsViewModel @Inject constructor(
      * Buy premium.
      *
      * The entitlement is never assumed here. A verified purchase only triggers
-     * [refresh] — whatever the server then reports is what the screen shows,
+     * [refresh] - whatever the server then reports is what the screen shows,
      * including the case where it reports the user is still on free.
      */
     fun upgrade(activity: Activity) {
         if (_uiState.value.purchasing) return
+        if (!PlayPurchaseRules.allowPlayPurchase(_uiState.value.playVerifyAvailable)) {
+            viewModelScope.launch {
+                _events.send(PlanEvent.Message(R.string.plan_upgrade_server_unavailable, isError = true))
+            }
+            return
+        }
         _uiState.value = _uiState.value.copy(purchasing = true)
         viewModelScope.launch {
             val outcome = billingRepository.purchasePremium(activity, _uiState.value.selectedPeriod)
@@ -190,8 +211,10 @@ class PlanEntitlementsViewModel @Inject constructor(
     @StringRes
     private fun messageFor(reason: BillingFailure): Int = when (reason) {
         BillingFailure.PLAY_UNAVAILABLE -> R.string.plan_upgrade_play_unavailable
+        BillingFailure.SERVER_UNAVAILABLE -> R.string.plan_upgrade_server_unavailable
         BillingFailure.PRODUCT_UNAVAILABLE -> R.string.plan_upgrade_play_unavailable
         BillingFailure.REJECTED -> R.string.plan_upgrade_rejected
+        BillingFailure.ALREADY_PREMIUM -> R.string.plan_upgrade_already_premium
         BillingFailure.VERIFY_UNAVAILABLE -> R.string.plan_upgrade_verify_later
         BillingFailure.OFFLINE -> R.string.plan_upgrade_offline
         BillingFailure.UNKNOWN -> R.string.plan_upgrade_failed

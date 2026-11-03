@@ -17,6 +17,7 @@ import {
 } from '../../../../packages/shared/src/errors';
 import type { AuthResponse } from '@aquazerofit/shared';
 import { isFirebaseAuthEnabled, loadFirebaseSdk } from './firebase';
+import { todayLocalDate } from './format';
 import { getTelegramInitData, isTMA } from './telegram';
 
 /**
@@ -277,7 +278,7 @@ export async function streamChat(
         ...(access ? { Authorization: `Bearer ${access}` } : {}),
         'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
-      body: JSON.stringify({ content, actionCards: true }),
+      body: JSON.stringify({ content, localDate: todayLocalDate(), actionCards: true }),
       signal,
     });
   };

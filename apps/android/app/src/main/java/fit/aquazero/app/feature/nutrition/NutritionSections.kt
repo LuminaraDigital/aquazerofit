@@ -17,9 +17,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AddCircleOutline
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Biotech
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.ChevronLeft
@@ -44,6 +45,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -58,17 +60,18 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
+import fit.aquazero.app.core.designsystem.AzfColors
+import fit.aquazero.app.core.designsystem.AzfHeroSurface
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.DataLarge
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
-import fit.aquazero.app.core.designsystem.RingProgress
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.pressScale
 import fit.aquazero.app.core.model.MealType
-import fit.aquazero.app.core.ui.MacroRow
+import fit.aquazero.app.core.ui.FuelRing
+import fit.aquazero.app.core.ui.MacroMiniBars
 import fit.aquazero.app.core.ui.NutritionFormat
 
 /** Previous / current / next day, with the calendar trigger on the label. */
@@ -148,43 +151,18 @@ internal fun DaySwitcher(
     }
 }
 
-/** Calories-remaining hero with the goal − food + exercise formula row. */
+/** The day's fuel at a glance, with the goal − food + exercise formula beneath. */
 @Composable
 internal fun CaloriesRemainingCard(
     nutrition: LocalDailyNutrition,
     kcalBurned: Double,
     modifier: Modifier = Modifier,
 ) {
-    AzfCard(modifier = modifier.fillMaxWidth(), tier = AzfCardTier.Hero) {
-        Text(
-            text = stringResource(R.string.nutrition_calories_remaining).uppercase(),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            RingProgress(
-                progress = NutritionFormat.clampFraction(
-                    nutrition.kcalConsumed,
-                    nutrition.kcalTarget,
-                ),
-                size = 160.dp,
-                strokeWidth = 8.dp,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = NutritionFormat.fmtInt(nutrition.kcalRemaining.coerceAtLeast(0.0)),
-                        style = DataLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        text = stringResource(R.string.dashboard_kcal_left).uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-            }
+    AzfHeroSurface(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FuelRing(nutrition = nutrition)
+            Spacer(Modifier.width(20.dp))
+            MacroMiniBars(nutrition = nutrition, modifier = Modifier.weight(1f))
         }
         Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
 
@@ -225,40 +203,6 @@ internal fun CaloriesRemainingCard(
                 modifier = Modifier.weight(1f),
             )
         }
-    }
-}
-
-/** Full-width macro bars: protein green, carbs aqua, fat coral. */
-@Composable
-internal fun MacroCard(nutrition: LocalDailyNutrition, modifier: Modifier = Modifier) {
-    val extended = LocalAzfExtended.current
-    AzfCard(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.nutrition_macros).uppercase(),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
-        MacroRow(
-            label = stringResource(R.string.macro_protein),
-            consumed = nutrition.proteinConsumed,
-            target = nutrition.proteinTarget,
-            color = extended.secondaryFixedDim,
-        )
-        Spacer(Modifier.height(12.dp))
-        MacroRow(
-            label = stringResource(R.string.macro_carbs),
-            consumed = nutrition.carbsConsumed,
-            target = nutrition.carbsTarget,
-            color = extended.primaryFixedDim,
-        )
-        Spacer(Modifier.height(12.dp))
-        MacroRow(
-            label = stringResource(R.string.macro_fat),
-            consumed = nutrition.fatConsumed,
-            target = nutrition.fatTarget,
-            color = extended.coral,
-        )
     }
 }
 
@@ -352,7 +296,7 @@ internal fun MicronutrientCard(
     }
 }
 
-/** Four quick actions: photo, barcode, copy-previous, meal plan. */
+/** Four quick actions in one thumb-width row: photo, barcode, copy-previous, meal plan. */
 @Composable
 internal fun QuickActions(
     copying: Boolean,
@@ -363,54 +307,44 @@ internal fun QuickActions(
     onMealPlan: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            QuickAction(
-                icon = Icons.Outlined.PhotoCamera,
-                title = stringResource(R.string.quick_scan_title),
-                subtitle = stringResource(R.string.quick_scan_sub),
-                onClick = onCaptureMeal,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(12.dp))
-            QuickAction(
-                icon = Icons.Outlined.QrCodeScanner,
-                title = stringResource(R.string.quick_barcode_title),
-                subtitle = stringResource(
-                    if (barcodeEnabled) R.string.quick_barcode_sub else R.string.quick_barcode_unavailable,
-                ),
-                enabled = barcodeEnabled,
-                onClick = onScanBarcode,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(modifier = Modifier.fillMaxWidth()) {
-            QuickAction(
-                icon = Icons.Outlined.ContentCopy,
-                title = stringResource(
-                    if (copying) R.string.quick_copy_busy else R.string.quick_copy_title,
-                ),
-                subtitle = stringResource(R.string.quick_copy_sub),
-                enabled = !copying,
-                accent = LocalAzfExtended.current.secondaryFixedDim,
-                onClick = onCopyPrevious,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(12.dp))
-            QuickAction(
-                icon = Icons.Outlined.RestaurantMenu,
-                title = stringResource(R.string.quick_meal_plan_title),
-                subtitle = stringResource(R.string.quick_meal_plan_sub),
-                accent = LocalAzfExtended.current.secondaryFixedDim,
-                onClick = onMealPlan,
-                modifier = Modifier.weight(1f),
-            )
-        }
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        QuickAction(
+            icon = Icons.Outlined.PhotoCamera,
+            title = stringResource(R.string.quick_scan_title),
+            onClick = onCaptureMeal,
+            modifier = Modifier.weight(1f),
+        )
+        QuickAction(
+            icon = Icons.Outlined.QrCodeScanner,
+            title = stringResource(R.string.quick_barcode_title),
+            enabled = barcodeEnabled,
+            onClick = onScanBarcode,
+            modifier = Modifier.weight(1f),
+        )
+        QuickAction(
+            icon = Icons.Outlined.ContentCopy,
+            title = stringResource(
+                if (copying) R.string.quick_copy_busy else R.string.quick_copy_title,
+            ),
+            enabled = !copying,
+            accent = LocalAzfExtended.current.secondaryFixedDim,
+            onClick = onCopyPrevious,
+            modifier = Modifier.weight(1f),
+        )
+        QuickAction(
+            icon = Icons.Outlined.RestaurantMenu,
+            title = stringResource(R.string.quick_meal_plan_title),
+            accent = LocalAzfExtended.current.secondaryFixedDim,
+            onClick = onMealPlan,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
-/** One meal-type block of the timeline: header, logs (or a tap-to-add row). */
+/**
+ * One meal as a card. An empty slot is one line with one button, so a day of
+ * unlogged meals reads as a short list of options rather than a wall of gaps.
+ */
 @Composable
 internal fun MealSection(
     mealType: MealType,
@@ -420,95 +354,95 @@ internal fun MealSection(
     onDelete: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val extended = LocalAzfExtended.current
     val label = stringResource(NutritionFormat.mealLabelRes(mealType))
-    Column(modifier = modifier.fillMaxWidth()) {
+    val addLabel = stringResource(R.string.timeline_add_to, label)
+    val interaction = remember { MutableInteractionSource() }
+    AzfCard(tier = AzfCardTier.Compact, modifier = modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = NutritionFormat.mealIcon(mealType),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+            Box(
                 modifier = Modifier
-                    .padding(start = 8.dp)
-                    .weight(1f),
-            )
-            if (logs.isNotEmpty()) {
-                Text(
-                    text = stringResource(
-                        R.string.kcal_value,
-                        NutritionFormat.fmtInt(logs.sumOf { it.kcal }),
-                    ),
-                    style = DataSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            IconButton(
-                onClick = onAdd,
-                modifier = Modifier.size(AzfSpacing.TouchTarget),
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.AddCircleOutline,
-                    contentDescription = stringResource(R.string.timeline_add_to, label),
-                    tint = MaterialTheme.colorScheme.primary,
+                    imageVector = NutritionFormat.mealIcon(mealType),
+                    contentDescription = null,
+                    tint = extended.primaryFixedDim,
+                    modifier = Modifier.size(20.dp),
                 )
             }
-        }
-        Spacer(Modifier.height(8.dp))
-        if (logs.isEmpty()) {
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(AzfShapes.Inner)
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .border(
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        AzfShapes.Inner,
+                    .padding(start = 12.dp)
+                    .weight(1f),
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = if (logs.isEmpty()) {
+                        stringResource(R.string.timeline_not_logged)
+                    } else {
+                        stringResource(R.string.kcal_value, NutritionFormat.fmtInt(logs.sumOf { it.kcal }))
+                    },
+                    style = if (logs.isEmpty()) MaterialTheme.typography.labelSmall else DataSmall,
+                    color = if (logs.isEmpty()) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(AzfSpacing.TouchTarget)
+                    .pressScale(interaction)
+                    .clip(CircleShape)
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        role = Role.Button,
+                        onClickLabel = addLabel,
+                        onClick = onAdd,
                     )
-                    .clickable(role = Role.Button, onClick = onAdd)
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .semantics { contentDescription = addLabel },
+                contentAlignment = Alignment.Center,
             ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(AzfShapes.Inner)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (logs.isEmpty()) {
+                                extended.ctaGradient
+                            } else {
+                                SolidColor(extended.primaryFixedDim.copy(alpha = 0.14f))
+                            },
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.PhotoCamera,
+                        imageVector = Icons.Outlined.Add,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.outline,
-                    )
-                }
-                Column(modifier = Modifier.padding(start = 12.dp)) {
-                    Text(
-                        text = stringResource(R.string.timeline_not_logged),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = stringResource(R.string.timeline_tap_to_add, label.lowercase()),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (logs.isEmpty()) AzfColors.OnPrimary else extended.primaryFixedDim,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
-        } else {
-            logs.forEachIndexed { index, log ->
-                if (index > 0) Spacer(Modifier.height(8.dp))
-                MealLogRow(
-                    log = log,
-                    mealLabel = label,
-                    onEdit = { onEdit(log.localId) },
-                    onDelete = { onDelete(log.localId) },
-                )
-            }
+        }
+        logs.forEach { log ->
+            Spacer(Modifier.height(10.dp))
+            MealLogRow(
+                log = log,
+                mealLabel = label,
+                onEdit = { onEdit(log.localId) },
+                onDelete = { onDelete(log.localId) },
+            )
         }
     }
 }
@@ -520,7 +454,13 @@ private fun MealLogRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    AzfCard(tier = AzfCardTier.Compact, modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(AzfShapes.Inner)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 2.dp),
+    ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Text(
                 text = log.title,
@@ -534,7 +474,7 @@ private fun MealLogRow(
                 text = stringResource(R.string.kcal_value, NutritionFormat.fmtInt(log.kcal)),
                 style = DataSmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 12.dp),
+                modifier = Modifier.padding(start = 12.dp, end = 8.dp),
             )
         }
         if (log.itemsLine.isNotBlank()) {
@@ -819,7 +759,6 @@ private fun MicroRow(labelRes: Int, value: String) {
 private fun QuickAction(
     icon: ImageVector,
     title: String,
-    subtitle: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -831,12 +770,8 @@ private fun QuickAction(
         modifier = modifier
             .alpha(if (enabled) 1f else 0.5f)
             .pressScale(interaction)
-            .clip(AzfShapes.Card)
+            .clip(AzfShapes.Inner)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-                AzfShapes.Card,
-            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -844,19 +779,25 @@ private fun QuickAction(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .padding(16.dp),
+            .padding(horizontal = 6.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = tint)
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        }
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            modifier = Modifier.padding(top = 6.dp),
         )
     }
 }
@@ -902,14 +843,6 @@ private fun CaloriesRemainingCardPreview() {
         Column(Modifier.padding(16.dp)) {
             CaloriesRemainingCard(nutrition = previewNutrition, kcalBurned = 320.0)
         }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF0E1416)
-@Composable
-private fun MacroCardPreview() {
-    AzfTheme {
-        Column(Modifier.padding(16.dp)) { MacroCard(previewNutrition) }
     }
 }
 

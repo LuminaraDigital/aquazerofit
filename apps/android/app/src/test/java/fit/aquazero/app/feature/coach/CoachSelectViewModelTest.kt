@@ -158,6 +158,8 @@ class CoachSelectViewModelTest {
             assertEquals(target.persona.firstName, (event as CoachSelectEvent.Switched).coachName)
             assertEquals(listOf("sanzo"), repository.selectCalls)
             assertNull(viewModel.uiState.value.switchingCoachId)
+            assertTrue(viewModel.uiState.value.cards.first { it.persona.id == "sanzo" }.active)
+            assertFalse(viewModel.uiState.value.cards.first { it.persona.id == freeId }.active)
         }
 
     @Test

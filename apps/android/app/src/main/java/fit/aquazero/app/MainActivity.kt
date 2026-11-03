@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
                     LocalContentColor provides MaterialTheme.colorScheme.onBackground,
                 ) {
                     AzfNavigation()
+                    IntroVideo()
                 }
             }
         }

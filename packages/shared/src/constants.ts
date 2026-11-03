@@ -112,26 +112,20 @@ export type CreditTask = keyof typeof CREDIT_COSTS;
 export const FREE_TIER_DAILY_CREDITS = 10;
 
 /**
- * The paid daily allowance. Fifteen times the free tier.
+ * The paid daily allowance. Six times the free tier, and a cap.
  *
- * Sized against the margin rather than against a round number. A chat turn on
- * the 70B lane costs roughly $0.0015 all-in, so a subscriber who genuinely
- * spent this every day for a month runs to about $7 - against a $9.99
- * subscription that nets nearer $8.49 after the store's cut. That is thin but
- * positive. At the 300 this started as, the same user costs about $14 and the
- * plan loses money on precisely the people most likely to buy it: a cap only
- * matters for the heaviest users, so it has to be set where the heaviest user
- * is still profitable, not where the median one is.
+ * mealPhoto costs 3, so a day spent only on photographs is 20 analyses.
+ * The previous 150 was 50 analyses, which is the volume that can outrun a
+ * Play monthly take-home of about A$7.72 on the A$9.99 price. This file does
+ * not price a provider call. The ledger is the ceiling: 60 credits a day,
+ * banked at most two days (see maxBankedCreditsFor). A chat turn costs 1,
+ * and a consented memory extraction costs 1 more.
  *
- * Deliberately the conservative direction of travel. Raising a published
- * allowance is a pleasant announcement; lowering one is a broken promise, and
- * the users who notice are the subscribers.
- *
- * Not the only ceiling: this bounds one account, and the deployment-level
- * AZF_DAILY_TOKEN_BUDGET bounds the aggregate. Neither substitutes for the
- * other - a thousand well-behaved subscribers are still a bill nobody capped.
+ * A month of daily grants is 1,800 credits. The deployment-level
+ * AZF_DAILY_TOKEN_BUDGET still bounds the fleet. Neither ceiling replaces
+ * the other.
  */
-export const PREMIUM_TIER_DAILY_CREDITS = 150;
+export const PREMIUM_TIER_DAILY_CREDITS = 60;
 
 /** Daily allowance for a tier. The single source both the grant and the UI read. */
 export function dailyCreditsFor(tier: 'free' | 'premium'): number {

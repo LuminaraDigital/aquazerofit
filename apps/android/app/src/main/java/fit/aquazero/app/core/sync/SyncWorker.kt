@@ -35,22 +35,13 @@ import fit.aquazero.app.core.telemetry.CrashReporter
 class SyncWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
+    private val outboxDrainCoordinator: OutboxDrainCoordinator,
     private val outboxRepository: OutboxRepository,
-    private val logsDao: LogsDao,
-    private val logsApi: LogsApi,
-    private val syncScheduler: SyncScheduler,
     private val crashReporter: CrashReporter,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val drainer = OutboxDrainer(
-            outboxRepository = outboxRepository,
-            logsDao = logsDao,
-            logsApi = logsApi,
-            syncScheduler = syncScheduler,
-            crashReporter = crashReporter,
-        )
-        val result = when (drainer.drain()) {
+        val result = when (outboxDrainCoordinator.runDrainPass()) {
             OutboxDrainer.DrainResult.SETTLED -> Result.success()
             OutboxDrainer.DrainResult.RETRY -> Result.retry()
         }

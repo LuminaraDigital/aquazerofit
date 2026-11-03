@@ -10,9 +10,13 @@ import android.os.Build
 import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,7 +40,6 @@ import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -51,13 +54,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -74,25 +74,23 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
+import fit.aquazero.app.core.designsystem.AzfMotion
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.DataLarge
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
-import fit.aquazero.app.core.designsystem.RingProgress
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.TabularNumbers
 import fit.aquazero.app.core.designsystem.ToastController
-import fit.aquazero.app.core.designsystem.pressScale
+import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.model.WorkoutSessionDto
 import fit.aquazero.app.core.service.WorkoutLiveService
 import fit.aquazero.app.core.service.WorkoutLiveService.LiveWorkoutAction
-import fit.aquazero.app.core.ui.CoachAvatar
 import fit.aquazero.app.core.ui.CoachRoster
 
 /**
@@ -454,6 +452,8 @@ private fun OverviewBody(
     }
 }
 
+private const val PHASE_ENTER_SCALE = 0.97f
+
 /** Work + rest phases share the progress header and the "next up" footer. */
 @Composable
 private fun GuidedBody(
@@ -478,18 +478,30 @@ private fun GuidedBody(
         SessionProgressHeader(state = state)
         Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
 
-        if (state.phase == SessionPhase.WORK) {
-            WorkCard(
-                state = state,
-                entry = entry,
-                onCompleteSet = onCompleteSet,
-                onSkipExercise = onSkipExercise,
-                onWeightChange = onWeightChange,
-                onRepsChange = onRepsChange,
-                onRirChange = onRirChange,
-            )
-        } else {
-            RestCard(state = state, entry = entry, onSkipRest = onSkipRest)
+        val reducedMotion = rememberReducedMotion()
+        AnimatedContent(
+            targetState = state.phase == SessionPhase.WORK,
+            transitionSpec = {
+                val enter = if (reducedMotion) 0 else AzfMotion.ScreenEnterMs
+                val exit = if (reducedMotion) 0 else AzfMotion.ScreenExitMs
+                (fadeIn(tween(enter)) + scaleIn(tween(enter), initialScale = PHASE_ENTER_SCALE)) togetherWith
+                    fadeOut(tween(exit))
+            },
+            label = "sessionPhase",
+        ) { working ->
+            if (working) {
+                WorkCard(
+                    state = state,
+                    entry = entry,
+                    onCompleteSet = onCompleteSet,
+                    onSkipExercise = onSkipExercise,
+                    onWeightChange = onWeightChange,
+                    onRepsChange = onRepsChange,
+                    onRirChange = onRirChange,
+                )
+            } else {
+                RestCard(state = state, entry = entry, onSkipRest = onSkipRest)
+            }
         }
 
         state.nextUp?.let { next ->
@@ -514,242 +526,6 @@ private fun GuidedBody(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun SessionProgressHeader(state: WorkoutSessionUiState) {
-    val label = stringResource(R.string.session_progress_label)
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResource(
-                    R.string.session_progress_exercise,
-                    state.exerciseIndex + 1,
-                    state.entries.size,
-                ),
-                style = DataSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = stringResource(
-                    R.string.session_progress_sets,
-                    state.completedSets,
-                    state.totalSets,
-                ),
-                style = DataSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        LinearProgressIndicator(
-            progress = { state.progress },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(AzfShapes.Pill)
-                .semantics { contentDescription = label },
-            color = LocalAzfExtended.current.primaryFixedDim,
-            trackColor = LocalAzfExtended.current.ringTrack,
-            gapSize = 0.dp,
-            drawStopIndicator = {},
-        )
-    }
-}
-
-@Composable
-private fun WorkCard(
-    state: WorkoutSessionUiState,
-    entry: ResolvedEntry,
-    onCompleteSet: () -> Unit,
-    onSkipExercise: () -> Unit,
-    onWeightChange: (String) -> Unit,
-    onRepsChange: (String) -> Unit,
-    onRirChange: (String) -> Unit,
-) {
-    val setNumber = state.currentSetsDone + 1
-    AzfCard(tier = AzfCardTier.Hero, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.session_current_exercise).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = LocalAzfExtended.current.primaryFixedDim,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = entry.name.uppercase(),
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = stringResource(R.string.session_target, TrainingFormat.targetLine(entry)),
-            style = DataSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        entry.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-            Text(
-                text = notes,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-        }
-
-        Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ActualField(
-                value = state.actual.weightKg,
-                onValueChange = onWeightChange,
-                label = stringResource(R.string.session_weight_kg),
-                description = stringResource(R.string.session_weight_cd, setNumber, entry.name),
-                placeholder = stringResource(R.string.session_bodyweight_hint),
-                decimal = true,
-                modifier = Modifier.weight(1f),
-            )
-            ActualField(
-                value = state.actual.reps,
-                onValueChange = onRepsChange,
-                label = stringResource(R.string.session_reps),
-                description = stringResource(R.string.session_reps_cd, setNumber, entry.name),
-                decimal = false,
-                modifier = Modifier.weight(1f),
-            )
-            ActualField(
-                value = state.actual.rir,
-                onValueChange = onRirChange,
-                label = stringResource(R.string.session_rir),
-                description = stringResource(R.string.session_rir_cd, setNumber, entry.name),
-                decimal = true,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        Spacer(modifier = Modifier.height(AzfSpacing.SectionGap))
-        TapTarget(
-            setNumber = setNumber,
-            totalSets = entry.sets,
-            exerciseName = entry.name,
-            onClick = onCompleteSet,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        )
-        Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-        SecondaryButton(
-            text = stringResource(R.string.session_skip_exercise),
-            onClick = onSkipExercise,
-        )
-    }
-}
-
-/** The very large primary action of the whole screen: one tap banks a set. */
-@Composable
-private fun TapTarget(
-    setNumber: Int,
-    totalSets: Int,
-    exerciseName: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val description = stringResource(
-        R.string.session_complete_set_cd,
-        setNumber,
-        totalSets,
-        exerciseName,
-    )
-    Box(
-        modifier = modifier
-            .size(TAP_TARGET_SIZE.dp)
-            .pressScale(interaction)
-            .clip(AzfShapes.Pill)
-            .background(LocalAzfExtended.current.ctaGradient)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            )
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = stringResource(R.string.session_set_counter, setNumber, totalSets),
-                style = DataLarge.copy(fontSize = 40.sp, lineHeight = 44.sp),
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
-            Text(
-                text = stringResource(R.string.session_tap_when_done).uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
-        }
-    }
-}
-
-@Composable
-private fun RestCard(
-    state: WorkoutSessionUiState,
-    entry: ResolvedEntry,
-    onSkipRest: () -> Unit,
-) {
-    val remaining = stringResource(R.string.session_rest_remaining_cd, state.restLeftSeconds)
-    val persona = CoachRoster.resolve(state.coachId)
-    AzfCard(tier = AzfCardTier.Hero, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            CoachAvatar(
-                persona = persona,
-                size = 40.dp,
-            )
-            Text(
-                text = stringResource(R.string.session_rest_coach_line, persona.firstName),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = AzfSpacing.ElementGapSmall),
-            )
-        }
-        Spacer(modifier = Modifier.height(AzfSpacing.ElementGapSmall))
-        Text(
-            text = stringResource(R.string.session_rest).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = LocalAzfExtended.current.secondaryFixedDim,
-        )
-        Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-        RingProgress(
-            progress = state.restProgress,
-            size = 176.dp,
-            strokeWidth = 10.dp,
-            color = LocalAzfExtended.current.secondaryFixedDim,
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                // Description only, never a live region: re-announcing the
-                // countdown once a second would talk over the user's rest.
-                // Cleared, not merely described: the bare seconds Text inside
-                // the ring is otherwise a second stop reading just "45".
-                .clearAndSetSemantics { contentDescription = remaining },
-        ) {
-            Text(
-                text = state.restLeftSeconds.toString(),
-                style = DataLarge.copy(fontSize = 44.sp, lineHeight = 48.sp),
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-        Text(
-            text = stringResource(R.string.session_rest_body, entry.name),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        )
-        Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-        SecondaryButton(text = stringResource(R.string.session_skip_rest), onClick = onSkipRest)
     }
 }
 
@@ -913,7 +689,7 @@ private fun MetaStat(value: String, label: String) {
 }
 
 @Composable
-private fun ActualField(
+internal fun ActualField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
@@ -1008,8 +784,6 @@ private fun Context.findActivity(): Activity? {
     }
     return null
 }
-
-private const val TAP_TARGET_SIZE = 176
 
 @Preview(showBackground = true, backgroundColor = 0xFF0E1416)
 @Composable

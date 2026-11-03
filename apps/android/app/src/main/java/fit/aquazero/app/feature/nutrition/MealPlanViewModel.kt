@@ -8,6 +8,7 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.data.CatalogRepository
 import fit.aquazero.app.core.data.MealSuggestionRepository
+import fit.aquazero.app.core.data.ProfileRepository
 import fit.aquazero.app.core.data.SuggestionFeedback
 import fit.aquazero.app.core.database.RecipeEntity
 import fit.aquazero.app.core.model.ApiResult
@@ -28,15 +29,17 @@ data class MealPlanSlot(
     val mealType: MealType,
     val loading: Boolean = true,
     val recommendation: MealRecommendationDto? = null,
-    /** True when generation failed — a per-slot retry, never a whole-page error. */
+    /** True when generation failed. One slot retries; the page stays up. */
     val failed: Boolean = false,
+    /** Copy for [failed]. Credits get their own line; everything else retries. */
+    @param:StringRes val failureMessageRes: Int = R.string.meal_plan_slot_failed,
     val logged: Boolean = false,
     val logging: Boolean = false,
     val feedback: SuggestionFeedback? = null,
 ) {
     /**
      * True when the suggestion came from the server's deterministic path
-     * rather than a model — the honest answer when AI personalisation is off,
+     * rather than a model. The honest answer when AI personalisation is off,
      * and worth saying rather than passing off as AI.
      */
     val deterministic: Boolean
@@ -49,8 +52,17 @@ data class MealPlanUiState(
     val slots: List<MealPlanSlot> = NutritionFormat.MEAL_TYPES.map { MealPlanSlot(it) },
     val kcalTarget: Double? = null,
     val proteinTarget: Double? = null,
+    /**
+     * Leftover budget from the last suggestion. Target minus meals already
+     * logged. Not a base to add this screen's unlogged suggestions onto.
+     */
+    val remainingKcal: Double? = null,
+    val remainingProteinG: Double? = null,
+    /** Stored daily targets. The same numbers the dashboard rings use. */
+    val storedKcalTarget: Double? = null,
+    val storedProteinTarget: Double? = null,
     val recipes: List<RecipeEntity> = emptyList(),
-    /** No suggestion could be fetched at all — the online-only explanation. */
+    /** No suggestion could be fetched at all. The online-only explanation. */
     val offline: Boolean = false,
 ) {
     private val ready: List<MealRecommendationDto>
@@ -82,7 +94,7 @@ sealed interface MealPlanEvent {
  * usable, and gives that one a retry rather than replacing the page with an
  * error.
  *
- * Nothing is logged without an explicit tap (product invariant 1) — there is no
+ * Nothing is logged without an explicit tap (product invariant 1). There is no
  * auto-log, and the button disables itself once used so a double tap cannot
  * create two meals.
  */
@@ -90,6 +102,7 @@ sealed interface MealPlanEvent {
 class MealPlanViewModel @Inject constructor(
     private val suggestionRepository: MealSuggestionRepository,
     private val catalogRepository: CatalogRepository,
+    private val profileRepository: ProfileRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MealPlanUiState())
@@ -105,6 +118,17 @@ class MealPlanViewModel @Inject constructor(
             }
         }
         viewModelScope.launch { catalogRepository.refreshRecipes() }
+        viewModelScope.launch {
+            profileRepository.targets().collect { entity ->
+                _uiState.value = _uiState.value.copy(
+                    storedKcalTarget = entity?.kcalTarget?.takeIf { it > 0.0 },
+                    storedProteinTarget = entity?.proteinG?.takeIf { it > 0.0 },
+                ).withResolvedTargets()
+            }
+        }
+        // Rings and this header must agree. Remaining-only would under-count
+        // once any meal is already logged.
+        viewModelScope.launch { profileRepository.refreshProfileAndTargets() }
         regenerateAll()
     }
 
@@ -131,19 +155,22 @@ class MealPlanViewModel @Inject constructor(
                     }
                     _uiState.value = _uiState.value.copy(
                         offline = false,
-                        kcalTarget = result.data.remainingKcal?.let { remaining ->
-                            // `remaining` is what is LEFT today; adding what the
-                            // plan already covers reconstructs the day's target
-                            // without a second call.
-                            remaining + _uiState.value.plannedKcal
-                        } ?: _uiState.value.kcalTarget,
-                        proteinTarget = result.data.remainingProteinG?.let { remaining ->
-                            remaining + _uiState.value.plannedProteinG
-                        } ?: _uiState.value.proteinTarget,
-                    )
+                        // `remaining` is already the day's leftover budget.
+                        // Adding planned kcal/protein double-counted the plan
+                        // (play-test: 1,500 of 4,240 against a 2,740 target).
+                        remainingKcal = result.data.remainingKcal ?: _uiState.value.remainingKcal,
+                        remainingProteinG = result.data.remainingProteinG
+                            ?: _uiState.value.remainingProteinG,
+                    ).withResolvedTargets()
                 }
                 is ApiResult.Failure -> {
-                    updateSlot(mealType) { it.copy(loading = false, failed = true) }
+                    updateSlot(mealType) {
+                        it.copy(
+                            loading = false,
+                            failed = true,
+                            failureMessageRes = mealPlanFailureMessageRes(result),
+                        )
+                    }
                     if (result is ApiResult.Failure.Network) {
                         _uiState.value = _uiState.value.copy(offline = true)
                     }

@@ -3,9 +3,10 @@ package fit.aquazero.app.core.network.api
 import fit.aquazero.app.core.model.UserTier
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
 
-/** Body for `POST /billing/play/verify` — the token Play handed the client. */
+/** Body for `POST /billing/play/verify` - the token Play handed the client. */
 @Serializable
 data class PlayVerifyRequest(
     val purchaseToken: String,
@@ -23,7 +24,7 @@ data class PlayVerifyRequest(
  * the entitlement decision on the device, where the user owns both ends of it.
  *
  * [premiumUntil] is decoded so a contract mismatch is not silently tolerated,
- * and deliberately not stored — a cached expiry is a claim that keeps being
+ * and deliberately not stored - a cached expiry is a claim that keeps being
  * true on the device after it has stopped being true on the server.
  */
 @Serializable
@@ -34,16 +35,34 @@ data class PlayVerificationDto(
 )
 
 /**
- * `/billing/…` — Google Play purchase verification.
+ * `/billing/…` - Google Play purchase verification.
  *
  * Errors this route raises, and what each means to the caller
- * (`apps/api` billing router): `400 VALIDATION_FAILED` — the token or product
- * id was malformed; `402 PURCHASE_INVALID` — Google itself rejected the token,
+ * (`apps/api` billing router): `400 VALIDATION_FAILED` - the token or product
+ * id was malformed; `402 PURCHASE_INVALID` - Google itself rejected the token,
  * so there is nothing to grant and nothing to acknowledge; `503
- * BILLING_UNAVAILABLE` — the server has no Play credentials configured, which
+ * BILLING_UNAVAILABLE` - the server has no Play credentials configured, which
  * is an outage rather than a verdict on the purchase and must be retried.
  */
+
+/**
+ * `GET /billing/config`. Only [play] is read here. `available` defaults false
+ * so a body that omits it cannot turn the buy button on.
+ */
+@Serializable
+data class BillingConfigDto(
+    val play: PlayBillingConfigDto = PlayBillingConfigDto(),
+)
+
+@Serializable
+data class PlayBillingConfigDto(
+    val available: Boolean = false,
+)
+
 interface BillingApi {
+
+    @GET("billing/config")
+    suspend fun billingConfig(): BillingConfigDto
 
     @POST("billing/play/verify")
     suspend fun verifyPlayPurchase(@Body body: PlayVerifyRequest): PlayVerificationDto

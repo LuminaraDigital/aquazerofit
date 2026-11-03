@@ -17,6 +17,7 @@ import type {
   MockChatContext,
   MockMemoryContext,
   MockNutritionContext,
+  MockNutritionFood,
   MockPlanContext,
   MockProfileContext,
   MockProgressContext,
@@ -26,7 +27,7 @@ import { byIdDoc, localToday, readTargets, round1, whereDocs } from '../ai/util'
 // Deliberate team-boundary exceptions (same as the router's hasConsent import):
 // getProfile is the typed profile read (vs the duck-typed ai/util readProfile)
 // and getMemoryForPrompt is the memory module's only sanctioned prompt-facing
-// API — both are consent-aware read paths, not aggregation helpers.
+// API. Both are consent-aware read paths, not aggregation helpers.
 import { getProfile } from '../me/service';
 import { getMemoryForPrompt } from '../memory/service';
 import { computeConsistency, computeStreak, type UserActivity } from '../progress/service';
@@ -56,6 +57,21 @@ export async function getTodayNutrition(
   const fatConsumed = meals.reduce((s, m) => s + (m.totalFatG ?? 0), 0);
   const waterConsumed = water.reduce((s, w) => s + (w.amountMl ?? 0), 0);
 
+  // Names, not just totals. A totals-only payload is how "what did I eat"
+  // becomes "no meal data" even when mealsLogged is above zero. Capped so a
+  // long day cannot blow the context window. The names are user-authored and
+  // stay inside the untrusted context block.
+  const foods: MockNutritionFood[] = [];
+  for (const meal of meals) {
+    for (const item of meal.items ?? []) {
+      const name = typeof item.name === 'string' ? item.name.trim() : '';
+      if (!name) continue;
+      foods.push({ name, mealType: meal.mealType });
+      if (foods.length >= 12) break;
+    }
+    if (foods.length >= 12) break;
+  }
+
   const data: MockNutritionContext = {
     kcalTarget: targets.kcalTarget,
     kcalConsumed: round1(kcalConsumed),
@@ -65,6 +81,7 @@ export async function getTodayNutrition(
     fatG: { consumed: round1(fatConsumed), target: targets.fatG },
     waterMl: { consumed: Math.round(waterConsumed), target: targets.waterMl },
     mealsLogged: meals.length,
+    ...(foods.length > 0 ? { foods } : {}),
   };
   return {
     data,
@@ -82,14 +99,14 @@ export async function getTodayNutrition(
 
 export async function getCurrentPlan(
   userId: string,
+  localDate: string = localToday(),
 ): Promise<ToolOutcome<{ plan: TrainingPlan | null; summary: MockPlanContext | null }>> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const plans = await whereDocs<TrainingPlan>('plans', (d: any) => {
     return d?.userId === userId && d?.type === 'trainingPlan';
   });
-  const today = localToday();
   const active = plans
-    .filter((p) => p.endDate == null || p.endDate >= today)
+    .filter((p) => p.endDate == null || p.endDate >= localDate)
     .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0];
   const plan = active ?? null;
   const summary: MockPlanContext | null = plan
@@ -137,7 +154,7 @@ export async function getTodayWorkout(
   }
 
   // Otherwise derive today's day from the active plan.
-  const { data: planData } = await getCurrentPlan(userId);
+  const { data: planData } = await getCurrentPlan(userId, localDate);
   const plan = planData.plan;
   if (!plan || plan.days.length === 0) {
     return {
@@ -187,7 +204,10 @@ export async function getTodayWorkout(
 
 // ---------------------------------------------------------------------------
 
-export async function getProgressSummary(userId: string): Promise<ToolOutcome<MockProgressContext>> {
+export async function getProgressSummary(
+  userId: string,
+  localDate: string = localToday(),
+): Promise<ToolOutcome<MockProgressContext>> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userLogs = await whereDocs<MealLog | WaterLog | WeightLog>('logs', (d: any) => d?.userId === userId);
   const weights = userLogs
@@ -211,20 +231,19 @@ export async function getProgressSummary(userId: string): Promise<ToolOutcome<Mo
   // punished), not an aggregation detail. A second local implementation is how
   // the coach ends up consoling a user over a broken streak the UI is telling
   // them is intact. Both functions are pure over the activity they are handed.
-  const today = localToday();
   const activity: UserActivity = {
     meals: userLogs.filter((d): d is MealLog => d.type === 'mealLog'),
     waters: userLogs.filter((d): d is WaterLog => d.type === 'waterLog'),
     weights,
     completedSessions,
   };
-  const consistency = computeConsistency(activity, today);
+  const consistency = computeConsistency(activity, localDate);
 
   const data: MockProgressContext = {
     currentWeightKg: current,
     startWeightKg: start,
     deltaKg,
-    streakDays: computeStreak(activity, today),
+    streakDays: computeStreak(activity, localDate),
     activeDays: consistency.activeDays,
     windowDays: consistency.windowDays,
     bestDays: consistency.bestDays,
@@ -250,14 +269,16 @@ export interface GatheredContext {
 
 /**
  * Consent-off variant (aiPersonalisation === false): no profile or log data is
- * read or injected into model context. Chat still works generically — each
+ * read or injected into model context. Chat still works generically. Each
  * grounding tool reports that personalisation is off instead of returning data.
+ * `personalisation: 'off'` is the signal the model and the offline engine read.
+ * Null nutrition alone is not that signal: it looks like an empty day.
  */
-export function gatherChatContextDenied(userName?: string): GatheredContext {
-  const denied = 'not available — personalisation off';
+export function gatherChatContextDenied(): GatheredContext {
+  const denied = 'not available, personalisation off';
   return {
     context: {
-      userName,
+      personalisation: 'off',
       nutrition: null,
       workout: null,
       plan: null,
@@ -283,7 +304,7 @@ export async function gatherChatContext(
   userName?: string,
 ): Promise<GatheredContext> {
   const toolCalls: ChatToolCall[] = [];
-  const context: MockChatContext = { userName };
+  const context: MockChatContext = { userName, personalisation: 'on' };
 
   try {
     const nutrition = await getTodayNutrition(userId, localDate);
@@ -300,21 +321,21 @@ export async function gatherChatContext(
     context.workout = null;
   }
   try {
-    const plan = await getCurrentPlan(userId);
+    const plan = await getCurrentPlan(userId, localDate);
     context.plan = plan.data.summary;
     toolCalls.push(plan.call);
   } catch {
     context.plan = null;
   }
   try {
-    const progress = await getProgressSummary(userId);
+    const progress = await getProgressSummary(userId, localDate);
     context.progress = progress.data;
     toolCalls.push(progress.call);
   } catch {
     context.progress = null;
   }
 
-  // Profile essentials (typed me/service read — consent already checked by the
+  // Profile essentials (typed me/service read; consent already checked by the
   // caller; this function only runs with aiPersonalisation on).
   try {
     const profile = getProfile(userId);

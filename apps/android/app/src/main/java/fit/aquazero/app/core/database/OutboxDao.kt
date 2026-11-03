@@ -55,6 +55,9 @@ interface OutboxDao {
     @Query("SELECT COUNT(*) FROM outbox WHERE state IN ('QUEUED', 'IN_FLIGHT')")
     fun liveCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM outbox WHERE state IN ('QUEUED', 'IN_FLIGHT')")
+    suspend fun liveCountOnce(): Int
+
     @Query(
         "UPDATE outbox SET state = :to, attempts = attempts + 1, " +
             "firstInFlightAt = CASE WHEN firstInFlightAt = 0 THEN :nowMs ELSE firstInFlightAt END " +

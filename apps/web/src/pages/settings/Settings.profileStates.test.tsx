@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     /** 'loaded' | 'absent' | 'failed' */
     state: 'loaded' as 'loaded' | 'absent' | 'failed',
     tier: 'free' as 'free' | 'premium',
+    activeBillingSources: undefined as Array<'play' | 'stripe' | 'stars' | 'admin'> | undefined,
     data: {
       userId: 'u1',
       weightKg: 70,
@@ -61,7 +62,10 @@ vi.mock('../../lib/queries', () => ({
     refetch: mocks.refetch,
   }),
   useEntitlements: () => ({
-    data: { tier: mocks.profile.tier },
+    data: {
+      tier: mocks.profile.tier,
+      activeBillingSources: mocks.profile.activeBillingSources,
+    },
   }),
   useConsents: () => ({
     data: {
@@ -104,6 +108,7 @@ function expectAccountControlsPresent(): void {
 beforeEach(() => {
   mocks.profile.state = 'loaded';
   mocks.profile.tier = 'free';
+  mocks.profile.activeBillingSources = undefined;
   Element.prototype.scrollIntoView = vi.fn() as unknown as Element['scrollIntoView'];
 });
 
@@ -130,6 +135,24 @@ describe('plan entry for a free account', () => {
     mocks.profile.tier = 'premium';
     renderSettings();
     expect(screen.queryByRole('link', { name: /your plan/i })).toBeNull();
+  });
+});
+
+describe('account deletion with a Play subscription', () => {
+  it('warns that deletion does not cancel Play billing', () => {
+    mocks.profile.tier = 'premium';
+    mocks.profile.activeBillingSources = ['play'];
+    renderSettings();
+
+    expect(screen.getByRole('note').textContent).toMatch(/does not cancel it/i);
+    fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
+    expect(screen.getByRole('dialog').textContent).toMatch(/cancel it in the play store/i);
+  });
+
+  it('stays quiet when there is no Play subscription', () => {
+    renderSettings();
+    expect(screen.queryByRole('note')).toBeNull();
+    expect(screen.queryByText(/play store/i)).toBeNull();
   });
 });
 

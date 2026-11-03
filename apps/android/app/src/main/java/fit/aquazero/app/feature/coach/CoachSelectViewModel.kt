@@ -144,9 +144,13 @@ class CoachSelectViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = coachesRepository.selectCoach(card.persona.id)) {
                 is ApiResult.Success -> {
+                    val activeId = result.data.activeCoachId
                     _uiState.value = _uiState.value.copy(
                         switchingCoachId = null,
                         experience = experience.accept(result.data.experience),
+                        cards = _uiState.value.cards.map {
+                            it.copy(active = it.persona.id == activeId)
+                        },
                     )
                     _events.send(CoachSelectEvent.Switched(card.persona.firstName))
                 }

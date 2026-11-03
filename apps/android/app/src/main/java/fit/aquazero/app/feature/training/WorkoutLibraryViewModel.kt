@@ -50,15 +50,15 @@ data class ExerciseCard(
     val difficulty: String,
     val equipmentNames: List<String>,
     /**
-     * CC-BY-SA attribution line for this exercise. Never null, never blank —
-     * rendering it on every card is a licence obligation (plan §5.6).
+     * CC-BY-SA attribution line for this exercise. Never null, never blank.
+     * Rendering it on every card is a licence obligation (plan §5.6).
      */
     val licence: String,
     val licenceAuthor: String,
     /**
      * Reviewed, exercise-specific art for this row, or null to draw the
      * equipment glyph. Generic category fallbacks are deliberately excluded
-     * here rather than at the call site — see
+     * here rather than at the call site - see
      * [ExerciseAttribution.isGenericFallback].
      */
     val thumbnail: ExerciseThumbnail? = null,
@@ -82,7 +82,7 @@ data class WorkoutLibraryUiState(
     val todayEntries: List<ResolvedEntry> = emptyList(),
     val isRestDay: Boolean = false,
     val filters: LibraryFilters = LibraryFilters(),
-    /** Exercises visible right now — grows a page at a time. */
+    /** Exercises visible right now - grows a page at a time. */
     val exercises: List<ExerciseCard> = emptyList(),
     /** Total matching the current filters (the pager denominator). */
     val totalMatches: Int = 0,
@@ -97,7 +97,7 @@ data class WorkoutLibraryUiState(
 ) {
     val hasMore: Boolean get() = exercises.size < totalMatches
 
-    /** Training days in the plan week — rest days excluded. */
+    /** Training days in the plan week - rest days excluded. */
     val trainingDays: Int get() = plan?.days?.count { !it.isRest } ?: 0
 
     val planDays: List<PlanDayDto> get() = plan?.days.orEmpty()
@@ -126,7 +126,7 @@ sealed interface WorkoutLibraryEvent {
  * **Paging deviation from the web, deliberate.** The web pages the server
  * (`/exercises?limit=&offset=`) on every keystroke. Here
  * [CatalogRepository.refreshExercises] bulk-caches the whole corpus through
- * that same paged envelope (always limit/offset — the bare route returns a
+ * that same paged envelope (always limit/offset - the bare route returns a
  * legacy array), and the list then pages out of Room. The library therefore
  * works in full offline, and filter changes cost no round trip. The corpus is
  * small enough for this by design (plan §4.1).
@@ -150,8 +150,8 @@ class WorkoutLibraryViewModel @Inject constructor(
     /**
      * The visible slice, straight out of SQL.
      *
-     * Every filter — including muscle and equipment, which used to be CSV
-     * columns post-filtered in memory — is now a predicate in the query, so
+     * Every filter - including muscle and equipment, which used to be CSV
+     * columns post-filtered in memory - is now a predicate in the query, so
      * this reads exactly the rows the screen draws instead of a fixed 2000-row
      * window of the corpus. Growing the list re-queries with a larger LIMIT
      * rather than slicing a cached list, which is what lets the library survive
@@ -179,7 +179,7 @@ class WorkoutLibraryViewModel @Inject constructor(
      *
      * This used to be `matches.size` over the fetched window, so past 2000 rows
      * the screen under-reported the total and `hasMore` went false while
-     * matches were still unread — the list simply stopped, with no way to reach
+     * matches were still unread - the list simply stopped, with no way to reach
      * the rest.
      */
     private val matchCount: StateFlow<Int> = filters
@@ -283,7 +283,7 @@ class WorkoutLibraryViewModel @Inject constructor(
 
     /**
      * Generate a plan. Online-only (AI lane): a transport failure is reported
-     * as "needs a connection", never as data loss — the existing plan is
+     * as "needs a connection", never as data loss - the existing plan is
      * untouched. The server's deterministic fallback returns 200 with a plan
      * whose `generatedBy` says so, and is treated as an ordinary success.
      */
@@ -340,7 +340,7 @@ class WorkoutLibraryViewModel @Inject constructor(
         val result = plansRepository.refreshCurrentPlan()
         _uiState.value = _uiState.value.copy(
             loadingPlan = false,
-            // A 404 simply means "no plan yet" — the empty state, not an error.
+            // A 404 simply means "no plan yet" - the empty state, not an error.
             planError = result is ApiResult.Failure.Api && result.httpStatus != NOT_FOUND,
         )
     }
@@ -357,7 +357,20 @@ class WorkoutLibraryViewModel @Inject constructor(
                     isRestDay = envelope.rest || envelope.session == null,
                 )
             }
-            is ApiResult.Failure -> loadCachedToday(networkFailure = true)
+            is ApiResult.Failure -> if (todayWorkoutMissingPlan(result)) {
+                // 404 is "no plan yet", the same fact as the empty plan card.
+                // Treating it as a failed session painted "Session unavailable"
+                // above "No training plan yet".
+                _uiState.value = _uiState.value.copy(
+                    loadingToday = false,
+                    todayError = false,
+                    todaySession = null,
+                    todayEntries = emptyList(),
+                    isRestDay = false,
+                )
+            } else {
+                loadCachedToday(networkFailure = true)
+            }
         }
     }
 

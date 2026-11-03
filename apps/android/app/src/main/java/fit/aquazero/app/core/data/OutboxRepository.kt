@@ -33,6 +33,9 @@ class OutboxRepository @Inject constructor(
     /** Ops that will still run, FAILED excluded: zero means the queue has drained. */
     val liveCount: Flow<Int> = outboxDao.liveCount()
 
+    /** Snapshot of [liveCount] so foreground drain loops stop once only terminal FAILED ops remain. */
+    suspend fun liveCountOnce(): Int = outboxDao.liveCountOnce()
+
     /** Enqueue a CREATE with its freshly minted idempotency key. */
     suspend fun enqueueCreate(
         entityType: String,

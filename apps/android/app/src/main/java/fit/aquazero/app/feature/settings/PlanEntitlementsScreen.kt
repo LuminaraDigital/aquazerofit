@@ -1,6 +1,7 @@
 package fit.aquazero.app.feature.settings
 
 import androidx.activity.compose.LocalActivity
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -504,8 +505,7 @@ private fun UpgradeCard(
 
                 val activeOffer = offers.offerFor(selectedPeriod)
                 val ctaText = when {
-                    selectedPeriod == PlanPeriod.ANNUAL &&
-                        (activeOffer?.hasFreeTrial == true || annualOffer?.hasFreeTrial == true) ->
+                    selectedPeriod == PlanPeriod.ANNUAL && annualOffer?.hasFreeTrial == true ->
                         stringResource(R.string.plan_upgrade_cta_trial)
                     selectedPeriod == PlanPeriod.ANNUAL && activeOffer != null ->
                         stringResource(R.string.plan_upgrade_cta_annual, activeOffer.formattedPrice)
@@ -525,12 +525,14 @@ private fun UpgradeCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val termsText = if (selectedPeriod == PlanPeriod.ANNUAL && annualOffer != null) {
-                    stringResource(R.string.plan_upgrade_terms_annual, annualOffer.formattedPrice)
-                } else if (monthlyOffer != null) {
-                    stringResource(R.string.plan_upgrade_terms_monthly, monthlyOffer.formattedPrice)
-                } else {
-                    stringResource(R.string.plan_upgrade_terms)
+                val termsRes = upgradeTermsRes(offers, selectedPeriod)
+                val termsText = when (termsRes) {
+                    R.string.plan_upgrade_terms_annual,
+                    R.string.plan_upgrade_terms_annual_no_trial,
+                    -> stringResource(termsRes, annualOffer?.formattedPrice.orEmpty())
+                    R.string.plan_upgrade_terms_monthly ->
+                        stringResource(termsRes, monthlyOffer?.formattedPrice.orEmpty())
+                    else -> stringResource(termsRes)
                 }
 
                 Text(
@@ -540,6 +542,21 @@ private fun UpgradeCard(
                 )
             }
         }
+    }
+}
+
+@StringRes
+internal fun upgradeTermsRes(offers: PremiumOffers, selectedPeriod: PlanPeriod): Int {
+    val annualOffer = offers.annual
+    return when {
+        selectedPeriod == PlanPeriod.ANNUAL && annualOffer != null && annualOffer.hasFreeTrial ->
+            R.string.plan_upgrade_terms_annual
+        selectedPeriod == PlanPeriod.ANNUAL && annualOffer != null ->
+            R.string.plan_upgrade_terms_annual_no_trial
+        offers.monthly != null ->
+            R.string.plan_upgrade_terms_monthly
+        else ->
+            R.string.plan_upgrade_terms
     }
 }
 

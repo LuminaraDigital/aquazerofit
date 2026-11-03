@@ -231,6 +231,36 @@ fun SettingsScreen(
             item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_privacy_heading)) }
             item(contentType = "consent") { ConsentCard(state, viewModel) }
 
+            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_security_heading)) }
+            item(contentType = "device-security") {
+                val security = state.deviceSecurity
+                AzfCard(modifier = Modifier.fillMaxWidth()) {
+                    AzfSwitchRow(
+                        title = stringResource(R.string.security_app_lock_title),
+                        body = if (security.restrictions.forceAppLock) {
+                            stringResource(R.string.security_app_lock_managed_body)
+                        } else {
+                            stringResource(R.string.security_app_lock_body)
+                        },
+                        checked = security.effectiveAppLockEnabled,
+                        onCheckedChange = viewModel::setAppLockEnabled,
+                        enabled = !security.restrictions.forceAppLock,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    AzfSwitchRow(
+                        title = stringResource(R.string.security_screen_capture_title),
+                        body = if (security.restrictions.forceScreenCaptureProtection) {
+                            stringResource(R.string.security_screen_capture_managed_body)
+                        } else {
+                            stringResource(R.string.security_screen_capture_body)
+                        },
+                        checked = security.effectiveScreenCaptureProtection,
+                        onCheckedChange = viewModel::setScreenCaptureProtectionEnabled,
+                        enabled = !security.restrictions.forceScreenCaptureProtection,
+                    )
+                }
+            }
+
             item(contentType = "nav-row") {
                 AzfNavigationRow(
                     title = stringResource(R.string.settings_memory_title),
@@ -265,9 +295,13 @@ fun SettingsScreen(
                     } else {
                         stringResource(R.string.settings_export_title)
                     },
-                    body = stringResource(R.string.settings_export_body),
+                    body = if (state.deviceSecurity.dataExportAllowed) {
+                        stringResource(R.string.settings_export_body)
+                    } else {
+                        stringResource(R.string.settings_export_disabled_by_policy)
+                    },
                     onClick = viewModel::exportData,
-                    enabled = !state.exporting,
+                    enabled = !state.exporting && state.deviceSecurity.dataExportAllowed,
                     icon = Icons.Outlined.Download,
                 )
             }

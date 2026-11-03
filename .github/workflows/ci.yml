@@ -61,6 +61,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Generate CycloneDX SBOMs (npm + Android)
+        run: npm run sbom
+
   # The runtime image copies node_modules itself. `npm test` cannot see a
   # package that the Dockerfile forgot to copy. The smoke step inside
   # apps/api/Dockerfile resolves the API import graph from the runtime stage

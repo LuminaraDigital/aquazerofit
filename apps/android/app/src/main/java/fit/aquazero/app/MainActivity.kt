@@ -1,33 +1,73 @@
 package fit.aquazero.app
 
+import android.app.Activity
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
+import android.os.SystemClock
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.navigation.DeepLinkStore
+import fit.aquazero.app.core.security.DeviceSecurityController
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import android.graphics.Color as AndroidColor
 
 /**
  * The single activity. Installs the splash screen, goes edge-to-edge with
- * dark system bars (the theme is dark-only), and hosts the Navigation 3 root.
+ * dark system bars (the theme is dark-only), enforces enterprise device
+ * security policies (`FLAG_SECURE`, background app-lock timeout, and MDM
+ * `RestrictionsManager` updates), and hosts the Navigation 3 root.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var deepLinkStore: DeepLinkStore
 
+    @Inject lateinit var deviceSecurityController: DeviceSecurityController
+
+    private var backgroundedAtElapsedMs: Long? = null
+    private var credentialPromptInFlight = false
+
+    private val restrictionsChangedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            deviceSecurityController.refreshRestrictions()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private val confirmDeviceCredentialLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            credentialPromptInFlight = false
+            if (result.resultCode == Activity.RESULT_OK) {
+                backgroundedAtElapsedMs = null
+            } else {
+                moveTaskToBack(true)
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        observeWindowSecurityFlags()
 
         // Only on a genuinely fresh launch. A non-null savedInstanceState means
         // this activity is being rebuilt — a rotation, a theme change, a restore
@@ -69,10 +109,69 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        ContextCompat.registerReceiver(
+            this,
+            restrictionsChangedReceiver,
+            IntentFilter(Intent.ACTION_APPLICATION_RESTRICTIONS_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        deviceSecurityController.refreshRestrictions()
+        maybePromptForDeviceUnlock()
+    }
+
+    override fun onStop() {
+        unregisterReceiver(restrictionsChangedReceiver)
+        if (!isChangingConfigurations && !credentialPromptInFlight) {
+            backgroundedAtElapsedMs = SystemClock.elapsedRealtime()
+        }
+        super.onStop()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         deepLinkStore.parseJoinChallengeIntent(intent)?.let(deepLinkStore::publish)
         deepLinkStore.parseShortcutIntent(intent)?.let(deepLinkStore::publish)
+    }
+
+    private fun observeWindowSecurityFlags() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                deviceSecurityController.state.collect { security ->
+                    if (security.effectiveScreenCaptureProtection) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    }
+                }
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun maybePromptForDeviceUnlock() {
+        val security = deviceSecurityController.state.value
+        val now = SystemClock.elapsedRealtime()
+        if (!security.shouldLockAfterBackground(backgroundedAtElapsedMs, now)) {
+            backgroundedAtElapsedMs = null
+            return
+        }
+        val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        if (keyguard?.isDeviceSecure != true) {
+            backgroundedAtElapsedMs = null
+            return
+        }
+        if (credentialPromptInFlight) return
+        val promptIntent = keyguard.createConfirmDeviceCredentialIntent(
+            getString(R.string.security_app_lock_prompt_title),
+            getString(R.string.security_app_lock_prompt_description),
+        ) ?: run {
+            backgroundedAtElapsedMs = null
+            return
+        }
+        credentialPromptInFlight = true
+        confirmDeviceCredentialLauncher.launch(promptIntent)
     }
 }

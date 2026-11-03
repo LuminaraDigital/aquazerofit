@@ -18,6 +18,13 @@ import org.junit.Test
 class PlayPurchaseRulesTest {
 
     @Test
+    fun `the buy button stays off unless the server can verify Play`() {
+        assertFalse(PlayPurchaseRules.allowPlayPurchase(null))
+        assertFalse(PlayPurchaseRules.allowPlayPurchase(false))
+        assertTrue(PlayPurchaseRules.allowPlayPurchase(true))
+    }
+
+    @Test
     fun `the product ids match the annual and monthly base plans`() {
         assertEquals("azf_premium_monthly", PlayPurchaseRules.PREMIUM_MONTHLY_PRODUCT_ID)
         assertEquals("azf_premium_annual", PlayPurchaseRules.PREMIUM_ANNUAL_PRODUCT_ID)
@@ -79,8 +86,8 @@ class PlayPurchaseRulesTest {
      * Verification and acknowledgement deliberately disagree on one case, and
      * it is the case that decides whether a renewing subscriber keeps premium.
      * A subscription renews under the SAME purchase token, so the only purchase
-     * a second month ever presents is an acknowledged one. Skipping those — the
-     * obvious reading of "already settled" — is what left renewals depending
+     * a second month ever presents is an acknowledged one. Skipping those - the
+     * obvious reading of "already settled" - is what left renewals depending
      * entirely on the RTDN webhook, with no way for the app to notice a
      * notification that never arrived.
      */
@@ -116,7 +123,7 @@ class PlayPurchaseRulesTest {
      * suite (apps/api/src/__tests__/playBilling.integration.test.ts). The
      * server rejects a purchase whose Play-reported account identifier does not
      * equal its own recomputation, so if these two implementations ever drift
-     * the result is not a degraded feature — it is every purchase on every
+     * the result is not a degraded feature - it is every purchase on every
      * device being refused as somebody else's, from the first one.
      *
      * Neither side's own tests would catch that, because each is correct in

@@ -67,13 +67,22 @@ class ProgressRepository @Inject constructor(
                     SERIES_PROTEIN,
                     trends.proteinG.map { TrendPointEntity(series = SERIES_PROTEIN, date = it.date, value = it.value) },
                 )
+                progressDao.replaceSeries(
+                    SERIES_CARBS,
+                    trends.carbsG.map { TrendPointEntity(series = SERIES_CARBS, date = it.date, value = it.value) },
+                )
+                progressDao.replaceSeries(
+                    SERIES_FAT,
+                    trends.fatG.map { TrendPointEntity(series = SERIES_FAT, date = it.date, value = it.value) },
+                )
                 ApiResult.Success(Unit)
             }
             is ApiResult.Failure -> result
         }
 
     /** The weekly insight (online-only AI lane with deterministic fallback). */
-    suspend fun insight(periodDays: Int? = null) = safeCall { progressApi.insight(periodDays) }
+    suspend fun insight(periodDays: Int? = null) =
+        safeCall { progressApi.insight(periodDays).insight }
 
     private fun ProgressSummaryEntity.decode(): ProgressSummaryDto? =
         runCatching { AzfJson.decodeFromString(ProgressSummaryDto.serializer(), docJson) }.getOrNull()
@@ -82,5 +91,7 @@ class ProgressRepository @Inject constructor(
         const val SERIES_WEIGHT = "weight"
         const val SERIES_KCAL = "kcal"
         const val SERIES_PROTEIN = "proteinG"
+        const val SERIES_CARBS = "carbsG"
+        const val SERIES_FAT = "fatG"
     }
 }

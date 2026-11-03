@@ -94,8 +94,6 @@ spec:
               value: "true"
             - name: MAIL_PROVIDER
               value: resend
-            - name: PLAY_PACKAGE_NAME
-              value: fit.aquazero.app
             - name: FORCE_HTTPS
               value: "true"
             - name: DATABASE_URL
@@ -145,10 +143,24 @@ spec:
                 secretKeyRef:
                   name: TURNSTILE_SITE_KEY
                   key: latest
-            # PLAY_SERVICE_ACCOUNT_JSON exists as a secret id but has no
-            # versions, so it is not mounted. Play billing stays off until a
-            # version is added and this env entry comes back.
-            #
+            # Live revision aquazerofit-api-00027-9l2 mounts these from Secret
+            # Manager (latest). PLAY_SERVICE_ACCOUNT_JSON version 1 exists.
+            # Keep secretKeyRef so a replace does not drop Play billing.
+            - name: PLAY_SERVICE_ACCOUNT_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: PLAY_SERVICE_ACCOUNT_JSON
+                  key: latest
+            - name: PLAY_PACKAGE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: PLAY_PACKAGE_NAME
+                  key: latest
+            - name: PLAY_RTDN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: PLAY_RTDN_SECRET
+                  key: latest
             # Firebase Admin uses Application Default Credentials (the Cloud
             # Run service account azf-api) when no key path and no
             # FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY

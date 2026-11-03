@@ -36,14 +36,28 @@ class PlansRepository @Inject constructor(
     fun sessionForDate(localDate: String): Flow<WorkoutSessionEntity?> =
         trainingDao.sessionForDate(localDate)
 
-    /** Refresh the current plan into Room. */
+    /**
+     * Refresh the current plan into Room.
+     *
+     * `GET /plans/current` answers 404 when the account has no active plan.
+     * That is an empty result, so the cached current row is deleted and
+     * Workouts can show the empty state. A dropped connection or any other
+     * status leaves the cache in place: offline still shows the last plan,
+     * and a server error is not proof the plan is gone. Sessions and older
+     * plan rows stay either way.
+     */
     suspend fun refreshCurrentPlan(): ApiResult<TrainingPlanDto> =
         when (val result = safeCall { plansApi.current() }) {
             is ApiResult.Success -> {
                 cachePlan(result.data.plan)
                 ApiResult.Success(result.data.plan)
             }
-            is ApiResult.Failure -> result
+            is ApiResult.Failure -> {
+                if (result is ApiResult.Failure.Api && result.httpStatus == HTTP_NOT_FOUND) {
+                    trainingDao.deleteCurrentPlan()
+                }
+                result
+            }
         }
 
     /** Generate a plan (online-only; deterministic fallback tolerated server-side). */
@@ -56,7 +70,7 @@ class PlansRepository @Inject constructor(
             is ApiResult.Failure -> result
         }
 
-    /** Readiness (Protect / Maintain / Progress) — computed server-side in code. */
+    /** Readiness (Protect / Maintain / Progress), computed server-side in code. */
     suspend fun readiness() = safeCall { plansApi.readiness() }
 
     /**
@@ -92,7 +106,7 @@ class PlansRepository @Inject constructor(
 
     /**
      * Finish a session (online-only). On success the returned session replaces
-     * the cached copy and the in-session draft is cleared — a completed
+     * the cached copy and the in-session draft is cleared. A completed
      * workout must never resurrect a half-finished draft.
      */
     suspend fun completeWorkout(
@@ -166,5 +180,9 @@ class PlansRepository @Inject constructor(
                 cachedAt = System.currentTimeMillis(),
             ),
         )
+    }
+
+    private companion object {
+        const val HTTP_NOT_FOUND = 404
     }
 }

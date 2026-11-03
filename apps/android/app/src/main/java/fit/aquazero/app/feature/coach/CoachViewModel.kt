@@ -18,8 +18,11 @@ import fit.aquazero.app.core.navigation.CoachPromptStore
 import fit.aquazero.app.core.network.ChatStreamEvent
 import fit.aquazero.app.core.network.api.ConfirmMealDraftRequest
 import fit.aquazero.app.core.network.api.MealDraftSelection
+import fit.aquazero.app.core.sync.ConnectivityMonitor
+import fit.aquazero.app.core.sync.OutboxDrainCoordinator
 import fit.aquazero.app.core.ui.CoachPersona
 import fit.aquazero.app.core.ui.CoachRoster
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -32,22 +35,30 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /** How the current turn ended, when it ended badly. */
 enum class TurnFailure {
-    /** `AI_UNAVAILABLE` — the gateway declined; nothing was written. */
+    /** `AI_UNAVAILABLE` - the gateway declined; nothing was written. */
     Unavailable,
 
     /** The stream dropped and the bounded poll found no reply. */
     Dropped,
+
+    /**
+     * HTTP 402 `CREDITS_INSUFFICIENT`. The turn was refused before it was
+     * stored, so the optimistic user line stays in the thread.
+     */
+    OutOfCredits,
 }
 
 /** Immutable state of the coach conversation. */
 data class CoachUiState(
     val loading: Boolean = true,
-    /** True when the session bootstrap itself failed — history may still show. */
+    /** True when the session bootstrap itself failed - history may still show. */
     val bootstrapFailed: Boolean = false,
     val sessionId: String? = null,
     val persona: CoachPersona = CoachRoster.default(),
@@ -67,7 +78,7 @@ data class CoachUiState(
 ) {
     val canSend: Boolean get() = sessionId != null && !streaming && !proposingDraft
 
-    /** Nothing said yet — show the greeting, the mascot and the prompt chips. */
+    /** Nothing said yet - show the greeting, the mascot and the prompt chips. */
     val isEmptyConversation: Boolean
         get() = !loading && messages.isEmpty() && pendingUserMessage == null && !streaming
 }
@@ -87,7 +98,7 @@ sealed interface CoachEvent {
     // "log it manually" affordance straight to its own `onOpenManualLogging`
     // callback, so the event never travelled through the ViewModel and the
     // branch handling it was unreachable. Route it through here again only if a
-    // ViewModel decision — not a tap — needs to trigger the navigation.
+    // ViewModel decision - not a tap - needs to trigger the navigation.
 }
 
 /** Toast identities, resolved to strings by the screen. */
@@ -125,6 +136,8 @@ class CoachViewModel @Inject constructor(
     private val coachesRepository: CoachesRepository,
     private val voiceEngine: CoachVoiceEngine,
     private val logsRepository: LogsRepository,
+    private val outboxDrainCoordinator: OutboxDrainCoordinator,
+    private val connectivityMonitor: ConnectivityMonitor,
     private val coachPromptStore: CoachPromptStore,
 ) : ViewModel() {
 
@@ -141,7 +154,7 @@ class CoachViewModel @Inject constructor(
 
     private val gateway = object : ChatTurnGateway {
         override fun stream(sessionId: String, content: String): Flow<ChatStreamEvent> =
-            chatRepository.stream(sessionId, content)
+            chatRepository.stream(sessionId, content, LocalDates.today())
 
         override suspend fun refreshMessages(sessionId: String): List<ChatMessageDto>? =
             when (val result = chatRepository.refreshMessages(sessionId)) {
@@ -185,13 +198,21 @@ class CoachViewModel @Inject constructor(
                 }
                 .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
                 .collect { messages ->
-                    _uiState.value = _uiState.value.copy(
-                        messages = messages,
-                        // The optimistic bubble retires the moment the real one
-                        // lands, so the user never sees their sentence twice.
-                        pendingUserMessage = _uiState.value.pendingUserMessage
-                            ?.takeIf { pending -> messages.none { it.content == pending } },
-                    )
+                    _uiState.update { current ->
+                        current.copy(
+                            messages = messages,
+                            // The optimistic bubble retires the moment the real
+                            // one lands, so the user never sees their sentence
+                            // twice. A credits refusal is the exception: that
+                            // turn was not stored, so an older line with the
+                            // same words must not hide it.
+                            pendingUserMessage = retainPendingUserMessage(
+                                pending = current.pendingUserMessage,
+                                failure = current.turnFailure,
+                                messages = messages,
+                            ),
+                        )
+                    }
                 }
         }
     }
@@ -246,6 +267,15 @@ class CoachViewModel @Inject constructor(
 
     private fun loadActiveCoach() {
         viewModelScope.launch {
+            coachesRepository.activeCoachId().collect { coachId ->
+                if (coachId != null) {
+                    _uiState.value = _uiState.value.copy(
+                        persona = CoachRoster.resolve(coachId),
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
             when (val roster = coachesRepository.refreshRoster()) {
                 is ApiResult.Success ->
                     _uiState.value = _uiState.value.copy(
@@ -281,6 +311,18 @@ class CoachViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
+            // The coach reads the server, not Room. A meal or glass logged
+            // moments ago is still in the outbox until this drain, and the
+            // model would answer as if the day were empty. Offline, skip the
+            // drain: the turn cannot reach the server either, and a timed-out
+            // upload would only delay that failure.
+            if (connectivityMonitor.currentlyOnline()) {
+                runCatching {
+                    withTimeoutOrNull(DRAIN_BEFORE_TURN_TIMEOUT_MS) {
+                        outboxDrainCoordinator.drainPending()
+                    }
+                }.onFailure { if (it is CancellationException) throw it }
+            }
             val result = runner.run(
                 sessionId = sessionId,
                 content = text,
@@ -290,21 +332,19 @@ class CoachViewModel @Inject constructor(
                     streamingText = _uiState.value.streamingText + token,
                 )
             }
-            _uiState.value = _uiState.value.copy(
-                streaming = false,
-                streamingText = "",
-                turnFailure = when (result) {
-                    ChatTurnResult.Unavailable -> TurnFailure.Unavailable
-                    ChatTurnResult.Dropped -> TurnFailure.Dropped
-                    // Safety refusals are already in history as supportive
-                    // assistant messages; surfacing a frame too shows them twice.
-                    else -> null
-                },
-                pendingUserMessage = when (result) {
-                    ChatTurnResult.Unavailable -> _uiState.value.pendingUserMessage
-                    else -> null
-                },
-            )
+            _uiState.update { current ->
+                current.copy(
+                    streaming = false,
+                    streamingText = "",
+                    turnFailure = coachTurnFailure(result),
+                    pendingUserMessage = pendingUserMessageAfterTurn(
+                        result = result,
+                        sent = text,
+                        pending = current.pendingUserMessage,
+                        messages = current.messages,
+                    ),
+                )
+            }
         }
     }
 
@@ -316,7 +356,15 @@ class CoachViewModel @Inject constructor(
     }
 
     fun dismissTurnFailure() {
-        _uiState.value = _uiState.value.copy(turnFailure = null, pendingUserMessage = null)
+        _uiState.update { state ->
+            state.copy(
+                turnFailure = null,
+                pendingUserMessage = pendingUserMessageAfterDismiss(
+                    failure = state.turnFailure,
+                    pending = state.pendingUserMessage,
+                ),
+            )
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -403,8 +451,9 @@ class CoachViewModel @Inject constructor(
                 localDate = LocalDates.today(),
                 acknowledgeAllergens = confirmation.acknowledgeAllergens,
             )
-            when (chatRepository.confirmMealDraft(draft.id, body)) {
+            when (val result = chatRepository.confirmMealDraft(draft.id, body)) {
                 is ApiResult.Success -> {
+                    result.data.mealLog?.let { logsRepository.cacheServerMealLog(it) }
                     _uiState.value = _uiState.value.copy(draftPending = false, draft = null)
                     _events.send(CoachEvent.Toast(CoachToast.MealLogged))
                     _events.send(CoachEvent.MealLogged)
@@ -491,5 +540,6 @@ class CoachViewModel @Inject constructor(
 
     private companion object {
         const val ROLE_ASSISTANT = "assistant"
+        const val DRAIN_BEFORE_TURN_TIMEOUT_MS = 2_500L
     }
 }

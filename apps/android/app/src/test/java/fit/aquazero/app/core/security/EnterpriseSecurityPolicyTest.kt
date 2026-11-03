@@ -95,4 +95,63 @@ class EnterpriseSecurityPolicyTest {
         assertTrue(lockedState.shouldLockAfterBackground(10_000L, 310_000L))
         assertTrue(lockedState.shouldLockAfterBackground(10_000L, 500_000L))
     }
+
+    @Test
+    fun `DeviceSecurityController latches lock across cancelled prompt and rotation`() {
+        val controller = DeviceSecurityController(
+            DeviceSecurityState(
+                userAppLockEnabled = true,
+                appLockTimeoutSeconds = 300L,
+            ),
+        )
+
+        // Background at t = 1,000 ms; configuration change at t = 50,000 ms must not reset timer.
+        controller.onAppStopped(nowElapsedMs = 1_000L, isChangingConfigurations = false)
+        controller.onAppStopped(nowElapsedMs = 50_000L, isChangingConfigurations = true)
+
+        // Return after 5 minutes (t = 301,000 ms) -> prompt launches.
+        assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 301_000L, isDeviceSecure = true))
+        // While prompt is in flight, a duplicate onStart does not launch a second prompt.
+        assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 301_100L, isDeviceSecure = true))
+
+        // User cancels the system credential screen -> returns false, suppresses immediate re-launch
+        // in the same onStart frame while moveTaskToBack(true) runs.
+        assertFalse(controller.onUnlockPromptResult(unlocked = false))
+        assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 301_200L, isDeviceSecure = true))
+
+        // moveTaskToBack(true) stops the Activity at t = 301,500 ms -> must NOT overwrite lockRequired.
+        controller.onAppStopped(nowElapsedMs = 301_500L, isChangingConfigurations = false)
+
+        // User reopens the app 1 second later (t = 302,500 ms) -> lock is still latched!
+        assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 302_500L, isDeviceSecure = true))
+
+        // User completes unlock -> lock clears.
+        assertTrue(controller.onUnlockPromptResult(unlocked = true))
+        assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 302_600L, isDeviceSecure = true))
+    }
+
+    @Test
+    fun `DeviceSecurityController updates user toggles and MDM overrides`() {
+        val controller = DeviceSecurityController()
+        assertFalse(controller.state.value.effectiveAppLockEnabled)
+        assertTrue(controller.state.value.dataExportAllowed)
+
+        controller.setUserAppLockEnabled(true)
+        controller.setUserScreenCaptureProtectionEnabled(true)
+        assertTrue(controller.state.value.effectiveAppLockEnabled)
+        assertTrue(controller.state.value.effectiveScreenCaptureProtection)
+
+        controller.setUserAppLockEnabled(false)
+        controller.setRestrictionsOverrideForTesting(
+            ManagedRestrictions(
+                forceAppLock = true,
+                disableDataExport = true,
+                allowedEmailDomain = "corp.example",
+            ),
+        )
+        assertTrue(controller.state.value.effectiveAppLockEnabled)
+        assertFalse(controller.state.value.dataExportAllowed)
+        assertTrue(controller.state.value.isEmailAllowed("pat@corp.example"))
+        assertFalse(controller.state.value.isEmailAllowed("pat@gmail.com"))
+    }
 }

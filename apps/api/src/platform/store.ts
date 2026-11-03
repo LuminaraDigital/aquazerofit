@@ -284,18 +284,31 @@ export abstract class MemoryBackedStore {
     const map = this.container(name);
     for (const doc of docs) {
       if (doc && typeof doc.id === 'string') {
-        map.set(doc.id, doc);
-        this.indexPut(name, doc);
-        if (
-          name === 'audit' &&
-          isChainedAuditDoc(doc) &&
-          typeof doc.seq === 'number' &&
-          typeof doc.hash === 'string' &&
-          doc.seq > this.auditChainSeq
-        ) {
-          this.auditChainSeq = doc.seq;
-          this.auditChainHeadHash = doc.hash;
+        let hydrated = doc;
+        if (name === 'audit' && isChainedAuditDoc(doc)) {
+          if (typeof doc.seq === 'number' && typeof doc.hash === 'string') {
+            if (doc.seq > this.auditChainSeq) {
+              this.auditChainSeq = doc.seq;
+              this.auditChainHeadHash = doc.hash;
+            }
+          } else if (doc.seq === undefined) {
+            const seq = this.auditChainSeq + 1;
+            const prevHash = this.auditChainHeadHash;
+            const hash = computeAuditEventHash({
+              seq,
+              prevHash,
+              id: doc.id,
+              type: doc.type,
+              action: doc.action,
+              createdAt: doc.createdAt,
+            });
+            this.auditChainSeq = seq;
+            this.auditChainHeadHash = hash;
+            hydrated = { ...doc, seq, prevHash, hash } as StoredDoc;
+          }
         }
+        map.set(hydrated.id, hydrated);
+        this.indexPut(name, hydrated);
       }
     }
   }
@@ -471,19 +484,36 @@ export abstract class MemoryBackedStore {
     this.assertUnique(name, doc);
     let toStore = doc;
     if (name === 'audit' && isChainedAuditDoc(doc) && doc.seq === undefined) {
-      const seq = this.auditChainSeq + 1;
-      const prevHash = this.auditChainHeadHash;
-      const hash = computeAuditEventHash({
-        seq,
-        prevHash,
-        id: doc.id,
-        type: doc.type,
-        action: doc.action,
-        createdAt: doc.createdAt,
-      });
-      this.auditChainSeq = seq;
-      this.auditChainHeadHash = hash;
-      toStore = { ...doc, seq, prevHash, hash } as T;
+      const existing = this.container(name).get(doc.id) as
+        | (StoredDoc & { seq?: number; prevHash?: string; hash?: string })
+        | undefined;
+      if (
+        existing &&
+        typeof existing.seq === 'number' &&
+        typeof existing.prevHash === 'string' &&
+        typeof existing.hash === 'string'
+      ) {
+        toStore = {
+          ...doc,
+          seq: existing.seq,
+          prevHash: existing.prevHash,
+          hash: existing.hash,
+        } as T;
+      } else {
+        const seq = this.auditChainSeq + 1;
+        const prevHash = this.auditChainHeadHash;
+        const hash = computeAuditEventHash({
+          seq,
+          prevHash,
+          id: doc.id,
+          type: doc.type,
+          action: doc.action,
+          createdAt: doc.createdAt,
+        });
+        this.auditChainSeq = seq;
+        this.auditChainHeadHash = hash;
+        toStore = { ...doc, seq, prevHash, hash } as T;
+      }
     }
     this.container(name).set(toStore.id, toStore);
     // Before markDirty, so a persist() that reads memory can never observe a

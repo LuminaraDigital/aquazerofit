@@ -46,11 +46,12 @@ for (const rawLine of raw.split(/\r?\n/)) {
     const groupMatch = body.match(/group\s*=\s*"([^"]+)"/);
     const nameMatch = body.match(/name\s*=\s*"([^"]+)"/);
     const versionRefMatch = body.match(/version\.ref\s*=\s*"([^"]+)"/);
+    const versionInlineMatch = body.match(/(?:^|,|\s)version\s*=\s*"([^"]+)"/);
     const group = moduleMatch ? moduleMatch[1] : groupMatch?.[1];
     const name = moduleMatch ? moduleMatch[2] : nameMatch?.[1];
     if (!group || !name) continue;
     const version =
-      (versionRefMatch ? versions.get(versionRefMatch[1]) : undefined) ??
+      (versionRefMatch ? versions.get(versionRefMatch[1]) : versionInlineMatch?.[1]) ??
       (group.startsWith('androidx.compose')
         ? versions.get('androidxComposeBom')
         : group === 'com.google.firebase'

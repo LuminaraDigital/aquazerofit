@@ -79,11 +79,26 @@ export function computeAuditEventHash(fields: ChainedAuditFields): string {
 export function verifyAuditChain(
   targetStore: Pick<MemoryBackedStore, 'all'> = getStore(),
 ): AuditChainVerificationResult {
-  const chained = targetStore
-    .all<StoredDoc>('audit')
-    .filter(isChainedAuditDoc)
-    .filter((doc) => typeof doc.seq === 'number')
-    .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+  const allChained = targetStore.all<StoredDoc>('audit').filter(isChainedAuditDoc);
+
+  for (const doc of allChained) {
+    if (
+      typeof doc.seq !== 'number' ||
+      typeof doc.prevHash !== 'string' ||
+      typeof doc.hash !== 'string'
+    ) {
+      return {
+        valid: false,
+        count: allChained.length,
+        headHash: AUDIT_CHAIN_GENESIS,
+        brokenAtId: doc.id,
+        brokenAtSeq: typeof doc.seq === 'number' ? doc.seq : undefined,
+        reason: 'Missing hash chain fields on audit event',
+      };
+    }
+  }
+
+  const chained = [...allChained].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
 
   let expectedSeq = 1;
   let expectedPrevHash = AUDIT_CHAIN_GENESIS;

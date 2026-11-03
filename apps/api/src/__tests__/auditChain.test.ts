@@ -129,4 +129,41 @@ describe('tamper-evident audit hash chain (EN-4.2)', () => {
     expect(purgedAudit.userId).toBe('anonymised');
     expect((purgedAudit.detail as { email?: string }).email).not.toBe('purge@example.com');
   });
+
+  it('preserves existing seq on in-place upsert without seq and detects stripped hash fields', () => {
+    auditDataAccess('usr-1', 'consents.update', {});
+    auditDataAccess('usr-1', 'export', {});
+
+    const first = getStore()
+      .all<AuditEvent>('audit')
+      .find((d) => d.seq === 1)!;
+
+    // In-place update omitting seq/prevHash/hash must NOT re-sequence the event to seq 3.
+    getStore().upsert('audit', {
+      id: first.id,
+      userId: 'anonymised',
+      type: first.type,
+      action: first.action,
+      createdAt: first.createdAt,
+    });
+
+    expect(verifyAuditChain().valid).toBe(true);
+    expect(getStore().byId<AuditEvent>('audit', first.id)?.seq).toBe(1);
+
+    // Stripping hash directly from an in-memory record must fail verification.
+    const brokenStore = {
+      all: () => [
+        {
+          id: first.id,
+          type: first.type,
+          action: first.action,
+          createdAt: first.createdAt,
+        },
+      ],
+    };
+    const strippedResult = verifyAuditChain(brokenStore as never);
+    expect(strippedResult.valid).toBe(false);
+    expect(strippedResult.brokenAtId).toBe(first.id);
+    expect(strippedResult.reason).toContain('Missing hash chain fields');
+  });
 });

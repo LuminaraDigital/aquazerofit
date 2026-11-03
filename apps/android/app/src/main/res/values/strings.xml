@@ -1526,4 +1526,5 @@
     <string name="restriction_disable_data_export_desc">Disables the local JSON data export share action on managed devices.</string>
     <string name="restriction_allowed_email_domain_title">Allowed sign-in email domain</string>
     <string name="restriction_allowed_email_domain_desc">Optional organisation email domain hint (for example example.com). Consents can never be granted via managed configuration.</string>
+    <string name="signin_error_email_domain">Use an @%1$s email address required by your organisation.</string>
 </resources>

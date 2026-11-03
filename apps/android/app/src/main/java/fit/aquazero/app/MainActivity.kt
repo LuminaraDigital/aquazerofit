@@ -43,9 +43,6 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var deviceSecurityController: DeviceSecurityController
 
-    private var backgroundedAtElapsedMs: Long? = null
-    private var credentialPromptInFlight = false
-
     private val restrictionsChangedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             deviceSecurityController.refreshRestrictions()
@@ -55,10 +52,10 @@ class MainActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     private val confirmDeviceCredentialLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            credentialPromptInFlight = false
-            if (result.resultCode == Activity.RESULT_OK) {
-                backgroundedAtElapsedMs = null
-            } else {
+            val unlocked = deviceSecurityController.onUnlockPromptResult(
+                unlocked = result.resultCode == Activity.RESULT_OK,
+            )
+            if (!unlocked) {
                 moveTaskToBack(true)
             }
         }
@@ -123,9 +120,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         unregisterReceiver(restrictionsChangedReceiver)
-        if (!isChangingConfigurations && !credentialPromptInFlight) {
-            backgroundedAtElapsedMs = SystemClock.elapsedRealtime()
-        }
+        deviceSecurityController.onAppStopped(
+            nowElapsedMs = SystemClock.elapsedRealtime(),
+            isChangingConfigurations = isChangingConfigurations,
+        )
         super.onStop()
     }
 
@@ -152,26 +150,19 @@ class MainActivity : ComponentActivity() {
 
     @Suppress("DEPRECATION")
     private fun maybePromptForDeviceUnlock() {
-        val security = deviceSecurityController.state.value
-        val now = SystemClock.elapsedRealtime()
-        if (!security.shouldLockAfterBackground(backgroundedAtElapsedMs, now)) {
-            backgroundedAtElapsedMs = null
-            return
-        }
         val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-        if (keyguard?.isDeviceSecure != true) {
-            backgroundedAtElapsedMs = null
-            return
-        }
-        if (credentialPromptInFlight) return
-        val promptIntent = keyguard.createConfirmDeviceCredentialIntent(
+        val shouldPrompt = deviceSecurityController.shouldLaunchUnlockPrompt(
+            nowElapsedMs = SystemClock.elapsedRealtime(),
+            isDeviceSecure = keyguard?.isDeviceSecure == true,
+        )
+        if (!shouldPrompt) return
+        val promptIntent = keyguard?.createConfirmDeviceCredentialIntent(
             getString(R.string.security_app_lock_prompt_title),
             getString(R.string.security_app_lock_prompt_description),
         ) ?: run {
-            backgroundedAtElapsedMs = null
+            deviceSecurityController.onUnlockPromptLaunchFailed()
             return
         }
-        credentialPromptInFlight = true
         confirmDeviceCredentialLauncher.launch(promptIntent)
     }
 }

@@ -2,6 +2,7 @@ package fit.aquazero.app.core.security
 
 import android.content.Context
 import android.content.RestrictionsManager
+import android.content.SharedPreferences
 import android.os.Bundle
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,8 +32,7 @@ data class ManagedRestrictions(
      * restriction is configured).
      */
     fun isEmailAllowed(email: String): Boolean {
-        val domain = allowedEmailDomain?.trim()?.trimStart('@')?.lowercase().orEmpty()
-        if (domain.isEmpty()) return true
+        val domain = normalizeDomain(allowedEmailDomain) ?: return true
         val atIndex = email.lastIndexOf('@')
         if (atIndex <= 0 || atIndex == email.lastIndex) return false
         val emailDomain = email.substring(atIndex + 1).trim().lowercase()
@@ -45,29 +45,25 @@ data class ManagedRestrictions(
         const val KEY_DISABLE_DATA_EXPORT = "disable_data_export"
         const val KEY_ALLOWED_EMAIL_DOMAIN = "allowed_email_domain"
 
-        fun fromMap(raw: Map<String, Any?>): ManagedRestrictions {
-            val domain = (raw[KEY_ALLOWED_EMAIL_DOMAIN] as? String)
-                ?.trim()
-                ?.trimStart('@')
-                ?.lowercase()
-                ?.takeIf { it.isNotEmpty() }
-            return ManagedRestrictions(
+        private fun normalizeDomain(raw: String?): String? =
+            raw?.trim()?.trimStart('@')?.lowercase()?.takeIf { it.isNotEmpty() }
+
+        fun fromMap(raw: Map<String, Any?>): ManagedRestrictions =
+            ManagedRestrictions(
                 forceAppLock = raw[KEY_FORCE_APP_LOCK] == true,
                 forceScreenCaptureProtection = raw[KEY_FORCE_SCREEN_CAPTURE] == true,
                 disableDataExport = raw[KEY_DISABLE_DATA_EXPORT] == true,
-                allowedEmailDomain = domain,
+                allowedEmailDomain = normalizeDomain(raw[KEY_ALLOWED_EMAIL_DOMAIN] as? String),
             )
-        }
 
         fun fromBundle(bundle: Bundle?): ManagedRestrictions {
             if (bundle == null) return ManagedRestrictions()
-            val map = mapOf<String, Any?>(
-                KEY_FORCE_APP_LOCK to bundle.getBoolean(KEY_FORCE_APP_LOCK, false),
-                KEY_FORCE_SCREEN_CAPTURE to bundle.getBoolean(KEY_FORCE_SCREEN_CAPTURE, false),
-                KEY_DISABLE_DATA_EXPORT to bundle.getBoolean(KEY_DISABLE_DATA_EXPORT, false),
-                KEY_ALLOWED_EMAIL_DOMAIN to bundle.getString(KEY_ALLOWED_EMAIL_DOMAIN),
+            return ManagedRestrictions(
+                forceAppLock = bundle.getBoolean(KEY_FORCE_APP_LOCK, false),
+                forceScreenCaptureProtection = bundle.getBoolean(KEY_FORCE_SCREEN_CAPTURE, false),
+                disableDataExport = bundle.getBoolean(KEY_DISABLE_DATA_EXPORT, false),
+                allowedEmailDomain = normalizeDomain(bundle.getString(KEY_ALLOWED_EMAIL_DOMAIN)),
             )
-            return fromMap(map)
         }
     }
 }
@@ -93,6 +89,8 @@ data class DeviceSecurityState(
     val dataExportAllowed: Boolean
         get() = !restrictions.disableDataExport
 
+    fun isEmailAllowed(email: String): Boolean = restrictions.isEmailAllowed(email)
+
     /**
      * True when the app was backgrounded at [backgroundedAtElapsedMs] and has
      * stayed in the background for at least [appLockTimeoutSeconds].
@@ -114,41 +112,155 @@ data class DeviceSecurityState(
 }
 
 /**
- * Persists user device-security toggles and merges them with live MDM
- * [RestrictionsManager] application restrictions.
+ * Persists user device-security toggles, merges them with live MDM
+ * [RestrictionsManager] application restrictions, and tracks the app-lock
+ * background session state across Activity configuration changes.
  */
 @Singleton
-class DeviceSecurityController @Inject constructor(
-    @ApplicationContext context: Context,
+class DeviceSecurityController private constructor(
+    private val prefs: SharedPreferences?,
+    private val restrictionsManager: RestrictionsManager?,
+    initialState: DeviceSecurityState,
 ) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val restrictionsManager =
-        context.getSystemService(Context.RESTRICTIONS_SERVICE) as? RestrictionsManager
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+    ) : this(
+        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        restrictionsManager = context.getSystemService(Context.RESTRICTIONS_SERVICE) as? RestrictionsManager,
+        initialState = DeviceSecurityState(),
+    ) {
+        refreshRestrictions()
+    }
 
-    private val _state = MutableStateFlow(loadState())
+    /** In-memory constructor for unit and Compose UI tests. */
+    constructor(initialState: DeviceSecurityState = DeviceSecurityState()) : this(
+        prefs = null,
+        restrictionsManager = null,
+        initialState = initialState,
+    )
+
+    private var userAppLockMem: Boolean = initialState.userAppLockEnabled
+    private var userScreenCaptureMem: Boolean = initialState.userScreenCaptureProtectionEnabled
+    private val timeoutSeconds: Long = initialState.appLockTimeoutSeconds
+    private val initialRestrictions: ManagedRestrictions = initialState.restrictions
+    private var restrictionsOverride: ManagedRestrictions? = null
+
+    private var backgroundedAtElapsedMs: Long? = null
+    private var lockRequired: Boolean = false
+    private var credentialPromptInFlight: Boolean = false
+    private var suppressPromptUntilStopped: Boolean = false
+
+    private val _state = MutableStateFlow(initialState)
     val state: StateFlow<DeviceSecurityState> = _state.asStateFlow()
 
     fun refreshRestrictions() {
         _state.value = loadState()
+        if (!_state.value.effectiveAppLockEnabled) {
+            clearLockSession()
+        }
     }
 
     fun setUserAppLockEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(PREF_USER_APP_LOCK, enabled).apply()
+        userAppLockMem = enabled
+        prefs?.edit()?.putBoolean(PREF_USER_APP_LOCK, enabled)?.apply()
         _state.value = loadState()
+        if (!_state.value.effectiveAppLockEnabled) {
+            clearLockSession()
+        }
     }
 
     fun setUserScreenCaptureProtectionEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(PREF_USER_SCREEN_CAPTURE, enabled).apply()
+        userScreenCaptureMem = enabled
+        prefs?.edit()?.putBoolean(PREF_USER_SCREEN_CAPTURE, enabled)?.apply()
         _state.value = loadState()
     }
 
+    /** Override MDM restrictions in unit or instrumented tests (`null` restores live restrictions). */
+    fun setRestrictionsOverrideForTesting(restrictions: ManagedRestrictions?) {
+        restrictionsOverride = restrictions
+        refreshRestrictions()
+    }
+
+    /**
+     * Record when the UI leaves the foreground.
+     *
+     * Does not overwrite [backgroundedAtElapsedMs] during configuration changes,
+     * while the system credential sheet is on screen, or while [lockRequired] is
+     * already latched after a cancelled unlock prompt.
+     */
+    fun onAppStopped(nowElapsedMs: Long, isChangingConfigurations: Boolean) {
+        suppressPromptUntilStopped = false
+        if (!isChangingConfigurations && !credentialPromptInFlight && !lockRequired) {
+            backgroundedAtElapsedMs = nowElapsedMs
+        }
+    }
+
+    /**
+     * Evaluate whether `MainActivity` must launch the system credential unlock
+     * prompt on `onStart()`. Latches [lockRequired] until [onUnlockPromptResult]
+     * succeeds so cancelling the credential screen and reopening the app cannot
+     * bypass the timeout.
+     */
+    fun shouldLaunchUnlockPrompt(nowElapsedMs: Long, isDeviceSecure: Boolean): Boolean {
+        val current = _state.value
+        if (!current.effectiveAppLockEnabled || !isDeviceSecure) {
+            clearLockSession()
+            return false
+        }
+        if (suppressPromptUntilStopped || credentialPromptInFlight) {
+            return false
+        }
+        if (lockRequired || current.shouldLockAfterBackground(backgroundedAtElapsedMs, nowElapsedMs)) {
+            lockRequired = true
+            credentialPromptInFlight = true
+            return true
+        }
+        backgroundedAtElapsedMs = null
+        return false
+    }
+
+    fun onUnlockPromptLaunchFailed() {
+        clearLockSession()
+    }
+
+    /**
+     * Handle the result of `KeyguardManager.createConfirmDeviceCredentialIntent`.
+     *
+     * @return `true` when unlocked; `false` when cancelled/failed (caller must
+     *   `moveTaskToBack(true)` while [lockRequired] stays latched).
+     */
+    fun onUnlockPromptResult(unlocked: Boolean): Boolean {
+        credentialPromptInFlight = false
+        if (unlocked) {
+            clearLockSession()
+            return true
+        }
+        lockRequired = true
+        suppressPromptUntilStopped = true
+        return false
+    }
+
+    private fun clearLockSession() {
+        backgroundedAtElapsedMs = null
+        lockRequired = false
+        credentialPromptInFlight = false
+        suppressPromptUntilStopped = false
+    }
+
     private fun loadState(): DeviceSecurityState {
-        val restrictions = runCatching {
-            ManagedRestrictions.fromBundle(restrictionsManager?.applicationRestrictions)
-        }.getOrDefault(ManagedRestrictions())
+        val liveRestrictions = restrictionsManager?.let { mgr ->
+            runCatching { ManagedRestrictions.fromBundle(mgr.applicationRestrictions) }
+                .getOrDefault(ManagedRestrictions())
+        } ?: initialRestrictions
+        val restrictions = restrictionsOverride ?: liveRestrictions
+        val appLock = prefs?.getBoolean(PREF_USER_APP_LOCK, false) ?: userAppLockMem
+        val screenCapture =
+            prefs?.getBoolean(PREF_USER_SCREEN_CAPTURE, false) ?: userScreenCaptureMem
         return DeviceSecurityState(
-            userAppLockEnabled = prefs.getBoolean(PREF_USER_APP_LOCK, false),
-            userScreenCaptureProtectionEnabled = prefs.getBoolean(PREF_USER_SCREEN_CAPTURE, false),
+            userAppLockEnabled = appLock,
+            userScreenCaptureProtectionEnabled = screenCapture,
+            appLockTimeoutSeconds = timeoutSeconds,
             restrictions = restrictions,
         )
     }

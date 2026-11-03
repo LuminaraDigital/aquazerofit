@@ -4,7 +4,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,8 +18,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -32,12 +37,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -313,8 +324,17 @@ private fun ChallengeCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(12.dp))
-        challenge.members.forEach { member ->
-            MemberRow(member = member, targetDays = challenge.targetDays)
+        val standings = challenge.members.sortedByDescending { it.progressDays }
+        if (standings.size >= PODIUM_SIZE) {
+            Podium(standings.take(PODIUM_SIZE))
+            Spacer(modifier = Modifier.height(16.dp))
+            standings.drop(PODIUM_SIZE).forEach { member ->
+                MemberRow(member = member, targetDays = challenge.targetDays)
+            }
+        } else {
+            standings.forEach { member ->
+                MemberRow(member = member, targetDays = challenge.targetDays)
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -339,6 +359,77 @@ private fun ChallengeCard(
         }
     }
 }
+
+/** Top three, with first place raised in the middle. Takes them in rank order. */
+@Composable
+private fun Podium(leaders: List<BuddyChallengeMemberDto>) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        PodiumSeat(leaders[1], rank = 2, avatarSize = 60.dp, medal = AzfColors.OnSurfaceVariant)
+        PodiumSeat(leaders[0], rank = 1, avatarSize = 76.dp, medal = AzfColors.Warning)
+        PodiumSeat(leaders[2], rank = 3, avatarSize = 60.dp, medal = AzfColors.Coral)
+    }
+}
+
+@Composable
+private fun PodiumSeat(member: BuddyChallengeMemberDto, rank: Int, avatarSize: Dp, medal: Color) {
+    val description = stringResource(R.string.challenges_podium_cd, rank, member.displayName, member.progressDays)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(92.dp)
+            .clearAndSetSemantics { contentDescription = description },
+    ) {
+        Box(contentAlignment = Alignment.TopStart) {
+            Box(
+                modifier = Modifier
+                    .padding(4.dp)
+                    .size(avatarSize)
+                    .clip(CircleShape)
+                    .background(medal.copy(alpha = 0.18f))
+                    .border(2.dp, medal, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = member.displayName.firstOrNull()?.uppercase().orEmpty(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(medal),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = rank.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AzfColors.Surface,
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = member.displayName,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = stringResource(R.string.challenges_days_short, member.progressDays),
+            style = MaterialTheme.typography.labelMedium,
+            color = AzfColors.PrimaryFixedDim,
+        )
+    }
+}
+
+private const val PODIUM_SIZE = 3
 
 @Composable
 private fun MemberRow(member: BuddyChallengeMemberDto, targetDays: Int) {

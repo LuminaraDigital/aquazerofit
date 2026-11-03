@@ -71,7 +71,7 @@ class ChatTurnRunnerTest {
 
         assertEquals(ChatTurnResult.Completed, result)
         assertEquals(listOf("Hello", " there"), tokens)
-        // One refresh to sync history — not a poll loop.
+        // One refresh to sync history, not a poll loop.
         assertEquals(1, gateway.refreshCount)
     }
 
@@ -86,6 +86,25 @@ class ChatTurnRunnerTest {
             assertEquals(ChatTurnResult.SafetyHandled(code), result)
             assertEquals(1, gateway.refreshCount)
         }
+    }
+
+    @Test
+    fun `CREDITS_INSUFFICIENT is terminal and never polls`() = runTest {
+        val slept = mutableListOf<Long>()
+        val gateway = FakeGateway(
+            events = listOf(
+                ChatStreamEvent.Error(
+                    ChatTurnRunner.CODE_CREDITS_INSUFFICIENT,
+                    "You have run out of AI credits for today.",
+                ),
+            ),
+        )
+
+        val result = runner(gateway, slept).run("s1", "what should I eat", emptySet()) {}
+
+        assertEquals(ChatTurnResult.OutOfCredits, result)
+        assertEquals(0, gateway.refreshCount)
+        assertTrue(slept.isEmpty())
     }
 
     @Test

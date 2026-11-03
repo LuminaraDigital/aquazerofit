@@ -15,9 +15,15 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
 import { config } from '../platform/config';
-import { rateLimiter, resetRateLimiter } from '../platform/rateLimiter';
+import {
+  AI_STRICT_PER_MINUTE,
+  COACH_CHAT_PER_MINUTE,
+  MEAL_PHOTO_PER_MINUTE,
+  rateLimiter,
+  resetRateLimiter,
+} from '../platform/rateLimiter';
 
-const STRICT_LIMIT = 20;
+const STRICT_LIMIT = AI_STRICT_PER_MINUTE;
 const DEFAULT_LIMIT = 300;
 
 const savedForce = process.env.AZF_RATE_LIMIT_FORCE;
@@ -79,17 +85,22 @@ describe('rate limiter lanes', () => {
    * if a route reserves credits it calls a model, and if it calls a model it
    * belongs on the strict lane.
    */
-  const AI_ROUTES: ReadonlyArray<[label: string, path: string]> = [
-    ['chat turn', '/api/v1/chat/sessions/s_1/messages'],
-    ['meal photo', '/api/v1/meal-photos'],
-    ['meal recommendation', '/api/v1/recommendations/meals'],
-    ['weekly insight', '/api/v1/progress/insight'],
-    ['plan generation', '/api/v1/plans/generate'],
-    ['exercise swap', '/api/v1/workouts/w_1/swap-exercise'],
+  const AI_ROUTES: ReadonlyArray<[label: string, path: string, limit: number]> = [
+    ['chat turn', '/api/v1/chat/sessions/s_1/messages', COACH_CHAT_PER_MINUTE],
+    ['meal photo', '/api/v1/meal-photos', MEAL_PHOTO_PER_MINUTE],
+    ['meal recommendation', '/api/v1/recommendations/meals', STRICT_LIMIT],
+    ['weekly insight', '/api/v1/progress/insight', STRICT_LIMIT],
+    ['plan generation', '/api/v1/plans/generate', STRICT_LIMIT],
+    ['exercise swap', '/api/v1/workouts/w_1/swap-exercise', STRICT_LIMIT],
   ];
 
-  it.each(AI_ROUTES)('puts %s on the strict lane', (_label, path) => {
-    expect(callsUntilBlocked(path, `1.2.3.${path.length}`, STRICT_LIMIT + 5)).toBe(STRICT_LIMIT + 1);
+  it.each(AI_ROUTES)('puts %s on a model lane', (_label, path, limit) => {
+    expect(callsUntilBlocked(path, `1.2.3.${path.length}`, limit + 5)).toBe(limit + 1);
+  });
+
+  it('keeps a photograph burst under the general model lane', () => {
+    expect(MEAL_PHOTO_PER_MINUTE).toBeLessThan(AI_STRICT_PER_MINUTE);
+    expect(COACH_CHAT_PER_MINUTE).toBeLessThan(AI_STRICT_PER_MINUTE);
   });
 
   /*

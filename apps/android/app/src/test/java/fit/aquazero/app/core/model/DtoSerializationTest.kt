@@ -1,9 +1,13 @@
 package fit.aquazero.app.core.model
 
+import fit.aquazero.app.core.network.api.ProgressApi
+import kotlinx.serialization.serializer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.lang.reflect.ParameterizedType
+import java.lang.reflect.WildcardType
 
 /**
  * Decodes realistic API payloads (shapes copied from the live routers /
@@ -203,5 +207,51 @@ class DtoSerializationTest {
             """{"tier": "free", "dailyCredits": 50, "creditsRemaining": 62}""",
         )
         assertEquals(0, decoded.maxBankedCredits)
+    }
+
+    @Test
+    fun `progress insight endpoint return type decodes the server insight envelope`() {
+        val json = """
+            {
+              "insight": {
+                "id": "pi-1",
+                "userId": "u-1",
+                "type": "progressInsight",
+                "periodStart": "2026-08-20",
+                "periodDays": 7,
+                "narrative": "Steady week across meals and sessions.",
+                "createdAt": "2026-08-27T00:00:00.000Z"
+              },
+              "cached": false
+            }
+        """.trimIndent()
+        val continuationType = ProgressApi::class.java.declaredMethods
+            .first { it.name == "insight" }
+            .genericParameterTypes.last() as ParameterizedType
+        val returnType = (continuationType.actualTypeArguments.first() as WildcardType)
+            .lowerBounds.first()
+        val decoded = AzfJson.decodeFromString(serializer(returnType), json)
+        assertTrue(decoded.toString().contains("pi-1"))
+    }
+
+    @Test
+    fun `nutrition trends decode nested macros object from analytics endpoint`() {
+        val json = """
+            {
+              "range": "7d",
+              "kcal": [{"date": "2026-08-26", "value": 2050}],
+              "weight": [{"date": "2026-08-26", "value": 81.2}],
+              "macros": {
+                "proteinG": [{"date": "2026-08-26", "value": 145}],
+                "carbsG": [{"date": "2026-08-26", "value": 210}],
+                "fatG": [{"date": "2026-08-26", "value": 65}]
+              }
+            }
+        """.trimIndent()
+        val decoded = AzfJson.decodeFromString(NutritionTrendsDto.serializer(), json)
+        assertEquals(1, decoded.kcal.size)
+        assertEquals(1, decoded.proteinG.size)
+        assertEquals(1, decoded.carbsG.size)
+        assertEquals(1, decoded.fatG.size)
     }
 }

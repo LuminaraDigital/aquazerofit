@@ -11,6 +11,7 @@ import fit.aquazero.app.core.network.api.CoachesApi
 import fit.aquazero.app.core.network.safeCall
 import fit.aquazero.app.core.ui.CoachRoster
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -59,19 +60,34 @@ open class CoachesRepository @Inject constructor(
         safeCall { coachesApi.ackReactions(ack) }
 
     private suspend fun cacheRoster(roster: CoachRosterDto) {
-        catalogDao.upsertCoaches(
-            roster.entitlements.map {
-                CoachEntity(
-                    coachId = it.coachId,
-                    unlocked = it.unlocked,
-                    reason = it.reason.name.lowercase(),
-                    requiredLevel = it.requiredLevel,
-                    bondXp = it.bondXp,
-                    bondLevel = it.bondLevel,
-                    isActive = it.coachId == roster.activeCoachId,
-                    updatedAt = System.currentTimeMillis(),
+        val now = System.currentTimeMillis()
+        if (roster.entitlements.isNotEmpty()) {
+            catalogDao.upsertCoaches(
+                roster.entitlements.map {
+                    CoachEntity(
+                        coachId = it.coachId,
+                        unlocked = it.unlocked,
+                        reason = it.reason.name.lowercase(),
+                        requiredLevel = it.requiredLevel,
+                        bondXp = it.bondXp,
+                        bondLevel = it.bondLevel,
+                        isActive = it.coachId == roster.activeCoachId,
+                        updatedAt = now,
+                    )
+                },
+            )
+        } else {
+            val existing = catalogDao.coaches().first()
+            if (existing.isNotEmpty()) {
+                catalogDao.upsertCoaches(
+                    existing.map {
+                        it.copy(
+                            isActive = it.coachId == roster.activeCoachId,
+                            updatedAt = now,
+                        )
+                    },
                 )
-            },
-        )
+            }
+        }
     }
 }

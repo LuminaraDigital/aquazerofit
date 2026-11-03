@@ -1,10 +1,18 @@
 package fit.aquazero.app.core.gamification
 
+import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.CoachExpression
 import fit.aquazero.app.core.model.CoachRankDto
 import fit.aquazero.app.core.model.CoachReactionDto
 import fit.aquazero.app.core.model.ExperienceStatusDto
 import fit.aquazero.app.core.model.ProgressionStatusDto
+import fit.aquazero.app.feature.coach.FakeCoachesRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -131,5 +139,40 @@ class CelebrationTest {
             CelebrationUiState(queue = listOf(Celebration.Achievement("akin", "x"))).isFullScreen,
         )
         assertEquals(false, CelebrationUiState().isFullScreen)
+    }
+
+    @Test
+    fun `dismissing a level-up acknowledges reactions even when an achievement banner follows`() {
+        val dispatcher = StandardTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        try {
+            runTest(dispatcher) {
+                val repo = FakeCoachesRepository().apply {
+                    progressionResult = ApiResult.Success(
+                        status(
+                            reaction("levelUp", "Level 7."),
+                            reaction("achievement", "Warming Up"),
+                        ),
+                    )
+                }
+                val vm = CelebrationViewModel(repo)
+                advanceUntilIdle()
+
+                val first = vm.uiState.value.current!!
+                assertTrue(first is Celebration.LevelUp)
+                vm.onShown(first)
+                vm.dismissCurrent()
+                advanceUntilIdle()
+
+                // The blocking LevelUp modal has been shown and dismissed, and the
+                // non-blocking Achievement banner is now on screen. Navigating to
+                // another tab before tapping the banner's X button must not replay
+                // the full-screen LevelUp modal.
+                assertTrue(repo.ackCalls.isNotEmpty())
+                assertEquals(7, repo.ackCalls.first().level)
+            }
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 }

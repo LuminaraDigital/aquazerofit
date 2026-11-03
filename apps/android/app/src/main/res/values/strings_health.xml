@@ -50,7 +50,7 @@
     <string name="health_empty">Nothing recorded yet today.</string>
 
     <!-- Value formats. A dash, not a zero: no reading is not a reading of nothing. -->
-    <string name="health_value_none">—</string>
+    <string name="health_value_none">-</string>
     <string name="health_value_bpm">%1$d bpm</string>
     <string name="health_value_kcal">%1$d kcal</string>
     <string name="health_value_sleep_hours_minutes">%1$dh %2$dm</string>

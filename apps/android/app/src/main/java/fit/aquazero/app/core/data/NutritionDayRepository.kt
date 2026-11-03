@@ -16,6 +16,7 @@ import fit.aquazero.app.core.model.MealRecommendationRequest
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.UpdateMealLogRequest
 import fit.aquazero.app.core.model.map
+import fit.aquazero.app.core.network.api.LogSuggestionRequest
 import fit.aquazero.app.core.network.api.LogsApi
 import fit.aquazero.app.core.network.api.RecommendationsApi
 import fit.aquazero.app.core.network.safeCall
@@ -116,10 +117,20 @@ class NutritionDayRepository @Inject constructor(
     /**
      * Log a suggestion the user explicitly accepted. Online-only by design:
      * the server owns the recommendation → meal-log conversion, so there is
-     * nothing to queue offline.
+     * nothing to queue offline. The returned row is cached straight into Room
+     * so the dashboard rings and Today loop reflect the meal immediately.
      */
-    suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto> =
-        safeCall { recommendationsApi.logRecommendation(recommendationId) }.map { it.mealLog }
+    suspend fun logRecommendation(
+        recommendationId: String,
+        localDate: String = LocalDates.today(),
+    ): ApiResult<MealLogDto> =
+        safeCall {
+            recommendationsApi.logRecommendation(recommendationId, LogSuggestionRequest(localDate))
+        }.map { it.mealLog }.also { result ->
+            if (result is ApiResult.Success) {
+                logsDao.upsertMealLog(MealReconciler.serverRowFor(result.data))
+            }
+        }
 
     private fun mealTypeOrNull(name: String): MealType? = when (name.lowercase()) {
         "breakfast" -> MealType.BREAKFAST
@@ -180,32 +191,35 @@ internal class MealReconciler(private val logsDao: LogsDao) {
     private fun acceptsServerCopy(row: MealLogEntity): Boolean =
         !row.deleted && row.syncState == SyncState.SYNCED
 
-    private fun rowFor(dto: MealLogDto, existing: MealLogEntity?): MealLogEntity = MealLogEntity(
-        localId = existing?.localId ?: "$SERVER_ROW_PREFIX${dto.id}",
-        serverId = dto.id,
-        mealType = mealTypeName(dto.mealType),
-        items = dto.items,
-        totalKcal = dto.totalKcal,
-        totalProteinG = dto.totalProteinG,
-        totalCarbsG = dto.totalCarbsG,
-        totalFatG = dto.totalFatG,
-        source = dto.source.name.lowercase(),
-        visionJobId = dto.visionJobId,
-        loggedAt = dto.loggedAt,
-        localDate = dto.localDate,
-        syncState = SyncState.SYNCED,
-        idempotencyKey = existing?.idempotencyKey.orEmpty(),
-    )
-
-    private fun mealTypeName(mealType: MealType): String = when (mealType) {
-        MealType.BREAKFAST -> "breakfast"
-        MealType.LUNCH -> "lunch"
-        MealType.DINNER -> "dinner"
-        MealType.SNACK -> "snack"
-    }
+    private fun rowFor(dto: MealLogDto, existing: MealLogEntity?): MealLogEntity =
+        serverRowFor(dto, existing)
 
     internal companion object {
         /** Local id prefix for rows that originated on the server. */
         const val SERVER_ROW_PREFIX = "srv-"
+
+        fun serverRowFor(dto: MealLogDto, existing: MealLogEntity? = null): MealLogEntity = MealLogEntity(
+            localId = existing?.localId ?: "$SERVER_ROW_PREFIX${dto.id}",
+            serverId = dto.id,
+            mealType = mealTypeName(dto.mealType),
+            items = dto.items,
+            totalKcal = dto.totalKcal,
+            totalProteinG = dto.totalProteinG,
+            totalCarbsG = dto.totalCarbsG,
+            totalFatG = dto.totalFatG,
+            source = dto.source.name.lowercase(),
+            visionJobId = dto.visionJobId,
+            loggedAt = dto.loggedAt,
+            localDate = dto.localDate,
+            syncState = SyncState.SYNCED,
+            idempotencyKey = existing?.idempotencyKey.orEmpty(),
+        )
+
+        private fun mealTypeName(mealType: MealType): String = when (mealType) {
+            MealType.BREAKFAST -> "breakfast"
+            MealType.LUNCH -> "lunch"
+            MealType.DINNER -> "dinner"
+            MealType.SNACK -> "snack"
+        }
     }
 }

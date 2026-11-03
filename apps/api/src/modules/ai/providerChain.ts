@@ -83,13 +83,17 @@ export const PROVIDERS: ProviderDef[] = [
     baseUrl: 'https://integrate.api.nvidia.com/v1',
     baseUrlEnv: 'NVIDIA_BASE_URL',
     keyEnv: 'NVIDIA_API_KEY',
-    supportsVision: true, // llama-3.2-11b-vision-instruct
+    // Default is nvidia/nemotron-3.5-super-vl-120b-a12b (smoke tested HTTP 200
+    // on 2026-11-02). meta/llama-3.2-11b-vision-instruct was retired on NIM and
+    // now answers 404 "Function not found", so it is no longer the default.
+    // Override with NVIDIA_MODEL_VISIONPRIMARY (one lane) or NVIDIA_MODEL (all).
+    supportsVision: true,
     models: {
-      visionPrimary: 'meta/llama-3.2-11b-vision-instruct',
-      chatFast: 'meta/llama-3.2-11b-vision-instruct',
-      planStructured: 'meta/llama-3.2-11b-vision-instruct',
-      safetyCheap: 'meta/llama-3.2-11b-vision-instruct',
-      insightBatch: 'meta/llama-3.2-11b-vision-instruct',
+      visionPrimary: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
+      chatFast: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
+      planStructured: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
+      safetyCheap: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
+      insightBatch: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
     },
   },
   {

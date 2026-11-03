@@ -1,12 +1,12 @@
 /**
- * Progress insight — the deterministic core behind GET /progress/insight (P-08).
+ * Progress insight: the deterministic core behind GET /progress/insight (P-08).
  *
  * The project invariant applies here more literally than anywhere else in the
  * app: models identify, interpret and explain; CODE calculates, filters and
  * enforces. Every number a user reads on their progress card is folded out of
  * the store by this module. The model in the `insightBatch` lane receives those
  * finished statistics and is asked only to narrate them, so there is no path by
- * which an invented figure can reach a user — the worst a bad completion can do
+ * which an invented figure can reach a user. The worst a bad completion can do
  * is get replaced by `deterministicNarrative`.
  *
  * Two averages here are computed over *logged* days rather than over every day
@@ -31,7 +31,7 @@ import { computeStreak } from './service';
 
 /** Sentence P-08 specifies for a user who has not logged enough to read yet. */
 export const NOT_ENOUGH_DATA_NARRATIVE =
-  'Keep logging — insights appear once there is enough data.';
+  'Keep logging: insights appear once there is enough data.';
 
 /** Movement below this is reported as "steady" rather than as a direction. */
 const WEIGHT_EPSILON_KG = 0.05;
@@ -45,11 +45,11 @@ interface PeriodActivity {
   completedSessions: WorkoutSession[];
 }
 
-/** Every log the user owns, ordered — the streak reaches outside the period. */
+/** Every log the user owns, ordered. The streak reaches outside the period. */
 function loadAllActivity(userId: string): PeriodActivity {
   const store = getStore();
   return {
-    // Indexed, for the same reason as loadActivity in ./service.ts — `logs`
+    // Indexed, for the same reason as loadActivity in ./service.ts: `logs`
     // carries every user's records, so a bare scan here walked all of them.
     meals: store.whereIndexed<MealLog>(
       'logs',
@@ -125,7 +125,7 @@ export function countActiveDays(userId: string, today: string, periodDays: numbe
  *
  * `today` is the last day of the period (inclusive), so the window is the
  * `periodDays` local dates ending today. `streakDays` is deliberately NOT
- * clipped to the window — a streak is a fact about the run ending today, and
+ * clipped to the window. A streak is a fact about the run ending today, and
  * truncating it at the period boundary would under-report a user's consistency
  * for no reason.
  */
@@ -176,7 +176,7 @@ export async function computeInsightStats(
 }
 
 // ---------------------------------------------------------------------------
-// Changes — "what changed and why", computed, never authored
+// Changes: "what changed and why", computed, never authored
 // ---------------------------------------------------------------------------
 
 function directionOf(delta: number, epsilon: number): ProgressInsightChange['direction'] {
@@ -210,7 +210,7 @@ function pointComparison(delta: number, days: number): string {
  * both the app deciding how someone should feel about their own body.
  *
  * Weight is the one metric whose change is measured *inside* the period rather
- * than between the two summary figures — `deltaKg` already spans first weigh-in
+ * than between the two summary figures. `deltaKg` already spans first weigh-in
  * to last, and the start of this window is where the previous window ended, so
  * differencing the two deltas would report a change in the rate of change,
  * which is not a sentence anyone wants on a dashboard.
@@ -226,14 +226,14 @@ export function computeChanges(
   /**
    * A count comparison across two windows only means anything when the user was
    * present in both. Someone returning after a break logs one day against last
-   * week's seven, so *every* count difference comes out negative — "4 fewer
-   * workouts", "6 fewer weigh-ins" — and each one is measuring attendance
+   * week's seven, so *every* count difference comes out negative ("4 fewer
+   * workouts", "6 fewer weigh-ins"), and each one is measuring attendance
    * rather than effort. That is wrong before it is discouraging, and the two
    * compound: the returning user, the one this product most needs not to
    * flinch, is the one who gets the wall of downward arrows.
    *
-   * When the windows are not comparable the current value is still reported —
-   * nothing is hidden — but the invented comparison clause is dropped and the
+   * When the windows are not comparable the current value is still reported.
+   * Nothing is hidden, but the invented comparison clause is dropped and the
    * delta is null. The rule is symmetric: a sparse window suppresses the
    * comparison whichever direction it would have pointed, so this cannot become
    * a way of only ever showing good news.
@@ -354,7 +354,7 @@ export function deterministicNarrative(
     );
   } else if (stats.weighInsCount === 1) {
     body.push(
-      `You logged one weigh-in in the last ${days} days — a second one gives the trend something to sit against.`,
+      `You logged one weigh-in in the last ${days} days: a second one gives the trend something to sit against.`,
     );
   }
 
@@ -394,6 +394,6 @@ export function deterministicNarrative(
 
   return [
     ...body.slice(0, 2),
-    'These are your own logged numbers — weekly averages read more honestly than any single day.',
+    'These are your own logged numbers: weekly averages read more honestly than any single day.',
   ].join(' ');
 }

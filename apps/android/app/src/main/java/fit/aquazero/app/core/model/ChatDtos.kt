@@ -50,7 +50,7 @@ data class ChatMessageDto(
     val createdAt: String,
 )
 
-/** Response of `POST /chat/sessions` — `{session, suggestedPrompts, disclaimer}`. */
+/** Response of `POST /chat/sessions` - `{session, suggestedPrompts, disclaimer}`. */
 @Serializable
 data class ChatSessionCreatedDto(
     val session: ChatSessionDto,
@@ -58,24 +58,31 @@ data class ChatSessionCreatedDto(
     val disclaimer: String = "",
 )
 
-/** Response of `GET /chat/sessions` — `{sessions, suggestedPrompts}`. */
+/** Response of `GET /chat/sessions` - `{sessions, suggestedPrompts}`. */
 @Serializable
 data class ChatSessionsDto(
     val sessions: List<ChatSessionDto> = emptyList(),
     val suggestedPrompts: List<String> = emptyList(),
 )
 
-/** Response of `GET /chat/sessions/:id/messages` — `{messages, …}`. */
+/** Response of `GET /chat/sessions/:id/messages` - `{messages, …}`. */
 @Serializable
 data class ChatMessagesDto(
     val messages: List<ChatMessageDto> = emptyList(),
     val disclaimer: String? = null,
 )
 
-/** Body for the streaming turn `POST /chat/sessions/:id/messages`. */
+/**
+ * Body for the streaming turn `POST /chat/sessions/:id/messages`.
+ *
+ * [localDate] is the device's calendar day. Without it the server keys the
+ * coach's tool reads to `X-Timezone`, and a missing or unusable zone looks
+ * up UTC. Meals logged with an explicit local date then look like an empty day.
+ */
 @Serializable
 data class ChatSendRequest(
     val content: String,
+    val localDate: String? = null,
 )
 
 /** Mirrors API `ChatMealMatch` (chat/mealDraft.ts). */

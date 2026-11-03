@@ -50,7 +50,7 @@ export interface EntitlementGrant {
    */
   externalId: string;
   /**
-   * The provider's identifier for the SUBSCRIPTION rather than for this event  - 
+   * The provider's identifier for the SUBSCRIPTION rather than for this event -
    * Play's purchase token, which survives every renewal under it.
    *
    * Separate from [externalId] because those two want opposite things.
@@ -155,7 +155,22 @@ export interface GrantOutcome {
  * A renewal that never arrives writes nothing, so the last reported end is
  * where the period stops. Nothing here adds a month the provider did not send.
  */
-export function activePremiumUntil(userId: string): string | null {
+interface SurvivingGrant {
+  source: EntitlementSource;
+  untilMs: number;
+}
+
+/**
+ * Grants that still contribute to the account end, in ledger order.
+ *
+ * The fold is the one `activePremiumUntil` already used: a charge revoke
+ * retires that charge, a subscription revoke retires earlier grants on that
+ * reference, and an admin revoke retires everything before it. Callers that
+ * only want a still-running period filter on `untilMs` themselves. This
+ * function does not, because the account end is the latest surviving end even
+ * after it has passed.
+ */
+function survivingGrants(userId: string): SurvivingGrant[] {
   const raw = getStore().where<EntitlementGrant>(
     'ledger',
     (d) => (d as { type?: string }).type === 'entitlementGrant' && (d as EntitlementGrant).userId === userId,
@@ -174,7 +189,7 @@ export function activePremiumUntil(userId: string): string | null {
     else accountWipe = pos;
   });
 
-  let best = Number.NEGATIVE_INFINITY;
+  const surviving: SurvivingGrant[] = [];
   ordered.forEach(({ grant }, pos) => {
     if (grant.action === 'revoke') return;
     if (pos < accountWipe) return;
@@ -184,10 +199,33 @@ export function activePremiumUntil(userId: string): string | null {
     if (subscriptionWipe !== undefined && pos < subscriptionWipe) return;
     const rawUntil = grant.sourceUntil ?? grant.premiumUntil;
     const at = Date.parse(rawUntil);
-    if (Number.isFinite(at) && at > best) best = at;
+    if (Number.isFinite(at)) surviving.push({ source: grant.source, untilMs: at });
   });
+  return surviving;
+}
+
+export function activePremiumUntil(userId: string): string | null {
+  let best = Number.NEGATIVE_INFINITY;
+  for (const grant of survivingGrants(userId)) {
+    if (grant.untilMs > best) best = grant.untilMs;
+  }
   if (!Number.isFinite(best)) return null;
   return new Date(best).toISOString();
+}
+
+/**
+ * Rails whose paid period is still running.
+ *
+ * Used to refuse a second purchase on another rail, and to warn someone with
+ * a live Play subscription that deleting the account does not cancel it.
+ * An expired or revoked grant is absent. Order follows the ledger.
+ */
+export function activeEntitlementSources(userId: string, now = Date.now()): EntitlementSource[] {
+  const sources: EntitlementSource[] = [];
+  for (const grant of survivingGrants(userId)) {
+    if (grant.untilMs > now && !sources.includes(grant.source)) sources.push(grant.source);
+  }
+  return sources;
 }
 
 /**

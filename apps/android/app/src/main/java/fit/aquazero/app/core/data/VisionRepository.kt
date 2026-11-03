@@ -7,6 +7,7 @@ import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
+import fit.aquazero.app.core.database.LogsDao
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.MealDayDto
 import fit.aquazero.app.core.model.MealLogItemDto
@@ -196,6 +197,7 @@ object VisionConfirmRecovery {
 class VisionRepository @Inject constructor(
     private val visionApi: VisionApi,
     private val logsApi: LogsApi,
+    private val logsDao: LogsDao,
     @param:ApplicationContext private val context: Context,
 ) {
 
@@ -324,6 +326,7 @@ class VisionRepository @Inject constructor(
         return when (val result = safeCall { visionApi.confirm(jobId, request) }) {
             is ApiResult.Success -> {
                 discardStagedForJob(jobId)
+                result.data.log?.let { logsDao.upsertMealLog(MealReconciler.serverRowFor(it)) }
                 val id = result.data.log?.id ?: resolveMealLogId(jobId, localDate)
                 ApiResult.Success(VisionConfirmOutcome(mealLogId = id, alreadyConfirmed = false))
             }

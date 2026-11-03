@@ -70,3 +70,10 @@ data class ProgressInsightDto(
     val ai: AiMetadataDto? = null,
     val createdAt: String = "",
 )
+
+/** `{insight, cached}` envelope returned by `GET /progress/insight`. */
+@Serializable
+data class ProgressInsightEnvelopeDto(
+    val insight: ProgressInsightDto,
+    val cached: Boolean = false,
+)

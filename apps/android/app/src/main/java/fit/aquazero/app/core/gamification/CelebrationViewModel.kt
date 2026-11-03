@@ -84,17 +84,22 @@ class CelebrationViewModel @Inject constructor(
 
     /**
      * Called by the celebration surface once it is on screen. Records the
-     * moment as shown; the ack request goes out when the queue drains.
+     * moment as shown; non-blocking achievement banners at the tail of the
+     * queue acknowledge as soon as they compose so navigating away without
+     * tapping the close icon never replays an earlier level-up.
      */
     fun onShown(celebration: Celebration) {
         if (shown.none { it == celebration }) shown += celebration
+        if (_uiState.value.queue.size == 1 && celebration is Celebration.Achievement) {
+            acknowledge()
+        }
     }
 
-    /** Advance past the current moment; acknowledges once nothing is left. */
+    /** Advance past the current moment and acknowledge everything shown so far. */
     fun dismissCurrent() {
         val remaining = _uiState.value.queue.drop(1)
         _uiState.value = _uiState.value.copy(queue = remaining)
-        if (remaining.isEmpty()) acknowledge()
+        acknowledge()
     }
 
     /**

@@ -494,3 +494,101 @@ describe('GDPR export scoping', () => {
     expect(flat).not.toContain('isolation-b@example.com');
   });
 });
+
+describe('chat meal drafts', () => {
+  const draftId = 'cmd-isolation-seeded-a';
+
+  beforeAll(() => {
+    const now = new Date().toISOString();
+    getStore().upsert('ai', {
+      id: draftId,
+      userId: userA.id,
+      type: 'chatMealDraft',
+      sessionId: null,
+      sourceText: 'A-only draft marker oats',
+      mealType: 'breakfast',
+      localDate: DATE,
+      status: 'proposed',
+      items: [],
+      notes: [],
+      allergyCheck: 'applied',
+      ai: null,
+      loggedMealId: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
+
+  it("B reading A's draft by id -> 404", async () => {
+    expectNotFound(await request(app).get(`${base}/chat/meal-drafts/${draftId}`).set(auth(userB)));
+  });
+
+  it("B dismissing A's draft -> 404, and the draft stays proposed", async () => {
+    expectNotFound(await request(app).post(`${base}/chat/meal-drafts/${draftId}/dismiss`).set(auth(userB)));
+    const owner = await request(app).get(`${base}/chat/meal-drafts/${draftId}`).set(auth(userA));
+    expect(owner.status).toBe(200);
+    expect(owner.body.draft.status).toBe('proposed');
+  });
+
+  it("B confirming A's draft -> 404 (no meal log created for anyone)", async () => {
+    const res = await request(app)
+      .post(`${base}/chat/meal-drafts/${draftId}/confirm`)
+      .set(auth(userB))
+      .send({ items: [] });
+    expectNotFound(res);
+  });
+
+  it("B's pending draft list never contains A's draft", async () => {
+    const res = await request(app).get(`${base}/chat/meal-drafts`).set(auth(userB));
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body)).not.toContain(draftId);
+    expect(JSON.stringify(res.body)).not.toContain('A-only draft marker oats');
+  });
+});
+
+describe('buddy challenges', () => {
+  let challengeId = '';
+
+  beforeAll(async () => {
+    const res = await request(app)
+      .post(`${base}/challenges`)
+      .set(auth(userA))
+      .send({ kind: 'meal_logs', targetDays: 5, durationDays: 7 });
+    expect(res.status).toBe(201);
+    challengeId = res.body.challenge.id as string;
+  });
+
+  it("a non-member reading A's huddle by id -> 404, not 403", async () => {
+    expectNotFound(await request(app).get(`${base}/challenges/${challengeId}`).set(auth(userB)));
+  });
+
+  it("a non-member's huddle list never contains A's huddle", async () => {
+    const res = await request(app).get(`${base}/challenges`).set(auth(userB));
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body)).not.toContain(challengeId);
+  });
+
+  it('the creator can still read the same huddle (the id is real)', async () => {
+    const res = await request(app).get(`${base}/challenges/${challengeId}`).set(auth(userA));
+    expect(res.status).toBe(200);
+    expect(res.body.challenge.id).toBe(challengeId);
+  });
+});
+
+describe('diary export scoping', () => {
+  it("B's diary export never contains A's meals or water", async () => {
+    const res = await request(app).get(`${base}/export/diary?format=json`).set(auth(userB));
+    expect(res.status).toBe(200);
+    const flat = JSON.stringify(res.body);
+    expect(flat).not.toContain(userA.id);
+    expect(flat).not.toContain('Chicken Breast');
+  });
+});
+
+describe('wellness profile', () => {
+  it("B's profile read never returns A's profile", async () => {
+    const res = await request(app).get(`${base}/me/profile`).set(auth(userB));
+    expect(JSON.stringify(res.body)).not.toContain(userA.id);
+    expect(res.body?.profile?.weightKg).not.toBe(82);
+  });
+});

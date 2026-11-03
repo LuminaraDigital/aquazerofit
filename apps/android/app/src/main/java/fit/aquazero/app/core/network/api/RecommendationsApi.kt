@@ -35,7 +35,10 @@ interface RecommendationsApi {
 
     /** Log a recommendation as a meal (confirm gate applies UI-side). */
     @POST("recommendations/{id}/log")
-    suspend fun logRecommendation(@Path("id") id: String): RecommendationLoggedDto
+    suspend fun logRecommendation(
+        @Path("id") id: String,
+        @Body body: LogSuggestionRequest = LogSuggestionRequest(fit.aquazero.app.core.common.LocalDates.today()),
+    ): RecommendationLoggedDto
 
     @POST("recommendations/{id}/feedback")
     suspend fun feedback(

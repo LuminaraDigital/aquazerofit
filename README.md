@@ -280,6 +280,7 @@ The gateway tries providers in order and falls back to a deterministic mock engi
 | `OPENAI_API_KEY` | OpenAI | https://platform.openai.com/api-keys |
 | `NVIDIA_API_KEY` | NVIDIA NIM | https://build.nvidia.com/ |
 | `NVIDIA_BASE_URL` | NVIDIA NIM | Override endpoint (default `https://integrate.api.nvidia.com/v1`) |
+| `NVIDIA_MODEL_VISIONPRIMARY` | NVIDIA NIM | Meal-photo model. Default `nvidia/nemotron-3.5-super-vl-120b-a12b` (`NVIDIA_MODEL` overrides every lane) |
 | `OLLAMA_API_KEY` | Ollama | Optional - local Ollama needs no auth |
 | `OLLAMA_BASE_URL` | Ollama | Override endpoint (default `http://localhost:11434/v1`) |
 

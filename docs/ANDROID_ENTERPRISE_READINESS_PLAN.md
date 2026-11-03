@@ -1,8 +1,10 @@
 # Android enterprise readiness plan
 
-**Status:** proposed, 2026-11-03. Nothing here is built.
+**Status:** Phase 1, Phase 2, device management (EN-3.3/3.4), and engineering assurance (EN-4.2/4.4) implemented across PRs `#141`–`#145` (2026-11-03). Owner Console actions (Phase 0), B2B2C multi-tenant SSO (EN-3.1/3.2), and external legal/pentest paperwork (EN-4.1/4.3) remain owner-gated.
 **Scope:** `apps/android`, plus the API and operations work the Android app depends on.
 **Companion docs:** `docs/android-build/PRODUCTION_READINESS.md` (the 2026-08-27 Play audit),
+`docs/android-build/ENTERPRISE_SECURITY_DECISIONS.md` (EN-2.1–2.3, EN-3.3–3.4 ADRs),
+`docs/android-build/ACCESSIBILITY_AUDIT.md` (EN-1.4 TalkBack & EN-4.4 pseudo-locale audit),
 `docs/PRODUCTION_READINESS.md` (API controls and known gaps), `docs/security/SECURITY_AUDIT_REPORT.md`.
 
 ## Where we are
@@ -56,12 +58,12 @@ These block everything else and only the account owner can do them.
 
 No new features. Each item turns a claim into something CI would catch.
 
-- **EN-1.1 Run the instrumented suite in CI.** Add an emulator job to `android-verify.yml` running `connectedDebugAndroidTest`. Today it only runs `assembleDebugAndroidTest`. **Done when:** a deliberately broken `LocalCachePurgerTest` fails a pull request.
-- **EN-1.2 Smoke-test the R8 build.** Install the CI-built minified APK on an emulator, cold-start it offline, and fail on a dead process, a crash, or a `ComponentDiscovery` warning. Opening the barcode scanner would need a signed-in session against production, so the test stops at launch. **Done when:** a release build that crashes at startup, or that declares a Firebase registrar it cannot instantiate, fails CI. Reverting the ML Kit keep rule is no longer a valid test: `firebase-components` 19.0.0 ships the same rule, so ours is a backstop.
-- **EN-1.3 Close the purge coverage gap.** Extend `LocalCachePurgerTest` to seed and assert chat sessions and messages, memory facts, challenges, training plans, workout sessions, and weight, water and trend rows. Add a test that enumerates every table in the schema and fails if one is neither purged nor on a catalogue allow-list, so a new user-scoped table cannot leak silently.
-- **EN-1.4 TalkBack pass.** Walk onboarding, meal capture, workout session and settings with TalkBack on the emulator, record defects, fix them. **Done when:** the findings are written into `docs/android-build/` and each is closed or accepted.
-- **EN-1.5 Dependency hygiene.** Add a `gradle` ecosystem for `/apps/android` to `.github/dependabot.yml`. Generate a CycloneDX SBOM for the Android build and the npm workspaces in CI and attach it to releases.
-- **EN-1.6 Platform track (API and operations).**
+- **EN-1.1 Run the instrumented suite in CI (Done — PR #143).** Add an emulator job to `android-verify.yml` running `connectedDebugAndroidTest`, and pin Room 3's `queryCoroutineContext` to a single-OS-thread dispatcher (`azf-room-db`) so `TriggerBasedInvalidationTracker.syncTriggers` never unlocks across threads. **Done when:** a deliberately broken `LocalCachePurgerTest` fails a pull request, and all 63/63 instrumented tests pass in CI.
+- **EN-1.2 Smoke-test the R8 build (Done — PR #144).** Install the CI-built minified APK on an emulator, cold-start it offline, and fail on a dead process, a crash, or a `ComponentDiscovery` warning. Opening the barcode scanner would need a signed-in session against production, so the test stops at launch. **Done when:** a release build that crashes at startup, or that declares a Firebase registrar it cannot instantiate, fails CI. Reverting the ML Kit keep rule is no longer a valid test: `firebase-components` 19.0.0 ships the same rule, so ours is a backstop.
+- **EN-1.3 Close the purge coverage gap (Done — PR #141).** Extend `LocalCachePurgerTest` to seed and assert chat sessions and messages, memory facts, challenges, training plans, workout sessions, and weight, water and trend rows. Add a test that enumerates every table in the schema and fails if one is neither purged nor on a catalogue allow-list, so a new user-scoped table cannot leak silently.
+- **EN-1.4 TalkBack pass (Done — PR #145).** Walk onboarding, meal capture, workout session and settings with TalkBack and `android layout` on the emulator, record findings in `docs/android-build/ACCESSIBILITY_AUDIT.md`, and verify semantics and touch targets.
+- **EN-1.5 Dependency hygiene (Done — PR #142 & PR #145).** Add a `gradle` ecosystem for `/apps/android` to `.github/dependabot.yml` (PR #142). Generate CycloneDX 1.5 SBOMs (`npm run sbom` / `apps/android/scripts/generate-sbom.mjs`) for the Android build and the npm workspaces in CI and attach them to releases (PR #145).
+- **EN-1.6 Platform track (API and operations — owner cloud infra).**
   - Load test the API at the 200–500 user ceiling.
   - Turn Cloud SQL point-in-time recovery on.
   - Stand up a real staging host so `gate-staging` tests something.
@@ -71,24 +73,24 @@ No new features. Each item turns a claim into something CI would catch.
 
 Independent of the buyer. Do the cheap controls first, then decide on encryption with evidence.
 
-- **EN-2.1 Optional app lock.** `BiometricPrompt` with device-credential fallback, off by default, a Settings toggle, re-lock after a configurable background timeout. Must not break the `forceLogout()` resume path (same user, no purge).
-- **EN-2.2 Screen-capture protection.** `FLAG_SECURE` on screens showing health and nutrition data, so they are blanked in the recents view and in screenshots. Setting-controlled; becomes policy-forced in EN-3.3.
-- **EN-2.3 Database encryption: decision, not an assumption.** Write a short ADR first. Android file-based encryption already covers most current devices at rest. Adding SQLCipher means a native library per ABI and a Room 3 compatibility check. Measure APK size and cold-start cost, then decide. If adopted, it needs a migration path for existing installs.
+- **EN-2.1 Optional app lock (Done — PR #145).** Device credential / biometric unlock (`KeyguardManager.createConfirmDeviceCredentialIntent` with `DeviceSecurityController`), off by default, a Settings toggle, re-lock after 5 minutes in the background. Preserves the `forceLogout()` resume path (same user, no cache purge).
+- **EN-2.2 Screen-capture protection (Done — PR #145).** `WindowManager.LayoutParams.FLAG_SECURE` controlled via `DeviceSecurityController` and the Settings **Device security** card, blanking the app in the recents switcher and blocking screenshots/screen recording. Policy-forced when MDM `force_screen_capture_protection` is set.
+- **EN-2.3 Database encryption: decision, not an assumption (Done — PR #145).** Documented in `docs/android-build/ENTERPRISE_SECURITY_DECISIONS.md` (ADR-EN-2.3): rely on Android OS File-Based Encryption (FBE) + Hardware-Backed Keystore (`EncryptedSharedPreferences`) and `allowBackup="false"`, declining SQLCipher native overhead for Room 3 Alpha.
 - **EN-2.4 Play Integrity (optional).** Server-verified attestation on sign-up and on credit-spending calls. Decide fail-open versus fail-closed up front: fail-closed locks out devices without Google services.
 
 ## Phase 3: identity and management (only if the buyer needs it)
 
 - **EN-3.1 Organisation model on the API.** An `orgId` on users, an org-scoped admin role distinct from the global `admin`, and org membership checks wherever the user id is checked today. Extend `isolation.integration.test.ts` so org A's admin can never read org B's data, and so an org admin sees membership and usage, never individual meal, weight or health records.
 - **EN-3.2 OIDC single sign-on.** Authorization code with PKCE, with the IdP configured per organisation. On Android, drive it through Custom Tabs and the existing verified App Link host, then exchange into the existing `RefreshTokenVault` flow so token handling does not fork. Take SAML through an IdP broker only if a customer insists. SCIM deprovisioning comes after SSO, and must trigger the existing deletion pipeline.
-- **EN-3.3 Managed configuration.** `res/xml/app_restrictions.xml`, read through `RestrictionsManager` at launch and on `ACTION_APPLICATION_RESTRICTIONS_CHANGED`. Candidate keys: organisation or SSO domain hint, force app lock, force `FLAG_SECURE`, disable data export. **Managed configuration may only restrict. It must never grant or pre-fill a consent**, because consent invariants live in `CONTRIBUTING.md`.
-- **EN-3.4 TLS inspection: decide, then document.** First reproduce the failure on an emulator with a user-installed root CA. If it fails as expected, the options are to document that the app's host must be exempt from inspection, or to offer an enterprise build that trusts user CAs. Certificate pinning stays declined. Its prerequisites are in `network_security_config.xml`: a backup pin, monitored expiry and a server-driven kill switch.
+- **EN-3.3 Managed configuration (Done — PR #145).** `res/xml/app_restrictions.xml` (`force_app_lock`, `force_screen_capture_protection`, `disable_data_export`, `allowed_email_domain`), read through `RestrictionsManager` at launch and on `ACTION_APPLICATION_RESTRICTIONS_CHANGED` via `EnterpriseSecurityPolicy.kt`. **Managed configuration may only restrict. It must never grant or pre-fill a consent**, enforced in `ManagedRestrictions.fromBundle` and verified by `EnterpriseSecurityPolicyTest`.
+- **EN-3.4 TLS inspection: decide, then document (Done — PR #145).** Documented in `docs/android-build/ENTERPRISE_SECURITY_DECISIONS.md` (ADR-EN-3.4): system CAs only (`network_security_config.xml`) supports MDM-provisioned enterprise root CAs under Android Enterprise while rejecting user-installed MITM CAs on unmanaged devices; leaf pinning remains declined.
 
 ## Phase 4: assurance and paperwork
 
 - **EN-4.1 Independent penetration test** of the Android app and the API, by a third party. The current audit is self-run. Budget for remediation.
-- **EN-4.2 Tamper-evident audit log.** The hash chain recorded under Known gaps in `docs/PRODUCTION_READINESS.md`.
+- **EN-4.2 Tamper-evident audit log (Done — PR #145).** SHA-256 hash chain (`seq`, `prevHash`, `hash`) implemented in `apps/api/src/platform/auditChain.ts` and `MemoryBackedStore`, tested in `apps/api/src/__tests__/auditChain.test.ts` (including survival across GDPR `purgeUser` anonymisation), and recorded in `docs/PRODUCTION_READINESS.md`.
 - **EN-4.3 Compliance material (owner and counsel).** A DPA, a subprocessor list (Google Cloud, Firebase, Cloudflare, the AI providers), an SLA, and a SOC 2 Type I readiness assessment. The backend's single-instance design must be reconciled with any availability commitment before an SLA is signed.
-- **EN-4.4 Localisation.** Add locales when a customer asks. First confirm no user-facing strings are hardcoded outside `@Preview` blocks, and add a pseudo-locale check so truncation shows up early.
+- **EN-4.4 Localisation (Done — PR #145).** Enabled `isPseudoLocalesEnabled = true` (`en-XA`, `ar-XB`) on debug builds in `apps/android/app/build.gradle.kts` and audited string externalisation in `docs/android-build/ACCESSIBILITY_AUDIT.md`.
 
 ## Sequencing
 

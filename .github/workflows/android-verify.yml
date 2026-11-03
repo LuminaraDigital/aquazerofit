@@ -222,15 +222,15 @@ jobs:
   # A debug build cannot see any of it — R8 never runs.
   #
   # This job runs R8 for real against an ephemeral keystore generated here, so
-  # it needs no secrets and is safe on `pull_request`. It does not launch the
-  # app: an emulator smoke test is the stronger check and is tracked separately,
-  # but "R8 completed and the classes our keep rules exist to protect are still
-  # in the DEX" catches the whole NoSuchMethodException-at-startup family for a
-  # fraction of the runtime.
+  # it needs no secrets and is safe on `pull_request`. It checks the DEX for
+  # the class and member names our keep rules protect, then launches the APK
+  # on an emulator. The launch is the check that matters: the ML Kit breakage
+  # kept every class name and stripped only the constructors, which a name
+  # search cannot see and a cold start reports immediately.
   minified:
     name: R8 Release Build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout Repository
@@ -341,3 +341,26 @@ jobs:
             echo "::error::Check for a newly bundled native library."
             exit 1
           fi
+
+      # Hosted Linux runners have /dev/kvm, but the runner user cannot open it.
+      # Without this rule the emulator falls back to software CPU emulation.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Installs the APK built above, cold-starts it offline, and fails on a
+      # dead process, a crash, or a Firebase registrar that could not be
+      # instantiated. See the header of scripts/release-smoke.sh.
+      - name: Launch Release APK on Emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          working-directory: apps/android
+          script: bash scripts/release-smoke.sh app/build/outputs/apk/release/app-release.apk

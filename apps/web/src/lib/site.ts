@@ -101,6 +101,15 @@ export interface MarketingRoute {
    * rank on. It is a standalone summary, not a copy of the page.
    */
   summary: string;
+  /**
+   * Optional fuller `<noscript>` body, for a page whose substance a
+   * non-executing fetch has to see rather than a summary of it. Used by
+   * /account/deletion: it is the account-deletion URL declared in Play
+   * Console, and Google checks that it states how to delete an account and
+   * what is erased and kept. Each item is plain text and must say the same thing as
+   * the rendered page (legal.test.tsx checks the facts in it against the page).
+   */
+  noscriptSections?: readonly { heading: string; items: readonly string[] }[];
   /** Relative weight in the sitemap. */
   priority: number;
 }
@@ -204,6 +213,49 @@ export const MARKETING_ROUTES: readonly MarketingRoute[] = [
     summary:
       'How to ask for a refund from AquaZeroFit, operated by Luminara Digital Pty Ltd. Web premium is a Stripe subscription: Stripe bills it again each period, and that subscription lasts until the end of the period already paid. Inside the Telegram Mini App, coaches are one-time Telegram Stars purchases. Premium in the Mini App, when a Stars price is configured, is a 30 day Stars subscription: each payment lasts until the expiration Telegram reports, and it is not extended when a renewal does not arrive. A support refund of a Stars charge returns that charge and stops further renewals. Overlapping paid periods last until the latest end, and are not added together. Email info@luminara.digital, or send /paysupport to the bot, and include the account that paid and what you bought. The request itself does not refund the payment.',
     priority: 0.3,
+  },
+  {
+    /* The account-deletion URL declared in Play Console (Data safety and the
+       account deletion requirement). Moving it breaks the declaration. */
+    path: '/account/deletion',
+    title: 'Delete your account | AquaZeroFit',
+    description:
+      'How to delete your AquaZeroFit account and its data, from the app or any browser: what is erased, what is kept, and how long it takes.',
+    summary:
+      'You can delete your AquaZeroFit account and its data yourself, from the Android app, the Telegram Mini App or any web browser, without contacting anyone. This page explains where the control is, what deletion erases, what is kept and why, and how long it takes.',
+    noscriptSections: [
+      {
+        heading: 'How to delete your account',
+        items: [
+          'In the Android app or the Telegram Mini App: open Settings, choose “Delete account”, and confirm.',
+          'From any web browser, without the app installed: sign in at https://aquazerofit.com/sign-in with your email address and password, open Settings, choose “Delete account”, and confirm.',
+          'If you cannot sign in, reset your password from the sign-in page, or write to info@luminara.digital from the address on the account.',
+        ],
+      },
+      {
+        heading: 'What happens, and when',
+        items: [
+          'Your account is flagged and erased automatically after 30 days. Confirming a second time within that window erases it immediately.',
+          'When the account is erased, every session is revoked.',
+          'A web subscription billed by Stripe is cancelled at erasure. A Google Play subscription is billed by Google and is not cancelled by deleting the account: cancel it in the Play Store.',
+        ],
+      },
+      {
+        heading: 'What is erased',
+        items: [
+          'Deletion removes your profile, logs, plans, coach conversations, remembered facts and any meal photographs still on disk.',
+          'Your account record, sign-in credentials and any linked Telegram identity.',
+        ],
+      },
+      {
+        heading: 'What is kept, and why',
+        items: [
+          'Credit and security-audit records survive, with your identity stripped out of them.',
+          'Referral and sharing counts remain only as aggregates, with the referral value and huddle code dropped.',
+        ],
+      },
+    ],
+    priority: 0.4,
   },
   {
     path: '/support',

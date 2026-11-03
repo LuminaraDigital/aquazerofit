@@ -212,6 +212,9 @@ describe('privacy notice', () => {
     }
     expect(hc).toMatch(/not sent to our servers, not shared with anyone/);
     expect(screen.getByText(/Limited Use requirements/)).toBeTruthy();
+    // createSpeechRecognizer, not createOnDeviceSpeechRecognizer: the policy
+    // must not claim the audio stays on the device.
+    expect(screen.getByText(/may process the audio off the device/)).toBeTruthy();
     expect(screen.getByText(/We never record, receive or store audio/)).toBeTruthy();
   });
 
@@ -324,6 +327,7 @@ describe('account deletion page', () => {
     const page = container.textContent ?? '';
     for (const sentence of [
       'Your account is flagged and erased automatically after 30 days. Confirming a second time within that window erases it immediately.',
+      'Signing in on the web or in the Android app cancels a pending deletion. Opening the Telegram Mini App does not.',
       'Deletion removes your profile, logs, plans, coach conversations, remembered facts and any meal photographs still on disk.',
       'Credit and security-audit records survive, with your identity stripped out of them.',
       'Your account record, sign-in credentials and any linked Telegram identity.',

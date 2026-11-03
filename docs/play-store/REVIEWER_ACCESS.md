@@ -16,10 +16,13 @@ it as a reviewer password.
 Production never seeds the demo account (`AZF_SEED_DEMO=false`, and
 `NODE_ENV=production` skips it regardless), but this page recorded a successful
 production sign-in as it on 2026-08-17, so an account created before that gate
-may still exist in the production database. An operator should sign in to it
-once more with the old password: if that works, delete the account (Settings →
-Delete account, then confirm a second time to erase it immediately) or reset its
-password. Do not give it to Google.
+may still exist in the production database. On every boot `seedIfNeeded` checks
+that account (and any account at `demo@aquazero.fit`). If the password is still
+the public one, it is replaced with a random password nobody is given, live
+sessions are revoked, and a `demo.compromised_password_retired` audit event is
+written. The boot log says `retired the public demo password`. You will not be
+able to sign in as it afterwards. Delete the row if you want the address freed.
+Do not give it to Google.
 
 ## The reviewer account
 
@@ -47,9 +50,11 @@ How it behaves (`provisionPlayReviewer` in `apps/api/src/data/seed.ts`, tests in
   `play_reviewer.password_rotated` go to the hash-chained audit log with a hash
   of the address, never the address or the password.
 - **Idempotent.** Later boots change nothing unless the password secret has
-  changed. Then the stored hash is replaced and every live session of the
-  reviewer account is revoked, so rotating is: add a new secret version, roll a
-  revision.
+  changed, or the account is missing its premium tier, its credentials or its
+  sample history (a crashed first boot). A password change replaces the hash
+  and revokes every live session, so rotating is: add a new secret version,
+  roll a revision. The boot log reads `"playReviewer":"unchanged"`,
+  `"rotated"` or `"repaired"`.
 - No MFA, PIN, biometric, QR code or location gate applies to a `user`-role
   account, so the password is the only access control.
 
@@ -84,7 +89,8 @@ unset REVIEWER_EMAIL REVIEWER_PASSWORD
 Confirm the runtime service account name first with
 `gcloud run services describe aquazerofit-api --region=australia-southeast1 --format='value(spec.template.spec.serviceAccountName)'`.
 Then check the boot log for `[seed] {... "playReviewer":"created"}` (or
-`"unchanged"` on later boots), and sign in once at
+`"unchanged"` on later boots, `"repaired"` if a previous boot had left the
+account incomplete), and sign in once at
 `https://aquazerofit.com/sign-in` and in the Android app with the same details.
 
 **Rotate:** `printf %s "$NEW" | gcloud secrets versions add PLAY_REVIEWER_PASSWORD --project=aquazerofit --data-file=-`,

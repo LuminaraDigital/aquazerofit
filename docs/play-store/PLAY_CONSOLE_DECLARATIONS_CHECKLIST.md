@@ -197,7 +197,7 @@ account details (card details stay with Google Play and Stripe).
 **Voice or sound recordings, rationale** (keep for review queries):
 
 ```
-Audio is used only for optional dictation in the AI coach, started by the user tapping the microphone. The app passes the microphone stream to the device's speech recognition service and receives only the transcribed text, which the user can edit before sending. AquaZeroFit never records, stores or uploads audio; the transcript, if sent, is handled as a coach message.
+Audio is used only for optional dictation in the AI coach, started by the user tapping the microphone. The app passes the microphone stream to Android's default speech recognition service, which may process the audio off the device, and receives only the transcribed text, which the user can edit before sending. AquaZeroFit never records, stores or uploads audio; the transcript, if sent, is handled as a coach message.
 ```
 
 ---
@@ -223,7 +223,7 @@ notification disappear.
 Paste into review notes or a policy query:
 
 ```
-AquaZeroFit requests the microphone only when the user taps the microphone button in the AI coach, to dictate a message instead of typing it. The request is made at that moment, never at launch, and declining keeps the coach fully usable by keyboard. Speech is converted to text by the device's speech recognition service; AquaZeroFit receives only the text and never records, stores or uploads audio.
+AquaZeroFit requests the microphone only when the user taps the microphone button in the AI coach, to dictate a message instead of typing it. The request is made at that moment, never at launch, and declining keeps the coach fully usable by keyboard. Speech is converted to text by Android's default speech recognition service, which may process the audio off the device; AquaZeroFit receives only the text and never records, stores or uploads audio.
 ```
 
 ---

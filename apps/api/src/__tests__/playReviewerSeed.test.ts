@@ -200,6 +200,61 @@ describe('provisionPlayReviewer', () => {
     expect(outcome.status).toBe('refused');
     expect(reviewerOf(store)?.email).toBe(EMAIL);
   });
+
+  it('refuses to attach a password when the reviewer id exists at another address with no credentials', async () => {
+    const store = freshStore();
+    store.upsert('users', {
+      id: PLAY_REVIEWER_USER_ID,
+      email: 'other@example.com',
+      emailVerified: true,
+      role: 'user',
+      tier: 'free',
+      displayName: 'Someone',
+      createdAt: new Date().toISOString(),
+      deletionRequestedAt: null,
+    });
+
+    const outcome = await provisionPlayReviewer(store, {
+      PLAY_REVIEWER_EMAIL: EMAIL,
+      PLAY_REVIEWER_PASSWORD: PASSWORD,
+    });
+
+    expect(outcome.status).toBe('refused');
+    expect(reviewerOf(store)).toMatchObject({ email: 'other@example.com', tier: 'free' });
+    expect(credOf(store)).toBeUndefined();
+  });
+
+  it('reports repaired, not unchanged, when it restores premium on the reviewer account', async () => {
+    const store = freshStore();
+    const env = { PLAY_REVIEWER_EMAIL: EMAIL, PLAY_REVIEWER_PASSWORD: PASSWORD };
+    await provisionPlayReviewer(store, env);
+    const hash = credOf(store)!.passwordHash;
+    store.upsert('users', { ...reviewerOf(store)!, tier: 'free' });
+
+    expect(await provisionPlayReviewer(store, env)).toEqual({ status: 'repaired' });
+    expect(reviewerOf(store)?.tier).toBe('premium');
+    expect(effectiveTier(reviewerOf(store)!)).toBe('premium');
+    expect(credOf(store)!.passwordHash).toBe(hash);
+    expect(reviewerAudit(store).map((e) => e.action)).toContain('play_reviewer.premium_comped');
+  });
+
+  it('fills sample history when the account exists without it', async () => {
+    const store = freshStore();
+    const env = { PLAY_REVIEWER_EMAIL: EMAIL, PLAY_REVIEWER_PASSWORD: PASSWORD };
+    await provisionPlayReviewer(store, env);
+    for (const doc of store.where<{ id: string; userId?: string }>('logs', (d) => {
+      return (d as { userId?: string }).userId === PLAY_REVIEWER_USER_ID;
+    })) {
+      store.delete('logs', doc.id);
+    }
+    store.delete('profiles', `profile-${PLAY_REVIEWER_USER_ID}`);
+
+    expect(await provisionPlayReviewer(store, env)).toEqual({ status: 'repaired' });
+    expect(store.byId('profiles', `profile-${PLAY_REVIEWER_USER_ID}`)).toBeTruthy();
+    expect(
+      store.where('logs', (d) => (d as { userId?: string }).userId === PLAY_REVIEWER_USER_ID).length,
+    ).toBeGreaterThan(14);
+  });
 });
 
 describe('seeding in production', () => {
@@ -254,5 +309,100 @@ describe('the development demo account', () => {
     expect(await bcrypt.compare(['AquaZero', 'Demo!', '2026'].join(''), cred.passwordHash)).toBe(false);
     // History still seeds, under the ids it always had.
     expect(store.byId('plans', 'plan-demo')).toBeTruthy();
+  });
+
+  it('will not leave the public demo password in place even when AZF_DEMO_PASSWORD is set to it', async () => {
+    const publicPassword = ['AquaZero', 'Demo!', '2026'].join('');
+    vi.stubEnv('AZF_DEMO_PASSWORD', publicPassword);
+    const store = freshStore();
+    await seedIfNeeded(store);
+    const cred = store.byId<{ id: string; passwordHash: string }>('users', 'cred-usr-demo')!;
+    expect(await bcrypt.compare(publicPassword, cred.passwordHash)).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('retired the public demo password'));
+    expect(JSON.stringify(store.where('audit', () => true))).not.toContain(publicPassword);
+  });
+});
+
+describe('a demo account left over from the public password', () => {
+  const publicPassword = ['AquaZero', 'Demo!', '2026'].join('');
+
+  beforeEach(() => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ADMIN_PASSWORD', '');
+    vi.stubEnv('PLAY_REVIEWER_EMAIL', '');
+    vi.stubEnv('PLAY_REVIEWER_PASSWORD', '');
+  });
+
+  it('replaces that password and revokes live sessions, once', async () => {
+    const store = freshStore();
+    store.upsert('users', {
+      id: 'usr-demo',
+      email: 'demo@aquazero.fit',
+      emailVerified: true,
+      role: 'user',
+      tier: 'premium',
+      displayName: 'Alex Waters',
+      createdAt: new Date().toISOString(),
+      deletionRequestedAt: null,
+    });
+    store.upsert('users', {
+      id: 'cred-usr-demo',
+      type: 'credentials',
+      userId: 'usr-demo',
+      passwordHash: await bcrypt.hash(publicPassword, 4),
+    });
+    store.upsert('users', {
+      id: 'rt-demo-1',
+      type: 'refreshToken',
+      userId: 'usr-demo',
+      revokedAt: null,
+    });
+
+    await seedIfNeeded(store);
+
+    const cred = store.byId<{ id: string; passwordHash: string }>('users', 'cred-usr-demo')!;
+    expect(await bcrypt.compare(publicPassword, cred.passwordHash)).toBe(false);
+    expect(store.byId<User>('users', 'usr-demo')?.tier).toBe('premium');
+    expect(store.byId<{ id: string; revokedAt: string | null }>('users', 'rt-demo-1')?.revokedAt).toBeTruthy();
+    const retired = store.where<{ id: string; action?: string }>('audit', (d) => {
+      return (d as { action?: string }).action === 'demo.compromised_password_retired';
+    });
+    expect(retired).toHaveLength(1);
+    expect(JSON.stringify(retired)).not.toContain(publicPassword);
+
+    resetSeededDirs();
+    await seedIfNeeded(store);
+    expect(
+      store.where('audit', (d) => (d as { action?: string }).action === 'demo.compromised_password_retired'),
+    ).toHaveLength(1);
+  });
+
+  it('leaves a demo account that already has its own password alone', async () => {
+    const store = freshStore();
+    const own = 'a-private-demo-password-99';
+    store.upsert('users', {
+      id: 'usr-demo',
+      email: 'demo@aquazero.fit',
+      emailVerified: true,
+      role: 'user',
+      tier: 'premium',
+      displayName: 'Alex Waters',
+      createdAt: new Date().toISOString(),
+      deletionRequestedAt: null,
+    });
+    store.upsert('users', {
+      id: 'cred-usr-demo',
+      type: 'credentials',
+      userId: 'usr-demo',
+      passwordHash: await bcrypt.hash(own, 4),
+    });
+
+    await seedIfNeeded(store);
+
+    const cred = store.byId<{ id: string; passwordHash: string }>('users', 'cred-usr-demo')!;
+    expect(await bcrypt.compare(own, cred.passwordHash)).toBe(true);
+    expect(
+      store.where('audit', (d) => (d as { action?: string }).action === 'demo.compromised_password_retired'),
+    ).toHaveLength(0);
   });
 });

@@ -140,7 +140,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
         <List
           items={[
             'Health Connect, if you connect it in Settings: the app reads your steps, heart rate (the day’s average and lowest), total calories burned and last night’s sleep duration, for today and last night only. These figures are read and shown on your device. They are not sent to our servers, not shared with anyone, not used for advertising and not used to train AI. Disconnect at any time in Settings or in Health Connect.',
-            'The microphone, only after you tap the microphone in the coach, and only while it is listening: your device’s own speech recognition service turns what you say into text, and we receive only the text you then choose to send, handled like any other coach message. We never record, receive or store audio.',
+            'The microphone, only after you tap the microphone in the coach, and only while it is listening. Android’s default speech recognition service turns what you say into text. That service may process the audio off the device; the audio is not sent to us. We receive only the text you then choose to send, handled like any other coach message. We never record, receive or store audio.',
             'The camera, only when you photograph a meal or scan a barcode. Barcodes are read on your device.',
           ]}
         />

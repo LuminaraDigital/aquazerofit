@@ -236,6 +236,7 @@ export const MARKETING_ROUTES: readonly MarketingRoute[] = [
         heading: 'What happens, and when',
         items: [
           'Your account is flagged and erased automatically after 30 days. Confirming a second time within that window erases it immediately.',
+          'Signing in on the web or in the Android app cancels a pending deletion. Opening the Telegram Mini App does not.',
           'When the account is erased, every session is revoked.',
           'A web subscription billed by Stripe is cancelled at erasure. A Google Play subscription is billed by Google and is not cancelled by deleting the account: cancel it in the Play Store.',
         ],

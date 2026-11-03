@@ -14,6 +14,9 @@
  *
  * The password that used to be hard-coded here is public in this repository's
  * history and must be treated as compromised wherever it was ever used.
+ * seedIfNeeded retires it on any account that still accepts it (see
+ * retireCompromisedDemoPassword): the hash is replaced and live sessions are
+ * revoked, so a database seeded before this change cannot keep signing in.
  *
  * Play reviewer account (any environment, production included): provisioned
  * from PLAY_REVIEWER_EMAIL / PLAY_REVIEWER_PASSWORD; see provisionPlayReviewer.
@@ -498,6 +501,11 @@ export async function seedIfNeeded(store: JsonStore): Promise<void> {
     }
   }
 
+  // Every environment, production included. Closes the public demo password
+  // even when this process did not seed the account (a production database
+  // from before the password left the source).
+  await retireCompromisedDemoPassword(store);
+
   // Every environment, production included. A no-op unless both
   // PLAY_REVIEWER_* variables are set.
   const reviewer = await provisionPlayReviewer(store);
@@ -529,17 +537,29 @@ export const COMPED_PREMIUM_ACCOUNTS: ReadonlyMap<string, string> = new Map([
 export const PLAY_REVIEWER_MIN_PASSWORD_LENGTH = 16;
 
 /**
- * SHA-256 of passwords known to be public, refused outright. The first is the
- * demo password that was committed to this repository in plain text.
+ * SHA-256 of passwords known to be public, refused outright. The only entry
+ * is the demo password that was committed to this repository in plain text.
+ * retireCompromisedDemoPassword compares the plaintext (bcrypt is salted, so
+ * the digest alone cannot be checked against a stored hash); the digest stays
+ * so a reviewer secret equal to that password is refused without a second copy
+ * of the string.
  */
 const COMPROMISED_PASSWORD_SHA256 = new Set([
   '9ae7ca195c2b075f9a9354023393873c358298b09cdba6df11c0c40e5d7f1f09',
 ]);
 
+/**
+ * The demo password that was committed in plain text. Assembled so the literal
+ * does not sit in the tree as a single credential.
+ */
+function compromisedDemoPassword(): string {
+  return ['AquaZero', 'Demo!', '2026'].join('');
+}
+
 export type PlayReviewerOutcome =
   | { status: 'skipped' }
   | { status: 'refused'; reason: string }
-  | { status: 'created' | 'unchanged' | 'rotated' };
+  | { status: 'created' | 'unchanged' | 'rotated' | 'repaired' };
 
 function reviewerAudit(store: JsonStore, action: string, detail: Record<string, unknown>): void {
   store.upsert('audit', {
@@ -556,17 +576,85 @@ function emailHash(email: string): string {
   return crypto.createHash('sha256').update(email).digest('hex').slice(0, 16);
 }
 
-function revokeReviewerSessions(store: JsonStore): number {
+function revokeUserSessions(store: JsonStore, userId: string): number {
   const now = new Date().toISOString();
   const live = store.where<{ id: string; type?: string; userId?: string; revokedAt?: string | null }>(
     'users',
     (d) => {
       const doc = d as { type?: string; userId?: string; revokedAt?: string | null };
-      return doc.type === 'refreshToken' && doc.userId === PLAY_REVIEWER_USER_ID && !doc.revokedAt;
+      return doc.type === 'refreshToken' && doc.userId === userId && !doc.revokedAt;
     },
   );
   for (const rec of live) store.upsert('users', { ...rec, revokedAt: now });
   return live.length;
+}
+
+function isAccountDoc(doc: Partial<User> & { type?: string }): boolean {
+  return (doc.type === undefined || doc.type === 'user') && typeof doc.email === 'string' && typeof doc.id === 'string';
+}
+
+/**
+ * Replace the public demo password wherever an account still accepts it, and
+ * revoke that account's live sessions.
+ *
+ * Production used to seed demo@aquazero.fit with a password that is now in the
+ * git history. seedAccount will not touch an account that already has
+ * credentials, so removing the literal from this file would otherwise leave
+ * that premium account sign-in-able by anyone who has read the repository.
+ * The replacement is random and is not logged. A password that does not match
+ * is left exactly as it is, so a demo account given its own AZF_DEMO_PASSWORD
+ * is not rotated on every boot.
+ */
+export async function retireCompromisedDemoPassword(store: JsonStore): Promise<number> {
+  const password = compromisedDemoPassword();
+  const digest = crypto.createHash('sha256').update(password).digest('hex');
+  if (!COMPROMISED_PASSWORD_SHA256.has(digest)) {
+    throw new Error('COMPROMISED_PASSWORD_SHA256 is out of date with compromisedDemoPassword()');
+  }
+
+  const candidates = new Map<string, User>();
+  const byId = store.byId<User & { type?: string }>('users', DEMO_USER_ID);
+  if (byId && isAccountDoc(byId)) candidates.set(byId.id, byId);
+  const byEmail = store.findOne<User & { type?: string }>('users', (d) => {
+    const doc = d as User & { type?: string };
+    return isAccountDoc(doc) && doc.email.toLowerCase() === DEMO_EMAIL;
+  });
+  if (byEmail) candidates.set(byEmail.id, byEmail);
+
+  let retired = 0;
+  for (const user of candidates.values()) {
+    const cred = store.byId<{ id: string; passwordHash?: string }>('users', `cred-${user.id}`);
+    if (!cred?.passwordHash) continue;
+    let matches = false;
+    try {
+      matches = await bcrypt.compare(password, cred.passwordHash);
+    } catch {
+      // eslint-disable-next-line no-console
+      console.warn(`[seed] could not check the stored password hash for ${user.id}`);
+      continue;
+    }
+    if (!matches) continue;
+
+    store.upsert('users', {
+      id: `cred-${user.id}`,
+      type: 'credentials',
+      userId: user.id,
+      passwordHash: await bcryptHashAsync(crypto.randomBytes(24).toString('base64url'), 10),
+    });
+    const revoked = revokeUserSessions(store, user.id);
+    store.upsert('audit', {
+      id: `aud-${crypto.randomUUID()}`,
+      userId: user.id,
+      type: 'authEvent',
+      action: 'demo.compromised_password_retired',
+      detail: { revokedSessions: revoked },
+      createdAt: new Date().toISOString(),
+    });
+    // eslint-disable-next-line no-console
+    console.warn(`[seed] retired the public demo password on ${user.id}; sessions revoked: ${revoked}`);
+    retired += 1;
+  }
+  return retired;
 }
 
 /**
@@ -579,11 +667,15 @@ function revokeReviewerSessions(store: JsonStore): number {
  *   profile and two weeks of sample history; later boots leave it alone
  *   unless the password secret has changed, in which case the hash is
  *   replaced and every live session revoked, so rotating the secret and
- *   redeploying is the whole rotation procedure.
+ *   redeploying is the whole rotation procedure. A boot that finds the
+ *   account missing its premium tier, its credentials, or its sample history
+ *   repairs that and reports `repaired` rather than `unchanged`.
  * - Premium only through COMPED_PREMIUM_ACCOUNTS, and only on the account
  *   this function created. If the address already belongs to any other
- *   account the provisioner refuses and changes nothing, so the variable
- *   cannot be pointed at an existing account to upgrade it.
+ *   account, or this fixed id already belongs to a different address, the
+ *   provisioner refuses and changes nothing — including when the credentials
+ *   doc was never written. The variable cannot be pointed at an existing
+ *   account to upgrade it.
  * - The password is never logged; the audit trail records a hash of the
  *   address and what changed.
  */
@@ -633,39 +725,65 @@ export async function provisionPlayReviewer(
   }
 
   const existing = store.byId<User>('users', PLAY_REVIEWER_USER_ID);
-  const cred = store.byId<{ id: string; passwordHash: string }>('users', `cred-${PLAY_REVIEWER_USER_ID}`);
+  if (existing && existing.email.toLowerCase() !== email) {
+    return refuse(
+      `${PLAY_REVIEWER_USER_ID} exists with a different address; delete that account to re-provision at the new one`,
+    );
+  }
 
-  if (existing && cred) {
-    if (existing.email.toLowerCase() !== email) {
-      return refuse(
-        `${PLAY_REVIEWER_USER_ID} exists with a different address; delete that account to re-provision at the new one`,
-      );
-    }
-    if (existing.tier !== 'premium') {
-      store.upsert('users', { ...existing, tier: 'premium' });
-      reviewerAudit(store, 'play_reviewer.premium_comped', { emailHash: emailHash(email), reason });
-    }
-    if (await bcrypt.compare(password, cred.passwordHash)) return { status: 'unchanged' };
+  if (!existing) {
+    await seedAccount(store, PLAY_REVIEWER_USER_ID, email, password, 'Play Reviewer', 'user', 'premium', 15, {
+      // A production account: product analytics and reminders stay off.
+      anonymisedAnalytics: false,
+      reminders: false,
+    });
+    seedSampleHistory(store, PLAY_REVIEWER_USER_ID, 'play-reviewer');
+    reviewerAudit(store, 'play_reviewer.provisioned', { emailHash: emailHash(email) });
+    reviewerAudit(store, 'play_reviewer.premium_comped', { emailHash: emailHash(email), reason });
+    return { status: 'created' };
+  }
+
+  // The id is already ours. Repair only what a crashed first boot, or a
+  // later edit, took away. Do not report `unchanged` for a tier write: the
+  // boot log is the operator's evidence that premium was restored.
+  let repaired = false;
+  if (existing.tier !== 'premium') {
+    store.upsert('users', { ...existing, tier: 'premium' });
+    reviewerAudit(store, 'play_reviewer.premium_comped', { emailHash: emailHash(email), reason });
+    repaired = true;
+  }
+
+  let rotated = false;
+  const cred = store.byId<{ id: string; passwordHash: string }>('users', `cred-${PLAY_REVIEWER_USER_ID}`);
+  if (!cred) {
+    await seedAccount(store, PLAY_REVIEWER_USER_ID, email, password, 'Play Reviewer', 'user', 'premium', 15, {
+      anonymisedAnalytics: false,
+      reminders: false,
+    });
+    reviewerAudit(store, 'play_reviewer.provisioned', { emailHash: emailHash(email) });
+    repaired = true;
+  } else if (!(await bcrypt.compare(password, cred.passwordHash))) {
     store.upsert('users', {
       id: `cred-${PLAY_REVIEWER_USER_ID}`,
       type: 'credentials',
       userId: PLAY_REVIEWER_USER_ID,
       passwordHash: await bcryptHashAsync(password, 10),
     });
-    const revoked = revokeReviewerSessions(store);
+    const revoked = revokeUserSessions(store, PLAY_REVIEWER_USER_ID);
     reviewerAudit(store, 'play_reviewer.password_rotated', { emailHash: emailHash(email), revokedSessions: revoked });
-    return { status: 'rotated' };
+    rotated = true;
   }
 
-  await seedAccount(store, PLAY_REVIEWER_USER_ID, email, password, 'Play Reviewer', 'user', 'premium', 15, {
-    // A production account: product analytics and reminders stay off.
-    anonymisedAnalytics: false,
-    reminders: false,
-  });
-  seedSampleHistory(store, PLAY_REVIEWER_USER_ID, 'play-reviewer');
-  reviewerAudit(store, 'play_reviewer.provisioned', { emailHash: emailHash(email) });
-  reviewerAudit(store, 'play_reviewer.premium_comped', { emailHash: emailHash(email), reason });
-  return { status: 'created' };
+  const hasHistory = store.findOne<MealLog>(
+    'logs',
+    (d) => (d as MealLog).type === 'mealLog' && (d as MealLog).userId === PLAY_REVIEWER_USER_ID,
+  );
+  if (!hasHistory) {
+    seedSampleHistory(store, PLAY_REVIEWER_USER_ID, 'play-reviewer');
+    repaired = true;
+  }
+  if (rotated) return { status: 'rotated' };
+  return { status: repaired ? 'repaired' : 'unchanged' };
 }
 
 // Standalone: `npm run seed` (tsx src/data/seed.ts)

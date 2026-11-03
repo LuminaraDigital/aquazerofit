@@ -22,6 +22,7 @@ import fit.aquazero.app.core.sync.ConnectivityMonitor
 import fit.aquazero.app.core.sync.OutboxDrainCoordinator
 import fit.aquazero.app.core.ui.CoachPersona
 import fit.aquazero.app.core.ui.CoachRoster
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /** How the current turn ended, when it ended badly. */
@@ -315,7 +317,11 @@ class CoachViewModel @Inject constructor(
             // drain: the turn cannot reach the server either, and a timed-out
             // upload would only delay that failure.
             if (connectivityMonitor.currentlyOnline()) {
-                runCatching { outboxDrainCoordinator.drainPending() }
+                runCatching {
+                    withTimeoutOrNull(DRAIN_BEFORE_TURN_TIMEOUT_MS) {
+                        outboxDrainCoordinator.drainPending()
+                    }
+                }.onFailure { if (it is CancellationException) throw it }
             }
             val result = runner.run(
                 sessionId = sessionId,
@@ -445,8 +451,9 @@ class CoachViewModel @Inject constructor(
                 localDate = LocalDates.today(),
                 acknowledgeAllergens = confirmation.acknowledgeAllergens,
             )
-            when (chatRepository.confirmMealDraft(draft.id, body)) {
+            when (val result = chatRepository.confirmMealDraft(draft.id, body)) {
                 is ApiResult.Success -> {
+                    result.data.mealLog?.let { logsRepository.cacheServerMealLog(it) }
                     _uiState.value = _uiState.value.copy(draftPending = false, draft = null)
                     _events.send(CoachEvent.Toast(CoachToast.MealLogged))
                     _events.send(CoachEvent.MealLogged)
@@ -533,5 +540,6 @@ class CoachViewModel @Inject constructor(
 
     private companion object {
         const val ROLE_ASSISTANT = "assistant"
+        const val DRAIN_BEFORE_TURN_TIMEOUT_MS = 2_500L
     }
 }

@@ -25,6 +25,7 @@ class FakeDashboardData : DashboardData {
     val userFlow = MutableStateFlow<UserEntity?>(null)
     val summaryFlow = MutableStateFlow<ProgressSummaryDto?>(null)
     val weightFlow = MutableStateFlow<List<Double>>(emptyList())
+    val latestWeighInFlow = MutableStateFlow<String?>(null)
     val profileFlow = MutableStateFlow<fit.aquazero.app.core.database.ProfileEntity?>(null)
     val targetsFlow = MutableStateFlow<fit.aquazero.app.core.database.TargetsEntity?>(null)
 
@@ -63,6 +64,8 @@ class FakeDashboardData : DashboardData {
 
     override fun weightSeries(): Flow<List<Double>> = weightFlow
 
+    override fun latestWeighInDate(): Flow<String?> = latestWeighInFlow
+
     override suspend fun refreshDay(localDate: String): ApiResult<DailyNutritionDto> = dayResult
 
     override suspend fun refreshProfile() {
@@ -83,7 +86,10 @@ class FakeDashboardData : DashboardData {
         return suggestResult
     }
 
-    override suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto> =
+    override suspend fun logRecommendation(
+        recommendationId: String,
+        localDate: String,
+    ): ApiResult<MealLogDto> =
         logRecommendationResult
 
     override suspend fun readiness(): ApiResult<ReadinessAssessmentDto> = readinessResult

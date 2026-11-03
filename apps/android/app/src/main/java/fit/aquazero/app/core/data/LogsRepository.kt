@@ -19,6 +19,7 @@ import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.model.CreateMealLogRequest
 import fit.aquazero.app.core.model.CreateWaterLogRequest
 import fit.aquazero.app.core.model.CreateWeightLogRequest
+import fit.aquazero.app.core.model.MealLogDto
 import fit.aquazero.app.core.model.MealLogItemDto
 import fit.aquazero.app.core.model.MealType
 import kotlinx.coroutines.flow.Flow
@@ -205,6 +206,11 @@ class LogsRepository @Inject constructor(
         logsDao.upsertMealLog(row.copy(deleted = true, syncState = SyncState.PENDING))
         outboxRepository.enqueueDelete(OutboxEntityTypes.MEAL_LOG, localId)
         syncScheduler.requestSync()
+    }
+
+    /** Cache a meal log created directly on the server (e.g. confirmed chat draft). */
+    suspend fun cacheServerMealLog(dto: MealLogDto) {
+        logsDao.upsertMealLog(MealReconciler.serverRowFor(dto))
     }
 
     private fun mealTypeName(mealType: MealType): String = when (mealType) {

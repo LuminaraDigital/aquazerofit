@@ -49,6 +49,20 @@ class OutboxDrainCoordinatorTest {
         assertEquals(OutboxState.SYNCED, outboxDao.byId(1L)!!.state)
     }
 
+    @Test
+    fun `drainPending stops immediately when only terminal FAILED ops remain`() = runTest {
+        val opId = outbox.enqueueCreate(
+            entityType = OutboxEntityTypes.WATER_LOG,
+            localId = "w-failed",
+            payloadJson = """{"amountMl":250,"loggedAt":"2026-01-01T08:00:00Z","localDate":"2026-01-01"}""",
+            idempotencyKey = "key-failed",
+        )
+        outbox.markFailed(opId, "VALIDATION_FAILED")
+        assertEquals(0, outbox.liveCountOnce())
+        assertEquals(1, coordinator().drainPending())
+        assertEquals(0, logsApi.createWaterCalls)
+    }
+
     private class RecordingSyncScheduler : SyncScheduler {
         override fun requestSync(initialDelaySeconds: Long, queueBehindCurrent: Boolean) = Unit
         override fun cancelPendingSync() = Unit

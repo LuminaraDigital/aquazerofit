@@ -375,9 +375,17 @@ function chatReply(messages: MockMessage[], ctx: MockChatContext, coachId?: stri
       break;
     }
     case 'workout':
+      if (personalisationOff(ctx)) {
+        parts.push(PERSONALISATION_OFF_REPLY);
+        break;
+      }
       parts.push(...workoutLines(ctx.workout, seed));
       break;
     case 'plan':
+      if (personalisationOff(ctx)) {
+        parts.push(PERSONALISATION_OFF_REPLY);
+        break;
+      }
       parts.push(
         ctx.plan
           ? `You’re on “${ctx.plan.name}”, ${ctx.plan.daysPerWeek} training days a week.`
@@ -386,6 +394,10 @@ function chatReply(messages: MockMessage[], ctx: MockChatContext, coachId?: stri
       parts.push(...workoutLines(ctx.workout, seed));
       break;
     case 'progress':
+      if (personalisationOff(ctx)) {
+        parts.push(PERSONALISATION_OFF_REPLY);
+        break;
+      }
       parts.push(...progressLines(ctx.progress, seed));
       break;
     case 'greeting':

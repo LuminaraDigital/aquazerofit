@@ -615,6 +615,7 @@
     <string name="coach_error_dropped">That reply did not come through. Your message is saved - ask again whenever you are ready.</string>
     <string name="coach_error_credits">You\'re out of AI credits for today. They refresh daily, and Premium raises the daily cap.</string>
     <string name="coach_error_send_retry">Ask again</string>
+    <string name="coach_error_dismiss">Dismiss</string>
     <string name="coach_offline">You are offline. Past conversations are here to read; a new question needs a connection.</string>
     <string name="coach_safety_cd">Supportive note from your coach</string>
     <string name="coach_read_aloud_cd">Read this reply aloud</string>
@@ -1223,6 +1224,7 @@
     <string name="plan_upgrade_cta_monthly">Go Monthly - %1$s / month</string>
     <string name="plan_upgrade_cta">Go premium - %1$s a month</string>
     <string name="plan_upgrade_terms_annual">7 days free, then %1$s/year. Auto-renews yearly. Cancel anytime in Google Play.</string>
+    <string name="plan_upgrade_terms_annual_no_trial">Renews every year at %1$s until you cancel. Cancel anytime in Google Play.</string>
     <string name="plan_upgrade_terms_monthly">Renews every month at %1$s until you cancel. Cancel anytime in Google Play.</string>
     <string name="plan_upgrade_terms">Renews every month until you cancel. You can cancel any time in Google Play, and you keep premium until the month you have paid for runs out.</string>
     <string name="plan_upgrade_unavailable">Google Play cannot offer the subscription on this device right now, so there is nothing to buy here at the moment. Your free plan is unaffected.</string>

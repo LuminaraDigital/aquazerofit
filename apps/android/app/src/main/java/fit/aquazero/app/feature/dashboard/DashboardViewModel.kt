@@ -318,10 +318,11 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             data.progressSummary().collect { summary ->
                 _uiState.update { state ->
+                    val summaryLast = summary?.weightSeries?.maxOfOrNull { it.date }
                     state.copy(
                         currentWeightKg = summary?.currentWeightKg,
                         consistency = summary?.consistency,
-                        lastWeighIn = summary?.weightSeries?.maxOfOrNull { it.date },
+                        lastWeighIn = listOfNotNull(state.lastWeighIn, summaryLast).maxOrNull(),
                         achievements = summary?.achievements.orEmpty().take(MAX_ACHIEVEMENTS).map {
                             AchievementUi(
                                 id = it.definition.id,
@@ -331,6 +332,13 @@ class DashboardViewModel @Inject constructor(
                         },
                         achievementsLoading = summary == null && state.achievementsLoading,
                     )
+                }
+            }
+        }
+        viewModelScope.launch {
+            data.latestWeighInDate().collect { localLast ->
+                _uiState.update { state ->
+                    state.copy(lastWeighIn = listOfNotNull(state.lastWeighIn, localLast).maxOrNull())
                 }
             }
         }
@@ -488,9 +496,10 @@ class DashboardViewModel @Inject constructor(
     fun logSuggestion() {
         val current = _uiState.value.suggestion ?: return
         if (current.logged || current.logging) return
+        val localDate = syncToToday()
         _uiState.update { it.copy(suggestion = current.copy(logging = true)) }
         viewModelScope.launch {
-            when (data.logRecommendation(current.id)) {
+            when (data.logRecommendation(current.id, localDate)) {
                 is ApiResult.Success -> {
                     _uiState.update {
                         it.copy(suggestion = current.copy(logging = false, logged = true))

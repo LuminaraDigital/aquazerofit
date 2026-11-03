@@ -5,6 +5,7 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import fit.aquazero.app.core.common.LocalDailyNutrition
+import fit.aquazero.app.core.common.LocalDates
 import fit.aquazero.app.core.data.CoachesRepository
 import fit.aquazero.app.core.data.LogsRepository
 import fit.aquazero.app.core.data.NutritionDayRepository
@@ -60,6 +61,9 @@ interface DashboardData {
     /** Cached weight trend points, oldest first. */
     fun weightSeries(): Flow<List<Double>>
 
+    /** Latest local weigh-in date (ISO YYYY-MM-DD), so optimistic logs tick off immediately. */
+    fun latestWeighInDate(): Flow<String?>
+
     /** Refresh-on-observe for the day; returns the server's view of it. */
     suspend fun refreshDay(localDate: String): ApiResult<DailyNutritionDto>
 
@@ -79,7 +83,10 @@ interface DashboardData {
     suspend fun suggestMeal(mealType: MealType): ApiResult<MealRecommendationDto>
 
     /** Log a suggestion the user explicitly accepted (online-only). */
-    suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto>
+    suspend fun logRecommendation(
+        recommendationId: String,
+        localDate: String = LocalDates.today(),
+    ): ApiResult<MealLogDto>
 
     /** Training readiness assessment for the current week. */
     suspend fun readiness(): ApiResult<ReadinessAssessmentDto>
@@ -121,6 +128,9 @@ class DefaultDashboardData @Inject constructor(
         progressRepository.series(ProgressRepository.SERIES_WEIGHT)
             .map { points -> points.sortedBy { it.date }.map { it.value } }
 
+    override fun latestWeighInDate(): Flow<String?> =
+        logsRepository.recentWeightLogs(1).map { it.firstOrNull()?.localDate }
+
     override suspend fun refreshDay(localDate: String): ApiResult<DailyNutritionDto> =
         nutritionDayRepository.refreshDay(localDate)
 
@@ -142,8 +152,11 @@ class DefaultDashboardData @Inject constructor(
     override suspend fun suggestMeal(mealType: MealType): ApiResult<MealRecommendationDto> =
         nutritionDayRepository.suggestMeal(mealType)
 
-    override suspend fun logRecommendation(recommendationId: String): ApiResult<MealLogDto> =
-        nutritionDayRepository.logRecommendation(recommendationId)
+    override suspend fun logRecommendation(
+        recommendationId: String,
+        localDate: String,
+    ): ApiResult<MealLogDto> =
+        nutritionDayRepository.logRecommendation(recommendationId, localDate)
 
     override suspend fun readiness(): ApiResult<ReadinessAssessmentDto> =
         when (val result = plansRepository.readiness()) {

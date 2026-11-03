@@ -50,7 +50,13 @@ class DayLoopPlannerTest {
     fun `nothing is next during quiet hours, however much is open`() {
         listOf(22, 23, 0, 3, 4).forEach { hour ->
             assertNull("hour $hour", DayLoopPlanner.plan(input(hour = hour)).next)
+            assertEquals("greeting period at hour $hour", 2, greetingPeriodForHour(hour))
         }
+        assertEquals(0, greetingPeriodForHour(5))
+        assertEquals(0, greetingPeriodForHour(11))
+        assertEquals(1, greetingPeriodForHour(12))
+        assertEquals(1, greetingPeriodForHour(17))
+        assertEquals(2, greetingPeriodForHour(18))
     }
 
     @Test

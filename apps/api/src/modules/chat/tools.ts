@@ -99,14 +99,14 @@ export async function getTodayNutrition(
 
 export async function getCurrentPlan(
   userId: string,
+  localDate: string = localToday(),
 ): Promise<ToolOutcome<{ plan: TrainingPlan | null; summary: MockPlanContext | null }>> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const plans = await whereDocs<TrainingPlan>('plans', (d: any) => {
     return d?.userId === userId && d?.type === 'trainingPlan';
   });
-  const today = localToday();
   const active = plans
-    .filter((p) => p.endDate == null || p.endDate >= today)
+    .filter((p) => p.endDate == null || p.endDate >= localDate)
     .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0];
   const plan = active ?? null;
   const summary: MockPlanContext | null = plan
@@ -154,7 +154,7 @@ export async function getTodayWorkout(
   }
 
   // Otherwise derive today's day from the active plan.
-  const { data: planData } = await getCurrentPlan(userId);
+  const { data: planData } = await getCurrentPlan(userId, localDate);
   const plan = planData.plan;
   if (!plan || plan.days.length === 0) {
     return {
@@ -204,7 +204,10 @@ export async function getTodayWorkout(
 
 // ---------------------------------------------------------------------------
 
-export async function getProgressSummary(userId: string): Promise<ToolOutcome<MockProgressContext>> {
+export async function getProgressSummary(
+  userId: string,
+  localDate: string = localToday(),
+): Promise<ToolOutcome<MockProgressContext>> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userLogs = await whereDocs<MealLog | WaterLog | WeightLog>('logs', (d: any) => d?.userId === userId);
   const weights = userLogs
@@ -228,20 +231,19 @@ export async function getProgressSummary(userId: string): Promise<ToolOutcome<Mo
   // punished), not an aggregation detail. A second local implementation is how
   // the coach ends up consoling a user over a broken streak the UI is telling
   // them is intact. Both functions are pure over the activity they are handed.
-  const today = localToday();
   const activity: UserActivity = {
     meals: userLogs.filter((d): d is MealLog => d.type === 'mealLog'),
     waters: userLogs.filter((d): d is WaterLog => d.type === 'waterLog'),
     weights,
     completedSessions,
   };
-  const consistency = computeConsistency(activity, today);
+  const consistency = computeConsistency(activity, localDate);
 
   const data: MockProgressContext = {
     currentWeightKg: current,
     startWeightKg: start,
     deltaKg,
-    streakDays: computeStreak(activity, today),
+    streakDays: computeStreak(activity, localDate),
     activeDays: consistency.activeDays,
     windowDays: consistency.windowDays,
     bestDays: consistency.bestDays,
@@ -319,14 +321,14 @@ export async function gatherChatContext(
     context.workout = null;
   }
   try {
-    const plan = await getCurrentPlan(userId);
+    const plan = await getCurrentPlan(userId, localDate);
     context.plan = plan.data.summary;
     toolCalls.push(plan.call);
   } catch {
     context.plan = null;
   }
   try {
-    const progress = await getProgressSummary(userId);
+    const progress = await getProgressSummary(userId, localDate);
     context.progress = progress.data;
     toolCalls.push(progress.call);
   } catch {

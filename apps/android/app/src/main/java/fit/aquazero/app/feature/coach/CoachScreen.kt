@@ -593,7 +593,7 @@ private fun TurnFailureFrame(
             )
             Spacer(Modifier.width(8.dp))
             AzfChip(
-                text = stringResource(R.string.action_retry),
+                text = stringResource(R.string.coach_error_dismiss),
                 selected = false,
                 onClick = onDismiss,
             )

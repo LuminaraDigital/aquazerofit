@@ -91,6 +91,12 @@ private const val AFTERNOON_END_HOUR = 18
 private const val DAYS_IN_WEEK = 7L
 private const val ML_PER_LITRE = 1000.0
 
+internal fun greetingPeriodForHour(hour: Int): Int = when (hour) {
+    in NIGHT_UNTIL_HOUR until MORNING_END_HOUR -> 0
+    in MORNING_END_HOUR until AFTERNOON_END_HOUR -> 1
+    else -> 2
+}
+
 /** Greeting that knows the time of day, opposite the shell's settings button. */
 @Composable
 internal fun HomeGreeting(
@@ -100,10 +106,10 @@ internal fun HomeGreeting(
     persona: CoachPersona,
     modifier: Modifier = Modifier,
 ) {
-    val greeting = when {
-        hour < MORNING_END_HOUR -> firstName?.let { stringResource(R.string.home_greeting_morning_named, it) }
+    val greeting = when (greetingPeriodForHour(hour)) {
+        0 -> firstName?.let { stringResource(R.string.home_greeting_morning_named, it) }
             ?: stringResource(R.string.home_greeting_morning)
-        hour < AFTERNOON_END_HOUR -> firstName?.let { stringResource(R.string.home_greeting_afternoon_named, it) }
+        1 -> firstName?.let { stringResource(R.string.home_greeting_afternoon_named, it) }
             ?: stringResource(R.string.home_greeting_afternoon)
         else -> firstName?.let { stringResource(R.string.home_greeting_evening_named, it) }
             ?: stringResource(R.string.home_greeting_evening)

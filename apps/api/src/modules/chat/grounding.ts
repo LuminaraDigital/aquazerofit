@@ -85,7 +85,7 @@ const EMPTY_LOG_MODIFIER = String.raw`(?:\s+(?!not\b|never\b)\w+){0,2}`;
 
 const EMPTY_LOG_CLAIM = new RegExp(
   [
-    String.raw`\b(?:(?:nutrition|food|meal)\s+)?logs?\s+(?:is|are|looks|appears|seems)${EMPTY_LOG_MODIFIER}\s+empty\b`,
+    String.raw`\b(?:(?:nutrition|food|meal|workout|progress)\s+)?logs?\s+(?:is|are|looks?|appears?|seems?)${EMPTY_LOG_MODIFIER}\s+empty\b`,
     String.raw`\blog(?:'s|\s+is|\s+looks)${EMPTY_LOG_MODIFIER}\s+empty\b`,
     String.raw`\bno meal data\b`,
     String.raw`\bno meals? (?:logged|recorded|data|yet)\b`,
@@ -93,8 +93,8 @@ const EMPTY_LOG_CLAIM = new RegExp(
     String.raw`\bno food logged\b`,
     String.raw`\bnothing (?:has been |was |is )?logged\b`,
     String.raw`\b(?:have not|has not|haven['’]t|hasn['’]t) logged (?:anything|any meals|a meal|meals|food|nutrition)\b`,
-    String.raw`\b(?:do not|don['’]t) (?:see|have) (?:any )?(?:meals|meal data|food|foods|nutrition data|a nutrition log)\b`,
-    String.raw`\b(?:cannot|can['’]t) see (?:any )?(?:meals|food|your (?:meals|log|nutrition))\b`,
+    String.raw`\b(?:do not|don['’]t) (?:see|have) (?:your data for today|(?:any )?(?:data for (?:your )?(?:meals|calories|today)|meals|meal data|food|foods|nutrition data|a nutrition log))\b`,
+    String.raw`\b(?:cannot|can['’]t) see (?:(?:any )?(?:meals|food)|your (?:specific )?(?:meals|food(?: items)?|log|nutrition))\b`,
     String.raw`\b(?:do not|don['’]t) have (?:any |a )?records? of what you(?:['’]ve| have) eaten\b`,
     String.raw`\bno records? of what you(?:['’]ve| have) eaten\b`,
   ].join('|'),
@@ -116,7 +116,13 @@ export function hasNutritionIntake(nutrition: NutritionGrounding): boolean {
 function usableFoodName(name: string): string | null {
   const trimmed = name.trim();
   if (trimmed.length === 0 || trimmed.length > 80) return null;
-  if (/\d|kcal|calor|ignore|instruction|system prompt/i.test(trimmed)) return null;
+  if (
+    /\b\d{3,}\b|\b\d+\s*(?:kcal|cal|g|mg|ml|oz)\b|kcal|calor|ignore|instruction|system prompt/i.test(
+      trimmed,
+    )
+  ) {
+    return null;
+  }
   return trimmed;
 }
 
@@ -249,11 +255,28 @@ export function enforceCoachGrounding(text: string, ctx: CoachGrounding): string
   }
   const replacement = correctionFor(ctx);
   if (!replacement || !claimsLogEmpty(text)) return text;
-  const next: string[] = [];
-  for (const sentence of sentences(text)) {
-    const piece: string = claimsLogEmpty(sentence) ? replacement : sentence;
-    if (piece === replacement && next[next.length - 1] === replacement) continue;
-    next.push(piece);
+  let emittedReplacement = false;
+  const lines: string[] = [];
+  for (const rawLine of text.split('\n')) {
+    const lineSentences = sentences(rawLine);
+    if (lineSentences.length === 0) {
+      lines.push('');
+      continue;
+    }
+    const next: string[] = [];
+    for (const sentence of lineSentences) {
+      if (claimsLogEmpty(sentence)) {
+        if (!emittedReplacement) {
+          next.push(replacement);
+          emittedReplacement = true;
+        }
+      } else {
+        next.push(sentence);
+      }
+    }
+    if (next.length > 0) {
+      lines.push(next.join(' ').replace(/[ \t]{2,}/g, ' ').trim());
+    }
   }
-  return next.join(' ').replace(/[ \t]{2,}/g, ' ').trim();
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }

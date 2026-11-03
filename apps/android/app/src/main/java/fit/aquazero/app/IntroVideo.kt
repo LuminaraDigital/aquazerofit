@@ -8,12 +8,14 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -34,8 +37,8 @@ import androidx.core.content.edit
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import kotlinx.coroutines.delay
 
-private const val PREFS = "azf_intro"
-private const val KEY_SEEN = "seen_v1"
+internal const val INTRO_PREFS = "azf_intro"
+internal const val INTRO_KEY_SEEN = "seen_v1"
 private const val START_TIMEOUT_MS = 4_000L
 private const val VIDEO_ASPECT = 9f / 16f
 
@@ -52,13 +55,13 @@ private const val VIDEO_ASPECT = 9f / 16f
 @Composable
 fun IntroVideo() {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+    val prefs = remember { context.getSharedPreferences(INTRO_PREFS, Context.MODE_PRIVATE) }
     val reducedMotion = rememberReducedMotion()
-    var visible by remember { mutableStateOf(!reducedMotion && !prefs.getBoolean(KEY_SEEN, false)) }
+    var visible by remember { mutableStateOf(!reducedMotion && !prefs.getBoolean(INTRO_KEY_SEEN, false)) }
     var started by remember { mutableStateOf(false) }
 
     fun close() {
-        prefs.edit { putBoolean(KEY_SEEN, true) }
+        prefs.edit { putBoolean(INTRO_KEY_SEEN, true) }
         visible = false
     }
 
@@ -96,6 +99,15 @@ fun IntroVideo() {
                 },
                 onRelease = { it.stopPlayback() },
             )
+            // Loading state: the mark on the same white the video fades in
+            // from, drawn above the video's surface until the first frame.
+            if (!started) {
+                Image(
+                    painter = painterResource(R.drawable.intro_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(96.dp),
+                )
+            }
             TextButton(
                 onClick = ::close,
                 shape = CircleShape,

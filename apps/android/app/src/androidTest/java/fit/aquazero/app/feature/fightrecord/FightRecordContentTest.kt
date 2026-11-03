@@ -3,8 +3,10 @@ package fit.aquazero.app.feature.fightrecord
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.performScrollToIndex
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.model.BeltRungDto
 import fit.aquazero.app.core.model.BeltTier
@@ -56,10 +58,13 @@ class FightRecordContentTest {
             }
         }
 
+        composeRule.onAllNodesWithText("Share my belt").assertCountEquals(1)
+        // The ladder is the third LazyColumn item, below the hero card, so on
+        // a small viewport it is not composed until scrolled into view.
+        composeRule.onNode(hasScrollToIndexAction()).performScrollToIndex(2)
         // White and Blue are held at a Blue belt; Purple, Brown and Black are not.
         composeRule.onAllNodes(stateIs("Held")).assertCountEquals(2)
         composeRule.onAllNodes(stateIs("Not yet held")).assertCountEquals(3)
-        composeRule.onAllNodesWithText("Share my belt").assertCountEquals(1)
     }
 
     private fun stateIs(value: String) = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, value)

@@ -101,38 +101,31 @@ export type CreditTask = keyof typeof CREDIT_COSTS;
 /**
  * The free daily allowance for lanes a free account may call.
  *
- * Ten credits is ten coach messages, five meal suggestions, or two AI
- * training plans. Meal photographs are not part of this allowance:
- * visionPrimary is premium, and a free account is refused before a credit
- * is reserved. Coach chat stays on this meter.
+ * Ten credits is ten coach messages, five meal suggestions, three meal
+ * photographs, or two AI training plans. This meter is what bounds a free
+ * account's vision spend: scans are free so that logging by photograph is open
+ * to everyone, and the volume is what Premium sells.
  *
  * It was 50, which at three scans a day is a fortnight of AI for every signup
- * on an unfunded product, and gave a paying user nothing to buy. Photos have
- * since moved to premium; the grant still caps the free coach.
+ * on an unfunded product, and gave a paying user nothing to buy.
  */
 export const FREE_TIER_DAILY_CREDITS = 10;
 
 /**
- * The paid daily allowance. Fifteen times the free tier.
+ * The paid daily allowance. Six times the free tier, and a cap.
  *
- * Sized against the margin rather than against a round number. A chat turn on
- * the 70B lane costs roughly $0.0015 all-in, so a subscriber who genuinely
- * spent this every day for a month runs to about $7 - against a $9.99
- * subscription that nets nearer $8.49 after the store's cut. That is thin but
- * positive. At the 300 this started as, the same user costs about $14 and the
- * plan loses money on precisely the people most likely to buy it: a cap only
- * matters for the heaviest users, so it has to be set where the heaviest user
- * is still profitable, not where the median one is.
+ * mealPhoto costs 3, so a day spent only on photographs is 20 analyses.
+ * The previous 150 was 50 analyses, which is the volume that can outrun a
+ * Play monthly take-home of about A$7.72 on the A$9.99 price. This file does
+ * not price a provider call. The ledger is the ceiling: 60 credits a day,
+ * banked at most two days (see maxBankedCreditsFor). A chat turn costs 1,
+ * and a consented memory extraction costs 1 more.
  *
- * Deliberately the conservative direction of travel. Raising a published
- * allowance is a pleasant announcement; lowering one is a broken promise, and
- * the users who notice are the subscribers.
- *
- * Not the only ceiling: this bounds one account, and the deployment-level
- * AZF_DAILY_TOKEN_BUDGET bounds the aggregate. Neither substitutes for the
- * other - a thousand well-behaved subscribers are still a bill nobody capped.
+ * A month of daily grants is 1,800 credits. The deployment-level
+ * AZF_DAILY_TOKEN_BUDGET still bounds the fleet. Neither ceiling replaces
+ * the other.
  */
-export const PREMIUM_TIER_DAILY_CREDITS = 150;
+export const PREMIUM_TIER_DAILY_CREDITS = 60;
 
 /** Daily allowance for a tier. The single source both the grant and the UI read. */
 export function dailyCreditsFor(tier: 'free' | 'premium'): number {
@@ -399,3 +392,10 @@ export const BUDDY_CHALLENGE_CODE_PREFIX = 'AQUA';
  * and every 6 hours alongside the deletion sweep.
  */
 export const GROWTH_EVENT_RETENTION_DAYS = 180;
+
+/**
+ * How long a meal photograph kept under the foodPhotoTraining consent survives.
+ * Withdrawing the consent or deleting the account erases it sooner. Published in
+ * the privacy notice, so changing this figure changes a promise.
+ */
+export const FOOD_PHOTO_SAMPLE_RETENTION_DAYS = 730;

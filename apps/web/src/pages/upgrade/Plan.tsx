@@ -20,10 +20,10 @@
  *    a payment the server confirms with Stripe grants premium.
  *
  * A premium account sees its position and what is switched on, not a sales
- * page it has already bought — and, when Stripe bills it, the way into
+ * page it has already bought, and, when Stripe bills it, the way into
  * Stripe's billing portal to change the card or cancel.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppHeader } from '@/components/ui/AppHeader';
@@ -35,8 +35,8 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ApiError } from '@/lib/api';
+import { hasActivePlaySubscription } from '@/lib/billing';
 import {
-  queryKeys,
   useBillingConfig,
   useEntitlements,
   useOpenStripePortal,
@@ -46,6 +46,7 @@ import {
   type BillingConfig,
   type Entitlements,
 } from '@/lib/queries';
+import { pollPremiumEntitlement } from '@/lib/pollEntitlements';
 import { canPayWithStars, isTMA, openStarsInvoice } from '@/lib/telegram';
 
 /**
@@ -58,10 +59,6 @@ const PREMIUM_LANE_COPY: Record<string, { title: string; body: string }> = {
   insightBatch: {
     title: 'A coach-written weekly note',
     body: 'On premium, the narrative at the top of your weekly summary is written by the coach. On free it is written from your own numbers by the app itself. You still get the summary, and every "what changed" line in it, every week.',
-  },
-  visionPrimary: {
-    title: 'Meal photo analysis',
-    body: 'Photographing a plate and having the model read it is part of Premium. Search and barcode logging stay on the free plan. A premium photo still spends meal-photo credits.',
   },
 };
 
@@ -218,18 +215,40 @@ function LaneList({ lanes, premium }: { lanes: string[]; premium: boolean }) {
   );
 }
 
-type StripePrice = NonNullable<NonNullable<BillingConfig['stripe']>['price']>;
+type StripeOffer = { interval: 'month' | 'year'; amount: number; currency: string };
 
 /** "A$9.99" from 999 minor units. The currency's own decimals, so yen prices read right too. */
-function formatAmount({ amount, currency }: StripePrice): string {
+function formatAmount({ amount, currency }: { amount: number; currency: string }): string {
   const format = new Intl.NumberFormat(undefined, { style: 'currency', currency });
   return format.format(amount / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2));
 }
 
-/** The purchase step: Stripe's price, on the button, and where the payment happens. */
-function SubscribeCard({ price }: { price: StripePrice }) {
+/**
+ * Purchasable Stripe intervals. `plans` wins when the API sends it. A response
+ * from before annual checkout only has `price`, which is the monthly plan.
+ */
+function stripeOffers(billing: BillingConfig | undefined, stripeAllowed: boolean): StripeOffer[] {
+  if (!stripeAllowed) return [];
+  const stripe = billing?.stripe;
+  if (!stripe?.available) return [];
+  if (stripe.plans) {
+    return stripe.plans
+      .filter((plan) => plan.available)
+      .map((plan) => ({ interval: plan.interval, amount: plan.amount, currency: plan.currency }));
+  }
+  if (!stripe.price) return [];
+  return [
+    {
+      interval: stripe.price.interval === 'year' ? 'year' : 'month',
+      amount: stripe.price.amount,
+      currency: stripe.price.currency,
+    },
+  ];
+}
+
+/** The purchase step: each open Stripe price, on its own button. */
+function SubscribeCard({ offers }: { offers: StripeOffer[] }) {
   const checkout = useStartStripeCheckout();
-  const amount = formatAmount(price);
 
   return (
     <section aria-labelledby="plan-subscribe">
@@ -240,17 +259,27 @@ function SubscribeCard({ price }: { price: StripePrice }) {
         >
           Go premium
         </h2>
-        <p className="flex items-baseline gap-2">
-          <span className="font-heading font-bold text-3xl tabular-nums text-primary">{amount}</span>
-          <span className="text-sm text-on-surface-variant">per {price.interval}</span>
-        </p>
         <p className="text-sm leading-relaxed text-on-surface-variant">
-          Renews each {price.interval}. You pay on Stripe&apos;s secure checkout page, and
-          AquaZeroFit never sees your card. Cancel any time from this page.
+          You pay on Stripe&apos;s secure checkout page, and AquaZeroFit never sees your card.
+          Cancel any time from this page.
         </p>
-        <PrimaryButton loading={checkout.isPending} onClick={() => checkout.mutate()}>
-          Subscribe for {amount} / {price.interval}
-        </PrimaryButton>
+        {offers.map((offer) => {
+          const amount = formatAmount(offer);
+          return (
+            <div key={offer.interval} className="space-y-2">
+              <p className="flex items-baseline gap-2">
+                <span className="font-heading font-bold text-3xl tabular-nums text-primary">{amount}</span>
+                <span className="text-sm text-on-surface-variant">per {offer.interval}</span>
+              </p>
+              <PrimaryButton
+                loading={checkout.isPending}
+                onClick={() => checkout.mutate(offer.interval)}
+              >
+                Subscribe for {amount} / {offer.interval}
+              </PrimaryButton>
+            </div>
+          );
+        })}
         {checkout.isError && (
           <p role="alert" className="text-sm text-error">
             {/* A refusal (already premium, or a subscription still open) will not clear on retry. */}
@@ -279,7 +308,15 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
   const qc = useQueryClient();
   const checkout = useStartStarsSubscription();
   const [note, setNote] = useState<string | null>(null);
+  const mounted = useRef(true);
   const period = starsPeriodLabel(offer.periodSeconds);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   async function subscribe() {
     setNote(null);
@@ -287,8 +324,10 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
       const { invoiceLink } = await checkout.mutateAsync();
       const status = await openStarsInvoice(invoiceLink);
       if (status === 'paid') {
-        await qc.invalidateQueries({ queryKey: queryKeys.entitlements });
         setNote('Payment received. Premium is on once Telegram confirms it.');
+        void pollPremiumEntitlement(qc).then((premium) => {
+          if (mounted.current && premium) setNote('Payment received. Premium is on.');
+        });
       } else if (status === 'cancelled') {
         setNote('Payment cancelled. Nothing was charged.');
       } else if (status === 'pending') {
@@ -331,6 +370,38 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
             {note}
           </p>
         )}
+      </GlassCard>
+    </section>
+  );
+}
+
+const PLAY_SUBSCRIPTIONS_URL =
+  'https://play.google.com/store/account/subscriptions?package=fit.aquazero.app';
+
+/**
+ * Play owns cancellation. This server has no Play cancel call, so the only
+ * honest action is to send the person to the Play Store.
+ */
+function PlaySubscriptionCard() {
+  return (
+    <section aria-labelledby="plan-play">
+      <GlassCard className="p-card-padding space-y-3">
+        <h2
+          id="plan-play"
+          className="font-heading font-semibold uppercase tracking-wide text-base text-on-surface"
+        >
+          Google Play subscription
+        </h2>
+        <p className="text-sm leading-relaxed text-on-surface-variant">
+          This subscription is billed by Google Play. Cancel it in the Play Store. Deleting your
+          AquaZeroFit account does not cancel it.
+        </p>
+        <a
+          href={PLAY_SUBSCRIPTIONS_URL}
+          className="inline-flex min-h-[48px] items-center text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          Manage subscription in Google Play
+        </a>
       </GlassCard>
     </section>
   );
@@ -401,7 +472,7 @@ export default function Plan() {
   const billing = useBillingConfig();
   // Telegram requires its own Stars for digital goods inside a Mini App.
   const stripeAllowed = !isTMA();
-  const stripePrice = stripeAllowed && billing.data?.stripe?.available ? billing.data.stripe.price : null;
+  const stripeCheckoutOffers = stripeOffers(billing.data, stripeAllowed);
   const starsConfig = billing.data?.stars;
   const starsOffer: StarsOffer | null =
     isTMA() &&
@@ -445,6 +516,7 @@ export default function Plan() {
 
   const premium = entitlements.tier === 'premium';
   const manageInStripe = premium && stripeAllowed && entitlements.billingSource === 'stripe';
+  const playSubscription = hasActivePlaySubscription(entitlements);
   const lanes = entitlements.premiumLanes;
 
   return (
@@ -474,8 +546,12 @@ export default function Plan() {
             <>
               <LaneList lanes={lanes} premium={premium} />
               <p className="mt-3 px-2 text-xs leading-relaxed text-on-surface-variant">
+                {typeof entitlements.premiumDailyCredits === 'number' &&
+                entitlements.premiumDailyCredits > 0
+                  ? `Premium is ${entitlements.premiumDailyCredits.toLocaleString()} AI credits a day. That is a cap. `
+                  : null}
                 {lanes.length === 1
-                  ? 'That is the whole difference today.'
+                  ? 'Beyond the daily credit cap, that is the whole difference today.'
                   : 'That is the difference today.'}{' '}
                 Your targets, your logging, your training plans, the coach chat and every number in
                 your weekly summary work the same way on both plans.
@@ -493,9 +569,9 @@ export default function Plan() {
           renders while the billing config loads, so the "not available" card
           cannot flash up and then turn into a button.
         */}
-        {!premium && stripePrice && <SubscribeCard price={stripePrice} />}
+        {!premium && stripeCheckoutOffers.length > 0 && <SubscribeCard offers={stripeCheckoutOffers} />}
         {!premium && starsOffer && <StarsSubscribeCard offer={starsOffer} />}
-        {!premium && !stripePrice && !starsOffer && !billing.isLoading && (
+        {!premium && stripeCheckoutOffers.length === 0 && !starsOffer && !billing.isLoading && (
           <section aria-labelledby="plan-availability">
             <GlassCard className="p-card-padding space-y-3 border-l-4 border-l-outline-variant">
               <div className="flex items-center gap-2">
@@ -526,7 +602,8 @@ export default function Plan() {
         )}
 
         {manageInStripe && <ManageSubscriptionCard />}
-        {premium && !manageInStripe && (
+        {playSubscription && <PlaySubscriptionCard />}
+        {premium && !manageInStripe && !playSubscription && (
           <p className="px-2 text-xs leading-relaxed text-on-surface-variant">
             Nothing to do here. This page is just your current position. Your weekly note is
             written for you automatically.

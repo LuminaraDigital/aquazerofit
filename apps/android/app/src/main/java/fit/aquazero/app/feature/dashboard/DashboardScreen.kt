@@ -1,5 +1,6 @@
 package fit.aquazero.app.feature.dashboard
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,15 +8,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,24 +28,24 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
-import fit.aquazero.app.core.designsystem.AzfAppHeader
+import fit.aquazero.app.core.designsystem.AquaAura
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.ErrorState
-import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.ReadinessChip
 import fit.aquazero.app.core.designsystem.revealOnEnter
 import fit.aquazero.app.core.gamification.CelebrationHost
 import fit.aquazero.app.core.ui.CardSkeleton
+import fit.aquazero.app.core.ui.CoachRoster
 import fit.aquazero.app.core.ui.HydrationCard
 import fit.aquazero.app.core.ui.TargetExplainSheet
 import fit.aquazero.app.core.ui.rememberToastSink
 
 /**
- * Home. A port of `apps/web/src/pages/dashboard/Dashboard.tsx`, with the
- * mobile-specific choices called out in the sub-composables:
- * one-tap optimistic hydration, the Akin mascot in the greeting, and a
- * camera FAB that opens photo meal logging.
+ * Home: the day as a loop. The first screen answers three questions in order
+ * (how is today going, what is next, what is left), each answerable with one
+ * thumb; the deeper cards sit below for anyone who wants to scroll on. Logging
+ * starts from the loop itself or from the dock's quick-log button.
  *
  * [seasonCard] is a slot the app shell fills with Fight Record's card, so
  * this feature reserves a place after the coach card and imports nothing
@@ -63,6 +59,7 @@ fun DashboardScreen(
     onOpenWorkout: (String?) -> Unit = {},
     onOpenProgress: () -> Unit = {},
     onOpenCoach: (String?) -> Unit = {},
+    onLogWeight: () -> Unit = {},
     seasonCard: @Composable (Modifier) -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
@@ -102,6 +99,7 @@ fun DashboardScreen(
             onOpenWorkout = onOpenWorkout,
             onOpenProgress = onOpenProgress,
             onOpenCoach = onOpenCoach,
+            onLogWeight = onLogWeight,
             onExplainTarget = if (state.targets != null) {
                 { showTargetExplain = true }
             } else {
@@ -132,62 +130,48 @@ fun DashboardContent(
     onOpenWorkout: (String?) -> Unit,
     onOpenProgress: () -> Unit,
     onOpenCoach: (String?) -> Unit = {},
+    onLogWeight: () -> Unit = {},
     onExplainTarget: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     seasonCard: @Composable (Modifier) -> Unit = {},
 ) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            AzfAppHeader(title = stringResource(R.string.screen_dashboard).uppercase())
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onCaptureMeal,
-                containerColor = LocalAzfExtended.current.primaryFixedDim,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(56.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.PhotoCamera,
-                    contentDescription = stringResource(R.string.fab_capture_meal),
-                )
-            }
-        },
-    ) { innerPadding ->
+    val reflectPrompt = stringResource(R.string.home_ask_coach_day)
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        AquaAura()
         Column(
             modifier = Modifier
-                .padding(innerPadding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
                 .padding(
                     PaddingValues(
                         start = AzfSpacing.ContainerMargin,
                         end = AzfSpacing.ContainerMargin,
-                        top = AzfSpacing.ElementGapMedium,
-                        bottom = AzfSpacing.SectionGap,
+                        top = AzfSpacing.ElementGapSmall,
+                        bottom = AzfSpacing.Gutter,
                     ),
                 ),
         ) {
-            GreetingHeader(
-                localDate = state.today,
+            HomeGreeting(
                 firstName = state.firstName,
-                loading = state.phase == DashboardPhase.Loading,
+                hour = state.hour,
+                localDate = state.today,
+                persona = state.coachAmbient?.persona ?: defaultCoach,
                 modifier = Modifier.revealOnEnter(0),
             )
 
             Spacer(Modifier.height(AzfSpacing.Gutter))
 
-            ReadinessChip(
-                readiness = state.readiness,
-                loading = state.readinessLoading,
+            WeekStrip(
+                localDate = state.today,
+                loggedDays = state.loggedThisWeek,
+                activeDays = state.consistency?.activeDays,
+                windowDays = state.consistency?.windowDays ?: DEFAULT_CONSISTENCY_WINDOW,
+                onOpenProgress = onOpenProgress,
                 modifier = Modifier.revealOnEnter(1),
             )
 
-            if (state.readiness != null || state.readinessLoading) {
-                Spacer(Modifier.height(AzfSpacing.Gutter))
-            }
+            Spacer(Modifier.height(AzfSpacing.Gutter))
 
             when {
                 state.phase == DashboardPhase.Error && !state.hasContent -> {
@@ -200,40 +184,79 @@ fun DashboardContent(
                 }
 
                 state.nutrition == null -> {
-                    CardSkeleton(height = 320.dp, modifier = Modifier.revealOnEnter(1))
+                    CardSkeleton(height = 220.dp, modifier = Modifier.revealOnEnter(2))
                     Spacer(Modifier.height(AzfSpacing.Gutter))
-                    CardSkeleton(height = 180.dp, modifier = Modifier.revealOnEnter(2))
+                    CardSkeleton(height = 120.dp, modifier = Modifier.revealOnEnter(3))
                 }
 
                 else -> {
-                    if (!state.proteinFirst) {
-                        DailyEnergyLoopCard(
-                            nutrition = state.nutrition,
-                            kcalBurned = state.effectiveKcalBurned,
-                            targets = state.targets,
-                            onExplainTarget = onExplainTarget,
-                            modifier = Modifier.revealOnEnter(2),
-                        )
-                        Spacer(Modifier.height(AzfSpacing.Gutter))
+                    val loop = state.dayLoop
+                    val onStep: (DayStepKind) -> Unit = { kind ->
+                        when (kind) {
+                            DayStepKind.Breakfast, DayStepKind.Lunch, DayStepKind.Dinner -> onCaptureMeal()
+                            DayStepKind.Water -> onLogWater()
+                            DayStepKind.Workout -> onOpenWorkout(state.workout?.sessionId)
+                            DayStepKind.WeighIn -> onLogWeight()
+                        }
                     }
-                    CalorieHeroCard(
+                    TodayHero(
                         nutrition = state.nutrition,
-                        kcalBurned = state.effectiveKcalBurned,
                         proteinFirst = state.proteinFirst,
-                        onExplainTarget = if (state.proteinFirst) onExplainTarget else null,
-                        showDerivationRow = state.proteinFirst,
-                        modifier = Modifier.revealOnEnter(if (state.proteinFirst) 2 else 3),
+                        loop = loop,
+                        modifier = Modifier.revealOnEnter(2),
+                    ) {
+                        if (state.proteinFirst) {
+                            CalorieHeroCard(
+                                nutrition = state.nutrition,
+                                kcalBurned = state.effectiveKcalBurned,
+                                proteinFirst = true,
+                                onExplainTarget = onExplainTarget,
+                                showDerivationRow = true,
+                            )
+                        } else {
+                            DailyEnergyLoopCard(
+                                nutrition = state.nutrition,
+                                kcalBurned = state.effectiveKcalBurned,
+                                targets = state.targets,
+                                onExplainTarget = onExplainTarget,
+                            )
+                        }
+                        Spacer(Modifier.height(AzfSpacing.Gutter))
+                        HydrationCard(
+                            consumedMl = state.waterConsumedMl,
+                            targetMl = state.nutrition.waterTargetMl,
+                            pending = state.waterPending,
+                            onLogWater = onLogWater,
+                        )
+                    }
+                    Spacer(Modifier.height(AzfSpacing.Gutter))
+                    NextStepCard(
+                        loop = loop,
+                        hour = state.hour,
+                        workoutFocus = state.workout?.focus?.takeIf(String::isNotBlank),
+                        waterPending = state.waterPending,
+                        onStep = onStep,
+                        onReflect = { onOpenCoach(reflectPrompt) },
+                        modifier = Modifier.revealOnEnter(3),
                     )
                     Spacer(Modifier.height(AzfSpacing.Gutter))
-                    HydrationCard(
-                        consumedMl = state.waterConsumedMl,
-                        targetMl = state.nutrition.waterTargetMl,
-                        pending = state.waterPending,
-                        onLogWater = onLogWater,
-                        modifier = Modifier.revealOnEnter(if (state.proteinFirst) 3 else 4),
+                    DayLoopList(
+                        loop = loop,
+                        waterConsumedMl = state.waterConsumedMl,
+                        waterTargetMl = state.nutrition.waterTargetMl,
+                        onStep = onStep,
+                        modifier = Modifier.revealOnEnter(4),
                     )
                 }
             }
+
+            ReadinessChip(
+                readiness = state.readiness,
+                loading = state.readinessLoading,
+                modifier = Modifier
+                    .padding(top = AzfSpacing.Gutter)
+                    .revealOnEnter(5),
+            )
 
             if (state.hasContent || state.coachAmbientLoading) {
                 Spacer(Modifier.height(AzfSpacing.Gutter))
@@ -241,14 +264,14 @@ fun DashboardContent(
                     ambient = state.coachAmbient,
                     loading = state.coachAmbientLoading,
                     onOpenCoach = onOpenCoach,
-                    modifier = Modifier.revealOnEnter(4),
+                    modifier = Modifier.revealOnEnter(5),
                 )
             }
 
             seasonCard(
                 Modifier
                     .padding(top = AzfSpacing.Gutter)
-                    .revealOnEnter(4),
+                    .revealOnEnter(5),
             )
 
             Spacer(Modifier.height(AzfSpacing.Gutter))
@@ -257,7 +280,7 @@ fun DashboardContent(
                 workout = state.workout,
                 loading = state.workoutLoading,
                 onOpenWorkout = onOpenWorkout,
-                modifier = Modifier.revealOnEnter(3),
+                modifier = Modifier.revealOnEnter(6),
             )
 
             Spacer(Modifier.height(AzfSpacing.Gutter))
@@ -267,7 +290,7 @@ fun DashboardContent(
                 phase = state.suggestionPhase,
                 onSuggest = onSuggestMeal,
                 onLog = onLogSuggestion,
-                modifier = Modifier.revealOnEnter(4),
+                modifier = Modifier.revealOnEnter(6),
             )
 
             Spacer(Modifier.height(AzfSpacing.Gutter))
@@ -276,7 +299,7 @@ fun DashboardContent(
                 series = state.weightSeries,
                 currentWeightKg = state.currentWeightKg,
                 onViewAll = onOpenProgress,
-                modifier = Modifier.revealOnEnter(5),
+                modifier = Modifier.revealOnEnter(6),
             )
 
             Spacer(Modifier.height(AzfSpacing.SectionGap))
@@ -286,12 +309,12 @@ fun DashboardContent(
                 loading = state.achievementsLoading,
                 modifier = Modifier.revealOnEnter(6),
             )
-
-            // Clears the FAB and the bottom bar.
-            Spacer(Modifier.height(96.dp))
         }
     }
 }
+
+private const val DEFAULT_CONSISTENCY_WINDOW = 28
+private val defaultCoach = CoachRoster.personas.first { it.id == CoachRoster.DEFAULT_ID }
 
 @Preview(showBackground = true, backgroundColor = 0xFF0E1416, heightDp = 1400)
 @Composable

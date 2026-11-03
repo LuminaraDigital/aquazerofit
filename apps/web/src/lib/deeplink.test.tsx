@@ -39,6 +39,7 @@ function renderLaunch(path = '/') {
           }
         />
         <Route path="/plan" element={<p>plan page</p>} />
+        <Route path="/workouts" element={<p>workouts page</p>} />
         <Route path="/nutrition" element={<p>nutrition page</p>} />
       </Routes>
     </MemoryRouter>,
@@ -62,6 +63,16 @@ describe('plan launch actions', () => {
     const navigate = vi.fn();
     expect(handleDeepLink('upgrade', navigate)).toBe(true);
     expect(navigate).toHaveBeenCalledWith('/plan');
+  });
+
+  it('routes startapp=workouts to the training library and leaves plan on /plan', () => {
+    const navigate = vi.fn();
+    expect(handleDeepLink('workouts', navigate)).toBe(true);
+    expect(handleDeepLink('workout', navigate)).toBe(true);
+    expect(handleDeepLink('plan', navigate)).toBe(true);
+    expect(navigate).toHaveBeenNthCalledWith(1, '/workouts');
+    expect(navigate).toHaveBeenNthCalledWith(2, '/workouts');
+    expect(navigate).toHaveBeenNthCalledWith(3, '/plan');
   });
 
   it('treats Plan and UPGRADE as the same destination', () => {
@@ -96,6 +107,13 @@ describe('launch listener', () => {
     mocks.startParam = 'upgrade';
     renderLaunch();
     await waitFor(() => expect(screen.getByText('plan page')).toBeTruthy());
+  });
+
+  it('opens the training library from a Telegram start_param of workouts', async () => {
+    mocks.startParam = 'workouts';
+    renderLaunch();
+    await waitFor(() => expect(screen.getByText('workouts page')).toBeTruthy());
+    expect(screen.queryByText('plan page')).toBeNull();
   });
 
   it('opens /plan from a page URL of ?startapp=plan when Telegram has no payload', async () => {

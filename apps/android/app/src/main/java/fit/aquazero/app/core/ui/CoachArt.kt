@@ -35,8 +35,12 @@ import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.BrandAssets
 
 /**
- * Coach art with the roster's required degradation: **portrait → avatar →
- * monogram**.
+ * Coach art with the roster's required degradation.
+ *
+ * A full-body tile asks for the portrait first, then the avatar, then the
+ * monogram. A circle asks for the avatar first, because that file is the
+ * face, and only then the portrait and the monogram. Neither slot skips a
+ * step, and neither draws a torso when the head is in the file.
  *
  * Resolved by asking the [android.content.res.AssetManager] whether the file
  * is actually bundled rather than by letting an image request fail. A loader
@@ -74,8 +78,38 @@ private fun rememberArtSource(coachId: String, preferPortrait: Boolean): ArtSour
 }
 
 /**
- * Square coach crop for the chat byline, header and roster row. Falls back
- * through the avatar to a coloured monogram.
+ * How a coach image sits in its slot.
+ *
+ * `portrait.webp` is a 600x900 full-body figure. [ContentScale.Crop] with
+ * [Alignment.Center] into a square throws away the top sixth of that file,
+ * and the top sixth is the head. That is what the circular coach marks and
+ * the character-select tiles were doing: neck and chest, no face.
+ *
+ * A circle crops from the top, the same rule as the web avatar
+ * (`object-cover object-top`). It applies to `avatar.webp` and to the
+ * full-body file when that is the fallback, so a missing avatar cannot
+ * land on the torso. A full-body tile fits the whole figure and pins it
+ * to the bottom, the same rule as the web portrait
+ * (`object-contain object-bottom`).
+ */
+internal data class CoachArtFrame(
+    val scale: ContentScale,
+    val alignment: Alignment,
+)
+
+internal fun coachArtFrame(fullBody: Boolean, portraitFile: Boolean): CoachArtFrame {
+    if (fullBody && portraitFile) {
+        return CoachArtFrame(ContentScale.Fit, Alignment.BottomCenter)
+    }
+    return CoachArtFrame(ContentScale.Crop, Alignment.TopCenter)
+}
+
+/**
+ * Circular coach face for the chat byline, the empty-state intro, the
+ * header and the roster row.
+ *
+ * File order is avatar, then portrait, then monogram. The portrait is only
+ * the fallback: the circle still frames the head, via [coachArtFrame].
  */
 @Composable
 fun CoachAvatar(
@@ -96,17 +130,12 @@ fun CoachAvatar(
     ) {
         when (source) {
             ArtSource.Monogram -> Monogram(persona, size)
-            ArtSource.Avatar -> AssetImage(
-                assetPath = BrandAssets.coachAvatar(persona.id),
+            ArtSource.Avatar, ArtSource.Portrait -> CoachArtImage(
+                persona = persona,
+                source = source,
+                fullBody = false,
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-            ArtSource.Portrait -> AssetImage(
-                assetPath = BrandAssets.coachPortrait(persona.id),
-                contentDescription = contentDescription,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
             )
         }
     }
@@ -114,7 +143,10 @@ fun CoachAvatar(
 
 /**
  * Full-body character-select portrait. [dimmed] greys a locked coach without
- * hiding them — a ladder you cannot see is a ladder nobody climbs.
+ * hiding them. A ladder you cannot see is a ladder nobody climbs.
+ *
+ * File order is portrait, then avatar, then monogram. The portrait is fit
+ * into the tile so the head stays in frame. See [coachArtFrame].
  */
 @Composable
 fun CoachPortrait(
@@ -141,24 +173,41 @@ fun CoachPortrait(
     ) {
         when (source) {
             ArtSource.Monogram -> Monogram(persona, 96.dp, dimmed = dimmed)
-            ArtSource.Portrait -> AssetImage(
-                assetPath = BrandAssets.coachPortrait(persona.id),
+            ArtSource.Portrait, ArtSource.Avatar -> CoachArtImage(
+                persona = persona,
+                source = source,
+                fullBody = true,
                 contentDescription = contentDescription,
                 modifier = Modifier
                     .fillMaxSize()
                     .then(if (dimmed) Modifier.dim() else Modifier),
-                contentScale = ContentScale.Crop,
-            )
-            ArtSource.Avatar -> AssetImage(
-                assetPath = BrandAssets.coachAvatar(persona.id),
-                contentDescription = contentDescription,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (dimmed) Modifier.dim() else Modifier),
-                contentScale = ContentScale.Crop,
             )
         }
     }
+}
+
+@Composable
+private fun CoachArtImage(
+    persona: CoachPersona,
+    source: ArtSource,
+    fullBody: Boolean,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+) {
+    val portraitFile = source == ArtSource.Portrait
+    val frame = coachArtFrame(fullBody = fullBody, portraitFile = portraitFile)
+    val path = if (portraitFile) {
+        BrandAssets.coachPortrait(persona.id)
+    } else {
+        BrandAssets.coachAvatar(persona.id)
+    }
+    AssetImage(
+        assetPath = path,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = frame.scale,
+        alignment = frame.alignment,
+    )
 }
 
 /** Locked-state veil: opacity only, never a colour cast that reads as failure. */

@@ -1,6 +1,7 @@
 package fit.aquazero.app.feature.settings
 
 import androidx.activity.compose.LocalActivity
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -200,6 +201,8 @@ fun PlanEntitlementsScreen(
                         item {
                             UpgradeCard(
                                 offers = state.offers,
+                                premiumDailyCredits = state.entitlements?.premiumDailyCredits ?: 0,
+                                playVerifyAvailable = state.playVerifyAvailable,
                                 selectedPeriod = state.selectedPeriod,
                                 onSelectPeriod = viewModel::selectPeriod,
                                 offerLoading = state.offerLoading,
@@ -209,17 +212,26 @@ fun PlanEntitlementsScreen(
                         }
                     } else {
                         item {
+                            val playActive = state.entitlements?.hasActivePlaySubscription() == true
                             Column(modifier = Modifier.padding(horizontal = 4.dp)) {
                                 Text(
-                                    text = stringResource(R.string.plan_premium_note),
+                                    text = stringResource(
+                                        if (playActive) {
+                                            R.string.plan_premium_play_note
+                                        } else {
+                                            R.string.plan_premium_note
+                                        },
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-                                SecondaryButton(
-                                    text = stringResource(R.string.plan_manage_subscription),
-                                    onClick = { context.openPlaySubscriptions() },
-                                )
+                                if (playActive) {
+                                    Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
+                                    SecondaryButton(
+                                        text = stringResource(R.string.plan_manage_subscription),
+                                        onClick = { context.openPlaySubscriptions() },
+                                    )
+                                }
                             }
                         }
                     }
@@ -399,6 +411,8 @@ private fun CostRow(task: String, cost: Int) {
 @Composable
 private fun UpgradeCard(
     offers: PremiumOffers?,
+    premiumDailyCredits: Int,
+    playVerifyAvailable: Boolean,
     selectedPeriod: PlanPeriod,
     onSelectPeriod: (PlanPeriod) -> Unit,
     offerLoading: Boolean,
@@ -422,7 +436,11 @@ private fun UpgradeCard(
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = stringResource(R.string.plan_upgrade_body),
+            text = if (premiumDailyCredits > 0) {
+                stringResource(R.string.plan_upgrade_body, premiumDailyCredits)
+            } else {
+                stringResource(R.string.plan_upgrade_body_capped)
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -436,6 +454,11 @@ private fun UpgradeCard(
 
         when {
             offerLoading -> Skeleton(modifier = Modifier.fillMaxWidth().height(140.dp))
+            !playVerifyAvailable -> Text(
+                text = stringResource(R.string.plan_upgrade_server_unavailable),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             offers == null || (offers.annual == null && offers.monthly == null) -> Text(
                 text = stringResource(R.string.plan_upgrade_unavailable),
                 style = MaterialTheme.typography.bodySmall,
@@ -482,8 +505,7 @@ private fun UpgradeCard(
 
                 val activeOffer = offers.offerFor(selectedPeriod)
                 val ctaText = when {
-                    selectedPeriod == PlanPeriod.ANNUAL &&
-                        (activeOffer?.hasFreeTrial == true || annualOffer?.hasFreeTrial == true) ->
+                    selectedPeriod == PlanPeriod.ANNUAL && annualOffer?.hasFreeTrial == true ->
                         stringResource(R.string.plan_upgrade_cta_trial)
                     selectedPeriod == PlanPeriod.ANNUAL && activeOffer != null ->
                         stringResource(R.string.plan_upgrade_cta_annual, activeOffer.formattedPrice)
@@ -503,12 +525,14 @@ private fun UpgradeCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val termsText = if (selectedPeriod == PlanPeriod.ANNUAL && annualOffer != null) {
-                    stringResource(R.string.plan_upgrade_terms_annual, annualOffer.formattedPrice)
-                } else if (monthlyOffer != null) {
-                    stringResource(R.string.plan_upgrade_terms_monthly, monthlyOffer.formattedPrice)
-                } else {
-                    stringResource(R.string.plan_upgrade_terms)
+                val termsRes = upgradeTermsRes(offers, selectedPeriod)
+                val termsText = when (termsRes) {
+                    R.string.plan_upgrade_terms_annual,
+                    R.string.plan_upgrade_terms_annual_no_trial,
+                    -> stringResource(termsRes, annualOffer?.formattedPrice.orEmpty())
+                    R.string.plan_upgrade_terms_monthly ->
+                        stringResource(termsRes, monthlyOffer?.formattedPrice.orEmpty())
+                    else -> stringResource(termsRes)
                 }
 
                 Text(
@@ -518,6 +542,21 @@ private fun UpgradeCard(
                 )
             }
         }
+    }
+}
+
+@StringRes
+internal fun upgradeTermsRes(offers: PremiumOffers, selectedPeriod: PlanPeriod): Int {
+    val annualOffer = offers.annual
+    return when {
+        selectedPeriod == PlanPeriod.ANNUAL && annualOffer != null && annualOffer.hasFreeTrial ->
+            R.string.plan_upgrade_terms_annual
+        selectedPeriod == PlanPeriod.ANNUAL && annualOffer != null ->
+            R.string.plan_upgrade_terms_annual_no_trial
+        offers.monthly != null ->
+            R.string.plan_upgrade_terms_monthly
+        else ->
+            R.string.plan_upgrade_terms
     }
 }
 
@@ -615,14 +654,12 @@ private fun PlanOptionCard(
 @Composable
 private fun laneTitle(lane: String): String = when (lane) {
     "insightBatch" -> stringResource(R.string.plan_lane_insight_title)
-    "visionPrimary" -> stringResource(R.string.plan_lane_vision_title)
     else -> lane
 }
 
 @Composable
 private fun laneBody(lane: String): String = when (lane) {
     "insightBatch" -> stringResource(R.string.plan_lane_insight_body)
-    "visionPrimary" -> stringResource(R.string.plan_lane_vision_body)
     else -> stringResource(R.string.plan_lane_generic_body)
 }
 
@@ -660,6 +697,8 @@ private fun PlanPreview() {
             )
             LaneCard(lane = "insightBatch", premium = false)
             UpgradeCard(
+                premiumDailyCredits = 60,
+                playVerifyAvailable = true,
                 offers = PremiumOffers(
                     annual = PremiumOffer(
                         productId = "azf_premium_annual",

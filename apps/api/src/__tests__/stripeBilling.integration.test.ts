@@ -48,6 +48,7 @@ const WHSEC = 'whsec_test_local_only';
 const savedEnv = {
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID,
+  STRIPE_PRICE_ID_ANNUAL: process.env.STRIPE_PRICE_ID_ANNUAL,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   APP_PUBLIC_URL: process.env.APP_PUBLIC_URL,
 };
@@ -168,6 +169,7 @@ beforeAll(async () => {
 beforeEach(() => {
   process.env.STRIPE_SECRET_KEY = 'sk_test_stub';
   process.env.STRIPE_PRICE_ID = 'price_test_premium';
+  delete process.env.STRIPE_PRICE_ID_ANNUAL;
   process.env.STRIPE_WEBHOOK_SECRET = WHSEC;
   process.env.APP_PUBLIC_URL = 'https://staging.aquazerofit.test';
 });
@@ -638,14 +640,24 @@ describe('POST /billing/stripe/checkout', () => {
   });
 
   it('opens a subscription checkout for the configured price, bound to the caller', async () => {
-    const stripe = stubStripe({ id: 'cs_test_1', url: 'https://checkout.stripe.com/c/pay/cs_test_1' });
+    const stripe = routeStripe({
+      'GET /v1/prices/price_test_premium': {
+        id: 'price_test_premium',
+        unit_amount: 999,
+        currency: 'aud',
+        recurring: { interval: 'month' },
+      },
+      'POST /v1/checkout/sessions': { id: 'cs_test_1', url: 'https://checkout.stripe.com/c/pay/cs_test_1' },
+    });
 
     const res = await request(app).post(`${base}/billing/stripe/checkout`).set(auth()).send({});
 
     expect(res.status).toBe(200);
     expect(res.body.url).toBe('https://checkout.stripe.com/c/pay/cs_test_1');
 
-    const [url, init] = stripe.mock.calls[0]!;
+    const checkout = stripe.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(checkout).toBeTruthy();
+    const [url, init] = checkout!;
     expect(String(url)).toBe('https://api.stripe.com/v1/checkout/sessions');
     const sent = new URLSearchParams(String(init?.body));
     expect(sent.get('mode')).toBe('subscription');
@@ -734,6 +746,11 @@ describe('POST /billing/stripe/checkout', () => {
     await deliver(event('customer.subscription.deleted', subscription('sub_deleted', userId)));
     const stripe = routeStripe({
       'GET /v1/subscriptions/sub_ended': { id: 'sub_ended', object: 'subscription', status: 'canceled' },
+      'GET /v1/prices/price_test_premium': {
+        unit_amount: 999,
+        currency: 'aud',
+        recurring: { interval: 'month' },
+      },
       'POST /v1/checkout/sessions': { id: 'cs_again', url: 'https://checkout.stripe.com/c/pay/cs_again' },
     });
 
@@ -741,7 +758,57 @@ describe('POST /billing/stripe/checkout', () => {
 
     expect(res.status).toBe(200);
     // sub_deleted has a recorded deletion, so Stripe is not asked about it.
-    expect(callsOf(stripe)).toEqual(['GET /v1/subscriptions/sub_ended', 'POST /v1/checkout/sessions']);
+    expect(callsOf(stripe)).toEqual([
+      'GET /v1/subscriptions/sub_ended',
+      'GET /v1/prices/price_test_premium',
+      'POST /v1/checkout/sessions',
+    ]);
+  });
+
+  it('opens annual checkout when the annual Price matches A$79.99', async () => {
+    process.env.STRIPE_PRICE_ID_ANNUAL = 'price_test_annual';
+    const stripe = routeStripe({
+      'GET /v1/prices/price_test_annual': {
+        unit_amount: 7999,
+        currency: 'aud',
+        recurring: { interval: 'year' },
+      },
+      'POST /v1/checkout/sessions': { id: 'cs_annual', url: 'https://checkout.stripe.com/c/pay/cs_annual' },
+    });
+
+    const res = await request(app)
+      .post(`${base}/billing/stripe/checkout`)
+      .set(auth())
+      .send({ interval: 'year' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.url).toBe('https://checkout.stripe.com/c/pay/cs_annual');
+    const checkout = stripe.mock.calls.find(([, init]) => init?.method === 'POST');
+    const sent = new URLSearchParams(String(checkout?.[1]?.body));
+    expect(sent.get('line_items[0][price]')).toBe('price_test_annual');
+    expect(callsOf(stripe)).toEqual(['GET /v1/prices/price_test_annual', 'POST /v1/checkout/sessions']);
+  });
+
+  it('does not start annual checkout when STRIPE_PRICE_ID_ANNUAL is unset', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const res = await request(app)
+      .post(`${base}/billing/stripe/checkout`)
+      .set(auth())
+      .send({ interval: 'year' });
+
+    expect(res.status).toBe(503);
+    expect(res.body.code).toBe('PAYMENT_UNAVAILABLE');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('refuses checkout when the Stripe Price is not the launch amount', async () => {
+    const stripe = stubStripe({ unit_amount: 500, currency: 'aud', recurring: { interval: 'month' } });
+
+    const res = await request(app).post(`${base}/billing/stripe/checkout`).set(auth()).send({});
+
+    expect(res.status).toBe(503);
+    expect(stripe.mock.calls.every(([url]) => !String(url).includes('/checkout/sessions'))).toBe(true);
   });
 });
 
@@ -827,6 +894,38 @@ describe('GET /billing/config', () => {
     expect(res.body.stripe).toEqual({
       available: true,
       price: { amount: 999, currency: 'aud', interval: 'month' },
+      plans: [
+        { interval: 'month', amount: 999, currency: 'aud', available: true },
+        { interval: 'year', amount: 7999, currency: 'aud', available: false },
+      ],
+    });
+  });
+
+  it('exposes both launch prices when the annual Price matches A$79.99', async () => {
+    process.env.STRIPE_PRICE_ID_ANNUAL = 'price_test_annual';
+    routeStripe({
+      'GET /v1/prices/price_test_premium': {
+        unit_amount: 999,
+        currency: 'aud',
+        recurring: { interval: 'month' },
+      },
+      'GET /v1/prices/price_test_annual': {
+        unit_amount: 7999,
+        currency: 'aud',
+        recurring: { interval: 'year' },
+      },
+    });
+
+    const res = await request(app).get(`${base}/billing/config`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.stripe).toEqual({
+      available: true,
+      price: { amount: 999, currency: 'aud', interval: 'month' },
+      plans: [
+        { interval: 'month', amount: 999, currency: 'aud', available: true },
+        { interval: 'year', amount: 7999, currency: 'aud', available: true },
+      ],
     });
   });
 
@@ -835,7 +934,29 @@ describe('GET /billing/config', () => {
 
     const res = await request(app).get(`${base}/billing/config`);
 
-    expect(res.body.stripe).toEqual({ available: false, price: null });
+    expect(res.body.stripe).toEqual({
+      available: false,
+      price: null,
+      plans: [
+        { interval: 'month', amount: 999, currency: 'aud', available: false },
+        { interval: 'year', amount: 7999, currency: 'aud', available: false },
+      ],
+    });
+  });
+
+  it('does not offer a Stripe price that is not the launch amount', async () => {
+    stubStripe({ unit_amount: 500, currency: 'aud', recurring: { interval: 'month' } });
+
+    const res = await request(app).get(`${base}/billing/config`);
+
+    expect(res.body.stripe.available).toBe(false);
+    expect(res.body.stripe.price).toBeNull();
+    expect(res.body.stripe.plans[0]).toEqual({
+      interval: 'month',
+      amount: 999,
+      currency: 'aud',
+      available: false,
+    });
   });
 
   it('does not offer Stripe on an unconfigured deployment', async () => {
@@ -843,7 +964,14 @@ describe('GET /billing/config', () => {
 
     const res = await request(app).get(`${base}/billing/config`);
 
-    expect(res.body.stripe).toEqual({ available: false, price: null });
+    expect(res.body.stripe).toEqual({
+      available: false,
+      price: null,
+      plans: [
+        { interval: 'month', amount: 999, currency: 'aud', available: false },
+        { interval: 'year', amount: 7999, currency: 'aud', available: false },
+      ],
+    });
   });
 });
 
@@ -895,15 +1023,17 @@ describe('GET /me/entitlements billingSource', () => {
       request(app).get(`${base}/me/entitlements`).set({ Authorization: `Bearer ${fresh.accessToken}` });
 
     expect((await read()).body.billingSource).toBeNull();
+    expect((await read()).body.activeBillingSources).toEqual([]);
     grantStripe(fresh.user.id, 'sub_source');
     expect((await read()).body.billingSource).toBe('stripe');
+    expect((await read()).body.activeBillingSources).toEqual(['stripe']);
   });
 });
 
 /*
  * Erasing an account must not leave Stripe billing a person who no longer has
  * one. The cancellation runs before the purge, because the purge anonymises the
- * ledger that names the subscription — and it never blocks the erasure: a
+ * ledger that names the subscription - and it never blocks the erasure: a
  * Stripe outage is logged for follow-up, not a reason to keep someone's data.
  */
 describe('account deletion with a Stripe subscription', () => {

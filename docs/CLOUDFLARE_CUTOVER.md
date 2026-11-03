@@ -111,9 +111,13 @@ One instance, Cloud SQL socket, secrets from Secret Manager. Mounted secrets:
 - `TELEGRAM_WEBHOOK_SECRET`
 - `TURNSTILE_SECRET_KEY`
 - `TURNSTILE_SITE_KEY`
+- `PLAY_SERVICE_ACCOUNT_JSON`
+- `PLAY_PACKAGE_NAME`
+- `PLAY_RTDN_SECRET`
 
-`PLAY_SERVICE_ACCOUNT_JSON` has no versions, so it is not mounted. Play
-billing stays off until a version exists.
+`PLAY_SERVICE_ACCOUNT_JSON`, `PLAY_PACKAGE_NAME`, and `PLAY_RTDN_SECRET` are
+mounted from Secret Manager (`latest`). `PLAY_SERVICE_ACCOUNT_JSON` version 1
+exists. Do not set `PLAY_PACKAGE_NAME` as a plain env value.
 
 `DATABASE_URL` must be the Cloud SQL socket, not the public IP `35.189.27.65`:
 
@@ -173,12 +177,11 @@ balancer, point `API_ORIGIN` at that origin, then set ingress to
 
 ## Follow-ups, not part of this cutover
 
-- Stripe. The API reads `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET` (see `.env.example`). Leave those mounts, and any other live secret or volume, on the service. The deploy step changes only the image, the one-instance scaling pin, `APP_VERSION` and `AZF_INSTANCE_COUNT`.
+- Stripe. The API reads `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_PRICE_ID_ANNUAL` and `STRIPE_WEBHOOK_SECRET` (see `.env.example`). Leave those mounts, and any other live secret or volume, on the service. The deploy step changes only the image, the one-instance scaling pin, `APP_VERSION` and `AZF_INSTANCE_COUNT`. `STRIPE_PRICE_ID_ANNUAL` is the annual Premium Price `price_1UX1Ue2KRdTmwWCnbO3bW4eh` (A$79.99 AUD per year). Monthly production stays `STRIPE_PRICE_ID=price_1UTzLC2KRdTmwWCnfblYV22F`.
 - Closing direct access to the run.app hostname. The API can now refuse it itself: `REQUIRE_ORIGIN_SECRET=true` 403s any request without the shared secret above, once both sides hold it and every provider webhook is on this domain (docs/OPERATIONS.md, "Closing the run.app bypass"). Do not raise `TRUST_PROXY` to paper over a shared Cloudflare egress address.
 - Firestore. The API is off. The store stays on Cloud SQL.
 - Meal-photo object storage. Cloud Run disk is ephemeral.
 - Firebase Auth on the web (build-args plus authorized domain).
 - Turnstile hostnames must include `aquazerofit.com`.
 - Admin MFA enrollment. `MFA_REQUIRE_ADMIN=true` locks admin routes until someone enrolls. The public site still boots.
-- `PLAY_RTDN_SECRET` and a version of `PLAY_SERVICE_ACCOUNT_JSON` before Play billing notifications.
 - A second database before any staging deploy.

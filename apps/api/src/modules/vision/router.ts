@@ -30,8 +30,10 @@ import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { post as postGuardrail } from '../ai/guardrails';
 import { loadPrompt } from '../ai/prompts';
 import { assertLaneAllowed } from '../ai/tierPolicy';
+import { getConsents } from '../me/service';
 import { todayFor } from '../../platform/dates';
 import { asyncHandler, byIdDoc, deleteDoc, getUser, newId, nowIso, round1, upsertDoc, whereDocs } from '../ai/util';
+import { retainFoodPhotoSample, sweepExpiredFoodPhotoSamples } from './trainingSamples';
 
 export const visionRouter = Router();
 visionRouter.use(requireAuth);
@@ -325,6 +327,7 @@ export async function sweepVisionArtifacts(now = Date.now()): Promise<number> {
     deleteJobImage(job);
     await deleteDoc('ai', job.id);
   }
+  sweepExpiredFoodPhotoSamples(now);
   return stale.length;
 }
 
@@ -649,6 +652,13 @@ visionRouter.post(
     job.status = 'confirmed';
     job.mealType = mealType;
     await upsertDoc('ai', job);
+
+    // Consent is read here, not at upload: this is the moment the photograph
+    // would otherwise be deleted, and the user may have changed their mind.
+    const consents = getConsents(user.id);
+    if (consents.foodPhotoTraining === true) {
+      retainFoodPhotoSample(job, confirmedItems, consents.updatedAt);
+    }
 
     // The confirmed items are persisted in the meal log; the raw photo is no
     // longer needed and is removed (data minimisation).

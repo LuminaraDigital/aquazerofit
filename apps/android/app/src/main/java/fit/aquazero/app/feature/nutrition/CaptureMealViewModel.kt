@@ -46,21 +46,21 @@ data class CaptureBanner(
     @param:StringRes val messageRes: Int? = null,
     /** Server-authored copy, already user-facing. */
     val message: String? = null,
-    /** Meal-photo FORBIDDEN: the banner should open the plan screen. */
+    /** Out of credits for a scan: the banner should open the plan screen. */
     val showPlan: Boolean = false,
 )
 
 /**
- * Upload failure copy. A premium refusal keeps the server's sentence and
+ * Upload failure copy. Running out of credits keeps the server's sentence and
  * offers the plan screen. Every other 4xx stays on the generic retry line,
  * with the server message when one was sent.
  */
 internal fun captureUploadFailureBanner(code: String?, message: String?): CaptureBanner {
     val text = message?.takeIf { it.isNotBlank() }
-    if (code == "FORBIDDEN") {
+    if (code == "CREDITS_INSUFFICIENT") {
         return CaptureBanner(
             message = text,
-            messageRes = R.string.capture_premium_required,
+            messageRes = R.string.capture_credits_used,
             showPlan = true,
         )
     }

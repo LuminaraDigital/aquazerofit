@@ -32,6 +32,11 @@ class OutboxDrainCoordinatorTest {
     }
 
     @Test
+    fun `drainPending returns zero when the outbox is already empty`() = runTest {
+        assertEquals(0, coordinator().drainPending())
+    }
+
+    @Test
     fun `drainForLogout clears a deliverable create`() = runTest {
         outbox.enqueueCreate(
             entityType = OutboxEntityTypes.WATER_LOG,
@@ -42,6 +47,20 @@ class OutboxDrainCoordinatorTest {
         assertEquals(0, coordinator().drainForLogout())
         assertEquals(0, outbox.pendingCountOnce())
         assertEquals(OutboxState.SYNCED, outboxDao.byId(1L)!!.state)
+    }
+
+    @Test
+    fun `drainPending stops immediately when only terminal FAILED ops remain`() = runTest {
+        val opId = outbox.enqueueCreate(
+            entityType = OutboxEntityTypes.WATER_LOG,
+            localId = "w-failed",
+            payloadJson = """{"amountMl":250,"loggedAt":"2026-01-01T08:00:00Z","localDate":"2026-01-01"}""",
+            idempotencyKey = "key-failed",
+        )
+        outbox.markFailed(opId, "VALIDATION_FAILED")
+        assertEquals(0, outbox.liveCountOnce())
+        assertEquals(1, coordinator().drainPending())
+        assertEquals(0, logsApi.createWaterCalls)
     }
 
     private class RecordingSyncScheduler : SyncScheduler {

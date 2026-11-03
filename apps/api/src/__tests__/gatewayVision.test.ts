@@ -189,7 +189,7 @@ describe('complete() vision-provider selection', () => {
 
     expect(calls.map((call) => new URL(call.url).host)).toEqual(['api.groq.com', 'integrate.api.nvidia.com']);
     expect(calls[0]!.body.model).toBe('qwen/qwen3.8-27b');
-    expect(calls[1]!.body.model).toBe('meta/llama-3.2-11b-vision-instruct');
+    expect(calls[1]!.body.model).toBe('nvidia/nemotron-3.5-super-vl-120b-a12b');
     expect(result.meta.provider).toBe('nvidia');
     expect(result.meta.degraded).toBe(false);
   });

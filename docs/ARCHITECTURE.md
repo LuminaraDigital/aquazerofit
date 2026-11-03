@@ -457,7 +457,7 @@ memory: ['memory']
 - **GDPR export/purge**: `USER_SCOPED_CONTAINERS` covers `ai` (memory), `logs`, `profiles`, `plans`
 - **Meal photos**: Size-capped (10MB), allowlisted MIME, unguessable UUID names, never static-served, streamed only to owner, deleted on confirm/failure + 24h TTL
 - **Telegram launch data**: HMAC validated, 600s freshness window
-- **Consent gates**: `wellnessDataProcessing`, `aiPersonalisation`, `anonymisedAnalytics`, `reminders` — all granular, revocable
+- **Consent gates**: `wellnessDataProcessing`, `aiPersonalisation`, `anonymisedAnalytics`, `reminders`, `foodPhotoTraining` — all granular, revocable
 
 ### 7.4 Security Posture
 

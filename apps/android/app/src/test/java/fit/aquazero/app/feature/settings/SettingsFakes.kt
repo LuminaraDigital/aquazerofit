@@ -111,6 +111,7 @@ class FakeAccountApi : AccountApi {
             aiPersonalisation = body.aiPersonalisation,
             anonymisedAnalytics = body.anonymisedAnalytics,
             reminders = body.reminders,
+            foodPhotoTraining = body.foodPhotoTraining,
         )
         return ConsentsEnvelopeDto(consentsDoc)
     }

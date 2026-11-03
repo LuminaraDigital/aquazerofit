@@ -1,9 +1,11 @@
 /**
  * In-memory sliding-window rate limiter (AQF-07 §4 step 2: per user AND per IP).
- * Generous default lane (300/min); stricter lane for every model-calling
- * surface (AI_PATHS below: 20/min); tighter lane again for the unauthenticated
- * surfaces (/analytics/events, /challenges/peek: 30/min). Emits 429
- * RATE_LIMITED with Retry-After.
+ * Generous default lane (300/min). Model routes sit on a 20/min lane, except
+ * meal photographs (5/min) and coach chat (10/min). Unauthenticated telemetry
+ * and invite peeks are 30/min. Auth guessing uses the configured per-IP
+ * minute cap, and Telegram signups have their own per-IP and per-subnet caps.
+ * Emits 429 RATE_LIMITED with Retry-After. Credit exhaustion is separate:
+ * the ledger answers 402 CREDITS_INSUFFICIENT.
  */
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
@@ -13,11 +15,23 @@ import { config } from './config';
 
 const WINDOW_MS = 60_000;
 const DEFAULT_LIMIT = 300;
-const STRICT_LIMIT = 20;
+/** Model routes that are not a photograph or a coach turn. */
+export const AI_STRICT_PER_MINUTE = 20;
+/**
+ * Meal-photo analyses. Premium's day is 60 credits and a photo costs 3, so
+ * 20 analyses empty the day. Five a minute means that day cannot be spent
+ * in one burst against the vision provider.
+ */
+export const MEAL_PHOTO_PER_MINUTE = 5;
+/**
+ * Coach chat turns. Ten a minute is a conversation, not a drain of the
+ * 60-credit day in sixty seconds. There is no server voice route: speech
+ * capture on Android stays on the device and does not call this limiter.
+ */
+export const COACH_CHAT_PER_MINUTE = 10;
 /** Unauthenticated telemetry writes and invite peeks. */
 const ANON_LIMIT = 30;
 const CHEER_LIMIT = 30;
-const LANE_LIMITS = { anon: ANON_LIMIT, strict: STRICT_LIMIT, cheer: CHEER_LIMIT, default: DEFAULT_LIMIT } as const;
 
 /** key -> sorted request timestamps within the current window */
 const buckets = new Map<string, number[]>();
@@ -60,6 +74,14 @@ const AI_PATHS = [
   '/plans/generate',
   '/swap-exercise',
 ] as const;
+
+function isPhotoPath(path: string): boolean {
+  return path.includes('/meal-photos');
+}
+
+function isChatPath(path: string): boolean {
+  return path.includes('/chat');
+}
 
 function isStrictPath(path: string): boolean {
   return AI_PATHS.some((p) => path.includes(p));
@@ -123,10 +145,36 @@ export function rateLimiter(req: Request, res: Response, next: NextFunction): vo
   const now = Date.now();
   const auth = isAuthPath(req.path);
   const anon = !auth && isAnonymousWritePath(req.path);
-  const strict = !auth && !anon && isStrictPath(req.path);
-  const cheer = !auth && !anon && !strict && isCheerSend(req);
-  const lane = auth ? 'auth' : anon ? 'anon' : strict ? 'strict' : cheer ? 'cheer' : 'default';
-  const limit = lane === 'auth' ? config.authRateLimitPerMinute : LANE_LIMITS[lane];
+  const photo = !auth && !anon && isPhotoPath(req.path);
+  const chat = !auth && !anon && !photo && isChatPath(req.path);
+  const strict = !auth && !anon && !photo && !chat && isStrictPath(req.path);
+  const cheer = !auth && !anon && !photo && !chat && !strict && isCheerSend(req);
+  const lane = auth
+    ? 'auth'
+    : anon
+      ? 'anon'
+      : photo
+        ? 'photo'
+        : chat
+          ? 'chat'
+          : strict
+            ? 'strict'
+            : cheer
+              ? 'cheer'
+              : 'default';
+  const limit = auth
+    ? config.authRateLimitPerMinute
+    : anon
+      ? ANON_LIMIT
+      : photo
+        ? MEAL_PHOTO_PER_MINUTE
+        : chat
+          ? COACH_CHAT_PER_MINUTE
+          : strict
+            ? AI_STRICT_PER_MINUTE
+            : cheer
+              ? CHEER_LIMIT
+              : DEFAULT_LIMIT;
 
   // Auth lane is per-IP only (requests are unauthenticated by nature);
   // other lanes: per user (or per IP when anonymous) AND per IP.

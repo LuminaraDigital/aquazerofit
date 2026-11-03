@@ -69,6 +69,9 @@ internal class FakeOutboxDao : OutboxDao {
         list.count { it.state == OutboxState.QUEUED || it.state == OutboxState.IN_FLIGHT }
     }
 
+    override suspend fun liveCountOnce(): Int =
+        rows.value.count { it.state == OutboxState.QUEUED || it.state == OutboxState.IN_FLIGHT }
+
     override suspend fun transition(id: Long, from: OutboxState, to: OutboxState, nowMs: Long): Int {
         var moved = 0
         rows.value = rows.value.map {

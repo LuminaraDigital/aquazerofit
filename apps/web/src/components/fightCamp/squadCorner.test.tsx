@@ -138,7 +138,7 @@ describe('Invite to squad in the Mini App', () => {
     tgStartParam: 'sq_SQD-ABC2345678',
     isCorner: true,
     weekStart: '2027-03-15',
-    members: [{ ref: 'm_aaaaaaaaaaaa', displayName: 'Rizal', isMe: true, role: 'owner', beltTier: null, weekActiveDays: 1 }],
+    members: [{ ref: 'm_aaaaaaaaaaaa', displayName: 'Rizal', isMe: true, role: 'owner', beltTier: null, weekActiveDays: 1, cheeredToday: false }],
     me: { ref: 'm_aaaaaaaaaaaa', showStats: false, role: 'owner' as const },
   };
 

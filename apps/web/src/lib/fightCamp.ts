@@ -6,9 +6,18 @@
  * ./fightRecord), so every write here refreshes that one cache entry rather
  * than keeping a second copy of the same state.
  */
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import type {
+  CheerKind,
+  CheerView,
   EnrolSource,
+  NudgeSettings,
   EnrolmentView,
   SquadCornerInput,
   SquadCornerView,
@@ -199,4 +208,67 @@ export async function prepareSquadInvite(squadId: string): Promise<string | null
   } catch {
     return null;
   }
+}
+
+// ---------- cheers ----------
+
+export const cheersKey = ['progress', 'cheers'] as const;
+
+/** One tap: a fixed cheer to a squad mate. The board shows "Sent today" straight after. */
+export function useSendCheer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ to, cheer }: { to: string; cheer: CheerKind }) =>
+      api<unknown>('/cheers', { method: 'POST', body: { to, cheer } }),
+    onSuccess: (_body, { to }) =>
+      qc.setQueryData<SquadView | null>(squadKey, (squad) =>
+        squad
+          ? { ...squad, members: squad.members.map((m) => (m.ref === to ? { ...m, cheeredToday: true } : m)) }
+          : squad,
+      ),
+  });
+}
+
+interface CheerPage {
+  cheers: CheerView[];
+  nextCursor: string | null;
+}
+
+export function useCheerInbox(enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: cheersKey,
+    queryFn: ({ pageParam }) =>
+      api<CheerPage>('/cheers', pageParam ? { query: { cursor: pageParam } } : {}),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page?.nextCursor ?? null,
+    enabled,
+  });
+}
+
+/** Mark cheers the person has now seen; the dashboard count follows. */
+export function useMarkCheersSeen() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => api<void>('/cheers/seen', { method: 'POST', body: { ids } }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: fightRecordKey }),
+  });
+}
+
+export const nudgeSettingsKey = ['fightCamp', 'nudges'] as const;
+
+export function useNudgeSettings(enabled: boolean) {
+  return useQuery({
+    queryKey: nudgeSettingsKey,
+    queryFn: async () => unwrap<NudgeSettings>(await api<unknown>('/cheers/nudges'), 'nudges'),
+    enabled,
+  });
+}
+
+export function useSetNudgeSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (settings: NudgeSettings) =>
+      unwrap<NudgeSettings>(await api<unknown>('/cheers/nudges', { method: 'PUT', body: settings }), 'nudges'),
+    onSuccess: (settings) => qc.setQueryData(nudgeSettingsKey, settings),
+  });
 }

@@ -410,6 +410,16 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       expect(await repo.claimNudge(userId, '2026-10-20', 'squad_prompt', at(1))).toBe(false);
       expect(await repo.claimNudge(userId, '2026-10-21', 'cheer', at(2))).toBe(true);
     });
+
+    it('stores a switched-off kind, and on again, per user', async () => {
+      const userId = uid('u');
+      expect(await repo.nudgeSettings(userId)).toEqual({});
+      await repo.setNudgeSetting(userId, 'cheer', false, at(0));
+      expect(await repo.nudgeSettings(userId)).toEqual({ cheer: false });
+      await repo.setNudgeSetting(userId, 'cheer', true, at(1));
+      expect(await repo.nudgeSettings(userId)).toEqual({ cheer: true });
+      expect(await repo.nudgeSettings(uid('other'))).toEqual({});
+    });
   });
 
   describe('share links and attribution', () => {
@@ -478,6 +488,7 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       await repo.insertCheer(cheerRow({ fromUserId: mate, toUserId: owner }));
       await repo.withGraceLedger(owner, (ledger) => ledger.append([graceRow(owner)]));
       await repo.claimNudge(owner, '2026-10-20', 'cheer', at(0));
+      await repo.setNudgeSetting(owner, 'cheer', false, at(0));
       const code = `Ef${String(++seq).padStart(6, '0')}`;
       await repo.insertShareLink({ code, userId: owner, kind: 'belt', seasonNumber: 1, createdAt: at(0) });
       const invitee = uid('invitee');
@@ -495,6 +506,7 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
         cheersReceived: [],
         grace: [],
         nudges: [],
+        nudgeSettings: [],
         shareLinks: [],
         attribution: null,
       });

@@ -34,6 +34,13 @@ afterAll(async () => {
   await h.cleanup();
 });
 
+/** Every part of the block other than `on` is null: a dark feature costs nothing and shows nothing. */
+function expectOnlyParts(block: Record<string, unknown>, on: string[]): void {
+  for (const [key, value] of Object.entries(block)) {
+    if (!on.includes(key)) expect(value, key).toBeNull();
+  }
+}
+
 const read = (who: Person) => request(h.app).get(`${h.base}/fight-record`).set(who.auth());
 const enrol = (who: Person, body: unknown = {}) =>
   request(h.app).post(`${h.base}/fight-camp/enrolments`).set(who.auth()).send(body as object);
@@ -95,12 +102,11 @@ describe('the fightCamp block on GET /fight-record', () => {
     h.enable('enrol');
     const grace = await h.register('Grace');
     const before = await read(grace);
-    expect(before.body.fightCamp).toEqual({
+    expect(before.body.fightCamp).toMatchObject({
       theme: seasonTheme(1),
       enrolment: { enrolled: false, prompt: 'primary' },
-      grace: null,
-      squads: null,
     });
+    expectOnlyParts(before.body.fightCamp, ['theme', 'enrolment']);
     await enrol(grace);
     expect((await read(grace)).body.fightCamp.enrolment).toEqual({ enrolled: true, prompt: 'primary' });
   });
@@ -117,12 +123,11 @@ describe('the fightCamp block on GET /fight-record', () => {
     pin(56);
     const next = (await read(await h.register('Season2'))).body;
     expect(next.fightRecord.current.season.number).toBe(2);
-    expect(next.fightCamp).toEqual({
+    expect(next.fightCamp).toMatchObject({
       theme: seasonTheme(2),
       enrolment: { enrolled: false, prompt: 'primary' },
-      grace: null,
-      squads: null,
     });
+    expectOnlyParts(next.fightCamp, ['theme', 'enrolment']);
   });
 
   it('awards belts whether or not the user enrolled', async () => {

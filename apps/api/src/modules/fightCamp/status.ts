@@ -12,6 +12,9 @@ import { enrolmentStatus } from './enrolment';
 import { fcEnabled } from './flags';
 import { syncGrace } from './grace';
 import { squadsStatus } from './squads';
+import { unseenCheers } from './cheers';
+import { isAdult } from '../fightRecord/service';
+import { getProfile } from '../me/service';
 
 export async function fightCampStatus(userId: string, today: string): Promise<FightCampStatus | null> {
   if (!FC_FEATURES.some((feature) => fcEnabled(feature, userId))) return null;
@@ -21,5 +24,7 @@ export async function fightCampStatus(userId: string, today: string): Promise<Fi
     enrolment: fcEnabled('enrol', userId) ? await enrolmentStatus(userId, today) : null,
     grace: fcEnabled('grace', userId) ? (await syncGrace(userId, today)).view : null,
     squads: fcEnabled('squads', userId) ? await squadsStatus(userId, today) : null,
+    cheers:
+      fcEnabled('cheers', userId) && isAdult(getProfile(userId)) ? { unseen: await unseenCheers(userId) } : null,
   };
 }

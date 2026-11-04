@@ -14,6 +14,8 @@ import { BottomNav } from '../../components/ui/BottomNav';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Switch } from '../../components/ui/fields';
 import { useToast } from '../../components/ui/Toast';
+import { useFightCamp } from '../../lib/fightRecord';
+import { useNudgeSettings, useSetNudgeSettings } from '../../lib/fightCamp';
 
 const STORAGE_KEY = 'azf.notificationPrefs';
 
@@ -145,6 +147,8 @@ export default function NotificationSettings() {
             </div>
           )}
         </div>
+
+        <CheerMessagesSetting masterOn={masterOn} />
 
         {/* Granular cards */}
         <div className={`flex flex-col gap-4 ${masterOn ? '' : 'opacity-50'}`}>
@@ -330,6 +334,42 @@ export default function NotificationSettings() {
       </main>
 
       <BottomNav />
+    </div>
+  );
+}
+
+/**
+ * Fight Camp cheers by Telegram (AZF-P1 US-D3): stored on the server, unlike
+ * the device-local cards above, because the bot is what reads it. Shown only
+ * while cheers are on for the account. It sends at most one message a day,
+ * never 21:00 to 08:00, and only with "All reminders" on.
+ */
+function CheerMessagesSetting({ masterOn }: { masterOn: boolean }) {
+  const available = Boolean(useFightCamp().data?.cheers);
+  const settings = useNudgeSettings(available);
+  const save = useSetNudgeSettings();
+  const toast = useToast();
+  if (!available) return null;
+  const on = settings.data?.cheer ?? true;
+  return (
+    <div className="glass-card p-card-padding mb-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-heading font-semibold text-lg text-on-surface">Cheers from your squad</h3>
+          <p className="mt-1 text-sm text-on-surface-variant text-pretty">
+            A Telegram message when a squad mate cheers you. At most one a day, never between 9 pm
+            and 8 am.
+          </p>
+        </div>
+        <Switch
+          checked={masterOn && on}
+          onChange={(v) =>
+            save.mutate({ cheer: v }, { onError: () => toast.error('Could not save that. Try again.') })
+          }
+          label="Cheers from your squad"
+          disabled={!masterOn || settings.isPending || save.isPending}
+        />
+      </div>
     </div>
   );
 }

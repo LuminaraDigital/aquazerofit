@@ -47,6 +47,7 @@ import { logEvent } from '../../platform/telemetry';
 import { auditDataAccess, getProfile } from '../me/service';
 import { activeDatesOf, loadActivity } from '../progress/service';
 import { isAdult, seasonBeltTier } from '../fightRecord/service';
+import { fcEnabled } from './flags';
 import { engageRepo, type MemberRow, type SquadRow } from './repo';
 
 export type JoinVia = 'code' | 'link' | 'corner';
@@ -170,8 +171,15 @@ function auditView(viewerId: string, squadId: string, today: string, others: rea
   });
 }
 
+/** Who the viewer has cheered today, or nobody while cheers are off for them. */
+async function cheeredBy(viewerId: string, today: string): Promise<ReadonlySet<string>> {
+  if (!fcEnabled('cheers', viewerId)) return new Set();
+  return new Set((await engageRepo().cheersSentOn(viewerId, today)).map((c) => c.toUserId));
+}
+
 async function viewOf(squad: SquadRow, viewerId: string, today: string): Promise<SquadView> {
   const members = await adultMembers(squad.id);
+  const cheered = await cheeredBy(viewerId, today);
   const me = members.find((m) => m.userId === viewerId);
   if (!me) notFound();
   const weekStart = weekStartOf(today);
@@ -188,12 +196,18 @@ async function viewOf(squad: SquadRow, viewerId: string, today: string): Promise
     tgStartParam: `sq_${squad.inviteCode}`,
     isCorner: squad.cornerHash !== null,
     weekStart,
-    members: members.map((m) => memberView(m, viewerId, today, weekStart)),
+    members: members.map((m) => memberView(m, viewerId, today, weekStart, cheered)),
     me: { ref: me.memberRef, showStats: me.showStats, role: me.role },
   };
 }
 
-function memberView(m: MemberRow, viewerId: string, today: string, weekStart: string): SquadMemberView {
+function memberView(
+  m: MemberRow,
+  viewerId: string,
+  today: string,
+  weekStart: string,
+  cheered: ReadonlySet<string>,
+): SquadMemberView {
   const isMe = m.userId === viewerId;
   // One activity load per member, shared by the belt and the week count.
   const activeDates = activeDatesOf(loadActivity(m.userId));
@@ -205,6 +219,7 @@ function memberView(m: MemberRow, viewerId: string, today: string, weekStart: st
     beltTier: seasonBeltTier(m.userId, today, activeDates),
     // Your own numbers are always yours to see; anyone else's only by choice.
     weekActiveDays: isMe || m.showStats ? squadWeekPoints(activeDates, weekStart) : null,
+    cheeredToday: cheered.has(m.userId),
   };
 }
 
@@ -451,5 +466,5 @@ export async function setShowStats(
   if (!updated) fail('NOT_FOUND', 'squad_not_found', 'That squad was not found.');
   auditDataAccess(userId, 'fightCamp.squad.showStats', { squadId, on: showStats });
   logEvent('squad_stats_toggled', { on: showStats });
-  return memberView(updated, userId, today, weekStartOf(today));
+  return memberView(updated, userId, today, weekStartOf(today), await cheeredBy(userId, today));
 }

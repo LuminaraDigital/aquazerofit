@@ -13,6 +13,7 @@ const member = (displayName: string, weekActiveDays: number | null, ref = displa
   role: 'member',
   beltTier: null,
   weekActiveDays,
+  cheeredToday: false,
 });
 
 describe('weekStartOf', () => {

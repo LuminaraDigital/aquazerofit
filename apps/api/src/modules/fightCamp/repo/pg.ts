@@ -12,7 +12,7 @@
  *    service understands. A violation this file does not recognise is
  *    rethrown, because swallowing an unknown constraint would hide a bug.
  */
-import type { ShareKindP1 } from '@aquazerofit/shared';
+import type { NudgeKind, ShareKindP1 } from '@aquazerofit/shared';
 import { isUniqueViolation, type SqlDatabase, type SqlRunner } from '../../../platform/sql';
 import { ARCHIVED_SQUAD_NAME } from './types';
 import type {
@@ -488,6 +488,22 @@ export class PgEngageRepo implements EngageRepo {
     return rows.length > 0;
   }
 
+  async nudgeSettings(userId: string): Promise<Partial<Record<NudgeKind, boolean>>> {
+    const { rows } = await this.db.query<{ kind: NudgeKind; enabled: boolean }>(
+      'SELECT kind, enabled FROM engage.nudge_settings WHERE user_id = $1',
+      [userId],
+    );
+    return Object.fromEntries(rows.map((r) => [r.kind, Boolean(r.enabled)]));
+  }
+
+  async setNudgeSetting(userId: string, kind: NudgeKind, enabled: boolean, at: string): Promise<void> {
+    await this.db.query(
+      `INSERT INTO engage.nudge_settings (user_id, kind, enabled, updated_at) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, kind) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = EXCLUDED.updated_at`,
+      [userId, kind, enabled, at],
+    );
+  }
+
   // ----- share kit -----
 
   async shareLink(userId: string, kind: ShareKindP1, seasonNumber: number): Promise<ShareLinkRow | null> {
@@ -543,7 +559,7 @@ export class PgEngageRepo implements EngageRepo {
 
   async exportUser(userId: string): Promise<EngageExport> {
     const q = (text: string) => this.db.query(text, [userId]).then((r) => r.rows);
-    const [enrolments, memberships, squads, sent, received, grace, nudges, links, attribution] =
+    const [enrolments, memberships, squads, sent, received, grace, nudges, nudgePrefs, links, attribution] =
       await Promise.all([
         q(`SELECT ${ENROLMENT_COLUMNS} FROM engage.season_enrolments WHERE user_id = $1`),
         q(`SELECT m.squad_id, m.user_id, m.member_ref, m.season_number, m.role, m.show_stats,
@@ -555,6 +571,7 @@ export class PgEngageRepo implements EngageRepo {
         q(`SELECT ${CHEER_COLUMNS} FROM engage.cheers WHERE to_user_id = $1`),
         q(`SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger WHERE user_id = $1 ORDER BY seq`),
         q(`SELECT local_date::text AS local_date, kind, sent_at FROM engage.nudge_log WHERE user_id = $1`),
+        q(`SELECT kind, enabled, updated_at FROM engage.nudge_settings WHERE user_id = $1`),
         q(`SELECT ${LINK_COLUMNS} FROM engage.share_links WHERE user_id = $1`),
         q(`SELECT share_code, squad_id, surface, created_at FROM engage.referral_attributions
            WHERE invitee_user_id = $1`),
@@ -594,6 +611,11 @@ export class PgEngageRepo implements EngageRepo {
         kind: String(r.kind),
         sentAt: iso(r.sent_at),
       })),
+      nudgeSettings: nudgePrefs.map((r) => ({
+        kind: r.kind as NudgeKind,
+        enabled: Boolean(r.enabled),
+        updatedAt: iso(r.updated_at),
+      })),
       shareLinks: links.map(toLink),
       attribution: attribution[0]
         ? {
@@ -626,6 +648,7 @@ export class PgEngageRepo implements EngageRepo {
         'UPDATE engage.cheers SET from_user_id = NULL WHERE from_user_id = $1',
         'DELETE FROM engage.grace_ledger WHERE user_id = $1',
         'DELETE FROM engage.nudge_log WHERE user_id = $1',
+        'DELETE FROM engage.nudge_settings WHERE user_id = $1',
         // Referral rows that pointed at these links keep the invitee and lose
         // the code (ON DELETE SET NULL), so the inviter is unlinkable.
         'DELETE FROM engage.share_links WHERE user_id = $1',

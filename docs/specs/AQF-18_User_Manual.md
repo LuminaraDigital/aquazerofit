@@ -171,16 +171,16 @@ npm run seed
 
 ### 2.4.3 The demo account
 
-Every environment is seeded with one populated account so that the product opens with real data in it rather than an empty shell.
+Development and test environments are seeded with one populated account so that the product opens with real data in it rather than an empty shell. Production never seeds it.
 
 | Field | Value |
 | :--- | :--- |
 | Email address | `demo@aquazero.fit` |
-| Password | `AquaZeroDemo!2026` |
+| Password | The value of `AZF_DEMO_PASSWORD` in that environment (a random password when it is unset) |
 | Contents | A complete wellness profile, fourteen days of weight history, meal logs and training history |
 
 > [!Warning]
-> These are development credentials for a seeded demo account only. They are published here because the account contains nothing but generated sample data. Never reuse this password on any real account.
+> The password previously published here was committed to a public repository and is compromised. Never reuse it. Google Play review uses a dedicated account provisioned from secrets (`docs/play-store/REVIEWER_ACCESS.md`).
 
 # 3. How to Use AquaZeroFit
 

@@ -279,10 +279,16 @@ export class MemoryEngageRepo implements EngageRepo {
 
   // ----- experiments -----
 
-  async assignArm(userId: string, experiment: 'early_cheers', arm: ExperimentArm, at: string): Promise<boolean> {
-    if (this.arms.some((a) => a.userId === userId && a.experiment === experiment)) return false;
+  async assignArm(
+    userId: string,
+    experiment: 'early_cheers',
+    arm: ExperimentArm,
+    at: string,
+  ): Promise<{ arm: ExperimentArm; recorded: boolean }> {
+    const held = this.arms.find((a) => a.userId === userId && a.experiment === experiment);
+    if (held) return { arm: held.arm, recorded: false };
     this.arms.push({ userId, experiment, arm, assignedAt: at });
-    return true;
+    return { arm, recorded: true };
   }
 
   // ----- Cut Man grace -----

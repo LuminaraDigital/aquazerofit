@@ -6,7 +6,7 @@
  * or bodies. Share opens the Share Kit's recap card; joining the new season
  * is offered here too, because a finished season is the natural fresh start.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { seasonByNumber, seasonTheme, type SeasonRecap } from '@aquazerofit/shared';
 import { AppHeader } from '@/components/ui/AppHeader';
@@ -21,7 +21,7 @@ import { ShareKitSheet } from '@/components/fightCamp/ShareKitSheet';
 import { EnrolAction } from '@/components/fightCamp/EnrolAction';
 import { ApiError } from '@/lib/api';
 import { beltName, useFightCamp, useFightRecord } from '@/lib/fightRecord';
-import { useFirstName, useSeasonRecap } from '@/lib/fightCamp';
+import { useSeasonRecap } from '@/lib/fightCamp';
 import { trackGrowth } from '@/lib/growth';
 
 export default function RecapPage() {
@@ -77,8 +77,17 @@ function Recap({ recap }: { recap: SeasonRecap }) {
   const [sharing, setSharing] = useState(false);
   const camp = useFightCamp().data;
   const record = useFightRecord().data;
-  const firstName = useFirstName();
   const theme = seasonTheme(recap.seasonNumber);
+  const card = useMemo(
+    () => ({
+      kind: 'recap' as const,
+      season: seasonByNumber(recap.seasonNumber),
+      accent: seasonTheme(recap.seasonNumber).accent,
+      belt: recap.belt,
+      activeDays: recap.activeDays,
+    }),
+    [recap],
+  );
 
   useEffect(() => {
     void trackGrowth('fc_recap_viewed', { season: recap.seasonNumber, belt: recap.belt ?? 'none' });
@@ -126,19 +135,7 @@ function Recap({ recap }: { recap: SeasonRecap }) {
       )}
 
       {sharing && (
-        <ShareKitSheet
-          open
-          onClose={() => setSharing(false)}
-          firstName={firstName}
-          accentId={theme.accentId}
-          card={{
-            kind: 'recap',
-            season: seasonByNumber(recap.seasonNumber),
-            accent: theme.accent,
-            belt: recap.belt,
-            activeDays: recap.activeDays,
-          }}
-        />
+        <ShareKitSheet open onClose={() => setSharing(false)} accentId={theme.accentId} card={card} />
       )}
     </div>
   );

@@ -137,6 +137,21 @@ describe('attribution (US-F3 AC2, AC3)', () => {
     expect(summary.body).toEqual({ summary: { joined: 2, inYourSquad: ['Ana'] } });
   });
 
+  it('keeps the summary to adults, and never credits a known minor', async () => {
+    h.enable('shareKit');
+    const inviter = await h.register('Inviter');
+    const { code } = (await link(inviter, 'belt')).body.shareLink;
+    const teen = await h.register('Teen', { age: 16 });
+    const unknown = await h.register('Newish', { age: null });
+    await claim(teen, code);
+    await claim(unknown, code);
+    expect((await engageRepo().exportUser(teen.userId)).attribution).toBeNull();
+    // An age not given yet still counts: onboarding asks for it after sign-up.
+    expect((await engageRepo().exportUser(unknown.userId)).attribution).toEqual(expect.objectContaining({ shareCode: code }));
+    h.setAge(inviter.userId, 17);
+    expect((await request(h.app).get(`${h.base}/share/summary`).set(inviter.auth())).status).toBe(403);
+  });
+
   it('credits a new account that joins through a squad invite link to that squad', async () => {
     h.enable('shareKit', 'squads');
     const owner = await h.register('Owner');
@@ -151,6 +166,25 @@ describe('attribution (US-F3 AC2, AC3)', () => {
       expect.objectContaining({ shareCode: null, squadId: made.body.squad.id, surface: 'tma' }),
     );
   });
+
+  it('never fails a join that worked because its attribution could not be written', async () => {
+    h.enable('shareKit', 'squads');
+    const owner = await h.register('Owner');
+    const made = await request(h.app).post(`${h.base}/squads`).set(owner.auth()).send({ name: 'Corner Crew', consent: true });
+    const joiner = await h.register('Joiner');
+    vi.setSystemTime(Date.now() + 1000);
+    const spy = vi.spyOn(engageRepo(), 'attribute').mockRejectedValueOnce(new Error('database away'));
+    try {
+      const res = await request(h.app)
+        .post(`${h.base}/squads/join?via=link`)
+        .set(joiner.auth())
+        .send({ code: made.body.squad.inviteCode, consent: true });
+      expect(res.status).toBe(200);
+      expect(res.body.squad.id).toBe(made.body.squad.id);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe('story captions and art (US-F2)', () => {
@@ -159,8 +193,15 @@ describe('story captions and art (US-F2)', () => {
     const linkText = 't.me/AquaZeroFitBot/app?startapp=sh_AbCdEfGh';
     for (const length of [0, 10, 150, 154, 155, 156, 400]) {
       const caption = storyCaption('x'.repeat(length), linkText);
-      expect([...caption].length).toBeLessThanOrEqual(STORY_CAPTION_MAX_CHARS);
+      expect(caption.length).toBeLessThanOrEqual(STORY_CAPTION_MAX_CHARS);
       expect(caption.endsWith(linkText)).toBe(true);
+    }
+    // Telegram counts UTF-16 units: an emoji is two, and is never cut in half.
+    for (const text of ['🔥'.repeat(120), `${'x'.repeat(151)}🔥🔥`, '🔥'.repeat(76)]) {
+      const caption = storyCaption(text, linkText);
+      expect(caption.length).toBeLessThanOrEqual(STORY_CAPTION_MAX_CHARS);
+      expect(caption.endsWith(linkText)).toBe(true);
+      expect(caption).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
     }
     expect(storyCaption('Blue Belt, Season 1 on AquaZeroFit.', linkText)).toBe(
       `Blue Belt, Season 1 on AquaZeroFit. ${linkText}`,

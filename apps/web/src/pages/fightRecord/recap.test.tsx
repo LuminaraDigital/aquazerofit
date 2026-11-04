@@ -38,7 +38,7 @@ const RECAP: SeasonRecap = {
   squadName: 'Corner Crew',
 };
 
-function serve(recap: SeasonRecap | 'missing', camp = campWith({ shareKit: { joined: 0 } })) {
+function serve(recap: SeasonRecap | 'missing', camp = campWith({ shareKit: { firstName: null } })) {
   mocks.api.mockImplementation(async (path: string) => {
     if (path.startsWith('/fight-camp/recap/')) {
       if (recap === 'missing') throw new ApiError(404, { code: 'NOT_FOUND', message: 'There is no recap for that season.' });

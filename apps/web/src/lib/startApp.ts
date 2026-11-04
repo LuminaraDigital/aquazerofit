@@ -23,11 +23,15 @@ export function fightCampStartPath(startParam: string | null): string | null {
   return code.success ? `/s/${code.data}` : null;
 }
 
-/** The Share Kit code in a start payload, or null. */
-export function shareCodeIn(startParam: string | null): string | null {
-  if (!startParam?.startsWith('sh_')) return null;
-  const code = shareCodeSchema.safeParse(startParam.slice(3));
-  return code.success ? code.data : null;
+/**
+ * The Share Kit code in a start payload or a stored ref, or null. A ref that
+ * crossed from the landing page into Telegram has lost its `_` (telegramLink
+ * keeps underscores out of its payload), so `sh<code>` is read as well.
+ */
+export function shareCodeIn(value: string | null): string | null {
+  const match = value ? /^sh_?(.*)$/.exec(value) : null;
+  const code = match ? shareCodeSchema.safeParse(match[1]) : null;
+  return code?.success ? code.data : null;
 }
 
 export function useFightCampStartApp(): void {
@@ -52,29 +56,30 @@ export function useFightCampStartApp(): void {
 const CLAIMED_KEY = 'azf_share_claim_v1';
 
 /**
- * Once signed in, credit a new account to the Share Kit link it arrived
- * through. The server decides whether it counts (only accounts under a day
- * old, never your own link) and answers the same either way; this only
- * avoids asking twice from the same browser.
+ * Credit a new, signed-in account to the Share Kit link it arrived through.
+ * The server decides whether it counts (only accounts under a day old, never
+ * your own link) and answers the same either way; this only avoids asking
+ * twice from the same browser. Never rejects.
  */
+export async function claimStoredShareAttribution(): Promise<void> {
+  const code = shareCodeIn(getAttribution().ref);
+  if (!code) return;
+  try {
+    if (localStorage.getItem(CLAIMED_KEY) === code) return;
+  } catch {
+    // No storage: the server's first-touch rule still holds.
+  }
+  try {
+    await api('/share/attributions', { method: 'POST', body: { code, surface: isTMA() ? 'tma' : 'web' } });
+    localStorage.setItem(CLAIMED_KEY, code);
+  } catch {
+    // Asking again later is harmless.
+  }
+}
+
+/** Claim once signed in; a squad join claims first itself (first touch wins). */
 export function useClaimShareAttribution(signedIn: boolean): void {
   useEffect(() => {
-    if (!signedIn) return;
-    const code = shareCodeIn(getAttribution().ref);
-    if (!code) return;
-    try {
-      if (localStorage.getItem(CLAIMED_KEY) === code) return;
-    } catch {
-      // No storage: the server's first-touch rule still holds.
-    }
-    void api('/share/attributions', { method: 'POST', body: { code, surface: isTMA() ? 'tma' : 'web' } })
-      .then(() => {
-        try {
-          localStorage.setItem(CLAIMED_KEY, code);
-        } catch {
-          // Ignore: asking again is harmless.
-        }
-      })
-      .catch(() => undefined);
+    if (signedIn) void claimStoredShareAttribution();
   }, [signedIn]);
 }

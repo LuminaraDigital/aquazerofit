@@ -85,16 +85,22 @@ export function telegramSafe(text: string, fallback: string): string {
 }
 
 /**
- * A member's first name, masked like huddle names. Names the account never
- * chose (the email local part registration fills in, Telegram's numbered
- * fallback) are not shown: they can identify someone who never typed them.
+ * The person's first name, or null when it is not one to show. Names the
+ * account never chose (the email local part registration fills in,
+ * Telegram's numbered fallback) are not shown: they can identify someone
+ * who never typed them.
  */
-export function displayNameOf(userId: string): string {
+export function firstNameOf(userId: string): string | null {
   const user = getStore().byId<User>('users', userId);
   const name = user?.displayName?.trim() ?? '';
   const autoFilled = name === user?.email.split('@')[0] || /^Telegram user \d+$/.test(name);
   const first = name.split(/\s+/)[0] ?? '';
-  return first && !autoFilled && !containsProfanity(first) ? first : FALLBACK_NAME;
+  return first && !autoFilled && !containsProfanity(first) ? first : null;
+}
+
+/** A member's first name, masked like huddle names. */
+export function displayNameOf(userId: string): string {
+  return firstNameOf(userId) ?? FALLBACK_NAME;
 }
 
 function fail(code: 'FORBIDDEN' | 'CONFLICT' | 'NOT_FOUND', reason: string, message: string): never {

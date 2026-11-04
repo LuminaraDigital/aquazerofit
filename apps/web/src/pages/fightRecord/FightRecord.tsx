@@ -12,7 +12,7 @@
  * asks Telegram for permission first and stores nothing if the user declines.
  * A user the feature is off for is sent home rather than shown a teaser.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import {
   seasonByNumber,
@@ -34,7 +34,6 @@ import { BeltBadge } from '@/components/fightRecord/BeltBadge';
 import { BeltCelebration, BeltShareSheet } from '@/components/fightRecord/BeltCelebration';
 import { CheersInbox } from '@/components/fightCamp/Cheers';
 import { ShareKitSheet } from '@/components/fightCamp/ShareKitSheet';
-import { useFirstName } from '@/lib/fightCamp';
 import { formatDate } from '@/lib/format';
 import {
   beltName,
@@ -88,9 +87,19 @@ function Record({ record }: { record: FightRecordStatus }) {
   const [sharing, setSharing] = useState<BeltAwardView | null>(null);
   const camp = useFightCamp().data;
   const shareKit = Boolean(camp?.shareKit) && record.adult;
-  const firstName = useFirstName();
   // With the Share Kit on, every share goes through it; off, R1a's belt sheet.
   const [kit, setKit] = useState<{ kind: 'belt' | 'season'; belt: BeltTier | null; seasonNumber: number } | null>(null);
+  const kitCard = useMemo(
+    () =>
+      kit && {
+        kind: kit.kind,
+        season: seasonByNumber(kit.seasonNumber),
+        accent: seasonTheme(kit.seasonNumber).accent,
+        belt: kit.belt,
+        activeDays,
+      },
+    [kit, activeDays],
+  );
   const share = (belt: BeltAwardView) =>
     shareKit ? setKit({ kind: 'belt', belt: belt.tier, seasonNumber: belt.seasonNumber }) : setSharing(belt);
   const currentBelt = record.belts.find((b) => b.seasonNumber === season.number) ?? null;
@@ -204,19 +213,12 @@ function Record({ record }: { record: FightRecordStatus }) {
 
       <BeltCelebration record={record} />
       <BeltShareSheet award={sharing} adult={record.adult} onClose={() => setSharing(null)} />
-      {kit && camp && (
+      {kit && kitCard && camp && (
         <ShareKitSheet
           open
           onClose={() => setKit(null)}
-          firstName={firstName}
           accentId={seasonTheme(kit.seasonNumber).accentId}
-          card={{
-            kind: kit.kind,
-            season: seasonByNumber(kit.seasonNumber),
-            accent: seasonTheme(kit.seasonNumber).accent,
-            belt: kit.belt,
-            activeDays,
-          }}
+          card={kitCard}
         />
       )}
     </div>

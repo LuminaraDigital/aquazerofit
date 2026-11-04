@@ -245,6 +245,6 @@ describe('SquadJoinPage', () => {
     await waitFor(() => expect(calls.some((c) => c.path === '/squads/join')).toBe(true));
     const joined = calls.find((c) => c.path === '/squads/join')!;
     expect(joined.body).toEqual({ code: 'SQD-ABC2345678', consent: true });
-    expect(joined.query).toEqual({ via: 'link' });
+    expect(joined.query).toEqual({ via: 'link', surface: 'web' });
   });
 });

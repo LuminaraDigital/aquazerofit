@@ -211,8 +211,17 @@ export interface EngageRepo {
   hasCheered(fromUserId: string, toUserId: string): Promise<boolean>;
 
   // ----- experiments -----
-  /** Record the arm once; true only for the call that recorded it. */
-  assignArm(userId: string, experiment: 'early_cheers', arm: ExperimentArm, at: string): Promise<boolean>;
+  /**
+   * Record `arm` unless the person already has one, and return the arm on
+   * record, which is the one to use. `recorded` is true only for the call
+   * that wrote it.
+   */
+  assignArm(
+    userId: string,
+    experiment: 'early_cheers',
+    arm: ExperimentArm,
+    at: string,
+  ): Promise<{ arm: ExperimentArm; recorded: boolean }>;
 
   // ----- Cut Man grace -----
   /** Every ledger row for the user, in write order. */

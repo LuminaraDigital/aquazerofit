@@ -27,7 +27,8 @@ import {
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { config } from '../../platform/config';
 import { AppError, asyncHandler } from '../../platform/errors';
-import { todayFor } from '../../platform/dates';
+import { timezoneOf, todayFor } from '../../platform/dates';
+import { logError } from '../../platform/telemetry';
 import { enrol } from './enrolment';
 import { seasonRecap } from './recap';
 import { requireFeature, requireFeatureSwitch } from './flags';
@@ -141,8 +142,13 @@ squadsRouter.post(
     const via = req.query.via === 'link' ? 'link' : 'code';
     const userId = userIdOf(req);
     const squad = await joinSquadByCode(userId, code, todayFor(req), via);
-    // A new account that came in through a squad invite counts for that squad.
-    if (via === 'link') await attributeSquadJoin(userId, squad.id, req.query.surface === 'tma' ? 'tma' : 'web');
+    // A new account that came in through a squad invite counts for that
+    // squad. The join has happened: an attribution fault is logged, not returned.
+    if (via === 'link') {
+      await attributeSquadJoin(userId, squad.id, req.query.surface === 'tma' ? 'tma' : 'web').catch((err: unknown) =>
+        logError(err, { route: 'squads.join.attribution' }),
+      );
+    }
     res.json({ squad });
   }),
 );
@@ -223,7 +229,7 @@ cheersRouter.get(
   asyncHandler(async (req, res) => {
     const userId = userIdOf(req);
     const today = todayFor(req);
-    await syncEarlyCheers(userId, today);
+    await syncEarlyCheers(userId, today, timezoneOf(req));
     res.json(await cheerInbox(userId, decodeCursor(req.query.cursor), today));
   }),
 );
@@ -315,6 +321,8 @@ shareRouter.post(
 shareRouter.get(
   '/summary',
   asyncHandler(async (req, res) => {
-    res.json({ summary: await shareSummary(userIdOf(req), todayFor(req)) });
+    const userId = userIdOf(req);
+    requireSquadAdult(userId);
+    res.json({ summary: await shareSummary(userId, todayFor(req)) });
   }),
 );

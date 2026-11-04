@@ -368,10 +368,16 @@ export function storyArtPath(kind: ShareKindP1, tier: BeltTier | null, accentId:
  * 200 characters a non-Premium account may post: the text gives way first.
  */
 export function storyCaption(text: string, link: string): string {
+  // Lengths in UTF-16 units, as Telegram counts them; cut on whole code points.
   const room = STORY_CAPTION_MAX_CHARS - link.length - 1;
   if (room <= 0) return link.slice(0, STORY_CAPTION_MAX_CHARS);
-  const body = [...text].length <= room ? text : `${[...text].slice(0, room - 1).join('').trimEnd()}…`;
-  return `${body} ${link}`;
+  if (text.length <= room) return `${text} ${link}`;
+  let body = '';
+  for (const ch of text) {
+    if (body.length + ch.length > room - 1) break;
+    body += ch;
+  }
+  return `${body.trimEnd()}… ${link}`;
 }
 
 // ---------- season recap ----------
@@ -464,7 +470,8 @@ export interface FightCampStatus {
   /** FC_CHEERS, for adults only: how many cheers are waiting to be seen. */
   cheers: { unseen: number } | null;
   /** FC_SHARE_KIT, for adults only: how many people joined from this person's cards. */
-  shareKit: { joined: number } | null;
+  /** `firstName` is what a card may print if the person turns it on; null when there is none to show. */
+  shareKit: { firstName: string | null } | null;
   /**
    * FC_ENROL: the season just ended has a recap ready, offered for its first
    * 14 days to anyone who showed up in it at least once.

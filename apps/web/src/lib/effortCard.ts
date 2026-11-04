@@ -186,7 +186,7 @@ export async function renderEffortCard(card: EffortCard, format: ShareFormat): P
   ctx.font = `500 ${42 * unit}px system-ui, sans-serif`;
   ctx.fillText(card.heroLabel, cx, top + span * (card.belt ? 0.65 : 0.58));
 
-  ctx.font = `600 ${40 * unit}px system-ui, sans-serif`;
+  fit(ctx, card.name, 600, 40 * unit, W - 160 * unit);
   ctx.fillText(card.name, cx, top + span * 0.76);
 
   ctx.fillStyle = '#f2fbff';
@@ -196,7 +196,13 @@ export async function renderEffortCard(card: EffortCard, format: ShareFormat): P
   fit(ctx, card.link, 500, 30 * unit, W - 120 * unit);
   ctx.fillText(card.link, cx, top + span * 0.93);
 
-  return await new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG encode failed'))), 'image/png');
-  });
+  try {
+    return await new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG encode failed'))), 'image/png');
+    });
+  } finally {
+    // A 1080x1920 backing store is large; iOS caps the total a page may hold.
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }

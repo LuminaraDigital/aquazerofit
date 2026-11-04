@@ -15,7 +15,7 @@ import { Router } from 'express';
 import { ackBeltSchema, emojiStatusPreferenceSchema } from '@aquazerofit/shared';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { AppError, asyncHandler } from '../../platform/errors';
-import { todayFor } from '../../platform/dates';
+import { timezoneOf, todayFor } from '../../platform/dates';
 import { logError } from '../../platform/telemetry';
 import {
   acknowledgeBelt,
@@ -45,7 +45,7 @@ fightRecordRouter.get(
     // belt read that worked before Fight Camp existed.
     let fightCamp = null;
     try {
-      fightCamp = await fightCampStatus(userId, today);
+      fightCamp = await fightCampStatus(userId, today, timezoneOf(req));
     } catch (err) {
       logError(err, { route: 'fightRecord.fightCamp' });
     }

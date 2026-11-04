@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mealTextOf, mealTypeIn, parseCoachIntent } from '../modules/chat/actions';
+import { actionNoteFor, actionNoteForModel, mealTextOf, mealTypeIn, parseCoachIntent } from '../modules/chat/actions';
 
 describe('parseCoachIntent', () => {
   it.each([
@@ -90,6 +90,20 @@ describe('parseCoachIntent', () => {
     'What is a good plan for rebuilding muscle?',
   ])('does not act on: %s', (text) => {
     expect(['rebuildPlan', 'swapExercise']).not.toContain(parseCoachIntent(text)?.kind);
+  });
+
+  it('keeps the resolved exercise name out of the model note until personalisation is on', () => {
+    const detail = actionNoteFor({
+      kind: 'swapExercise',
+      sessionId: 'ses',
+      exerciseId: 'ex',
+      exerciseName: 'Barbell Back Squat',
+    });
+    expect(detail).toMatch(/Barbell Back Squat/);
+    expect(actionNoteForModel(detail, false)).not.toMatch(/Barbell Back Squat/);
+    expect(actionNoteForModel(detail, false)).toMatch(/confirmation card/);
+    expect(actionNoteForModel(detail, true)).toBe(detail);
+    expect(actionNoteForModel(null, false)).toBeNull();
   });
 
   it('takes the meal time out of the food text', () => {

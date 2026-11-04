@@ -141,3 +141,16 @@ function askOf(action: CoachAction | { kind: 'logMeal' }): string {
 export function actionNoteFor(action: CoachAction | { kind: 'logMeal' }): string {
   return `The app is showing the user a confirmation card to ${askOf(action)}. Nothing happens until they confirm it. Do not say it is done, and do not say you cannot do it.`;
 }
+
+/**
+ * What the model is allowed to see. The detailed note names the resolved
+ * exercise, which is plan data. That stays out of model context unless
+ * aiPersonalisation is on. The user's own sentence is already in the turn.
+ * A client with no card sends no note at all, so this is never a substitute
+ * for one.
+ */
+export function actionNoteForModel(detail: string | null, personalisationOn: boolean): string | null {
+  if (!detail) return null;
+  if (personalisationOn) return detail;
+  return 'The app is showing the user a confirmation card. Nothing happens until they confirm it. Do not say it is done, and do not say you cannot do it.';
+}

@@ -7,6 +7,8 @@
  */
 import {
   generatePlanSchema,
+  waterLogSchema,
+  weightLogSchema,
   type Allergen,
   type ChatActionDraft,
   type CoachAction,
@@ -243,13 +245,25 @@ function ownedProposal(userId: string, draftId: string): ChatActionDraft {
   return draft;
 }
 
+/** Same bounds as POST /logs/water and POST /logs/weight. The draft is not a second schema. */
+function logInput<T>(
+  schema: { safeParse: (value: unknown) => { success: true; data: T } | { success: false } },
+  value: unknown,
+): T {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    throw new AppError('VALIDATION_FAILED', 'That log does not meet the limits the logging screen enforces.');
+  }
+  return parsed.data;
+}
+
 async function runAction(user: ActionUser, draft: ChatActionDraft, today: string): Promise<string> {
   const { action, localDate } = draft;
   switch (action.kind) {
     case 'logWater':
-      return createWaterLog(user.id, { amountMl: action.amountMl, localDate }).log.id;
+      return createWaterLog(user.id, logInput(waterLogSchema, { amountMl: action.amountMl, localDate })).log.id;
     case 'logWeight':
-      return upsertWeightLog(user.id, { weightKg: action.weightKg, localDate }).id;
+      return upsertWeightLog(user.id, logInput(weightLogSchema, { weightKg: action.weightKg, localDate })).id;
     case 'swapExercise':
       return (await swapExercise(user.id, action.sessionId, action.exerciseId)).session.id;
     case 'rebuildPlan': {

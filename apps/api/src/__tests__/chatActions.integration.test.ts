@@ -3,10 +3,11 @@
  * Runs on the offline engine, which is the point: no model is involved.
  */
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type {
   Allergen,
   ChatActionDraft,
+  CreditTransaction,
   MealLog,
   TrainingPlan,
   WaterLog,
@@ -15,6 +16,7 @@ import type {
   WorkoutSession,
 } from '@aquazerofit/shared';
 import { creditLedger } from '../modules/ai/creditLedger';
+import { config } from '../platform/config';
 import type { ChatMealDraft } from '../modules/chat/mealDraft';
 import type { TodayWorkout } from '../modules/workouts/service';
 import {
@@ -140,6 +142,29 @@ describe('coach actions', () => {
     const { token } = await signUp();
     expect(await say(token, 'How much water should I drink?')).toEqual([]);
   });
+
+  it('logs the amount stored on the draft, not a figure the client sends', async () => {
+    const { token, userId } = await signUp();
+    const [draft] = await say(token, 'I drank 500ml of water');
+    await request(app)
+      .post(`${base}/chat/action-drafts/${draft!.id}/confirm`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amountMl: 1, tier: 'premium', weightKg: 40 })
+      .expect(200);
+    expect(waterRows(userId).map((row) => row.amountMl)).toEqual([500]);
+  });
+
+  it('refuses a stored water amount the logging screen would refuse', async () => {
+    const { token, userId } = await signUp();
+    const [draft] = await say(token, 'I drank 500ml of water');
+    const stored = getStore().byId<ChatActionDraft>('ai', draft!.id)!;
+    getStore().upsert('ai', { ...stored, action: { kind: 'logWater', amountMl: 9000 } });
+    await request(app)
+      .post(`${base}/chat/action-drafts/${draft!.id}/confirm`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+    expect(waterRows(userId)).toHaveLength(0);
+  });
 });
 
 function seedProfile(userId: string, allergies: Allergen[] = []): void {
@@ -207,6 +232,43 @@ describe('meal sentences', () => {
     const [draft] = await mealDrafts(token);
     expect(draft?.allergyCheck).toBe('applied');
     expect(draft?.items.flatMap((item) => item.matches.flatMap((m) => m.allergenConflicts))).toContain('milk');
+  });
+
+  it('will not log an allergen match until the user acknowledges it', async () => {
+    const { token, userId } = await signUp();
+    seedProfile(userId, ['milk']);
+    await request(app)
+      .put(`${base}/me/consents`)
+      .set(authed(token))
+      .send({ wellnessDataProcessing: true, aiPersonalisation: false, anonymisedAnalytics: false, reminders: false })
+      .expect(200);
+    await say(token, 'I had skim milk');
+    const [draft] = await mealDrafts(token);
+    const item = draft!.items.find((entry) => entry.matches.some((match) => match.allergenConflicts.includes('milk')));
+    const foodId = item?.matches.find((match) => match.allergenConflicts.includes('milk'))?.foodId;
+    expect(foodId).toBeTruthy();
+
+    const meals = () => getStore().where<MealLog>('logs', (d) => d.type === 'mealLog' && d.userId === userId);
+    const body = { items: [{ itemId: item!.id, foodId }] };
+    await request(app).post(`${base}/chat/meal-drafts/${draft!.id}/confirm`).set(authed(token)).send(body).expect(409);
+    expect(meals()).toHaveLength(0);
+
+    await request(app)
+      .post(`${base}/chat/meal-drafts/${draft!.id}/confirm`)
+      .set(authed(token))
+      .send({ ...body, acknowledgeAllergens: true })
+      .expect(201);
+    expect(meals()).toHaveLength(1);
+  });
+
+  it('says allergy checks are off when wellness data processing is off', async () => {
+    const { token, userId } = await signUp();
+    seedProfile(userId, ['milk']);
+    await say(token, 'I had skim milk');
+    const [draft] = await mealDrafts(token);
+    expect(draft?.allergyCheck).toBe('skippedNoConsent');
+    expect(draft?.notes.some((note) => /allergy checks are off/i.test(note))).toBe(true);
+    expect(draft?.items.flatMap((item) => item.matches.flatMap((match) => match.allergenConflicts))).toEqual([]);
   });
 });
 
@@ -278,6 +340,43 @@ describe('training actions', () => {
 
     await request(app).post(`${base}/chat/action-drafts/${draft!.id}/confirm`).set(authed(token)).expect(200);
     expect(current().map((p) => p.id)).not.toContain(original);
+  });
+
+  it('does not bill a keyless production rebuild, and still replaces the plan', async () => {
+    const { token, userId } = await userWithPlan();
+    getStore().upsert('ledger', {
+      id: `ct-topup-${userId}`,
+      userId,
+      type: 'creditTransaction',
+      kind: 'grant',
+      amount: 50,
+      reason: 'test',
+      createdAt: new Date().toISOString(),
+    } satisfies CreditTransaction);
+    const current = () =>
+      getStore().where<TrainingPlan>('plans', (d) => d.type === 'trainingPlan' && d.userId === userId && d.endDate === null);
+    const original = current()[0]!.id;
+    const [draft] = await say(token, 'rebuild my plan');
+    const before = await creditLedger.balance(userId);
+    const spy = vi.spyOn(config, 'isProduction', 'get').mockReturnValue(true);
+    try {
+      await request(app).post(`${base}/chat/action-drafts/${draft!.id}/confirm`).set(authed(token)).expect(200);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(current().map((plan) => plan.id)).not.toContain(original);
+    expect(await creditLedger.balance(userId)).toBe(before);
+    const planRows = getStore().where<CreditTransaction>(
+      'ledger',
+      (d) => d.type === 'creditTransaction' && d.userId === userId && d.reason === 'reserve:planGeneration',
+    );
+    const latest = planRows.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    expect(latest?.reservationId).toBeTruthy();
+    const settled = getStore().where<CreditTransaction>(
+      'ledger',
+      (d) => d.type === 'creditTransaction' && d.reservationId === latest!.reservationId && d.kind !== 'reserve',
+    );
+    expect(settled.map((row) => row.kind)).toEqual(['release']);
   });
 
   it('keeps one live rebuild card when asked twice', async () => {

@@ -49,6 +49,7 @@ import {
   loadFoodCorpus,
   proposeCoachAction,
 } from './actionDrafts';
+import { actionNoteForModel } from './actions';
 import { buildHistoryMessages } from './history';
 import {
   CHAT_MEAL_DRAFT_TYPE,
@@ -322,6 +323,10 @@ chatRouter.post(
             return null;
           })
         : null;
+      // The detailed note names the resolved exercise. That is plan data, so
+      // it enters model context only with aiPersonalisation. The card itself
+      // is unchanged.
+      const modelNote = actionNoteForModel(actionNote, consented);
 
       // --- Stream the reply using real SSE from provider (AI-02)
       // Consent off holds tokens until grounding has run. The Android client
@@ -333,7 +338,7 @@ chatRouter.post(
         'chatFast',
         [
           ...systemMessagesFor(coach),
-          ...(actionNote ? [{ role: 'system' as const, content: actionNote }] : []),
+          ...(modelNote ? [{ role: 'system' as const, content: modelNote }] : []),
           ...history,
           ...(groundingOverride ? [groundingOverride] : []),
           { role: 'user', content },

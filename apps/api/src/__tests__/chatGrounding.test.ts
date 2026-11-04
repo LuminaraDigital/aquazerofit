@@ -307,6 +307,7 @@ describe('P-07', () => {
     expect(prompt.content).toMatch(/Privacy/);
     expect(prompt.content).toMatch(/log is not empty/);
     expect(prompt.content).toMatch(/do not repeat kcal totals/i);
+    expect(prompt.content).toMatch(/do not claim one is on screen/i);
     expect(prompt.content).not.toMatch(/\u2014|\u2013/);
 
     const here = path.dirname(fileURLToPath(import.meta.url));

@@ -24,6 +24,11 @@ calculation and enforcement, and nothing is written without the user's tap.
   messages about how the user feels.
 - `CoachConsentCard` asks for `aiPersonalisation` in the coach screen. It stays
   off until the user taps Allow.
+- The model is told a card is showing. The note names the resolved exercise
+  only when personalisation is on. With it off, the note does not carry plan
+  data. Clients that do not send `actionCards` get no note, and P-07 tells the
+  coach not to invent a card. Water and weight confirms are checked again
+  against the same limits as the logging screens.
 
 ## Deployment
 

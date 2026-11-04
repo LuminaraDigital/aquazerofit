@@ -1,6 +1,6 @@
 # tools/
 
-Five generators. None of them run in CI and none are needed to build or test
+Five generators and one config helper. None of them run in CI and none are needed to build or test
 the application — they exist to turn source material (character renders, card
 masters, screen captures, Markdown) into the committed artefacts the app and
 the document set consume.
@@ -20,6 +20,7 @@ Root-level npm scripts exist for each, so they are discoverable from
 | `npm run screenshots:optimise` | `tools/screenshots/optimise.mjs` |
 | `npm run assets:belts` | `tools/belts/build-belt-art.mjs` |
 | `npm run docs:setup` then `npm run docs:build -- <in.md> <out.docx>` | `tools/docgen/md-to-docx.js` |
+| `npm run assetlinks:add -- <SHA-256>` | `tools/assetlinks/add-fingerprint.mjs` |
 
 The `--` matters: it passes the arguments through npm to the script rather
 than letting npm consume them.
@@ -202,3 +203,23 @@ TELEGRAM_BOT_TOKEN=... node tools/belts/create-emoji-set.mjs --owner <telegram-u
 It uploads the emoji PNGs as a custom-emoji set named
 `azf_belts_by_<bot username>` and prints the `TELEGRAM_BELT_EMOJI_IDS` value
 for the API. Re-running it prints the ids again without uploading.
+
+---
+
+## `tools/assetlinks/` — App Links signing certificates
+
+```bash
+npm run assetlinks:add -- "AB:CD:…"     # add a SHA-256 (idempotent)
+npm run assetlinks:add -- --list        # show the current list
+```
+
+Edits `apps/web/public/.well-known/assetlinks.json`, the Digital Asset Links
+statement Android checks before it opens `https://aquazerofit.com/challenges`
+links in the app. It must list the SHA-256 of every key that signs an APK users
+install: the upload key (already there) and the **Play App Signing key**, which
+only Play Console shows (Test and release → App integrity → App signing →
+"App signing key certificate", SHA-256). Input may be colon-separated or bare
+hex, any case. `apps/web/src/lib/assetlinks.test.ts` validates the file. Commit
+the change and deploy the web build; the step-by-step is in
+`docs/play-store/PLAY_CONSOLE_DECLARATIONS_CHECKLIST.md`.
+

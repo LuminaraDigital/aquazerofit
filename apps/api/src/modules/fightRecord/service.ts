@@ -200,9 +200,13 @@ function standingOf(userId: string, today: string, now: Date): Standing {
  * higher of what they hold and what their count has reached, so a rung
  * earned since their last visit shows before they have opened the app.
  */
-export function seasonBeltTier(userId: string, today: string): BeltTier | null {
+export function seasonBeltTier(
+  userId: string,
+  today: string,
+  activeDates: ReadonlySet<string> = activeDatesOf(loadActivity(userId)),
+): BeltTier | null {
   const season = seasonFor(today);
-  const days = activeDaysBySeason(activeDatesOf(loadActivity(userId)), today).get(season.number) ?? 0;
+  const days = activeDaysBySeason(activeDates, today).get(season.number) ?? 0;
   const reached = [...BELT_LADDER].reverse().find((rung) => days >= rung.activeDays)?.tier ?? null;
   const held = bestPerSeason(awardsOf(userId).filter((a) => a.seasonNumber === season.number))[0]?.tier ?? null;
   return tierRank(held) >= tierRank(reached) ? held : reached;

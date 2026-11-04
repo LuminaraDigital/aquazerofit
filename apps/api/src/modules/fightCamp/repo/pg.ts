@@ -268,10 +268,11 @@ export class PgEngageRepo implements EngageRepo {
     return activeIn(this.db, squadId);
   }
 
-  async memberByRef(memberRef: string): Promise<MemberRow | null> {
+  async activeMemberByRef(squadId: string, memberRef: string): Promise<MemberRow | null> {
     const { rows } = await this.db.query(
-      `SELECT ${MEMBER_COLUMNS} FROM engage.squad_members WHERE member_ref = $1`,
-      [memberRef],
+      `SELECT ${MEMBER_COLUMNS} FROM engage.squad_members
+       WHERE squad_id = $1 AND member_ref = $2 AND left_at IS NULL`,
+      [squadId, memberRef],
     );
     return rows[0] ? toMember(rows[0]) : null;
   }
@@ -330,6 +331,19 @@ export class PgEngageRepo implements EngageRepo {
       [squadId, userId, showStats],
     );
     return rows[0] ? toMember(rows[0]) : null;
+  }
+
+  async setInviteCode(squadId: string, inviteCode: string): Promise<'ok' | 'code_taken' | 'not_found'> {
+    try {
+      const { rows } = await this.db.query(
+        `UPDATE engage.squads SET invite_code = $2 WHERE id = $1 AND archived_at IS NULL RETURNING id`,
+        [squadId, inviteCode],
+      );
+      return rows.length > 0 ? 'ok' : 'not_found';
+    } catch (err) {
+      if (isUniqueViolation(err) && constraintOf(err) === 'squads_invite_code_key') return 'code_taken';
+      throw err;
+    }
   }
 
   async squadsCreatedSince(userId: string, since: string): Promise<number> {

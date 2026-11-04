@@ -27,9 +27,12 @@ import {
   createSquad,
   currentSquad,
   joinSquadByCode,
+  leaveIfNoLongerAdult,
   leaveSquad,
   peekSquad,
+  removeMember,
   requireSquadAdult,
+  rotateInviteCode,
   setShowStats,
 } from './squads';
 
@@ -90,8 +93,10 @@ squadsRouter.get(
   '/current',
   asyncHandler(async (req, res) => {
     const userId = userIdOf(req);
+    const today = todayFor(req);
+    await leaveIfNoLongerAdult(userId, today);
     requireSquadAdult(userId);
-    res.json({ squad: await currentSquad(userId, todayFor(req)) });
+    res.json({ squad: await currentSquad(userId, today) });
   }),
 );
 
@@ -116,6 +121,23 @@ squadsRouter.post(
   '/:id/leave',
   asyncHandler(async (req, res) => {
     await leaveSquad(userIdOf(req), String(req.params.id));
+    res.status(204).end();
+  }),
+);
+
+/** Owner only: a fresh invite code; old links stop working. */
+squadsRouter.post(
+  '/:id/rotate-code',
+  asyncHandler(async (req, res) => {
+    res.json({ squad: await rotateInviteCode(userIdOf(req), String(req.params.id), todayFor(req)) });
+  }),
+);
+
+/** Owner only: take a member out. 204, or 404 for a ref not in this squad. */
+squadsRouter.post(
+  '/:id/members/:ref/remove',
+  asyncHandler(async (req, res) => {
+    await removeMember(userIdOf(req), String(req.params.id), String(req.params.ref));
     res.status(204).end();
   }),
 );

@@ -40,6 +40,12 @@ export type EnrolSource = (typeof ENROL_SOURCES)[number];
 
 export const SQUAD_MAX_MEMBERS = 5;
 export const SQUAD_CODE_PREFIX = 'SQD';
+/**
+ * Characters after the prefix. An invite code is a bearer capability, so it
+ * is long enough (32^10, about 10^15) that guessing a live one is not a
+ * plan, even before the rate limits and the lockout.
+ */
+export const SQUAD_CODE_LENGTH = 10;
 export const GRACE_EARN_EVERY_ACTIVE_DAYS = 7;
 export const GRACE_BANK_MAX = 2;
 /** A banked Cut Man day only bridges a gap inside this many trailing days. */
@@ -58,7 +64,7 @@ export const squadCodeSchema = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(/^SQD-[A-HJ-NP-Z2-9]{6}$/);
+  .regex(/^SQD-[A-HJ-NP-Z2-9]{10}$/);
 export const memberRefSchema = z.string().regex(/^m_[A-Za-z0-9]{12}$/);
 export const shareCodeSchema = z.string().regex(/^[A-Za-z0-9]{8}$/);
 
@@ -73,7 +79,7 @@ export type EnrolInput = z.infer<typeof enrolInputSchema>;
  * join was agreed under; reword it and the version must move.
  */
 export const SQUAD_CONSENT_TEXT =
-  'Your squad will see your belt. Your daily numbers stay hidden unless you turn them on.';
+  'Your squad will see your first name and your belt. Your daily numbers stay hidden unless you turn them on.';
 export const SQUAD_CONSENT_VERSION = 'squad-consent-v1';
 
 export const squadNameSchema = z
@@ -218,8 +224,8 @@ export interface SquadView {
   weekStart: string;
   /** Active members, earliest joined first. At most SQUAD_MAX_MEMBERS. */
   members: SquadMemberView[];
-  /** The caller's own settings in this squad. */
-  me: { ref: string; showStats: boolean };
+  /** The caller's own place in this squad. Owners can rotate the code and remove members. */
+  me: { ref: string; showStats: boolean; role: 'owner' | 'member' };
 }
 
 /** What an invite link shows before sign-in. No member is named. */

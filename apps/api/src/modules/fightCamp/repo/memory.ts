@@ -126,8 +126,10 @@ export class MemoryEngageRepo implements EngageRepo {
     return this.activeIn(squadId).map(copy);
   }
 
-  async memberByRef(memberRef: string): Promise<MemberRow | null> {
-    const found = this.members.find((m) => m.memberRef === memberRef);
+  async activeMemberByRef(squadId: string, memberRef: string): Promise<MemberRow | null> {
+    const found = this.members.find(
+      (m) => m.squadId === squadId && m.memberRef === memberRef && m.leftAt === null,
+    );
     return found ? copy(found) : null;
   }
 
@@ -180,6 +182,14 @@ export class MemoryEngageRepo implements EngageRepo {
     if (!member) return null;
     member.showStats = showStats;
     return copy(member);
+  }
+
+  async setInviteCode(squadId: string, inviteCode: string): Promise<'ok' | 'code_taken' | 'not_found'> {
+    const squad = this.squads.find((s) => s.id === squadId && s.archivedAt === null);
+    if (!squad) return 'not_found';
+    if (this.squads.some((s) => s.inviteCode === inviteCode)) return 'code_taken';
+    squad.inviteCode = inviteCode;
+    return 'ok';
   }
 
   async squadsCreatedSince(userId: string, since: string): Promise<number> {

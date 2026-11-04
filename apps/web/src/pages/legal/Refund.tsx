@@ -88,11 +88,12 @@ export default function RefundPage() {
         </P>
         <P>
           Premium in the Mini App, when a Stars price is configured, is a subscription with a 30
-          day period (2592000 seconds). The plan page shows the price. Each payment, including a
-          renewal, lasts until the expiration Telegram reports for that payment. If a renewal does
-          not arrive, that subscription is not extended. The app has no cancel button. A support
-          refund returns the Stars for that charge and stops further renewals. It does not remove
-          a Stripe or Play period that is still running.
+          day period (2592000 seconds). The plan page shows the price. It renews every 30 days
+          until you cancel. Cancel in Telegram: Settings, then My Stars, then Subscriptions. You
+          keep Premium until the period you have already paid for ends. If a renewal does not
+          arrive, that subscription is not extended. A support refund returns the Stars for that
+          charge and stops further renewals. It does not remove a Stripe or Play period that is
+          still running.
         </P>
         <P>A Stars refund is done by support on request.</P>
         <P>That covers a coach purchase or a premium subscription charge.</P>

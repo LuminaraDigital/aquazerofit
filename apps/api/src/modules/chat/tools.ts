@@ -88,9 +88,9 @@ export async function getTodayNutrition(
     call: {
       tool: 'getTodayNutrition',
       args: { localDate },
-      resultSummary: `${Math.round(kcalConsumed)}/${targets.kcalTarget} kcal, ${meals.length} meals, ${Math.round(
-        waterConsumed,
-      )} ml water`,
+      resultSummary: `${Math.round(kcalConsumed)}/${targets.kcalTarget} kcal, ${meals.length} ${
+        meals.length === 1 ? 'meal' : 'meals'
+      }, ${Math.round(waterConsumed)} ml water`,
     },
   };
 }

@@ -7,6 +7,17 @@
  */
 import type { OutboundButton } from './telegramBot';
 
+/**
+ * One welcome. /start replies with it, and it is the BotFather description
+ * and short description so those three cannot drift apart.
+ * Short descriptions are capped at 120 characters.
+ */
+export const BOT_WELCOME =
+  'Welcome to AquaZeroFit. Log meals, train at home, and talk with a coach who uses your real day.';
+
+export const BOT_DESCRIPTION = BOT_WELCOME;
+export const BOT_SHORT_DESCRIPTION = BOT_WELCOME;
+
 export const TELEGRAM_BOT_COMMANDS = [
   { command: 'start', description: 'Open AquaZeroFit' },
   { command: 'paysupport', description: 'Payment help and refunds' },
@@ -59,7 +70,7 @@ export function replyForCommand(command: BotCommandName, ctx: CommandContext): C
   switch (command) {
     case 'start':
       return {
-        text: 'Welcome to AquaZeroFit. Log meals, train, and talk with your coach.',
+        text: BOT_WELCOME,
         buttons: [openButton(ctx.miniAppUrl, ctx.chatType)],
       };
     case 'paysupport': {
@@ -83,7 +94,7 @@ export function replyForCommand(command: BotCommandName, ctx: CommandContext): C
         text: [
           'How to stop.',
           'Telegram Stars coach purchases do not renew. For a refund, send /paysupport.',
-          'Premium paid with Stars in the Mini App renews every 30 days while that subscription is active. It is not extended when a renewal payment does not arrive. The app has no cancel button. To ask about a charge, send /paysupport.',
+          'Premium paid with Stars renews every 30 days until you cancel. Cancel in Telegram: Settings, then My Stars, then Subscriptions. You keep access until the period you already paid for ends. It is not extended when a renewal payment does not arrive. For a refund of a charge, send /paysupport.',
           'Premium from Google Play: cancel in the Play Store. You keep access until the period you already paid for ends.',
           'Premium paid by card: contact support. The same period rule applies.',
           `Delete your account and data: ${ctx.deletionUrl}`,

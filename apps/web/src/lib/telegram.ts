@@ -655,6 +655,25 @@ export function haptic(type: HapticType = 'light'): void {
 }
 
 /**
+ * Open an https page from the Mini App.
+ *
+ * Telegram.WebApp.openLink is the supported way out of the webview. A plain
+ * anchor navigates the Mini App itself, which loses the session.
+ */
+export function openExternalLink(url: string): void {
+  const tg = getWebApp();
+  try {
+    if (isTMA() && telegramSupports('6.1') && tg?.openLink) {
+      tg.openLink(url);
+      return;
+    }
+  } catch {
+    // fall through to a normal browser tab
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+/**
  * Open an external / Telegram share URL. Uses Telegram.WebApp.openTelegramLink
  * inside TMA when available; falls back to window.open.
  */

@@ -4,6 +4,7 @@ import fit.aquazero.app.core.model.PlanDayDto
 import fit.aquazero.app.core.model.SessionExerciseDto
 import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
 import fit.aquazero.app.core.model.WorkoutSessionDto
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -11,7 +12,6 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
-import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
@@ -88,17 +88,11 @@ object TrainingFormat {
         }
 
     /**
-     * Session length estimate, matching the web exactly:
-     * `setsPlanned × (reps × 4s + restSeconds)`, floored at 10 minutes, with
-     * the server's own `durationMinutes` winning when present.
+     * Session length. Home uses the same function (`NutritionFormat`), so a
+     * workout cannot read 30 minutes in one place and 27 in another.
      */
-    fun estimateMinutes(session: WorkoutSessionDto): Int {
-        session.durationMinutes?.let { return it }
-        val seconds = session.exercises.sumOf { ex ->
-            ex.setsPlanned * (ex.reps * 4 + ex.restSeconds)
-        }
-        return max(10, (seconds / 60.0).roundToInt())
-    }
+    fun estimateMinutes(session: WorkoutSessionDto): Int =
+        NutritionFormat.estimateDurationMinutes(session)
 
     /** Burn estimate, matching the web: ~5.5 kcal/min rounded to the nearest 10. */
     fun estimateKcal(session: WorkoutSessionDto): Int {

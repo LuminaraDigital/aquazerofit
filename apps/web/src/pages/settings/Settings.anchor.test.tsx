@@ -42,6 +42,7 @@ vi.mock('../../lib/telegram', () => ({
   haptic: vi.fn(),
   isTMA: () => false,
   getTelegramInitData: () => null,
+  openExternalLink: vi.fn(),
 }));
 vi.mock('../../lib/queries', () => ({
   useSetCredentials: () => ({ mutateAsync: vi.fn(), isPending: false }),

@@ -300,8 +300,9 @@ export default function Coach() {
       meals: countLoggedMeals(daily?.meals),
       waterMl: daily?.waterMl.consumed ?? 0,
       planName,
+      nutritionReady: dailyQuery.isSuccess,
     };
-  }, [dailyQuery.data, planQuery.data]);
+  }, [dailyQuery.data, dailyQuery.isSuccess, planQuery.data]);
 
   const orderedMessages = useMemo(
     () => [...messages].sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0)),
@@ -579,7 +580,7 @@ export default function Coach() {
             {orderedMessages.map((m) => {
               const isLatest = m.id === latestAssistantId;
               const live = isLatest && !snapshotSuppressed(m.toolCalls) ? liveSnapshot : null;
-              const toolCalls = reconcileToolSummaries(m.toolCalls, live);
+              const toolCalls = reconcileToolSummaries(m.toolCalls, live, today);
               const content = live ? freshenCoachText(m.content, live) : m.content;
               return m.role === 'user' ? (
                 <div key={m.id} className="flex max-w-[85%] flex-col gap-1 self-end">

@@ -5,6 +5,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  BOT_DESCRIPTION,
+  BOT_SHORT_DESCRIPTION,
+  BOT_WELCOME,
   TELEGRAM_BOT_COMMANDS,
   commandName,
   replyForCommand,
@@ -47,7 +50,10 @@ describe('bot commands', () => {
 
   it('opens the Mini App from /start and names the configured mailbox', () => {
     const start = replyForCommand('start', ctx);
-    expect(start.text).toMatch(/Welcome to AquaZeroFit/);
+    expect(start.text).toBe(BOT_WELCOME);
+    expect(BOT_DESCRIPTION).toBe(BOT_WELCOME);
+    expect(BOT_SHORT_DESCRIPTION).toBe(BOT_WELCOME);
+    expect(BOT_WELCOME.length).toBeLessThanOrEqual(120);
     expect(start.buttons?.[0]).toEqual({
       text: 'Open AquaZeroFit',
       webAppUrl: 'https://aquazerofit.com/',
@@ -63,6 +69,8 @@ describe('bot commands', () => {
     expect(stop.text).toContain('https://aquazerofit.com/account/deletion');
     expect(stop.text).toContain('/paysupport');
     expect(stop.text).toMatch(/do not renew/);
+    expect(stop.text).toMatch(/until you cancel/i);
+    expect(stop.text).toContain('My Stars');
 
     const terms = replyForCommand('terms', ctx);
     expect(terms.text).toContain('https://aquazerofit.com/terms');

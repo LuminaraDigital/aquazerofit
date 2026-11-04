@@ -46,14 +46,71 @@
     <meta name="apple-itunes-app" content="app-id=686449807, app-argument=https://t.me/aquazerofitbot/app" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Non-blocking: a Mini App must paint before Google Fonts answers. -->
     <link
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
     <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <style>#azf-boot { display: none !important; }</style>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap"
+        rel="stylesheet"
+      />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
+    <style>
+      html, body { margin: 0; background: #0e1416; color: #dde4e5; }
+      #azf-boot {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: #0e1416;
+      }
+      #azf-boot .mark {
+        font-family: "Barlow Condensed", system-ui, sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        font-size: 28px;
+        color: #8aebff;
+      }
+      #azf-boot .spin {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 3px solid rgba(138, 235, 255, 0.25);
+        border-top-color: #8aebff;
+        animation: azf-boot-spin 0.8s linear infinite;
+      }
+      #azf-boot p { margin: 0; font-size: 14px; color: #bbcdc9; }
+      #azf-boot .bars { display: flex; flex-direction: column; gap: 8px; width: min(240px, 70vw); }
+      #azf-boot .bars span {
+        display: block;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(138, 235, 255, 0.12);
+      }
+      #azf-boot .bars span:nth-child(2) { width: 78%; }
+      #azf-boot .bars span:nth-child(3) { width: 52%; }
+      @keyframes azf-boot-spin { to { transform: rotate(360deg); } }
+    </style>
     <!-- The Telegram WebApp SDK is NOT loaded here.
 
          It used to be a blocking <script> from telegram.org on every page
@@ -68,6 +125,12 @@
          then, with a timeout. On the web, telegram.org is never contacted. -->
   </head>
   <body>
+    <div id="azf-boot" role="status" aria-live="polite">
+      <div class="spin" aria-hidden="true"></div>
+      <div class="mark">AquaZeroFit</div>
+      <p>Loading your day…</p>
+      <div class="bars" aria-hidden="true"><span></span><span></span><span></span></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

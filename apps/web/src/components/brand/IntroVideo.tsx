@@ -97,7 +97,7 @@ export function IntroVideo() {
     <div
       role="dialog"
       aria-label="AquaZero intro"
-      className="fixed inset-0 z-[100] bg-white transition-opacity ease-in"
+      className={`fixed inset-0 z-[100] transition-opacity ease-in ${playing ? 'bg-black' : 'bg-white'}`}
       style={{ opacity: leaving ? 0 : 1, transitionDuration: `${EXIT_MS}ms` }}
     >
       {/* Loading state: the mark on the same white the video fades in from and ends on. */}
@@ -111,7 +111,7 @@ export function IntroVideo() {
       <video
         ref={videoRef}
         src={src}
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-contain"
         style={{ opacity: playing ? 1 : 0 }}
         autoPlay
         muted
@@ -122,7 +122,7 @@ export function IntroVideo() {
         onEnded={close}
         onError={close}
       />
-      <div className="absolute inset-x-0 bottom-0 h-1 bg-black/10">
+      <div className="absolute inset-x-0 bottom-0 h-1 bg-white/15">
         <div ref={barRef} className="h-full origin-left bg-primary" style={{ transform: 'scaleX(0)' }} />
       </div>
       <button

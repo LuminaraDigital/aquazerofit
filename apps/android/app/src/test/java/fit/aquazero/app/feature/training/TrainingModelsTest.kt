@@ -4,6 +4,7 @@ import fit.aquazero.app.core.model.AzfJson
 import fit.aquazero.app.core.model.SessionExerciseDto
 import fit.aquazero.app.core.model.TodayWorkoutEnvelopeDto
 import fit.aquazero.app.core.model.WorkoutSessionDto
+import fit.aquazero.app.core.ui.NutritionFormat
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -148,6 +149,26 @@ class TrainingModelsTest {
         assertEquals(60, TrainingFormat.estimateKcal(session))
         assertEquals(42, TrainingFormat.estimateMinutes(session.copy(durationMinutes = 42)))
         assertEquals(3, TrainingFormat.totalSets(session))
+    }
+
+    @Test
+    fun `home and workouts share the timing estimate`() {
+        val session = WorkoutSessionDto(
+            id = "s",
+            userId = "u",
+            exercises = listOf(
+                SessionExerciseDto(
+                    exerciseId = "e",
+                    name = "e",
+                    setsPlanned = 12,
+                    reps = 10,
+                    restSeconds = 95,
+                ),
+            ),
+        )
+        // 12 × (10×4 + 95) = 1620s = 27 min. sets × 2.5 would have said 30.
+        assertEquals(27, TrainingFormat.estimateMinutes(session))
+        assertEquals(27, NutritionFormat.estimateDurationMinutes(session))
     }
 
     @Test

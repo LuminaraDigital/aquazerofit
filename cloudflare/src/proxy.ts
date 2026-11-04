@@ -27,7 +27,16 @@ export function isProxiedPath(pathname: string): boolean {
  * Telegram's review of the terms, privacy and refund URLs treats that redirect
  * as the page not being there.
  */
-export const LEGAL_PAGE_PATHS = ['/terms', '/privacy', '/refund'] as const;
+export const LEGAL_PAGE_PATHS = [
+  '/terms',
+  '/privacy',
+  '/refund',
+  // Declared in Play Console as the privacy policy and account deletion URLs.
+  // Google's checks follow a redirect, but the declared URL should answer
+  // with the page itself.
+  '/google-play/privacy-policy',
+  '/account/deletion',
+] as const;
 
 /** Slashless form of a legal path, or null when this path is not one of them. */
 export function canonicalLegalPath(pathname: string): string | null {

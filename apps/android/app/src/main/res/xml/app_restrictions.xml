@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Enterprise managed configuration schema (EN-3.3).
+
+  INVARIANT (CONTRIBUTING.md / EN-3.3):
+  Managed configuration may ONLY restrict device behaviour (forcing app lock,
+  forcing FLAG_SECURE, disabling local export, or constraining the sign-in
+  email domain). No consent key is declared here or read by EnterpriseSecurityPolicy:
+  an MDM profile must never grant or pre-fill a user consent.
+-->
+<restrictions xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <restriction
+        android:key="force_app_lock"
+        android:title="@string/restriction_force_app_lock_title"
+        android:description="@string/restriction_force_app_lock_desc"
+        android:restrictionType="bool"
+        android:defaultValue="false" />
+
+    <restriction
+        android:key="force_screen_capture_protection"
+        android:title="@string/restriction_force_screen_capture_title"
+        android:description="@string/restriction_force_screen_capture_desc"
+        android:restrictionType="bool"
+        android:defaultValue="false" />
+
+    <restriction
+        android:key="disable_data_export"
+        android:title="@string/restriction_disable_data_export_title"
+        android:description="@string/restriction_disable_data_export_desc"
+        android:restrictionType="bool"
+        android:defaultValue="false" />
+
+    <restriction
+        android:key="allowed_email_domain"
+        android:title="@string/restriction_allowed_email_domain_title"
+        android:description="@string/restriction_allowed_email_domain_desc"
+        android:restrictionType="string"
+        android:defaultValue="" />
+
+</restrictions>

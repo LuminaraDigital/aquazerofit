@@ -49,3 +49,19 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+
+  # The Android app is a Gradle build outside the npm workspaces, so nothing
+  # above ever looked at apps/android/gradle/libs.versions.toml: its libraries,
+  # security fixes included, only moved when someone bumped them by hand. Same
+  # staging base, and the same rule as the root npm entry: minors and patches
+  # arrive grouped, each major arrives alone.
+  - package-ecosystem: gradle
+    directory: /apps/android
+    target-branch: staging
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      android-dependencies:
+        patterns: ['*']
+        update-types: ['minor', 'patch']

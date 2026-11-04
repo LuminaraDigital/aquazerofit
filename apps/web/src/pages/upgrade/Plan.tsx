@@ -308,6 +308,7 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
   const qc = useQueryClient();
   const checkout = useStartStarsSubscription();
   const [note, setNote] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
   const mounted = useRef(true);
   const period = starsPeriodLabel(offer.periodSeconds);
 
@@ -320,7 +321,10 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
 
   async function subscribe() {
     setNote(null);
+    setOpening(true);
     try {
+      // The invoice is created only after this tap. A page view must not write
+      // a ledger anchor or call Telegram.
       const { invoiceLink } = await checkout.mutateAsync();
       const status = await openStarsInvoice(invoiceLink);
       if (status === 'paid') {
@@ -336,7 +340,9 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
         setNote('The payment did not complete. Nothing was charged.');
       }
     } catch {
-      setNote(null);
+      if (mounted.current) setNote(null);
+    } finally {
+      if (mounted.current) setOpening(false);
     }
   }
 
@@ -354,11 +360,13 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
           <span className="text-sm text-on-surface-variant">Stars / {period}</span>
         </p>
         <p className="text-sm leading-relaxed text-on-surface-variant">
-          Renews every {period} until support stops it. You pay with Telegram Stars. If a renewal
-          does not arrive, premium from this subscription is not extended.
+          Renews every {period} until you cancel. Cancel in Telegram under Settings, then My Stars,
+          then Subscriptions. You keep Premium until the period you have already paid for ends. You
+          pay with Telegram Stars. If a renewal does not arrive, Premium from this subscription is
+          not extended.
         </p>
-        <PrimaryButton loading={checkout.isPending} onClick={() => void subscribe()}>
-          Subscribe for {offer.price} Stars
+        <PrimaryButton loading={opening} onClick={() => void subscribe()}>
+          {opening ? 'Preparing secure checkout…' : `Subscribe for ${offer.price} Stars`}
         </PrimaryButton>
         {checkout.isError && (
           <p role="alert" className="text-sm text-error">
@@ -548,13 +556,13 @@ export default function Plan() {
               <p className="mt-3 px-2 text-xs leading-relaxed text-on-surface-variant">
                 {typeof entitlements.premiumDailyCredits === 'number' &&
                 entitlements.premiumDailyCredits > 0
-                  ? `Premium is ${entitlements.premiumDailyCredits.toLocaleString()} AI credits a day. That is a cap. `
+                  ? `Premium includes ${entitlements.premiumDailyCredits.toLocaleString()} AI credits a day. `
                   : null}
                 {lanes.length === 1
-                  ? 'Beyond the daily credit cap, that is the whole difference today.'
-                  : 'That is the difference today.'}{' '}
-                Your targets, your logging, your training plans, the coach chat and every number in
-                your weekly summary work the same way on both plans.
+                  ? 'That daily allowance is the only difference from the free plan. '
+                  : 'The features above are the rest of the difference. '}
+                Targets, logging, training plans, coach chat and your weekly summary work the same
+                way on both plans.
               </p>
             </>
           )}

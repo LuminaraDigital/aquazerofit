@@ -3,6 +3,7 @@
  * `@/lib/format` (SSOT); this module keeps meal labels and defensive unwraps.
  */
 import type { MealRecommendation, MealType, PublicUser, WorkoutSession } from '@aquazerofit/shared';
+import { estimateSessionMinutes } from '@/lib/workoutEstimate';
 
 export {
   todayLocalDate,
@@ -30,13 +31,54 @@ export const MEAL_ICON: Record<MealType, string> = {
   snack: 'cookie',
 };
 
-/** Best-guess meal type for the current time of day. */
-export function mealTypeForNow(): MealType {
-  const h = new Date().getHours();
-  if (h < 11) return 'breakfast';
-  if (h < 15) return 'lunch';
-  if (h < 18) return 'snack';
+/**
+ * Meal slot for a local hour.
+ *
+ * Breakfast is the morning, not the small hours. 1:30am is a snack. The
+ * Android client uses the same boundaries.
+ */
+export function mealTypeForHour(hour: number): MealType {
+  if (hour < 5 || hour >= 21) return 'snack';
+  if (hour < 11) return 'breakfast';
+  if (hour < 15) return 'lunch';
+  if (hour < 17) return 'snack';
   return 'dinner';
+}
+
+/** Best-guess meal type for the current local time. */
+export function mealTypeForNow(now: Date = new Date()): MealType {
+  return mealTypeForHour(now.getHours());
+}
+
+/** Someone who has logged before today should not be told to log a first meal. */
+export function hasLoggingHistory(
+  progress:
+    | {
+        consistency?: { lastActiveDate?: string | null; activeDays?: number } | null;
+        workoutsCompleted?: number;
+        currentWeightKg?: number | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!progress) return false;
+  if (progress.consistency?.lastActiveDate) return true;
+  if ((progress.consistency?.activeDays ?? 0) > 0) return true;
+  if ((progress.workoutsCompleted ?? 0) > 0) return true;
+  return progress.currentWeightKg != null;
+}
+
+export function homeNextStep(showFirstMeal: boolean): { title: string; body: string } {
+  if (showFirstMeal) {
+    return {
+      title: 'Log your first meal',
+      body: 'Search a food, scan a barcode, or photograph your plate. One log unlocks the rest of today’s targets.',
+    };
+  }
+  return {
+    title: 'Nothing logged today',
+    body: 'Log a meal to bring today’s targets up to date. Search a food, scan a barcode, or photograph your plate.',
+  };
 }
 
 /** Idempotency key for one-tap log mutations. */
@@ -80,9 +122,7 @@ export function asRecommendation(raw: unknown): RecommendationWithRecipe | null 
   return null;
 }
 
-/** Rough duration estimate (minutes) when a session has no explicit duration. */
+/** Session length. Home and Workouts share `estimateSessionMinutes`. */
 export function estimateDurationMinutes(session: WorkoutSession): number {
-  if (session.durationMinutes) return session.durationMinutes;
-  const totalSets = session.exercises.reduce((acc, e) => acc + e.setsPlanned, 0);
-  return Math.max(15, Math.round(totalSets * 2.5));
+  return estimateSessionMinutes(session);
 }

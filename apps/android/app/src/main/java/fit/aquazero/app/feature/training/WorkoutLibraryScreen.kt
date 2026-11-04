@@ -212,6 +212,13 @@ private fun WorkoutLibraryContent(
 
                         state.plan != null -> RestDayCard(modifier = Modifier.revealOnEnter(2))
 
+                        state.plan == null && state.planError == null && !state.loadingPlan -> EmptyState(
+                            title = stringResource(R.string.training_plan_empty_title),
+                            message = stringResource(R.string.training_plan_empty_body),
+                            actionLabel = stringResource(R.string.training_generate_plan),
+                            onAction = onOpenGenerate,
+                        )
+
                         else -> Spacer(modifier = Modifier.height(0.dp))
                     }
                 }

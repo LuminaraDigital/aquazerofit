@@ -93,10 +93,12 @@ class NutritionFormatTest {
 
     @Test
     fun `meal type follows the time of day`() {
+        assertEquals(MealType.SNACK, NutritionFormat.mealTypeForNow(hour = 1))
         assertEquals(MealType.BREAKFAST, NutritionFormat.mealTypeForNow(hour = 7))
         assertEquals(MealType.LUNCH, NutritionFormat.mealTypeForNow(hour = 12))
         assertEquals(MealType.SNACK, NutritionFormat.mealTypeForNow(hour = 16))
         assertEquals(MealType.DINNER, NutritionFormat.mealTypeForNow(hour = 20))
+        assertEquals(MealType.SNACK, NutritionFormat.mealTypeForNow(hour = 22))
     }
 
     @Test

@@ -184,7 +184,7 @@ it('stores a grounded reply when the model and an older turn both say the log is
   expect(stored.content).toContain('500 ml');
   expect(claimsLogEmpty(stored.content)).toBe(false);
   const nutrition = stored.toolCalls?.find((call) => call.tool === 'getTodayNutrition');
-  expect(nutrition?.resultSummary).toMatch(/^615\/\d+ kcal, 1 meals, 500 ml water$/);
+  expect(nutrition?.resultSummary).toMatch(/^615\/\d+ kcal, 1 meal, 500 ml water$/);
   const progress = stored.toolCalls?.find((call) => call.tool === 'getProgressSummary');
   expect(progress?.resultSummary).toContain('1/28 days active');
 

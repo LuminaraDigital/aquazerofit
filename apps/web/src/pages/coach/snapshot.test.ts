@@ -36,6 +36,39 @@ describe('coach snapshot', () => {
     ]);
   });
 
+  it('replaces a previous day, even when that card shows more than today', () => {
+    const stale: ChatToolCall[] = [
+      {
+        tool: 'getTodayNutrition',
+        args: { localDate: '2026-11-02' },
+        resultSummary: '540/2870 kcal, 1 meals, 0 ml water',
+      },
+    ];
+    const today: CoachLiveSnapshot = {
+      kcalConsumed: 0,
+      kcalTarget: 2870,
+      meals: 0,
+      waterMl: 0,
+      planName: null,
+      nutritionReady: true,
+    };
+    expect(reconcileToolSummaries(stale, today, '2026-11-03')?.[0]?.resultSummary).toBe(
+      '0/2870 kcal, 0 meals, 0 ml water',
+    );
+  });
+
+  it('does not wipe a same-day total while nutrition is still loading', () => {
+    const sameDay: ChatToolCall[] = [
+      {
+        tool: 'getTodayNutrition',
+        args: { localDate: '2026-11-03' },
+        resultSummary: '540/2870 kcal, 1 meal, 0 ml water',
+      },
+    ];
+    const loading: CoachLiveSnapshot = { ...LIVE, kcalConsumed: 0, meals: 0, nutritionReady: false };
+    expect(reconcileToolSummaries(sameDay, loading, '2026-11-03')).toEqual(sameDay);
+  });
+
   it('does not rewrite a card that already matches or exceeds the cache', () => {
     const ahead: ChatToolCall[] = [
       { tool: 'getTodayNutrition', args: {}, resultSummary: '800/2000 kcal, 2 meals, 500 ml water' },

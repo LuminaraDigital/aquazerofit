@@ -94,7 +94,7 @@
     <string name="training_day_completed">completed</string>
     <string name="training_day_rest">rest day</string>
     <string name="training_plan_empty_title">No training plan yet</string>
-    <string name="training_plan_empty_body">Generate a weekly plan matched to your equipment and experience.</string>
+    <string name="training_plan_empty_body">Generate a weekly plan matched to your equipment and experience. This uses 5 AI credits.</string>
     <string name="training_generate_plan">Generate my plan</string>
     <string name="training_generate_title">Generate plan</string>
     <string name="training_generate_days">Days per week</string>

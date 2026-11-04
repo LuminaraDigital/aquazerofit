@@ -7,7 +7,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { SOURCE_CODE_URL, WELLNESS_DISCLAIMER, type ProfileInput } from '@aquazerofit/shared';
 import { api } from '../../lib/api';
 import { formatMonthYear, todayLocalDate } from '../../lib/format';
-import { haptic } from '../../lib/telegram';
+import { haptic, openExternalLink } from '../../lib/telegram';
+import { LEGAL_LINKS } from '../../lib/legalLinks';
 import { hasActivePlaySubscription } from '../../lib/billing';
 import {
   useAuthActions,
@@ -562,6 +563,31 @@ export default function Settings() {
               offered its corresponding source. This link is a licence obligation, not a
               credit - do not remove it, and repoint it if you deploy modified source.
             */}
+            <p className="text-xs text-on-surface-variant/70 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+              <button
+                type="button"
+                onClick={() => openExternalLink(LEGAL_LINKS.privacy)}
+                className="underline hover:text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded"
+              >
+                Privacy policy
+              </button>
+              <span aria-hidden="true">·</span>
+              <button
+                type="button"
+                onClick={() => openExternalLink(LEGAL_LINKS.terms)}
+                className="underline hover:text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded"
+              >
+                Terms of use
+              </button>
+              <span aria-hidden="true">·</span>
+              <button
+                type="button"
+                onClick={() => openExternalLink(LEGAL_LINKS.accountDeletion)}
+                className="underline hover:text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded"
+              >
+                How to delete your account
+              </button>
+            </p>
             <p className="text-[10px] text-on-surface-variant/40">
               Free software under{' '}
               <a

@@ -146,6 +146,8 @@ export interface MockRecCandidate {
 export interface MockRecommendationContext {
   mealType: string;
   remaining: { kcal: number; proteinG: number; carbsG: number; fatG: number };
+  /** Per-meal cap computed in code. The day's remainder is not this number. */
+  mealBudgetKcal?: number;
   candidates: MockRecCandidate[];
 }
 
@@ -509,8 +511,13 @@ function rankRecommendations(ctx: MockRecommendationContext): {
   rationale: string;
 } {
   const { remaining, candidates, mealType } = ctx;
-  // Aim the meal at roughly the remaining budget (or a sensible share of it).
-  const kcalGoal = Math.max(250, Math.min(remaining.kcal, remaining.kcal > 1200 ? remaining.kcal * 0.4 : remaining.kcal));
+  // The meal aims at the code-computed per-meal budget. Falling back to a
+  // share of the day keeps older callers from offering the whole remainder.
+  const supplied = ctx.mealBudgetKcal;
+  const kcalGoal =
+    typeof supplied === 'number' && Number.isFinite(supplied)
+      ? Math.max(0, supplied)
+      : Math.max(250, Math.min(remaining.kcal, remaining.kcal > 1200 ? remaining.kcal * 0.4 : remaining.kcal));
   const proteinGoal = Math.max(15, remaining.proteinG * 0.4);
 
   const scored = candidates
@@ -524,11 +531,11 @@ function rankRecommendations(ctx: MockRecommendationContext): {
 
   const top = scored[0];
   const rationale = top
-    ? `Picked for your ${mealType}: it fits your remaining ~${Math.round(remaining.kcal)} kcal budget at ${Math.round(
-        top.kcal,
-      )} kcal and adds ${Math.round(top.proteinG)} g protein toward the ${Math.round(
-        remaining.proteinG,
-      )} g you have left today.`
+    ? `Picked for your ${mealType}: about ${Math.round(top.kcal)} kcal, inside a ${mealType} budget of about ${Math.round(
+        kcalGoal,
+      )} kcal. ${Math.round(remaining.kcal)} kcal are still left today, and this adds ${Math.round(
+        top.proteinG,
+      )} g protein toward the ${Math.round(remaining.proteinG)} g left.`
     : 'No suitable candidates were available.';
 
   return { rankedIds: scored.map((s) => s.id), rationale };

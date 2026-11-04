@@ -21,6 +21,7 @@ import { refundStarsPurchase } from '../payments/stars';
 import { refundStarsSubscription } from '../payments/starsSubscription';
 import { refundGift } from '../fightCamp/gifts';
 import { todayFor } from '../../platform/dates';
+import { verifyAuditChain } from '../../platform/auditChain';
 import { retentionReport } from './retention';
 import { engageMetrics } from '../fightCamp/metrics';
 
@@ -86,6 +87,21 @@ adminRouter.get('/retention', (req, res) => {
   const report = retentionReport(todayFor(req), weeks);
   auditDataAccess(req.user!.id, 'admin.retention.read', { weeks });
   res.json({ report });
+});
+
+/**
+ * Verify the SHA-256 tamper-evident audit hash chain (EN-4.2).
+ *
+ * Evaluates the current chain state before recording the verification access
+ * event so the returned `count` and `headHash` reflect the chain verified.
+ */
+adminRouter.get('/audit/verify', (req, res) => {
+  const verification = verifyAuditChain();
+  auditDataAccess(req.user!.id, 'admin.audit.verify', {
+    valid: verification.valid,
+    count: verification.count,
+  });
+  res.json({ verification });
 });
 
 /**

@@ -2,10 +2,10 @@
  * With every Fight Camp flag off, the API answers exactly as it did before
  * Fight Camp existed (AZF-P1 §10.2 DoD).
  *
- * The snapshot file was recorded by running this same file on staging at
- * 325b561, the commit this stack sits on. The earlier bases, 6a80efd and
- * 1732a90, gave the same output until #69 began storing a timezone at
- * signup, which the export now carries. Every read Fight Camp reached into
+ * The snapshot file was recorded again on staging at a858dcd. Audit events
+ * now carry the hash chain that landed after 325b561. The earlier bases,
+ * 6a80efd and 1732a90, gave the same output until #69 began storing a
+ * timezone at signup, which the export now carries. Every read Fight Camp reached into
  * is in it: the Fight Record read (rollout off, and on with no Fight Camp
  * feature), the progress summary Cut Man can bridge, the coach card that
  * describes the same run, and the data export that gained an engage

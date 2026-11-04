@@ -1,0 +1,396 @@
+/**
+ * /squad: your squad this season (AZF-P1 Epic C).
+ *
+ * Up to five people who show up together. The page is built around what a
+ * squad mate is allowed to see: everyone's belt, and a member's days this
+ * week only if that member turned "Show my numbers" on. The board counts
+ * days, one per day, never anything about bodies or food; nobody is ranked
+ * last, and a member with nothing yet this week is "warming up".
+ *
+ * Off for the account (flag, rollout or age): sent home, like /fight-record.
+ */
+import { useState, type FormEvent } from 'react';
+import { Navigate } from 'react-router-dom';
+import {
+  SQUAD_CONSENT_TEXT,
+  SQUAD_MAX_MEMBERS,
+  squadBoard,
+  type SquadMemberView,
+  type SquadView,
+} from '@aquazerofit/shared';
+import { AppHeader } from '@/components/ui/AppHeader';
+import { AppBackground } from '@/components/layout/AppBackground';
+import { BottomNav } from '@/components/ui/BottomNav';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { SecondaryButton } from '@/components/ui/SecondaryButton';
+import { useToast } from '@/components/ui/Toast';
+import { BeltBadge } from '@/components/fightRecord/BeltBadge';
+import { BottomSheet } from '@/pages/training/BottomSheet';
+import { ApiError } from '@/lib/api';
+import { formatDate } from '@/lib/format';
+import { beltName, useFightCamp } from '@/lib/fightRecord';
+import {
+  squadTelegramUrl,
+  useCreateSquad,
+  useJoinSquad,
+  useLeaveSquad,
+  useShowMyNumbers,
+  useSquad,
+} from '@/lib/fightCamp';
+import { isTMA, openTelegramLink } from '@/lib/telegram';
+
+/** The server's message when it has one: its copy is already reviewed. */
+export function squadErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError && error.body?.message ? error.body.message : fallback;
+}
+
+export default function SquadPage() {
+  const camp = useFightCamp();
+  const available = Boolean(camp.data?.squads);
+  const squad = useSquad(available);
+
+  let body;
+  if (camp.isPending || (available && squad.isPending)) {
+    body = (
+      <div aria-busy="true" aria-label="Squad loading" className="mt-6 space-y-4">
+        <Skeleton className="h-36 w-full" />
+        <Skeleton className="h-56 w-full" />
+      </div>
+    );
+  } else if (camp.isError || squad.isError) {
+    body = (
+      <div className="mt-6">
+        <ErrorState
+          surface="squad"
+          message="We couldn't load your squad."
+          retry={() => void (camp.isError ? camp.refetch() : squad.refetch())}
+        />
+      </div>
+    );
+  } else if (!available) {
+    return <Navigate to="/" replace />;
+  } else {
+    body = squad.data ? <Member squad={squad.data} /> : <NoSquad />;
+  }
+
+  return (
+    <>
+      <AppBackground />
+      <div className="azf-content relative mx-auto min-h-screen max-w-md safe-bottom">
+        <div className="px-5 pb-28">
+          <AppHeader title="Squad" back />
+          {body}
+        </div>
+        <BottomNav />
+      </div>
+    </>
+  );
+}
+
+// ---------- no squad yet ----------
+
+function NoSquad() {
+  const create = useCreateSquad();
+  const join = useJoinSquad();
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [pending, setPending] = useState<'create' | 'join' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const ask = (action: 'create' | 'join') => (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setPending(action);
+  };
+  const agree = () => {
+    const done = { onError: (e: unknown) => setError(squadErrorMessage(e, 'That did not work. Try again.')) };
+    if (pending === 'create') create.mutate(name.trim(), done);
+    if (pending === 'join') join.mutate({ code: code.trim(), via: 'code' }, done);
+    setPending(null);
+  };
+
+  return (
+    <div className="mt-4 space-y-5">
+      <p className="text-sm leading-relaxed text-on-surface-variant text-pretty">
+        A squad is up to {SQUAD_MAX_MEMBERS} people who show up together this season. You see each
+        other&apos;s belts and send cheers. Daily numbers stay hidden unless each person turns them on.
+      </p>
+
+      <GlassCard className="p-5">
+        <form onSubmit={ask('create')} className="space-y-3">
+          <h2 className="font-heading text-lg font-semibold text-on-surface">Start a squad</h2>
+          <label className="block text-sm font-semibold text-on-surface" htmlFor="squad-name">
+            Squad name
+          </label>
+          <input
+            id="squad-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            minLength={3}
+            maxLength={32}
+            required
+            autoComplete="off"
+            className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          />
+          <PrimaryButton type="submit" loading={create.isPending} disabled={name.trim().length < 3}>
+            Start a squad
+          </PrimaryButton>
+        </form>
+      </GlassCard>
+
+      <GlassCard className="p-5">
+        <form onSubmit={ask('join')} className="space-y-3">
+          <h2 className="font-heading text-lg font-semibold text-on-surface">Join with a code</h2>
+          <label className="block text-sm font-semibold text-on-surface" htmlFor="squad-code">
+            Invite code
+          </label>
+          <input
+            id="squad-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="SQD-XXXXXX"
+            required
+            autoComplete="off"
+            autoCapitalize="characters"
+            className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 font-mono uppercase tracking-wider text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          />
+          <SecondaryButton type="submit" loading={join.isPending} disabled={code.trim().length < 10}>
+            Join squad
+          </SecondaryButton>
+        </form>
+      </GlassCard>
+
+      {error && (
+        <p role="alert" className="text-sm text-on-surface">
+          {error}
+        </p>
+      )}
+
+      <ConsentSheet
+        open={pending !== null}
+        action={pending === 'create' ? 'Agree and start' : 'Agree and join'}
+        onAgree={agree}
+        onClose={() => setPending(null)}
+      />
+    </div>
+  );
+}
+
+/** The one-time consent the server also requires (PRD §8.4). */
+export function ConsentSheet({
+  open,
+  action,
+  onAgree,
+  onClose,
+}: {
+  open: boolean;
+  action: string;
+  onAgree: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Before you join">
+      <p className="text-base leading-relaxed text-on-surface text-pretty">{SQUAD_CONSENT_TEXT}</p>
+      <p className="mt-2 text-sm leading-relaxed text-on-surface-variant text-pretty">
+        No weight, food or photos are ever shown to your squad. You can leave whenever you like.
+      </p>
+      <div className="mt-5 space-y-3">
+        <PrimaryButton onClick={onAgree}>{action}</PrimaryButton>
+        <SecondaryButton onClick={onClose}>Not now</SecondaryButton>
+      </div>
+    </BottomSheet>
+  );
+}
+
+// ---------- in a squad ----------
+
+function Member({ squad }: { squad: SquadView }) {
+  const toast = useToast();
+  const [leaving, setLeaving] = useState(false);
+  const leave = useLeaveSquad();
+
+  const invite = async () => {
+    const text = `Join my squad "${squad.name}" on AquaZeroFit.`;
+    if (isTMA()) {
+      const url = squadTelegramUrl(squad);
+      openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
+      return;
+    }
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: 'AquaZeroFit squad', text, url: squad.inviteUrl });
+        return;
+      } catch {
+        // Cancelled or refused: fall through to copying, which always works.
+      }
+    }
+    await copyInvite();
+  };
+  const copyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(squad.inviteUrl);
+      toast.success('Invite link copied.');
+    } catch {
+      toast.show(`Your invite code is ${squad.inviteCode}`);
+    }
+  };
+
+  return (
+    <div className="mt-4 space-y-5">
+      <GlassCard className="p-5">
+        <h2 className="heading-display font-heading text-2xl text-on-surface text-balance">{squad.name}</h2>
+        <p className="mt-0.5 text-xs tabular-nums text-on-surface-variant">
+          Season {squad.seasonNumber} · {squad.members.length} of {SQUAD_MAX_MEMBERS} members
+        </p>
+        {squad.members.length < SQUAD_MAX_MEMBERS && (
+          <div className="mt-4 space-y-3">
+            <PrimaryButton onClick={() => void invite()}>Invite to squad</PrimaryButton>
+            <button
+              type="button"
+              onClick={() => void copyInvite()}
+              className="min-h-[44px] w-full rounded-lg text-sm font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              Copy invite link · <span className="font-mono">{squad.inviteCode}</span>
+            </button>
+          </div>
+        )}
+      </GlassCard>
+
+      <WeekBoard squad={squad} />
+      <ShowMyNumbers squad={squad} />
+
+      <SecondaryButton onClick={() => setLeaving(true)}>Leave squad</SecondaryButton>
+      <BottomSheet open={leaving} onClose={() => setLeaving(false)} title={`Leave ${squad.name}?`}>
+        <p className="text-base leading-relaxed text-on-surface text-pretty">
+          Your belts stay on your Fight Record. Cheers you sent stay with your squad mates. You can
+          join or start another squad this season.
+        </p>
+        <div className="mt-5 space-y-3">
+          <PrimaryButton
+            loading={leave.isPending}
+            onClick={() =>
+              leave.mutate(squad.id, {
+                onSuccess: () => setLeaving(false),
+                onError: (e) => toast.error(squadErrorMessage(e, 'Could not leave just now. Try again.')),
+              })
+            }
+          >
+            Leave squad
+          </PrimaryButton>
+          <SecondaryButton onClick={() => setLeaving(false)}>Stay</SecondaryButton>
+        </div>
+      </BottomSheet>
+    </div>
+  );
+}
+
+function MemberRow({ member, rank }: { member: SquadMemberView; rank: number | null }) {
+  return (
+    <li className="flex min-h-[44px] items-center gap-3">
+      <span className="w-6 text-center text-sm font-semibold tabular-nums text-on-surface-variant">
+        {rank ?? ''}
+      </span>
+      <BeltBadge tier={member.beltTier} size="sm" decorative />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-on-surface">
+          {member.displayName}
+          {member.isMe && <span className="font-normal text-on-surface-variant"> (you)</span>}
+        </p>
+        <p className="text-xs text-on-surface-variant">
+          {member.beltTier ? beltName(member.beltTier) : 'No belt yet'}
+          {member.role === 'owner' ? ' · Started the squad' : ''}
+        </p>
+      </div>
+      <span className="shrink-0 text-sm tabular-nums text-on-surface">
+        {member.weekActiveDays === null ? 'Hidden' : `${member.weekActiveDays} of 7`}
+      </span>
+    </li>
+  );
+}
+
+function WeekBoard({ squad }: { squad: SquadView }) {
+  const { ranked, warmingUp, hidden } = squadBoard(squad.members);
+  return (
+    <GlassCard className="p-5">
+      <h2 className="font-heading text-lg font-semibold text-on-surface">This week</h2>
+      <p className="mt-0.5 text-xs text-on-surface-variant">
+        Days shown up since {formatDate(squad.weekStart)}. One point a day, whatever you log.
+      </p>
+      {ranked.length > 0 && (
+        <ol className="mt-3 space-y-2" aria-label="Showed up this week">
+          {ranked.map(({ member, rank }) => (
+            <MemberRow key={member.ref} member={member} rank={rank} />
+          ))}
+        </ol>
+      )}
+      {warmingUp.length > 0 && (
+        <>
+          <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+            Warming up
+          </h3>
+          <ul className="mt-2 space-y-2">
+            {warmingUp.map((member) => (
+              <MemberRow key={member.ref} member={member} rank={null} />
+            ))}
+          </ul>
+        </>
+      )}
+      {hidden.length > 0 && (
+        <>
+          <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+            Numbers hidden
+          </h3>
+          <ul className="mt-2 space-y-2">
+            {hidden.map((member) => (
+              <MemberRow key={member.ref} member={member} rank={null} />
+            ))}
+          </ul>
+        </>
+      )}
+    </GlassCard>
+  );
+}
+
+function ShowMyNumbers({ squad }: { squad: SquadView }) {
+  const toast = useToast();
+  const setShow = useShowMyNumbers(squad.id);
+  const on = squad.me.showStats;
+  return (
+    <GlassCard className="p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 id="show-numbers-label" className="font-heading text-lg font-semibold text-on-surface">
+            Show my numbers
+          </h2>
+          <p id="show-numbers-help" className="mt-1 text-sm leading-relaxed text-on-surface-variant text-pretty">
+            Your squad sees how many days you showed up this week. Nothing else, ever.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          aria-labelledby="show-numbers-label"
+          aria-describedby="show-numbers-help"
+          disabled={setShow.isPending}
+          onClick={() =>
+            setShow.mutate(!on, { onError: () => toast.error('Could not change that. Try again.') })
+          }
+          className={`relative mt-1 h-7 w-12 shrink-0 rounded-full transition-colors motion-reduce:transition-none before:absolute before:-inset-2 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60 ${
+            on ? 'bg-primary' : 'bg-outline-variant'
+          }`}
+        >
+          <span
+            aria-hidden="true"
+            className={`absolute top-1 h-5 w-5 rounded-full bg-surface transition-transform motion-reduce:transition-none ${
+              on ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+    </GlassCard>
+  );
+}

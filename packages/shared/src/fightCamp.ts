@@ -15,6 +15,8 @@
  * and the web client compute the same week, the same bank and the same theme.
  */
 import { z } from 'zod';
+import { containsProfanity, PROFANITY_MESSAGE } from './profanity';
+import type { BeltTier } from './types/fightRecord';
 
 // ---------- vocabulary ----------
 
@@ -63,6 +65,37 @@ export const enrolInputSchema = z.object({
   source: z.enum(ENROL_SOURCES).default('dashboard'),
 });
 export type EnrolInput = z.infer<typeof enrolInputSchema>;
+
+/**
+ * The words a person agrees to before their belt becomes visible to a
+ * squad (PRD §8.4). Versioned so the audit trail says which wording each
+ * join was agreed under; reword it and the version must move.
+ */
+export const SQUAD_CONSENT_TEXT =
+  'Your squad will see your belt. Your daily numbers stay hidden unless you turn them on.';
+export const SQUAD_CONSENT_VERSION = 'squad-consent-v1';
+
+export const squadNameSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(32)
+  .refine((v) => !containsProfanity(v), { message: PROFANITY_MESSAGE });
+
+/** `consent: true` is the server-side record of the sheet above, not a UI nicety. */
+export const createSquadInputSchema = z.object({
+  name: squadNameSchema,
+  consent: z.literal(true),
+});
+export type CreateSquadInput = z.infer<typeof createSquadInputSchema>;
+
+export const joinSquadInputSchema = z.object({
+  code: squadCodeSchema,
+  consent: z.literal(true),
+});
+export type JoinSquadInput = z.infer<typeof joinSquadInputSchema>;
+
+export const updateMySquadSettingsSchema = z.object({ showStats: z.boolean() });
 
 // ---------- copy ----------
 
@@ -118,6 +151,100 @@ export function seasonTheme(seasonNumber: number): SeasonTheme {
  * a season's fresh-start window, a quiet link after it (US-A1 AC4).
  */
 export type EnrolPrompt = 'primary' | 'secondary';
+
+// ---------- squads ----------
+
+const DAY_MS = 86_400_000;
+
+/** The Monday of the ISO week containing `localDate` (weeks run Monday to Sunday). */
+export function weekStartOf(localDate: string): string {
+  const day = Date.parse(`${localDate}T00:00:00Z`);
+  const weekday = (new Date(day).getUTCDay() + 6) % 7; // Monday = 0
+  return new Date(day - weekday * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * Squad points for one week: distinct active dates from `weekStart` to the
+ * Sunday after it, so 0 to 7. One per day, whatever was logged that day: a
+ * second meal, a bigger workout or a lower weight earns nothing more, which
+ * is what keeps the board from rewarding extreme behaviour (US-C5 AC2).
+ */
+export function squadWeekPoints(activeDates: Iterable<string>, weekStart: string): number {
+  const end = new Date(Date.parse(`${weekStart}T00:00:00Z`) + 6 * DAY_MS).toISOString().slice(0, 10);
+  let points = 0;
+  for (const date of new Set(activeDates)) if (date >= weekStart && date <= end) points += 1;
+  return points;
+}
+
+export interface SquadMemberView {
+  /** Opaque, stable per membership. Never a user id. */
+  ref: string;
+  displayName: string;
+  isMe: boolean;
+  role: 'owner' | 'member';
+  /** Current-season belt, or null for "No belt yet". */
+  beltTier: BeltTier | null;
+  /** Active days this week, 0 to 7, or null when the member keeps them hidden. */
+  weekActiveDays: number | null;
+}
+
+export interface SquadView {
+  id: string;
+  name: string;
+  seasonNumber: number;
+  inviteCode: string;
+  /** https://<site>/s/<code> */
+  inviteUrl: string;
+  /** `sq_<code>` for t.me/<bot>/<app>?startapp=… (fits Telegram's 64 characters). */
+  tgStartParam: string;
+  /** Bound to a Telegram group (Squad Corner). */
+  isCorner: boolean;
+  /** Monday of the week the board counts. */
+  weekStart: string;
+  /** Active members, earliest joined first. At most SQUAD_MAX_MEMBERS. */
+  members: SquadMemberView[];
+  /** The caller's own settings in this squad. */
+  me: { ref: string; showStats: boolean };
+}
+
+/** What an invite link shows before sign-in. No member is named. */
+export interface SquadPeekView {
+  name: string;
+  memberCount: number;
+  seasonName: string;
+  full: boolean;
+}
+
+export interface SquadBoardRow {
+  member: SquadMemberView;
+  /** Shared by ties. Null for members who are warming up or hidden. */
+  rank: number | null;
+}
+
+/**
+ * The weekly board (US-C5): members with points ranked by them, ties
+ * sharing a rank; members on 0 listed alphabetically under "Warming up";
+ * hidden members listed alphabetically after. Nobody is labelled last.
+ */
+export function squadBoard(members: readonly SquadMemberView[]): {
+  ranked: SquadBoardRow[];
+  warmingUp: SquadMemberView[];
+  hidden: SquadMemberView[];
+} {
+  const byName = (a: SquadMemberView, b: SquadMemberView) =>
+    a.displayName.localeCompare(b.displayName) || (a.ref < b.ref ? -1 : 1);
+  const counted = members.filter((m) => m.weekActiveDays !== null && m.weekActiveDays > 0);
+  const sorted = [...counted].sort((a, b) => b.weekActiveDays! - a.weekActiveDays! || byName(a, b));
+  const ranked = sorted.map((member) => ({
+    member,
+    rank: 1 + sorted.filter((other) => other.weekActiveDays! > member.weekActiveDays!).length,
+  }));
+  return {
+    ranked,
+    warmingUp: members.filter((m) => m.weekActiveDays === 0).sort(byName),
+    hidden: members.filter((m) => m.weekActiveDays === null).sort(byName),
+  };
+}
 
 // ---------- Cut Man grace ----------
 
@@ -179,4 +306,9 @@ export interface FightCampStatus {
   enrolment: { enrolled: boolean; prompt: EnrolPrompt } | null;
   /** FC_GRACE. */
   grace: GraceView | null;
+  /**
+   * FC_SQUADS, for adults only: the caller's squad this season, or
+   * `current: null` with the create and join actions available.
+   */
+  squads: { current: { id: string; name: string } | null } | null;
 }

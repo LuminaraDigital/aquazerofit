@@ -289,6 +289,9 @@ export const NON_INDEXABLE_PREFIXES: readonly string[] = [
   '/progress',
   '/coach',
   '/challenges',
+  '/fight-record',
+  '/squad',
+  '/s/',
   '/settings',
   '/plan',
 ];

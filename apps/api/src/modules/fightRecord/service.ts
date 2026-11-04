@@ -191,6 +191,23 @@ function standingOf(userId: string, today: string, now: Date): Standing {
   };
 }
 
+/**
+ * Someone's belt this season, read without writing anything (AZF-P1 US-B1).
+ *
+ * A squad view reads its members' belts, and must not do on their behalf
+ * what `readFightRecord` does for the owner: write awards, celebrate or
+ * touch a Telegram status. The answer is still the same belt they see: the
+ * higher of what they hold and what their count has reached, so a rung
+ * earned since their last visit shows before they have opened the app.
+ */
+export function seasonBeltTier(userId: string, today: string): BeltTier | null {
+  const season = seasonFor(today);
+  const days = activeDaysBySeason(activeDatesOf(loadActivity(userId)), today).get(season.number) ?? 0;
+  const reached = [...BELT_LADDER].reverse().find((rung) => days >= rung.activeDays)?.tier ?? null;
+  const held = bestPerSeason(awardsOf(userId).filter((a) => a.seasonNumber === season.number))[0]?.tier ?? null;
+  return tierRank(held) >= tierRank(reached) ? held : reached;
+}
+
 function viewOf(award: BeltAward): BeltAwardView {
   return {
     id: beltViewId(award.seasonNumber, award.tier),

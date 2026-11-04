@@ -4,15 +4,31 @@
  *
  *   /fight-camp  season enrolment and, from S9, the season recap
  *   /grace       the Cut Man bank
+ *   /squads      squads: peek (public), current, create, join, leave, settings
  */
 import { Router } from 'express';
-import { enrolInputSchema } from '@aquazerofit/shared';
+import {
+  createSquadInputSchema,
+  enrolInputSchema,
+  joinSquadInputSchema,
+  squadCodeSchema,
+  updateMySquadSettingsSchema,
+} from '@aquazerofit/shared';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { asyncHandler } from '../../platform/errors';
 import { todayFor } from '../../platform/dates';
 import { enrol } from './enrolment';
-import { requireFeature } from './flags';
+import { requireFeature, requireFeatureSwitch } from './flags';
 import { syncGrace } from './grace';
+import {
+  createSquad,
+  currentSquad,
+  joinSquadByCode,
+  leaveSquad,
+  peekSquad,
+  requireSquadAdult,
+  setShowStats,
+} from './squads';
 
 export const fightCampRouter = Router();
 
@@ -40,5 +56,71 @@ graceRouter.get(
     const userId = userIdOf(req);
     requireFeature('grace', userId);
     res.json({ grace: (await syncGrace(userId, todayFor(req))).view });
+  }),
+);
+
+export const squadsRouter = Router();
+
+/**
+ * Public, for the invite landing before sign-in: name, size and season only.
+ * An unknown, malformed, archived or past-season code all answer the same
+ * null, so the route cannot be used to tell which codes once existed.
+ * Rate-limited per IP in the anonymous lane (platform/rateLimiter).
+ */
+squadsRouter.get(
+  '/peek/:code',
+  asyncHandler(async (req, res) => {
+    requireFeatureSwitch('squads');
+    const code = squadCodeSchema.safeParse(req.params.code);
+    res.json({ squad: code.success ? await peekSquad(code.data, todayFor(req)) : null });
+  }),
+);
+
+squadsRouter.use(requireAuth);
+
+squadsRouter.use((req, _res, next) => {
+  requireFeature('squads', userIdOf(req));
+  next();
+});
+
+squadsRouter.get(
+  '/current',
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    requireSquadAdult(userId);
+    res.json({ squad: await currentSquad(userId, todayFor(req)) });
+  }),
+);
+
+squadsRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { name } = createSquadInputSchema.parse(req.body);
+    res.status(201).json({ squad: await createSquad(userIdOf(req), name, todayFor(req)) });
+  }),
+);
+
+squadsRouter.post(
+  '/join',
+  asyncHandler(async (req, res) => {
+    const { code } = joinSquadInputSchema.parse(req.body);
+    const via = req.query.via === 'link' ? 'link' : 'code';
+    res.json({ squad: await joinSquadByCode(userIdOf(req), code, todayFor(req), via) });
+  }),
+);
+
+squadsRouter.post(
+  '/:id/leave',
+  asyncHandler(async (req, res) => {
+    await leaveSquad(userIdOf(req), String(req.params.id));
+    res.status(204).end();
+  }),
+);
+
+squadsRouter.patch(
+  '/:id/me',
+  asyncHandler(async (req, res) => {
+    const { showStats } = updateMySquadSettingsSchema.parse(req.body);
+    res.json({ member: await setShowStats(userIdOf(req), String(req.params.id), showStats, todayFor(req)) });
   }),
 );

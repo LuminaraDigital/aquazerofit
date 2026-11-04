@@ -40,6 +40,7 @@ export function campWith(overrides: Partial<FightCampStatus> = {}): FightCampSta
     theme: seasonTheme(SEASON.number),
     enrolment: null,
     grace: null,
+    squads: null,
     ...overrides,
   };
 }

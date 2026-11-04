@@ -143,6 +143,6 @@ coachesRouter.post(
   asyncHandler(async (req, res) => {
     const userId = userIdOf(req);
     const experience = experienceOf(userId, timezoneOf(req));
-    res.json(await createCoachInvoice(userId, String(req.params.coachId ?? ''), experience.level));
+    res.json(await createCoachInvoice(userId, req.params.coachId!, experience.level));
   }),
 );

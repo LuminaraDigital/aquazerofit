@@ -167,13 +167,38 @@ export interface SubscriptionCheckoutQuery {
   invoice_payload: string;
 }
 
-/** Whether a premium pre-checkout may proceed. The payload is not logged. */
-export function premiumCheckoutAccepts(query: SubscriptionCheckoutQuery): boolean {
-  if (!query.invoice_payload.startsWith(PREMIUM_PAYLOAD_PREFIX)) return false;
+function payloadPaid(payload: string): boolean {
+  return (
+    getStore().where<StarsSubscriptionPayment>(
+      'ledger',
+      (d) => d.type === 'starsSubscriptionPayment' && d.invoicePayload === payload,
+    ).length > 0
+  );
+}
+
+export type PremiumCheckoutDecision = { ok: true } | { ok: false; reason: 'unavailable' | 'already_premium' };
+
+/**
+ * Whether a premium pre-checkout may proceed. The payload is not logged.
+ *
+ * Opening the invoice refuses a premium account, but Telegram lets the user
+ * pay that invoice later. If the account became premium in between (Google
+ * Play, Stripe, a comp, another Stars subscription), taking this first charge
+ * would bill twice for one tier, so it is declined here, before any Stars
+ * move. A charge on a payload that already has a payment is this same
+ * subscription renewing and is allowed.
+ */
+export function premiumCheckoutDecision(query: SubscriptionCheckoutQuery): PremiumCheckoutDecision {
+  const unavailable = { ok: false, reason: 'unavailable' } as const;
+  if (!query.invoice_payload.startsWith(PREMIUM_PAYLOAD_PREFIX)) return unavailable;
   const anchor = findSubscriptionAnchor(query.invoice_payload);
-  if (!anchor) return false;
-  if (payloadRefunded(query.invoice_payload)) return false;
-  return query.currency === 'XTR' && query.total_amount >= anchor.stars;
+  if (!anchor) return unavailable;
+  if (payloadRefunded(query.invoice_payload)) return unavailable;
+  if (query.currency !== 'XTR' || query.total_amount < anchor.stars) return unavailable;
+  if (!payloadPaid(query.invoice_payload) && tierOf(anchor.userId) === 'premium') {
+    return { ok: false, reason: 'already_premium' };
+  }
+  return { ok: true };
 }
 
 export interface SubscriptionPaymentInput {

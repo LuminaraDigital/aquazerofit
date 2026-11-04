@@ -306,6 +306,8 @@ describe('subscription webhook', () => {
   });
 
   it('awaits pre-checkout and does not log the payload', async () => {
+    // Earlier tests leave the account premium, which a first charge now declines.
+    revokePremium(userId, 'admin', `wipe-${crypto.randomUUID()}`, 'isolate');
     const payload = 'premium.do-not-log-this';
     seedAnchor(payload, 417);
     const spy = vi.spyOn(telemetry, 'logEvent');
@@ -325,6 +327,51 @@ describe('subscription webhook', () => {
     const logged = spy.mock.calls.map((call) => JSON.stringify(call));
     expect(logged.some((line) => line.includes(payload))).toBe(false);
     spy.mockRestore();
+  });
+
+  it('declines pre-checkout when the account went premium after the invoice was created', async () => {
+    // Opening the invoice checked the tier, but Telegram lets the user pay it
+    // later. Premium bought through Play in between must stop the Stars charge.
+    seedAnchor('premium.after-play', 417);
+    const playId = `play-${crypto.randomUUID()}`;
+    grantPremium({
+      userId,
+      source: 'play',
+      externalId: playId,
+      premiumUntil: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+    const res = await postUpdate({
+      pre_checkout_query: {
+        id: 'pcq-after-play',
+        currency: 'XTR',
+        total_amount: 417,
+        invoice_payload: 'premium.after-play',
+      },
+    });
+    revokePremium(userId, 'play', `clear-${playId}`, 'test cleanup');
+    expect(res.status).toBe(200);
+    const answered = fetchCalls.find((call) => call.url.endsWith('/answerPreCheckoutQuery'));
+    expect(answered?.body.ok).toBe(false);
+    expect(answered?.body.error_message).toMatch(/already has Premium/i);
+  });
+
+  it('still accepts pre-checkout for a renewal of a subscription that is already paid', async () => {
+    const payload = 'premium.renewal-precheckout';
+    seedAnchor(payload, 417);
+    await postUpdate(paymentBody(payload, 'chg-renewal-precheckout', inSeconds(30), 417, { is_first_recurring: true }));
+    expect(effectiveTier(userDoc())).toBe('premium');
+    fetchCalls.length = 0;
+    const res = await postUpdate({
+      pre_checkout_query: {
+        id: 'pcq-renewal',
+        currency: 'XTR',
+        total_amount: 417,
+        invoice_payload: payload,
+      },
+    });
+    expect(res.status).toBe(200);
+    const answered = fetchCalls.find((call) => call.url.endsWith('/answerPreCheckoutQuery'));
+    expect(answered?.body.ok).toBe(true);
   });
 
   it('declines pre-checkout below the anchored price', async () => {

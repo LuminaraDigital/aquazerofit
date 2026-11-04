@@ -86,7 +86,12 @@ const ANSWERS: Answer[] = [
       <>
         Settings → delete account. Your profile, logs, plans, conversations and remembered facts are
         erased after a 30-day grace period, or immediately if you confirm the request a second time.
-        Ledger and audit records are kept anonymised.{' '}
+        Ledger and audit records are kept anonymised. You can also do it from any browser, without
+        the app:{' '}
+        <Link to="/account/deletion" className="text-primary hover:text-secondary">
+          how to delete your account
+        </Link>
+        .{' '}
         <Link to="/privacy#retention" className="text-primary hover:text-secondary">
           What is kept, and for how long
         </Link>

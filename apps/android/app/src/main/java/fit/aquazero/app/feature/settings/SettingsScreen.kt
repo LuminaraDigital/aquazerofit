@@ -20,7 +20,6 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Group
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.WorkspacePremium
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -73,22 +71,14 @@ import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
-import fit.aquazero.app.core.designsystem.currentLocale
-import fit.aquazero.app.core.model.ActivityLevel
 import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.DietaryPreference
-import fit.aquazero.app.core.model.Goal
 import fit.aquazero.app.core.model.NutritionEmphasis
-import fit.aquazero.app.core.model.Sex
 import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
-import fit.aquazero.app.core.ui.LocaleFormatters
-import fit.aquazero.app.core.ui.SetupUnits
 import fit.aquazero.app.core.ui.TargetExplainSheet
 import fit.aquazero.app.core.ui.TargetsNotSetCard
 import fit.aquazero.app.core.ui.rememberToastSink
-import java.time.YearMonth
-import kotlin.math.roundToInt
 
 /**
  * Profile and settings.
@@ -231,6 +221,15 @@ fun SettingsScreen(
             item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_privacy_heading)) }
             item(contentType = "consent") { ConsentCard(state, viewModel) }
 
+            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_security_heading)) }
+            item(contentType = "device-security") {
+                DeviceSecurityCard(
+                    security = state.deviceSecurity,
+                    onAppLockChanged = viewModel::setAppLockEnabled,
+                    onScreenCaptureChanged = viewModel::setScreenCaptureProtectionEnabled,
+                )
+            }
+
             item(contentType = "nav-row") {
                 AzfNavigationRow(
                     title = stringResource(R.string.settings_memory_title),
@@ -259,16 +258,10 @@ fun SettingsScreen(
                 )
             }
             item(contentType = "nav-row") {
-                AzfNavigationRow(
-                    title = if (state.exporting) {
-                        stringResource(R.string.settings_export_preparing)
-                    } else {
-                        stringResource(R.string.settings_export_title)
-                    },
-                    body = stringResource(R.string.settings_export_body),
-                    onClick = viewModel::exportData,
-                    enabled = !state.exporting,
-                    icon = Icons.Outlined.Download,
+                DataExportRow(
+                    exporting = state.exporting,
+                    dataExportAllowed = state.deviceSecurity.dataExportAllowed,
+                    onExport = viewModel::exportData,
                 )
             }
 
@@ -756,151 +749,6 @@ private fun DeletionCard(
         }
     }
 }
-
-@Composable
-private fun SettingsDialogs(state: SettingsUiState, viewModel: SettingsViewModel) {
-    val dialog = state.dialog ?: return
-    val grace = SettingsViewModel.DELETION_GRACE_DAYS
-    val playWarning = if (state.playSubscriptionActive) {
-        "\n\n" + stringResource(R.string.settings_delete_play_warning)
-    } else {
-        ""
-    }
-    when (dialog) {
-        SettingsDialog.RequestDeletion -> ConfirmDialog(
-            title = stringResource(R.string.settings_delete_dialog_title),
-            body = stringResource(R.string.settings_delete_dialog_body, grace) + playWarning,
-            confirmLabel = stringResource(R.string.settings_delete_dialog_confirm),
-            busy = state.deleting,
-            onConfirm = viewModel::confirmDeletion,
-            onDismiss = viewModel::dismissDialog,
-        )
-        SettingsDialog.PurgeNow -> ConfirmDialog(
-            title = stringResource(R.string.settings_delete_now_dialog_title),
-            body = stringResource(R.string.settings_delete_now_dialog_body) + playWarning,
-            confirmLabel = stringResource(R.string.settings_delete_now_confirm),
-            busy = state.deleting,
-            onConfirm = viewModel::confirmDeletion,
-            onDismiss = viewModel::dismissDialog,
-        )
-        is SettingsDialog.SignOutWithPending -> ConfirmDialog(
-            title = stringResource(R.string.settings_sign_out_pending_title),
-            body = stringResource(R.string.settings_sign_out_pending_body, dialog.pending),
-            confirmLabel = stringResource(R.string.settings_sign_out_pending_confirm),
-            busy = state.signingOut,
-            onConfirm = { viewModel.signOut(force = true) },
-            onDismiss = viewModel::dismissDialog,
-        )
-    }
-}
-
-@Composable
-private fun ConfirmDialog(
-    title: String,
-    body: String,
-    confirmLabel: String,
-    busy: Boolean,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(text = title, style = MaterialTheme.typography.titleMedium) },
-        text = { Text(text = body, style = MaterialTheme.typography.bodyMedium) },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !busy) {
-                Text(text = confirmLabel, color = AzfColors.Coral)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) {
-                Text(text = stringResource(R.string.settings_cancel))
-            }
-        },
-        containerColor = AzfColors.SurfaceContainerHigh,
-    )
-}
-
-// ---------------------------------------------------------------------------
-// Labels and formatting
-// ---------------------------------------------------------------------------
-
-private fun sexLabel(sex: Sex): Int = when (sex) {
-    Sex.FEMALE -> R.string.setup_sex_female
-    Sex.MALE -> R.string.setup_sex_male
-    Sex.UNSPECIFIED -> R.string.setup_sex_unspecified
-}
-
-private fun goalLabel(goal: Goal): Int = when (goal) {
-    Goal.LOSE -> R.string.setup_goal_lose
-    Goal.MAINTAIN -> R.string.setup_goal_maintain
-    Goal.GAIN -> R.string.setup_goal_gain
-}
-
-private fun activityLabel(level: ActivityLevel): Int = when (level) {
-    ActivityLevel.SEDENTARY -> R.string.setup_activity_sedentary
-    ActivityLevel.LIGHT -> R.string.setup_activity_light
-    ActivityLevel.MODERATE -> R.string.setup_activity_moderate
-    ActivityLevel.ACTIVE -> R.string.setup_activity_active
-    ActivityLevel.VERY_ACTIVE -> R.string.setup_activity_very_active
-}
-
-private fun dietaryLabel(preference: DietaryPreference): Int = when (preference) {
-    DietaryPreference.VEGETARIAN -> R.string.diet_vegetarian
-    DietaryPreference.VEGAN -> R.string.diet_vegan
-    DietaryPreference.PESCATARIAN -> R.string.diet_pescatarian
-    DietaryPreference.HALAL -> R.string.diet_halal
-    DietaryPreference.KOSHER -> R.string.diet_kosher
-    DietaryPreference.GLUTEN_FREE -> R.string.diet_gluten_free
-    DietaryPreference.DAIRY_FREE -> R.string.diet_dairy_free
-    DietaryPreference.LOW_CARB -> R.string.diet_low_carb
-    DietaryPreference.HIGH_PROTEIN -> R.string.diet_high_protein
-}
-
-private fun allergenLabel(allergen: Allergen): Int = when (allergen) {
-    Allergen.PEANUTS -> R.string.allergen_title_peanuts
-    Allergen.TREE_NUTS -> R.string.allergen_title_tree_nuts
-    Allergen.MILK -> R.string.allergen_title_milk
-    Allergen.EGGS -> R.string.allergen_title_eggs
-    Allergen.FISH -> R.string.allergen_title_fish
-    Allergen.SHELLFISH -> R.string.allergen_title_shellfish
-    Allergen.SOY -> R.string.allergen_title_soy
-    Allergen.WHEAT -> R.string.allergen_title_wheat
-    Allergen.SESAME -> R.string.allergen_title_sesame
-}
-
-@Composable
-private fun formatHeight(heightCm: Double, unit: UnitPreference): String =
-    if (unit == UnitPreference.IMPERIAL) {
-        val (feet, inches) = SetupUnits.cmToFtIn(heightCm)
-        stringResource(R.string.settings_height_imperial, feet, inches)
-    } else {
-        stringResource(R.string.settings_height_metric, heightCm.roundToInt())
-    }
-
-@Composable
-private fun formatWeight(weightKg: Double, unit: UnitPreference): String {
-    val value = SetupUnits.round1(SetupUnits.kgToDisplay(weightKg, unit))
-    val text = String.format(currentLocale(), "%.1f", value)
-    return if (unit == UnitPreference.IMPERIAL) {
-        stringResource(R.string.settings_weight_imperial, text)
-    } else {
-        stringResource(R.string.settings_weight_metric, text)
-    }
-}
-
-/**
- * "August 2026" from the ISO timestamp `/me` returns; the raw value on failure.
- *
- * Called from inside the identity card's composition, so the formatter comes
- * from the [LocaleFormatters] cache instead of being compiled per call.
- */
-private fun formatMonthYear(isoTimestamp: String): String = runCatching {
-    val date = java.time.OffsetDateTime.parse(isoTimestamp).toLocalDate()
-    YearMonth.from(date).format(LocaleFormatters.of(MONTH_YEAR_PATTERN))
-}.getOrDefault(isoTimestamp)
-
-private const val MONTH_YEAR_PATTERN = "LLLL yyyy"
 
 @Preview(showBackground = true, backgroundColor = 0xFF0E1416, heightDp = 1600)
 @Composable

@@ -27,6 +27,7 @@
     "assets:cards": "node tools/cards/build-card.mjs",
     "assets:belts": "node tools/belts/build-belt-art.mjs",
     "screenshots:optimise": "node tools/screenshots/optimise.mjs",
+    "assetlinks:add": "node tools/assetlinks/add-fingerprint.mjs",
     "docs:setup": "npm --prefix tools/docgen install",
     "docs:build": "node tools/docgen/md-to-docx.js"
   },

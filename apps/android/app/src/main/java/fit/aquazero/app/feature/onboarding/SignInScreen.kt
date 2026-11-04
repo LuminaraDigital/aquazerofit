@@ -44,6 +44,7 @@ import fit.aquazero.app.core.designsystem.TurnstileChallenge
 import fit.aquazero.app.core.designsystem.revealOnEnter
 import fit.aquazero.app.core.model.ApiResult
 import fit.aquazero.app.core.model.TurnstileOutcome
+import fit.aquazero.app.core.security.DeviceSecurityController
 import fit.aquazero.app.core.telemetry.CrashReporter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,6 +65,7 @@ data class SignInMessages(
     val challengeUnavailable: String,
     val challengeFailed: String,
     val challengeCancelled: String,
+    val domainRestricted: (String) -> String = { "Use an @$it email address required by your organisation." },
 )
 
 /**
@@ -130,6 +132,7 @@ data class SignInUiState(
 class SignInViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val crashReporter: CrashReporter,
+    private val deviceSecurityController: DeviceSecurityController,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SignInUiState())
@@ -162,14 +165,21 @@ class SignInViewModel @Inject constructor(
      */
     fun submit(messages: SignInMessages) {
         val s = _state.value
-        if (!EMAIL_REGEX.matches(s.email.trim())) {
+        val trimmedEmail = s.email.trim()
+        if (!EMAIL_REGEX.matches(trimmedEmail)) {
             _state.update { it.copy(emailError = true) }
+            return
+        }
+        val security = deviceSecurityController.state.value
+        if (!security.isEmailAllowed(trimmedEmail)) {
+            val domain = security.restrictions.allowedEmailDomain.orEmpty()
+            _state.update { it.copy(submitError = messages.domainRestricted(domain)) }
             return
         }
         _state.update { it.copy(loading = true, submitError = null) }
         if (!s.registerMode) {
             viewModelScope.launch {
-                finish(authRepository.login(email = s.email.trim(), password = s.password), messages)
+                finish(authRepository.login(email = trimmedEmail, password = s.password), messages)
             }
             return
         }
@@ -188,8 +198,15 @@ class SignInViewModel @Inject constructor(
      */
     fun requestPasswordReset(messages: SignInMessages) {
         val s = _state.value
-        if (!EMAIL_REGEX.matches(s.email.trim())) {
+        val trimmedEmail = s.email.trim()
+        if (!EMAIL_REGEX.matches(trimmedEmail)) {
             _state.update { it.copy(emailError = true) }
+            return
+        }
+        val security = deviceSecurityController.state.value
+        if (!security.isEmailAllowed(trimmedEmail)) {
+            val domain = security.restrictions.allowedEmailDomain.orEmpty()
+            _state.update { it.copy(submitError = messages.domainRestricted(domain)) }
             return
         }
         _state.update { it.copy(loading = true, submitError = null, resetSent = false) }
@@ -311,12 +328,16 @@ fun SignInScreen(
     androidx.compose.runtime.LaunchedEffect(startInRegisterMode) {
         viewModel.setMode(startInRegisterMode)
     }
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val messages = SignInMessages(
         generic = stringResource(R.string.signin_error_generic),
         offline = stringResource(R.string.signin_error_offline),
         challengeUnavailable = stringResource(R.string.captcha_error_unavailable),
         challengeFailed = stringResource(R.string.captcha_error_failed),
         challengeCancelled = stringResource(R.string.captcha_error_cancelled),
+        domainRestricted = { domain ->
+            resources.getString(R.string.signin_error_email_domain, domain)
+        },
     )
 
     state.challengeAction?.let { action ->

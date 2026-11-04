@@ -115,6 +115,9 @@ android {
 
   buildTypes {
     debug {
+      // EN-4.4: Enable pseudo-locales (en-XA, ar-XB) in debug builds so string
+      // expansion, truncation, and RTL layout issues can be exercised on emulator.
+      isPseudoLocalesEnabled = true
       buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api/v1\"")
       buildConfigField("String", "MEDIA_BASE_URL", "\"http://10.0.2.2:4000\"")
       // Legal/support pages are always the published ones: a debug build must

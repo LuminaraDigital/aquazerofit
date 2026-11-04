@@ -124,6 +124,10 @@ function renderWith(state: QueryState, billing: BillingConfig = NO_STRIPE, url =
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mocks.startStars.mockReset();
+  mocks.startStars.mockImplementation(() =>
+    Promise.resolve({ invoiceLink: 'https://t.me/invoice/test', stars: 417 }),
+  );
   mocks.isTMA.mockReturnValue(false);
   mocks.canPayWithStars.mockReturnValue(false);
   mocks.openStarsInvoice.mockResolvedValue('cancelled');
@@ -381,11 +385,46 @@ describe('plan page - Stripe checkout', () => {
     expect(screen.getAllByText(/30 days/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/until you cancel/i)).toBeTruthy();
     expect(screen.getByText(/my stars/i)).toBeTruthy();
+    // Opening the page must not create an invoice. The server writes a ledger
+    // anchor and calls Telegram only when Subscribe is tapped.
+    expect(mocks.startStars).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /subscribe for 417 stars/i }));
 
     expect(await screen.findByText(/payment received/i)).toBeTruthy();
     expect(mocks.startStars).toHaveBeenCalledTimes(1);
     expect(mocks.openStarsInvoice).toHaveBeenCalledWith('https://t.me/invoice/test');
+  });
+
+  it('says it is preparing checkout until Telegram returns, and does not call the API before the tap', async () => {
+    let resolveInvoice: (value: { invoiceLink: string; stars: number }) => void = () => {};
+    mocks.startStars.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveInvoice = resolve;
+        }),
+    );
+    mocks.isTMA.mockReturnValue(true);
+    mocks.canPayWithStars.mockReturnValue(true);
+    mocks.openStarsInvoice.mockResolvedValue('paid');
+    renderWith(
+      { data: FREE },
+      {
+        stripe: { available: false, price: null },
+        stars: { available: true, price: 417, periodSeconds: 2_592_000 },
+      },
+    );
+
+    expect(mocks.startStars).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /preparing secure checkout/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /subscribe for 417 stars/i }));
+
+    expect(await screen.findByRole('button', { name: /preparing secure checkout/i })).toBeTruthy();
+    expect(mocks.startStars).toHaveBeenCalledTimes(1);
+    expect(mocks.openStarsInvoice).not.toHaveBeenCalled();
+
+    resolveInvoice({ invoiceLink: 'https://t.me/invoice/held', stars: 417 });
+    expect(await screen.findByText(/payment received/i)).toBeTruthy();
+    expect(mocks.openStarsInvoice).toHaveBeenCalledWith('https://t.me/invoice/held');
   });
 
   it('keeps the not-available card when Stars has no price, even inside Telegram', () => {

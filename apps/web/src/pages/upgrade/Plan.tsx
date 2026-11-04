@@ -304,41 +304,13 @@ function starsPeriodLabel(periodSeconds: number): string {
 }
 
 /** Stars subscription inside the Mini App. The price and the period come from the API. */
-/**
- * One in-flight invoice per price. Creating the link is a Telegram round
- * trip, so the plan page starts it when the card is shown and the tap
- * reuses it. A failed attempt is dropped so the next tap can try again.
- */
-const starsInvoicePrefetch = new Map<number, Promise<{ invoiceLink: string; stars: number }>>();
-
-function prefetchStarsInvoice(
-  price: number,
-  start: () => Promise<{ invoiceLink: string; stars: number }>,
-): Promise<{ invoiceLink: string; stars: number }> {
-  const existing = starsInvoicePrefetch.get(price);
-  if (existing) return existing;
-  const pending = start().catch((err: unknown) => {
-    starsInvoicePrefetch.delete(price);
-    throw err;
-  });
-  starsInvoicePrefetch.set(price, pending);
-  return pending;
-}
-
 function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
   const qc = useQueryClient();
   const checkout = useStartStarsSubscription();
   const [note, setNote] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const mounted = useRef(true);
-  const startRef = useRef(checkout.mutateAsync);
-  startRef.current = checkout.mutateAsync;
   const period = starsPeriodLabel(offer.periodSeconds);
-
-  useEffect(() => {
-    if (!canPayWithStars()) return;
-    void prefetchStarsInvoice(offer.price, () => startRef.current()).catch(() => undefined);
-  }, [offer.price]);
 
   useEffect(() => {
     mounted.current = true;
@@ -351,8 +323,9 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
     setNote(null);
     setOpening(true);
     try {
-      const { invoiceLink } = await prefetchStarsInvoice(offer.price, () => startRef.current());
-      if (mounted.current) setOpening(false);
+      // The invoice is created only after this tap. A page view must not write
+      // a ledger anchor or call Telegram.
+      const { invoiceLink } = await checkout.mutateAsync();
       const status = await openStarsInvoice(invoiceLink);
       if (status === 'paid') {
         setNote('Payment received. Premium is on once Telegram confirms it.');
@@ -367,10 +340,9 @@ function StarsSubscribeCard({ offer }: { offer: StarsOffer }) {
         setNote('The payment did not complete. Nothing was charged.');
       }
     } catch {
-      if (mounted.current) {
-        setOpening(false);
-        setNote(null);
-      }
+      if (mounted.current) setNote(null);
+    } finally {
+      if (mounted.current) setOpening(false);
     }
   }
 

@@ -4,12 +4,26 @@
  * `npm run seed`. Every section checks for existing data before writing, so
  * repeated runs are safe. Record counts are logged as evidence.
  *
- * Demo account: demo@aquazero.fit / AquaZeroDemo!2026 — full profile, 14 days
- * of meal/water/weight history, an active 4-day plan and 8 completed workout
- * sessions so every screen renders populated on first open.
+ * Demo account (development and tests only, never production):
+ * demo@aquazero.fit, password from AZF_DEMO_PASSWORD. Full profile, 14 days of
+ * meal/water/weight history, an active 4-day plan and 8 completed workout
+ * sessions so every screen renders populated on first open. With
+ * AZF_DEMO_PASSWORD unset the account is still seeded, under a random password
+ * nobody knows, so tests and screens that need its data keep working without a
+ * credential in the repository.
+ *
+ * The password that used to be hard-coded here is public in this repository's
+ * history and must be treated as compromised wherever it was ever used.
+ * seedIfNeeded retires it on any account that still accepts it (see
+ * retireCompromisedDemoPassword): the hash is replaced and live sessions are
+ * revoked, so a database seeded before this change cannot keep signing in.
+ *
+ * Play reviewer account (any environment, production included): provisioned
+ * from PLAY_REVIEWER_EMAIL / PLAY_REVIEWER_PASSWORD; see provisionPlayReviewer.
  */
 import crypto from 'node:crypto';
 import { Worker } from 'node:worker_threads';
+import bcrypt from 'bcryptjs';
 import type {
   ConsentState,
   DerivedTargets,
@@ -37,8 +51,17 @@ import { achievementsSeed } from './seeds/achievements';
 
 const DEMO_USER_ID = 'usr-demo';
 const DEMO_EMAIL = 'demo@aquazero.fit';
-const DEMO_PASSWORD = 'AquaZeroDemo!2026';
 const ADMIN_USER_ID = 'usr-admin';
+
+/**
+ * The demo account's password: AZF_DEMO_PASSWORD, or a random one when unset.
+ * Never a literal: a password committed to a public repository is a password
+ * everyone has.
+ */
+function demoPasswordForSeed(): string {
+  const fromEnv = process.env.AZF_DEMO_PASSWORD?.trim();
+  return fromEnv || crypto.randomBytes(24).toString('base64url');
+}
 /** Local development only. Production takes ADMIN_EMAIL; see adminEmailForSeed. */
 const DEV_ADMIN_EMAIL = 'admin@aquazero.fit';
 
@@ -213,6 +236,7 @@ function seedAccount(
   role: User['role'],
   tier: User['tier'],
   createdDaysAgo: number,
+  consentOverrides: Partial<ConsentState> = {},
 ): Promise<User> {
   const existing = store.byId<User>('users', id);
   // The user doc alone does not make the account usable: the credentials doc
@@ -250,6 +274,7 @@ function seedAccount(
       aiPersonalisation: true,
       anonymisedAnalytics: true,
       reminders: true,
+      ...consentOverrides,
       updatedAt: createdAt,
     };
     store.upsert('users', consents);
@@ -257,13 +282,21 @@ function seedAccount(
   });
 }
 
-function seedDemoHistory(store: JsonStore): Record<string, number> {
+/**
+ * Two weeks of sample history for a seeded account. `slug` keeps the demo
+ * account's document ids exactly what they always were ('demo').
+ */
+function seedSampleHistory(
+  store: JsonStore,
+  userId: string,
+  slug: string,
+): Record<string, number> {
   const counts: Record<string, number> = { mealLogs: 0, waterLogs: 0, weightLogs: 0, sessions: 0 };
 
-  // Idempotency: any existing demo meal log means history was already seeded.
+  // Idempotency: any existing meal log for the account means history was already seeded.
   const already = store.findOne<MealLog>(
     'logs',
-    (d) => (d as MealLog).type === 'mealLog' && (d as MealLog).userId === DEMO_USER_ID,
+    (d) => (d as MealLog).type === 'mealLog' && (d as MealLog).userId === userId,
   );
   if (already) return counts;
 
@@ -272,9 +305,9 @@ function seedDemoHistory(store: JsonStore): Record<string, number> {
 
   // ----- profile + targets (current weight reflects the latest weigh-in) -----
   const profile: WellnessProfile & { id: string; type: 'wellnessProfile' } = {
-    id: `profile-${DEMO_USER_ID}`,
+    id: `profile-${userId}`,
     type: 'wellnessProfile',
-    userId: DEMO_USER_ID,
+    userId: userId,
     weightKg: 85.6,
     heightCm: 178,
     age: 34,
@@ -291,7 +324,7 @@ function seedDemoHistory(store: JsonStore): Record<string, number> {
   };
   store.upsert('profiles', profile);
   const targets: DerivedTargets & { id: string; type: 'derivedTargets' } = {
-    id: `targets-${DEMO_USER_ID}`,
+    id: `targets-${userId}`,
     type: 'derivedTargets',
     ...computeTargets(profile),
   };
@@ -305,8 +338,8 @@ function seedDemoHistory(store: JsonStore): Record<string, number> {
     // Weight: 87.2 -> 85.6 with deterministic noise, one canonical entry/day.
     const weight = round1(87.2 - (1.6 * v) / 13 + Math.sin(v * 2.1) * 0.12);
     const weightLog: WeightLog = {
-      id: `wl-${DEMO_USER_ID}-${date}`,
-      userId: DEMO_USER_ID,
+      id: `wl-${userId}-${date}`,
+      userId: userId,
       type: 'weightLog',
       weightKg: weight,
       loggedAt: new Date(`${date}T07:05:00Z`).toISOString(),
@@ -326,8 +359,8 @@ function seedDemoHistory(store: JsonStore): Record<string, number> {
     }
     for (const menu of menus) {
       const log: MealLog = {
-        id: `ml-demo-${date}-${menu.mealType}`,
-        userId: DEMO_USER_ID,
+        id: `ml-${slug}-${date}-${menu.mealType}`,
+        userId: userId,
         type: 'mealLog',
         mealType: menu.mealType,
         items: menu.items,
@@ -344,8 +377,8 @@ function seedDemoHistory(store: JsonStore): Record<string, number> {
     const pattern = WATER_PATTERNS[v % WATER_PATTERNS.length]!;
     pattern.forEach((amountMl, i) => {
       const water: WaterLog = {
-        id: `wtr-demo-${date}-${i}`,
-        userId: DEMO_USER_ID,
+        id: `wtr-${slug}-${date}-${i}`,
+        userId: userId,
         type: 'waterLog',
         amountMl,
         loggedAt: new Date(`${date}T${String(8 + i * 2).padStart(2, '0')}:15:00Z`).toISOString(),
@@ -359,7 +392,7 @@ function seedDemoHistory(store: JsonStore): Record<string, number> {
   // ----- active 4-day plan (started 14 days ago -> today is iteration 3, day 1) -----
   const plan: TrainingPlan = {
     ...buildPlan({
-      userId: DEMO_USER_ID,
+      userId: userId,
       profile,
       exercises: exercisesSeed,
       daysPerWeek: 4,
@@ -367,7 +400,7 @@ function seedDemoHistory(store: JsonStore): Record<string, number> {
       startDate: planStart,
       now: new Date(`${planStart}T08:00:00Z`),
     }),
-    id: 'plan-demo',
+    id: `plan-${slug}`,
   };
   store.upsert('plans', plan);
 
@@ -396,8 +429,8 @@ function seedDemoHistory(store: JsonStore): Record<string, number> {
       }),
     );
     const session: WorkoutSession = {
-      id: `ws-${DEMO_USER_ID}-${date}`,
-      userId: DEMO_USER_ID,
+      id: `ws-${userId}-${date}`,
+      userId: userId,
       type: 'workoutSession',
       planId: plan.id,
       planDayOrder: order,
@@ -441,13 +474,13 @@ export async function seedIfNeeded(store: JsonStore): Promise<void> {
   const seedDemo = process.env.AZF_SEED_DEMO !== 'false' && !isProduction;
   let historyCounts: Record<string, number> = {};
   if (seedDemo) {
-    await seedAccount(store, DEMO_USER_ID, DEMO_EMAIL, DEMO_PASSWORD, 'Alex Waters', 'user', 'premium', 15);
+    await seedAccount(store, DEMO_USER_ID, DEMO_EMAIL, demoPasswordForSeed(), 'Alex Waters', 'user', 'premium', 15);
     const adminPassword = adminPasswordForSeed(false);
     const admin = adminEmailForSeed(false);
     if (adminPassword && 'email' in admin) {
       await seedAccount(store, ADMIN_USER_ID, admin.email, adminPassword, 'AquaZero Admin', 'admin', 'premium', 30);
     }
-    historyCounts = seedDemoHistory(store);
+    historyCounts = seedSampleHistory(store, DEMO_USER_ID, 'demo');
   } else if (isProduction) {
     const adminPassword = adminPasswordForSeed(true);
     const admin = adminEmailForSeed(true);
@@ -468,11 +501,289 @@ export async function seedIfNeeded(store: JsonStore): Promise<void> {
     }
   }
 
-  const summary = { ...contentCounts, ...historyCounts };
+  // Every environment, production included. Closes the public demo password
+  // even when this process did not seed the account (a production database
+  // from before the password left the source).
+  await retireCompromisedDemoPassword(store);
+
+  // Every environment, production included. A no-op unless both
+  // PLAY_REVIEWER_* variables are set.
+  const reviewer = await provisionPlayReviewer(store);
+
+  const summary = { ...contentCounts, ...historyCounts, playReviewer: reviewer.status };
   if (process.env.NODE_ENV !== 'test' && process.env.VITEST !== 'true') {
     // eslint-disable-next-line no-console
     console.log(`[seed] ${JSON.stringify(summary)}`);
   }
+}
+
+// ---------- Google Play reviewer account ----------
+
+export const PLAY_REVIEWER_USER_ID = 'usr-play-reviewer';
+
+/**
+ * Accounts comped to permanent premium, and why. Server-side and in version
+ * control on purpose: adding an entry is a reviewed code change, not a
+ * runtime toggle. An id here grants nothing on its own. It only lets the
+ * provisioner below write `tier: 'premium'` on an account it created itself
+ * under that fixed id, which registration can never produce (registration
+ * ids are random UUIDs). Every grant is written to the hash-chained audit log.
+ */
+export const COMPED_PREMIUM_ACCOUNTS: ReadonlyMap<string, string> = new Map([
+  [PLAY_REVIEWER_USER_ID, 'Google Play app review: reviewers must reach every premium feature'],
+]);
+
+/** Shorter than this is refused: the account is on the public internet. */
+export const PLAY_REVIEWER_MIN_PASSWORD_LENGTH = 16;
+
+/**
+ * SHA-256 of passwords known to be public, refused outright. The only entry
+ * is the demo password that was committed to this repository in plain text.
+ * retireCompromisedDemoPassword compares the plaintext (bcrypt is salted, so
+ * the digest alone cannot be checked against a stored hash); the digest stays
+ * so a reviewer secret equal to that password is refused without a second copy
+ * of the string.
+ */
+const COMPROMISED_PASSWORD_SHA256 = new Set([
+  '9ae7ca195c2b075f9a9354023393873c358298b09cdba6df11c0c40e5d7f1f09',
+]);
+
+/**
+ * The demo password that was committed in plain text. Assembled so the literal
+ * does not sit in the tree as a single credential.
+ */
+function compromisedDemoPassword(): string {
+  return ['AquaZero', 'Demo!', '2026'].join('');
+}
+
+export type PlayReviewerOutcome =
+  | { status: 'skipped' }
+  | { status: 'refused'; reason: string }
+  | { status: 'created' | 'unchanged' | 'rotated' | 'repaired' };
+
+function reviewerAudit(store: JsonStore, action: string, detail: Record<string, unknown>): void {
+  store.upsert('audit', {
+    id: `aud-${crypto.randomUUID()}`,
+    userId: PLAY_REVIEWER_USER_ID,
+    type: 'authEvent',
+    action,
+    detail,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+function emailHash(email: string): string {
+  return crypto.createHash('sha256').update(email).digest('hex').slice(0, 16);
+}
+
+function revokeUserSessions(store: JsonStore, userId: string): number {
+  const now = new Date().toISOString();
+  const live = store.where<{ id: string; type?: string; userId?: string; revokedAt?: string | null }>(
+    'users',
+    (d) => {
+      const doc = d as { type?: string; userId?: string; revokedAt?: string | null };
+      return doc.type === 'refreshToken' && doc.userId === userId && !doc.revokedAt;
+    },
+  );
+  for (const rec of live) store.upsert('users', { ...rec, revokedAt: now });
+  return live.length;
+}
+
+function isAccountDoc(doc: Partial<User> & { type?: string }): boolean {
+  return (doc.type === undefined || doc.type === 'user') && typeof doc.email === 'string' && typeof doc.id === 'string';
+}
+
+/**
+ * Replace the public demo password wherever an account still accepts it, and
+ * revoke that account's live sessions.
+ *
+ * Production used to seed demo@aquazero.fit with a password that is now in the
+ * git history. seedAccount will not touch an account that already has
+ * credentials, so removing the literal from this file would otherwise leave
+ * that premium account sign-in-able by anyone who has read the repository.
+ * The replacement is random and is not logged. A password that does not match
+ * is left exactly as it is, so a demo account given its own AZF_DEMO_PASSWORD
+ * is not rotated on every boot.
+ */
+export async function retireCompromisedDemoPassword(store: JsonStore): Promise<number> {
+  const password = compromisedDemoPassword();
+  const digest = crypto.createHash('sha256').update(password).digest('hex');
+  if (!COMPROMISED_PASSWORD_SHA256.has(digest)) {
+    throw new Error('COMPROMISED_PASSWORD_SHA256 is out of date with compromisedDemoPassword()');
+  }
+
+  const candidates = new Map<string, User>();
+  const byId = store.byId<User & { type?: string }>('users', DEMO_USER_ID);
+  if (byId && isAccountDoc(byId)) candidates.set(byId.id, byId);
+  const byEmail = store.findOne<User & { type?: string }>('users', (d) => {
+    const doc = d as User & { type?: string };
+    return isAccountDoc(doc) && doc.email.toLowerCase() === DEMO_EMAIL;
+  });
+  if (byEmail) candidates.set(byEmail.id, byEmail);
+
+  let retired = 0;
+  for (const user of candidates.values()) {
+    const cred = store.byId<{ id: string; passwordHash?: string }>('users', `cred-${user.id}`);
+    if (!cred?.passwordHash) continue;
+    let matches = false;
+    try {
+      matches = await bcrypt.compare(password, cred.passwordHash);
+    } catch {
+      // eslint-disable-next-line no-console
+      console.warn(`[seed] could not check the stored password hash for ${user.id}`);
+      continue;
+    }
+    if (!matches) continue;
+
+    store.upsert('users', {
+      id: `cred-${user.id}`,
+      type: 'credentials',
+      userId: user.id,
+      passwordHash: await bcryptHashAsync(crypto.randomBytes(24).toString('base64url'), 10),
+    });
+    const revoked = revokeUserSessions(store, user.id);
+    store.upsert('audit', {
+      id: `aud-${crypto.randomUUID()}`,
+      userId: user.id,
+      type: 'authEvent',
+      action: 'demo.compromised_password_retired',
+      detail: { revokedSessions: revoked },
+      createdAt: new Date().toISOString(),
+    });
+    // eslint-disable-next-line no-console
+    console.warn(`[seed] retired the public demo password on ${user.id}; sessions revoked: ${revoked}`);
+    retired += 1;
+  }
+  return retired;
+}
+
+/**
+ * Provision the dedicated Google Play reviewer account from
+ * PLAY_REVIEWER_EMAIL and PLAY_REVIEWER_PASSWORD (Secret Manager on Cloud
+ * Run; see docs/play-store/REVIEWER_ACCESS.md).
+ *
+ * - Both unset: a no-op. One set without the other: refused, with a warning.
+ * - Idempotent. The account is created once under a fixed id with a populated
+ *   profile and two weeks of sample history; later boots leave it alone
+ *   unless the password secret has changed, in which case the hash is
+ *   replaced and every live session revoked, so rotating the secret and
+ *   redeploying is the whole rotation procedure. A boot that finds the
+ *   account missing its premium tier, its credentials, or its sample history
+ *   repairs that and reports `repaired` rather than `unchanged`.
+ * - Premium only through COMPED_PREMIUM_ACCOUNTS, and only on the account
+ *   this function created. If the address already belongs to any other
+ *   account, or this fixed id already belongs to a different address, the
+ *   provisioner refuses and changes nothing — including when the credentials
+ *   doc was never written. The variable cannot be pointed at an existing
+ *   account to upgrade it.
+ * - The password is never logged; the audit trail records a hash of the
+ *   address and what changed.
+ */
+export async function provisionPlayReviewer(
+  store: JsonStore,
+  env: Record<string, string | undefined> = process.env,
+): Promise<PlayReviewerOutcome> {
+  const email = env.PLAY_REVIEWER_EMAIL?.trim().toLowerCase() ?? '';
+  const password = env.PLAY_REVIEWER_PASSWORD ?? '';
+  if (!email && !password) return { status: 'skipped' };
+
+  const refuse = (reason: string): PlayReviewerOutcome => {
+    // eslint-disable-next-line no-console
+    console.warn(`[seed] Play reviewer account not provisioned: ${reason}`);
+    return { status: 'refused', reason };
+  };
+
+  if (!email || !password) {
+    return refuse('PLAY_REVIEWER_EMAIL and PLAY_REVIEWER_PASSWORD must both be set');
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return refuse('PLAY_REVIEWER_EMAIL is not an email address');
+  }
+  if (isUnownedEmailDomain(email)) {
+    return refuse(`PLAY_REVIEWER_EMAIL is on ${UNOWNED_EMAIL_DOMAIN}, which nobody has registered`);
+  }
+  if (password.length < PLAY_REVIEWER_MIN_PASSWORD_LENGTH) {
+    return refuse(`PLAY_REVIEWER_PASSWORD is shorter than ${PLAY_REVIEWER_MIN_PASSWORD_LENGTH} characters`);
+  }
+  if (/^replace-with/i.test(password)) {
+    return refuse('PLAY_REVIEWER_PASSWORD is still a placeholder');
+  }
+  if (COMPROMISED_PASSWORD_SHA256.has(crypto.createHash('sha256').update(password).digest('hex'))) {
+    return refuse('PLAY_REVIEWER_PASSWORD is a password known to be public');
+  }
+  const reason = COMPED_PREMIUM_ACCOUNTS.get(PLAY_REVIEWER_USER_ID);
+  if (!reason) return refuse(`${PLAY_REVIEWER_USER_ID} is not in COMPED_PREMIUM_ACCOUNTS`);
+
+  const owner = store.findOne<User>('users', (d) => {
+    const doc = d as Partial<User> & { type?: string };
+    return (doc.type === undefined || doc.type === 'user') &&
+      typeof doc.email === 'string' &&
+      doc.email.toLowerCase() === email;
+  });
+  if (owner && owner.id !== PLAY_REVIEWER_USER_ID) {
+    return refuse('PLAY_REVIEWER_EMAIL already belongs to another account; use a dedicated address');
+  }
+
+  const existing = store.byId<User>('users', PLAY_REVIEWER_USER_ID);
+  if (existing && existing.email.toLowerCase() !== email) {
+    return refuse(
+      `${PLAY_REVIEWER_USER_ID} exists with a different address; delete that account to re-provision at the new one`,
+    );
+  }
+
+  if (!existing) {
+    await seedAccount(store, PLAY_REVIEWER_USER_ID, email, password, 'Play Reviewer', 'user', 'premium', 15, {
+      // A production account: product analytics and reminders stay off.
+      anonymisedAnalytics: false,
+      reminders: false,
+    });
+    seedSampleHistory(store, PLAY_REVIEWER_USER_ID, 'play-reviewer');
+    reviewerAudit(store, 'play_reviewer.provisioned', { emailHash: emailHash(email) });
+    reviewerAudit(store, 'play_reviewer.premium_comped', { emailHash: emailHash(email), reason });
+    return { status: 'created' };
+  }
+
+  // The id is already ours. Repair only what a crashed first boot, or a
+  // later edit, took away. Do not report `unchanged` for a tier write: the
+  // boot log is the operator's evidence that premium was restored.
+  let repaired = false;
+  if (existing.tier !== 'premium') {
+    store.upsert('users', { ...existing, tier: 'premium' });
+    reviewerAudit(store, 'play_reviewer.premium_comped', { emailHash: emailHash(email), reason });
+    repaired = true;
+  }
+
+  let rotated = false;
+  const cred = store.byId<{ id: string; passwordHash: string }>('users', `cred-${PLAY_REVIEWER_USER_ID}`);
+  if (!cred) {
+    await seedAccount(store, PLAY_REVIEWER_USER_ID, email, password, 'Play Reviewer', 'user', 'premium', 15, {
+      anonymisedAnalytics: false,
+      reminders: false,
+    });
+    reviewerAudit(store, 'play_reviewer.provisioned', { emailHash: emailHash(email) });
+    repaired = true;
+  } else if (!(await bcrypt.compare(password, cred.passwordHash))) {
+    store.upsert('users', {
+      id: `cred-${PLAY_REVIEWER_USER_ID}`,
+      type: 'credentials',
+      userId: PLAY_REVIEWER_USER_ID,
+      passwordHash: await bcryptHashAsync(password, 10),
+    });
+    const revoked = revokeUserSessions(store, PLAY_REVIEWER_USER_ID);
+    reviewerAudit(store, 'play_reviewer.password_rotated', { emailHash: emailHash(email), revokedSessions: revoked });
+    rotated = true;
+  }
+
+  const hasHistory = store.findOne<MealLog>(
+    'logs',
+    (d) => (d as MealLog).type === 'mealLog' && (d as MealLog).userId === PLAY_REVIEWER_USER_ID,
+  );
+  if (!hasHistory) {
+    seedSampleHistory(store, PLAY_REVIEWER_USER_ID, 'play-reviewer');
+    repaired = true;
+  }
+  if (rotated) return { status: 'rotated' };
+  return { status: repaired ? 'repaired' : 'unchanged' };
 }
 
 // Standalone: `npm run seed` (tsx src/data/seed.ts)

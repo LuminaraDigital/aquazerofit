@@ -95,6 +95,26 @@ describe('SPA hosting enabled', () => {
     }
   });
 
+  it('serves the Play-declared privacy policy and account deletion pages in place', async () => {
+    for (const [dir, body] of [
+      ['account/deletion', 'deletion body'],
+      ['google-play/privacy-policy', 'play privacy body'],
+    ] as const) {
+      fs.mkdirSync(path.join(fixtureDir, dir), { recursive: true });
+      fs.writeFileSync(
+        path.join(fixtureDir, dir, 'index.html'),
+        `<!doctype html><title>x</title><main>${body}</main>`,
+        'utf8',
+      );
+      for (const url of [`/${dir}`, `/${dir}/`]) {
+        const res = await request(createApp()).get(url);
+        expect(res.status, url).toBe(200);
+        expect(res.headers.location, url).toBeUndefined();
+        expect(res.text, url).toContain(body);
+      }
+    }
+  });
+
   it('serves a client-side deep link with the shell, not a 404', async () => {
     const res = await request(createApp()).get('/nutrition/analysis/some-job-id');
     expect(res.status).toBe(200);

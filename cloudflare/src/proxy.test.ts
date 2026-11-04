@@ -28,6 +28,17 @@ test('follows a trailing-slash redirect only for the legal pages', () => {
   assert.equal(canonicalLegalPath('/privacy'), '/privacy');
   assert.equal(canonicalLegalPath('/refund/'), '/refund');
   assert.equal(canonicalLegalPath('/features'), null);
+  // The two URLs declared in Play Console.
+  assert.equal(canonicalLegalPath('/account/deletion/'), '/account/deletion');
+  assert.equal(canonicalLegalPath('/google-play/privacy-policy/'), '/google-play/privacy-policy');
+  assert.equal(
+    legalRedirectTarget(
+      'https://aquazerofit.com/account/deletion',
+      307,
+      'https://aquazerofit.com/account/deletion/',
+    ),
+    'https://aquazerofit.com/account/deletion/',
+  );
 
   const followed = legalRedirectTarget(
     'https://aquazerofit.com/terms',

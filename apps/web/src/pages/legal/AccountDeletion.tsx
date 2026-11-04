@@ -123,9 +123,7 @@ export default function AccountDeletionPage() {
           ]}
         />
         <Notice icon="schedule">
-          The grace period is the window in which you can change your mind — signing in again during
-          it leaves the flag in place. If you are certain, confirming a second time is the way to
-          finish immediately rather than waiting.
+          Signing in on the web or in the Android app cancels a pending deletion. Opening the Telegram Mini App does not. If you are certain, confirming a second time erases the account immediately rather than waiting out the period.
         </Notice>
       </Section>
 

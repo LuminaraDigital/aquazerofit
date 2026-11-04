@@ -43,7 +43,7 @@ import { completePayment, findPendingInvoice } from './stars';
 import {
   PREMIUM_PAYLOAD_PREFIX,
   completeSubscriptionPayment,
-  premiumCheckoutAccepts,
+  premiumCheckoutDecision,
 } from './starsSubscription';
 
 export const telegramWebhookRouter = Router();
@@ -132,19 +132,23 @@ function answerFailureReason(error: string): string {
 
 async function handlePreCheckout(query: NonNullable<TelegramUpdate['pre_checkout_query']>): Promise<void> {
   if (query.invoice_payload.startsWith(PREMIUM_PAYLOAD_PREFIX)) {
-    const priceOk = premiumCheckoutAccepts(query);
+    const decision = premiumCheckoutDecision(query);
     const answered = await answerPreCheckoutQuery(
       query.id,
-      priceOk,
-      priceOk ? undefined : 'This subscription is no longer available.',
+      decision.ok,
+      decision.ok
+        ? undefined
+        : decision.reason === 'already_premium'
+          ? 'This account already has Premium, so this payment was stopped. No Stars were charged.'
+          : 'This subscription is no longer available.',
     );
     if (!answered.ok) {
       logEvent('stars_precheckout_answer_failed', {
-        accepted: priceOk,
+        accepted: decision.ok,
         reason: answerFailureReason(answered.error),
       });
     }
-    if (!priceOk) logEvent('stars_precheckout_declined', { reason: 'unavailable' });
+    if (!decision.ok) logEvent('stars_precheckout_declined', { reason: decision.reason });
     return;
   }
 

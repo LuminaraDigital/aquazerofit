@@ -152,6 +152,8 @@ describe('environment documentation', () => {
     'FC_EARLY_CHEERS_PERCENT',
     'GIFT_PREMIUM_7D_STARS',
     'ENGAGE_HMAC_SECRET',
+    'TELEGRAM_BOT_USERNAME',
+    'TELEGRAM_MINI_APP_SHORT_NAME',
   ];
 
   it.each(['.env.example', '.env.staging.example', '.env.production.example'])(

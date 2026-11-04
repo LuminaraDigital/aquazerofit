@@ -4,7 +4,8 @@
  *
  *   /fight-camp  season enrolment and, from S9, the season recap
  *   /grace       the Cut Man bank
- *   /squads      squads: peek (public), current, create, join, leave, settings
+ *   /squads      squads: peek (public), current, create, join, leave,
+ *                settings, Squad Corner, Telegram invite messages
  */
 import { Router } from 'express';
 import {
@@ -12,6 +13,7 @@ import {
   enrolInputSchema,
   joinSquadInputSchema,
   squadCodeSchema,
+  squadCornerInputSchema,
   updateMySquadSettingsSchema,
 } from '@aquazerofit/shared';
 import { requireAuth, userIdOf } from '../../platform/auth';
@@ -19,6 +21,7 @@ import { asyncHandler } from '../../platform/errors';
 import { todayFor } from '../../platform/dates';
 import { enrol } from './enrolment';
 import { requireFeature, requireFeatureSwitch } from './flags';
+import { prepareSquadInvite, squadCorner } from './corner';
 import { syncGrace } from './grace';
 import {
   createSquad,
@@ -122,5 +125,22 @@ squadsRouter.patch(
   asyncHandler(async (req, res) => {
     const { showStats } = updateMySquadSettingsSchema.parse(req.body);
     res.json({ member: await setShowStats(userIdOf(req), String(req.params.id), showStats, todayFor(req)) });
+  }),
+);
+
+/** Opened from a Telegram group: what that group's Squad Corner is, and act on it. */
+squadsRouter.post(
+  '/corner',
+  asyncHandler(async (req, res) => {
+    const input = squadCornerInputSchema.parse(req.body);
+    res.json({ corner: await squadCorner(userIdOf(req), input, todayFor(req)) });
+  }),
+);
+
+/** A prepared Telegram message for shareMessage, or null: fall back to a link. */
+squadsRouter.post(
+  '/:id/invite-message',
+  asyncHandler(async (req, res) => {
+    res.json({ preparedMessageId: await prepareSquadInvite(userIdOf(req), String(req.params.id)) });
   }),
 );

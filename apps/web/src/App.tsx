@@ -10,6 +10,7 @@ import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { ScrollToTop } from './components/layout/ScrollToTop';
 import { RequireAuth, RequireTargets, useProfileGate } from './components/layout/RequireAuth';
 import { RouteFallbackSkeleton } from './components/ui/Skeleton';
+import { useFightCampStartApp } from './lib/startApp';
 import { IntroVideo } from './components/brand/IntroVideo';
 
 const Landing = lazy(() => import('./pages/landing/Landing'));
@@ -90,6 +91,12 @@ function LandingAlias() {
   return <Navigate to={{ pathname: '/', hash, search }} replace />;
 }
 
+/** Opens a Fight Camp `startapp` payload (a squad invite) once at launch. */
+function FightCampStartApp() {
+  useFightCampStartApp();
+  return null;
+}
+
 function TelegramChrome() {
   useTelegramHostChrome();
   useTelegramBackButton();
@@ -104,6 +111,7 @@ export default function App() {
   return (
     <>
     <TelegramChrome />
+    <FightCampStartApp />
     <IntroVideo />
     <ScrollToTop />
     <ErrorBoundary resetKey={pathname}>

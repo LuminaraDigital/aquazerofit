@@ -15,6 +15,7 @@
  * and the web client compute the same week, the same bank and the same theme.
  */
 import { z } from 'zod';
+import { TG_INIT_DATA_MAX_BYTES } from './constants';
 import { containsProfanity, PROFANITY_MESSAGE } from './profanity';
 import type { BeltTier } from './types/fightRecord';
 
@@ -96,6 +97,20 @@ export const joinSquadInputSchema = z.object({
 export type JoinSquadInput = z.infer<typeof joinSquadInputSchema>;
 
 export const updateMySquadSettingsSchema = z.object({ showStats: z.boolean() });
+
+/**
+ * Squad Corner (US-C3): the Mini App was opened from a Telegram group. The
+ * raw initData is sent so the server can check its signature and read the
+ * group's `chat_instance` itself; nothing the client claims about the group
+ * is trusted.
+ */
+const tgInitData = z.string().min(1).max(TG_INIT_DATA_MAX_BYTES);
+export const squadCornerInputSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('peek'), tgInitData }),
+  z.object({ action: z.literal('create'), tgInitData, name: squadNameSchema, consent: z.literal(true) }),
+  z.object({ action: z.literal('join'), tgInitData, consent: z.literal(true) }),
+]);
+export type SquadCornerInput = z.infer<typeof squadCornerInputSchema>;
 
 // ---------- copy ----------
 
@@ -213,6 +228,17 @@ export interface SquadPeekView {
   memberCount: number;
   seasonName: string;
   full: boolean;
+}
+
+/**
+ * none: no squad for this group yet (offer to start one); joinable: there is
+ * one with room; full; member: the caller is already in it.
+ */
+export type SquadCornerState = 'none' | 'joinable' | 'full' | 'member';
+
+export interface SquadCornerView {
+  state: SquadCornerState;
+  squad: SquadPeekView | null;
 }
 
 export interface SquadBoardRow {

@@ -29,10 +29,11 @@ import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { useToast } from '@/components/ui/Toast';
 import { BeltBadge } from '@/components/fightRecord/BeltBadge';
 import { BottomSheet } from '@/pages/training/BottomSheet';
-import { ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { beltName, useFightCamp } from '@/lib/fightRecord';
 import {
+  prepareSquadInvite,
+  squadErrorMessage,
   squadTelegramUrl,
   useCreateSquad,
   useJoinSquad,
@@ -40,12 +41,7 @@ import {
   useShowMyNumbers,
   useSquad,
 } from '@/lib/fightCamp';
-import { isTMA, openTelegramLink } from '@/lib/telegram';
-
-/** The server's message when it has one: its copy is already reviewed. */
-export function squadErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof ApiError && error.body?.message ? error.body.message : fallback;
-}
+import { isTMA, openTelegramLink, shareMessage } from '@/lib/telegram';
 
 export default function SquadPage() {
   const camp = useFightCamp();
@@ -214,7 +210,11 @@ function Member({ squad }: { squad: SquadView }) {
 
   const invite = async () => {
     const text = `Join my squad "${squad.name}" on AquaZeroFit.`;
+    // Bot API 8.0: a prepared message sent to chats the user picks. Anything
+    // less, or a refusal, falls through to the share link below.
     if (isTMA()) {
+      const prepared = await prepareSquadInvite(squad.id);
+      if (prepared && (await shareMessage(prepared))) return;
       const url = squadTelegramUrl(squad);
       openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
       return;

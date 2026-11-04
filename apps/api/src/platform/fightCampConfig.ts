@@ -72,4 +72,19 @@ export const fightCampConfig = {
     const raw = process.env.ENGAGE_HMAC_SECRET?.trim() ?? '';
     return raw.length >= MIN_ENGAGE_SECRET_LENGTH ? raw : '';
   },
+
+  /**
+   * `https://t.me/<bot>/<app>`: the link a squad invite opens. Built from
+   * configuration, never from a client, because it goes out in a message
+   * the bot sends. Mirrors the web build's VITE_TELEGRAM_BOT_USERNAME and
+   * VITE_TELEGRAM_MINI_APP_SHORT_NAME; a malformed value falls back to the
+   * default rather than producing a link to somewhere else.
+   */
+  get telegramMiniAppLink(): string {
+    const bot = process.env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '') ?? '';
+    const app = process.env.TELEGRAM_MINI_APP_SHORT_NAME?.trim() ?? '';
+    const botName = /^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(bot) ? bot : 'AquaZeroFitBot';
+    const appName = /^[A-Za-z0-9_]{3,30}$/.test(app) ? app : 'app';
+    return `https://t.me/${botName}/${appName}`;
+  },
 };

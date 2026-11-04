@@ -56,6 +56,7 @@ vi.mock('../../lib/api', () => ({
 vi.mock('../../lib/telegram', () => ({
   isTMA: () => false,
   getTelegramInitData: () => undefined,
+  // App routes a Fight Camp startapp payload once at launch (lib/startApp).
   getTelegramStartParam: () => null,
   haptic: vi.fn(),
 }));

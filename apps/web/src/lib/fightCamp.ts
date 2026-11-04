@@ -10,11 +10,13 @@ import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tan
 import type {
   EnrolSource,
   EnrolmentView,
+  SquadCornerInput,
+  SquadCornerView,
   SquadMemberView,
   SquadPeekView,
   SquadView,
 } from '@aquazerofit/shared';
-import { api } from './api';
+import { api, ApiError } from './api';
 import { unwrap } from './envelopes';
 import { fightRecordKey, type FightRecordEnvelope } from './fightRecord';
 import { telegramStartAppUrl } from './telegramLink';
@@ -46,6 +48,11 @@ export function useEnrol() {
 }
 
 // ---------- squads ----------
+
+/** The server's message when it has one: its copy is already reviewed. */
+export function squadErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError && error.body?.message ? error.body.message : fallback;
+}
 
 /**
  * Under ['progress'] like the Fight Record key, so a log anywhere refreshes
@@ -132,4 +139,32 @@ export function useShowMyNumbers(squadId: string) {
 /** t.me/<bot>/<app>?startapp=sq_<code>: opens the Mini App on the invite. */
 export function squadTelegramUrl(squad: Pick<SquadView, 'tgStartParam'>): string {
   return telegramStartAppUrl(squad.tgStartParam);
+}
+
+/** Squad Corner: what the launching group's squad is, and act on it. */
+export function useSquadCorner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: SquadCornerInput) =>
+      unwrap<SquadCornerView>(await api<unknown>('/squads/corner', { method: 'POST', body: input }), 'corner'),
+    onSuccess: (corner) => {
+      if (corner?.state === 'member') {
+        void qc.invalidateQueries({ queryKey: squadKey });
+        void qc.invalidateQueries({ queryKey: fightRecordKey });
+      }
+    },
+  });
+}
+
+/** A prepared Telegram invite, or null when the client must fall back to a link. */
+export async function prepareSquadInvite(squadId: string): Promise<string | null> {
+  try {
+    const body = await api<{ preparedMessageId: string | null }>(
+      `/squads/${encodeURIComponent(squadId)}/invite-message`,
+      { method: 'POST' },
+    );
+    return body?.preparedMessageId ?? null;
+  } catch {
+    return null;
+  }
 }

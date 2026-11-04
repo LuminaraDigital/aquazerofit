@@ -235,6 +235,9 @@ export const GROWTH_EVENT_NAMES = [
   'first_value_workout',
   'error_encountered',
   'page_abandoned',
+  /* Fight Camp (AZF-P1 §7.1). Props carry state and kinds only, never a
+     code, a name or a health figure. */
+  'squad_corner_opened',
 ] as const;
 export type GrowthEventName = (typeof GROWTH_EVENT_NAMES)[number];
 

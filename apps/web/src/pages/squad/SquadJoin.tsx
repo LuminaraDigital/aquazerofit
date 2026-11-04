@@ -16,8 +16,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ApiError, restoreSession, tokenStore } from '@/lib/api';
-import { peekSquad, useJoinSquad } from '@/lib/fightCamp';
-import { squadErrorMessage } from './Squad';
+import { peekSquad, squadErrorMessage, useJoinSquad } from '@/lib/fightCamp';
 
 /** null until the cookie-backed session restore has answered. */
 function useSignedIn(): boolean | null {

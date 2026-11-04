@@ -14,6 +14,7 @@ import { syncGrace } from './grace';
 import { squadsStatus } from './squads';
 import { unseenCheers } from './cheers';
 import { syncEarlyCheers } from './earlyCheers';
+import { engageRepo } from './repo';
 import { isAdult } from '../fightRecord/service';
 import { getProfile } from '../me/service';
 
@@ -26,6 +27,10 @@ export async function fightCampStatus(userId: string, today: string): Promise<Fi
     grace: fcEnabled('grace', userId) ? (await syncGrace(userId, today)).view : null,
     squads: fcEnabled('squads', userId) ? await squadsStatus(userId, today) : null,
     cheers: fcEnabled('cheers', userId) && isAdult(getProfile(userId)) ? await cheersStatus(userId, today) : null,
+    shareKit:
+      fcEnabled('shareKit', userId) && isAdult(getProfile(userId))
+        ? { joined: (await engageRepo().inviteesOf(userId)).length }
+        : null,
   };
 }
 

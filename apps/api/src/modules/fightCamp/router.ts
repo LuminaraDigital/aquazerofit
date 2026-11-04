@@ -7,6 +7,7 @@
  *   /squads      squads: peek (public), current, create, join, leave,
  *                settings, Squad Corner, Telegram invite messages
  *   /cheers      send, inbox, mark seen, and the bot-nudge setting
+ *   /share       Share Kit links, the public landing redirect, attribution
  */
 import { Router } from 'express';
 import {
@@ -16,11 +17,15 @@ import {
   squadCodeSchema,
   squadCornerInputSchema,
   cheersSeenInputSchema,
+  createShareLinkInputSchema,
+  shareAttributionInputSchema,
+  shareCodeSchema,
   nudgeSettingsInputSchema,
   sendCheerInputSchema,
   updateMySquadSettingsSchema,
 } from '@aquazerofit/shared';
 import { requireAuth, userIdOf } from '../../platform/auth';
+import { config } from '../../platform/config';
 import { asyncHandler } from '../../platform/errors';
 import { todayFor } from '../../platform/dates';
 import { enrol } from './enrolment';
@@ -28,6 +33,7 @@ import { requireFeature, requireFeatureSwitch } from './flags';
 import { prepareSquadInvite, squadCorner } from './corner';
 import { cheerInbox, decodeCursor, markCheersSeen, sendCheer } from './cheers';
 import { syncEarlyCheers } from './earlyCheers';
+import { attributeSquadJoin, claimShareAttribution, landOn, shareLinkFor, shareSummary } from './share';
 import { engageRepo } from './repo';
 import { syncGrace } from './grace';
 import {
@@ -120,7 +126,11 @@ squadsRouter.post(
   asyncHandler(async (req, res) => {
     const { code } = joinSquadInputSchema.parse(req.body);
     const via = req.query.via === 'link' ? 'link' : 'code';
-    res.json({ squad: await joinSquadByCode(userIdOf(req), code, todayFor(req), via) });
+    const userId = userIdOf(req);
+    const squad = await joinSquadByCode(userId, code, todayFor(req), via);
+    // A new account that came in through a squad invite counts for that squad.
+    if (via === 'link') await attributeSquadJoin(userId, squad.id, req.query.surface === 'tma' ? 'tma' : 'web');
+    res.json({ squad });
   }),
 );
 
@@ -229,5 +239,69 @@ cheersRouter.put(
     const { cheer } = nudgeSettingsInputSchema.parse(req.body);
     await engageRepo().setNudgeSetting(userIdOf(req), 'cheer', cheer, new Date().toISOString());
     res.json({ nudges: { cheer } });
+  }),
+);
+
+export const shareRouter = Router();
+
+/**
+ * Public: someone opened a share link. Web visitors are redirected to the
+ * landing page with `?ref=sh_<code>` (nothing about the sharer); the Mini
+ * App reports its own launch with `?surface=tma` and gets 204. A code that
+ * matches nothing, or a Share Kit that is switched off, still lands on the
+ * home page rather than an error: the link is already out in the world.
+ */
+shareRouter.get(
+  '/r/:code',
+  asyncHandler(async (req, res) => {
+    const surface = req.query.surface === 'tma' ? 'tma' : 'web';
+    const code = shareCodeSchema.safeParse(req.params.code);
+    let target = `${config.appPublicUrl}/`;
+    try {
+      requireFeatureSwitch('shareKit');
+      if (code.success) target = await landOn(code.data, surface);
+    } catch {
+      // Off, or the lookup failed: home, without a ref.
+    }
+    if (surface === 'tma') {
+      res.status(204).end();
+      return;
+    }
+    res.redirect(302, target);
+  }),
+);
+
+shareRouter.use(requireAuth);
+
+shareRouter.use((req, _res, next) => {
+  const userId = userIdOf(req);
+  requireFeature('shareKit', userId);
+  next();
+});
+
+shareRouter.post(
+  '/links',
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    requireSquadAdult(userId);
+    const { kind } = createShareLinkInputSchema.parse(req.body);
+    res.json({ shareLink: await shareLinkFor(userId, kind, todayFor(req)) });
+  }),
+);
+
+/** 204 whatever happened: the answer says nothing about codes or accounts. */
+shareRouter.post(
+  '/attributions',
+  asyncHandler(async (req, res) => {
+    const { code, surface } = shareAttributionInputSchema.parse(req.body);
+    await claimShareAttribution(userIdOf(req), code, surface);
+    res.status(204).end();
+  }),
+);
+
+shareRouter.get(
+  '/summary',
+  asyncHandler(async (req, res) => {
+    res.json({ summary: await shareSummary(userIdOf(req), todayFor(req)) });
   }),
 );

@@ -107,7 +107,8 @@ function isAnonymousWritePath(path: string): boolean {
   return (
     path.includes('/analytics/events') ||
     path.includes('/challenges/peek') ||
-    path.includes('/squads/peek')
+    path.includes('/squads/peek') ||
+    path.includes('/share/r/')
   );
 }
 

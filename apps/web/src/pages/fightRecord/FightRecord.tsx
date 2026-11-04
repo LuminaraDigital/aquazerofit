@@ -14,7 +14,14 @@
  */
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { tierRank, type BeltAwardView, type FightRecordStatus } from '@aquazerofit/shared';
+import {
+  seasonByNumber,
+  seasonTheme,
+  tierRank,
+  type BeltAwardView,
+  type BeltTier,
+  type FightRecordStatus,
+} from '@aquazerofit/shared';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { AppBackground } from '@/components/layout/AppBackground';
 import { BottomNav } from '@/components/ui/BottomNav';
@@ -26,6 +33,8 @@ import { useToast } from '@/components/ui/Toast';
 import { BeltBadge } from '@/components/fightRecord/BeltBadge';
 import { BeltCelebration, BeltShareSheet } from '@/components/fightRecord/BeltCelebration';
 import { CheersInbox } from '@/components/fightCamp/Cheers';
+import { ShareKitSheet } from '@/components/fightCamp/ShareKitSheet';
+import { useFirstName } from '@/lib/fightCamp';
 import { formatDate } from '@/lib/format';
 import {
   beltName,
@@ -77,6 +86,13 @@ export default function FightRecordPage() {
 function Record({ record }: { record: FightRecordStatus }) {
   const { season, activeDays, daysLeft, tier } = record.current;
   const [sharing, setSharing] = useState<BeltAwardView | null>(null);
+  const camp = useFightCamp().data;
+  const shareKit = Boolean(camp?.shareKit) && record.adult;
+  const firstName = useFirstName();
+  // With the Share Kit on, every share goes through it; off, R1a's belt sheet.
+  const [kit, setKit] = useState<{ kind: 'belt' | 'season'; belt: BeltTier | null; seasonNumber: number } | null>(null);
+  const share = (belt: BeltAwardView) =>
+    shareKit ? setKit({ kind: 'belt', belt: belt.tier, seasonNumber: belt.seasonNumber }) : setSharing(belt);
   const currentBelt = record.belts.find((b) => b.seasonNumber === season.number) ?? null;
 
   return (
@@ -108,9 +124,18 @@ function Record({ record }: { record: FightRecordStatus }) {
         </div>
         <p className="mt-3 text-sm text-on-surface-variant text-pretty">{nextBeltCopy(record)}</p>
         {currentBelt && (
-          <PrimaryButton className="mt-4 w-full" onClick={() => setSharing(currentBelt)}>
+          <PrimaryButton className="mt-4 w-full" onClick={() => share(currentBelt)}>
             Share my belt
           </PrimaryButton>
+        )}
+        {shareKit && (
+          <button
+            type="button"
+            onClick={() => setKit({ kind: 'season', belt: tier, seasonNumber: season.number })}
+            className="mt-3 min-h-[44px] w-full rounded-lg text-sm font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            Share this season
+          </button>
         )}
       </GlassCard>
 
@@ -158,7 +183,7 @@ function Record({ record }: { record: FightRecordStatus }) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setSharing(belt)}
+                  onClick={() => share(belt)}
                   aria-label={`Share ${beltName(belt.tier)}, season ${belt.seasonNumber}`}
                   className="flex h-10 w-10 items-center justify-center rounded-full text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 >
@@ -179,6 +204,21 @@ function Record({ record }: { record: FightRecordStatus }) {
 
       <BeltCelebration record={record} />
       <BeltShareSheet award={sharing} adult={record.adult} onClose={() => setSharing(null)} />
+      {kit && camp && (
+        <ShareKitSheet
+          open
+          onClose={() => setKit(null)}
+          firstName={firstName}
+          accentId={seasonTheme(kit.seasonNumber).accentId}
+          card={{
+            kind: kit.kind,
+            season: seasonByNumber(kit.seasonNumber),
+            accent: seasonTheme(kit.seasonNumber).accent,
+            belt: kit.belt,
+            activeDays,
+          }}
+        />
+      )}
     </div>
   );
 }

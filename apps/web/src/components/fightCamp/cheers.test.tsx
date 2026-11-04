@@ -16,6 +16,7 @@ vi.mock('@/lib/api', async (original) => ({
 import { CheerButton, CheersInbox } from './Cheers';
 import { SeasonCard } from '@/components/fightRecord/SeasonCard';
 import NotificationSettings from '@/pages/settings/NotificationSettings';
+import SquadPage from '@/pages/squad/Squad';
 import { tokenStore } from '@/lib/api';
 
 afterEach(() => {
@@ -61,7 +62,6 @@ describe('CheerButton', () => {
 
 describe('the just-joined prompt', () => {
   it('offers one cheer for a new squad mate, and is gone once sent', async () => {
-    const { default: SquadPage } = await import('@/pages/squad/Squad');
     const squad = {
       id: 'sqd-1',
       name: 'Corner Crew',

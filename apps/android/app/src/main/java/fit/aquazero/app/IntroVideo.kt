@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
@@ -75,12 +74,16 @@ fun IntroVideo() {
     }
 
     AnimatedVisibility(visible = visible, exit = fadeOut(tween(300))) {
-        BoxWithConstraints(Modifier.fillMaxSize().background(Color.White), contentAlignment = Alignment.Center) {
-            // Cover, not fit: size the view to the video's aspect at whichever
-            // dimension overflows, and let the screen clip the excess.
-            val scale = maxOf(maxWidth.value / VIDEO_ASPECT, maxHeight.value)
+        BoxWithConstraints(
+            Modifier.fillMaxSize().background(if (started) Color.Black else Color.White),
+            contentAlignment = Alignment.Center,
+        ) {
+            // Fit, not cover: phones taller than 9:16 would otherwise crop the
+            // captions and fighters off the sides. Letterbox in black once
+            // playing; the montage is dark.
+            val height = minOf(maxWidth.value / VIDEO_ASPECT, maxHeight.value)
             AndroidView(
-                modifier = Modifier.requiredSize((scale * VIDEO_ASPECT).dp, scale.dp),
+                modifier = Modifier.size((height * VIDEO_ASPECT).dp, height.dp),
                 factory = { ctx ->
                     VideoView(ctx).apply {
                         // Silent video: never pause whatever the user is listening to.

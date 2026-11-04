@@ -49,6 +49,10 @@ COPY apps/api apps/api
 # copy them; it copies source explicitly below.
 COPY .gcloudignore cloudbuild.yaml ./
 COPY deploy/cloudrun/service.yaml deploy/cloudrun/service.yaml
+# The provider-disclosure test reads aiProviders out of this file. The rest of
+# apps/web is copied only after the API gate, so this one file has to land first
+# or that test dies with ENOENT inside the image and nowhere else.
+COPY apps/web/src/pages/legal/operator.tsx apps/web/src/pages/legal/operator.tsx
 
 # Gate the image on a green API build before the slower web compile.
 RUN npm run typecheck --workspace packages/shared \

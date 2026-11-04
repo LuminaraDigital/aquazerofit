@@ -3,6 +3,7 @@
  * via AZF_DATA_DIR): register, duplicate email, login, refresh rotation,
  * reuse -> family revocation, logout, and the seeded demo account.
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,6 +12,10 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'azf-auth-'));
 process.env.AZF_DATA_DIR = dataDir;
+// The demo password is no longer in the source; tests supply their own, set
+// before the store boots and seeds.
+const DEMO_PASSWORD = `demo-${crypto.randomBytes(12).toString('hex')}`;
+process.env.AZF_DEMO_PASSWORD = DEMO_PASSWORD;
 
 const { createApp } = await import('../app');
 const { getStore } = await import('../platform/store');
@@ -151,12 +156,12 @@ describe('refresh rotation + family revocation', () => {
 const { seedIfNeeded, resetSeededDirs } = await import('../data/seed');
 
 describe('seeded demo account', () => {
-  it('signs in with the documented demo credentials and has a full profile', async () => {
+  it('signs in with the AZF_DEMO_PASSWORD credentials and has a full profile', async () => {
     resetSeededDirs();
     await seedIfNeeded(getStore());
     const res = await request(app)
       .post(`${base}/auth/login`)
-      .send({ email: 'demo@aquazero.fit', password: 'AquaZeroDemo!2026' });
+      .send({ email: 'demo@aquazero.fit', password: DEMO_PASSWORD });
     expect(res.status).toBe(200);
     expect(res.body.user.hasProfile).toBe(true);
 
@@ -165,6 +170,16 @@ describe('seeded demo account', () => {
       .set('Authorization', `Bearer ${res.body.accessToken}`);
     expect(targets.status).toBe(200);
     expect(targets.body.targets.kcalTarget).toBeGreaterThan(1500);
+  });
+
+  it('no longer accepts the password that used to be hard-coded in the seeder', async () => {
+    // It is public in the repository history. Assembled here so the literal
+    // does not sit in the tree as a usable credential.
+    const old = ['AquaZero', 'Demo!', '2026'].join('');
+    const res = await request(app)
+      .post(`${base}/auth/login`)
+      .send({ email: 'demo@aquazero.fit', password: old });
+    expect(res.status).toBe(401);
   });
 });
 

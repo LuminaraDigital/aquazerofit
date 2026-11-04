@@ -31,8 +31,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import type { AuditEvent } from '@aquazerofit/shared';
 import { config } from './config';
 import { seedIfNeeded } from '../data/seed';
+import {
+  AUDIT_CHAIN_GENESIS,
+  computeAuditEventHash,
+  isChainedAuditDoc,
+} from './auditChain';
 
 export const CONTAINERS = [
   'users',
@@ -250,6 +256,8 @@ export abstract class MemoryBackedStore {
   private flushScheduled = false;
   /** container -> index name -> index. Empty for containers with no indexes. */
   private readonly indexes = new Map<ContainerName, Map<string, SecondaryIndex>>();
+  private auditChainSeq = 0;
+  private auditChainHeadHash = AUDIT_CHAIN_GENESIS;
 
   protected constructor(dataDir: string) {
     this.dataDir = dataDir;
@@ -281,8 +289,52 @@ export abstract class MemoryBackedStore {
         this.indexPut(name, doc);
       }
     }
+    if (name === 'audit') this.adoptAuditChain(map);
   }
 
+  /**
+   * Resume the audit hash chain after hydration (EN-4.2).
+   *
+   * The head is the highest persisted seq. Rows written before the chain
+   * existed have no seq; they are stamped AFTER the head in a deterministic
+   * (createdAt, id) order, because Postgres returns rows in arbitrary order and
+   * the stamp must come out identical on every boot. They are marked dirty so
+   * the stamp is persisted: later events chain onto it, so it must not be
+   * recomputed differently on the next restart.
+   */
+  private adoptAuditChain(map: Map<string, StoredDoc>): void {
+    const legacy: (StoredDoc & AuditEvent)[] = [];
+    for (const doc of map.values()) {
+      if (!isChainedAuditDoc(doc)) continue;
+      if (typeof doc.seq === 'number' && typeof doc.hash === 'string') {
+        if (doc.seq > this.auditChainSeq) {
+          this.auditChainSeq = doc.seq;
+          this.auditChainHeadHash = doc.hash;
+        }
+      } else if (doc.seq === undefined) {
+        legacy.push(doc);
+      }
+    }
+    legacy.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+    for (const doc of legacy) {
+      const seq = this.auditChainSeq + 1;
+      const prevHash = this.auditChainHeadHash;
+      const hash = computeAuditEventHash({
+        seq,
+        prevHash,
+        id: doc.id,
+        type: doc.type,
+        action: doc.action,
+        createdAt: doc.createdAt,
+      });
+      this.auditChainSeq = seq;
+      this.auditChainHeadHash = hash;
+      const stamped = { ...doc, seq, prevHash, hash } as StoredDoc;
+      map.set(doc.id, stamped);
+      this.indexPut('audit', stamped);
+      this.markDirty('audit', doc.id, 'write');
+    }
+  }
   /**
    * Write a document into memory and its indexes WITHOUT marking it dirty.
    *
@@ -452,12 +504,45 @@ export abstract class MemoryBackedStore {
 
   upsert<T extends StoredDoc>(name: ContainerName, doc: T): T {
     this.assertUnique(name, doc);
-    this.container(name).set(doc.id, doc);
+    let toStore = doc;
+    if (name === 'audit' && isChainedAuditDoc(doc) && doc.seq === undefined) {
+      const existing = this.container(name).get(doc.id) as
+        | (StoredDoc & { seq?: number; prevHash?: string; hash?: string })
+        | undefined;
+      if (
+        existing &&
+        typeof existing.seq === 'number' &&
+        typeof existing.prevHash === 'string' &&
+        typeof existing.hash === 'string'
+      ) {
+        toStore = {
+          ...doc,
+          seq: existing.seq,
+          prevHash: existing.prevHash,
+          hash: existing.hash,
+        } as T;
+      } else {
+        const seq = this.auditChainSeq + 1;
+        const prevHash = this.auditChainHeadHash;
+        const hash = computeAuditEventHash({
+          seq,
+          prevHash,
+          id: doc.id,
+          type: doc.type,
+          action: doc.action,
+          createdAt: doc.createdAt,
+        });
+        this.auditChainSeq = seq;
+        this.auditChainHeadHash = hash;
+        toStore = { ...doc, seq, prevHash, hash } as T;
+      }
+    }
+    this.container(name).set(toStore.id, toStore);
     // Before markDirty, so a persist() that reads memory can never observe a
     // document whose index entry has not caught up.
-    this.indexPut(name, doc);
-    this.markDirty(name, doc.id, 'write');
-    return doc;
+    this.indexPut(name, toStore);
+    this.markDirty(name, toStore.id, 'write');
+    return toStore;
   }
 
   delete(name: ContainerName, id: string): boolean {

@@ -115,6 +115,15 @@ describe('cloud run packaging', () => {
     expect(cloudbuildCommands).toContain('VITE_TG_ANALYTICS_APP_NAME=${_VITE_TG_ANALYTICS_APP_NAME}');
 
     const dockerfile = fs.readFileSync(path.join(repoRoot, 'apps/api/Dockerfile'), 'utf8');
+    // aiProviderDisclosure.test.ts reads operator.tsx. The API tests run before
+    // the rest of apps/web is copied, so this file has to be in the image first.
+    const buildStage = dockerfile.split('Stage 2: runtime')[0] ?? '';
+    const operatorCopy = buildStage.indexOf(
+      'COPY apps/web/src/pages/legal/operator.tsx apps/web/src/pages/legal/operator.tsx',
+    );
+    const apiTests = buildStage.indexOf('npm run test --workspace apps/api');
+    expect(operatorCopy).toBeGreaterThan(-1);
+    expect(apiTests).toBeGreaterThan(operatorCopy);
     expect(dockerfile).toContain('ARG VITE_SITE_ORIGIN=');
     expect(dockerfile).toContain('ARG VITE_TG_ANALYTICS_TOKEN=');
     expect(dockerfile).toContain('ARG VITE_TG_ANALYTICS_APP_NAME=');

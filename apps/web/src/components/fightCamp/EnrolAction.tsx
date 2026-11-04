@@ -11,7 +11,7 @@
  * here implies a user who has not joined is missing anything.
  */
 import { useEffect, useRef } from 'react';
-import type { FightCampStatus, Season } from '@aquazerofit/shared';
+import type { EnrolSource, FightCampStatus, Season } from '@aquazerofit/shared';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useToast } from '@/components/ui/Toast';
 import { useEnrol } from '@/lib/fightCamp';
@@ -19,16 +19,18 @@ import { useEnrol } from '@/lib/fightCamp';
 interface Props {
   enrolment: NonNullable<FightCampStatus['enrolment']>;
   season: Season;
+  /** Where the commitment was made, for the fc_enrolled event. */
+  source?: EnrolSource;
 }
 
-export function EnrolAction({ enrolment, season }: Props) {
+export function EnrolAction({ enrolment, season, source = 'dashboard' }: Props) {
   const toast = useToast();
   const enrol = useEnrol();
   const confirmation = useRef<HTMLParagraphElement>(null);
   const joinedHere = useRef(false);
   const join = () => {
     joinedHere.current = true;
-    enrol.mutate('dashboard', {
+    enrol.mutate(source, {
       onSuccess: () => toast.success(`You're in. Season ${season.number} starts with you.`),
       onError: () => toast.error('Could not join just now. Try again.'),
     });

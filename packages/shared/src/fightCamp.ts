@@ -374,6 +374,28 @@ export function storyCaption(text: string, link: string): string {
   return `${body} ${link}`;
 }
 
+// ---------- season recap ----------
+
+/**
+ * A finished season, effort only (US-A3): no weight, measurement, photo,
+ * calorie or macro has a field here.
+ */
+export interface SeasonRecap {
+  seasonNumber: number;
+  seasonName: string;
+  startsOn: string;
+  endsOn: string;
+  /** The highest belt held for the season, or null. */
+  belt: BeltTier | null;
+  activeDays: number;
+  /** Longest run of the season, counted the way the consistency card counts it. */
+  longestRun: number;
+  cheersGiven: number;
+  cheersReceived: number;
+  /** The squad the person was in at the end of the season, if any. */
+  squadName: string | null;
+}
+
 // ---------- Cut Man grace ----------
 
 /** Cut Man days a season's active days have earned: one per seven. */
@@ -443,4 +465,9 @@ export interface FightCampStatus {
   cheers: { unseen: number } | null;
   /** FC_SHARE_KIT, for adults only: how many people joined from this person's cards. */
   shareKit: { joined: number } | null;
+  /**
+   * FC_ENROL: the season just ended has a recap ready, offered for its first
+   * 14 days to anyone who showed up in it at least once.
+   */
+  recap: { seasonNumber: number; seasonName: string } | null;
 }

@@ -15,6 +15,7 @@ import { squadsStatus } from './squads';
 import { unseenCheers } from './cheers';
 import { syncEarlyCheers } from './earlyCheers';
 import { engageRepo } from './repo';
+import { recapOffer } from './recap';
 import { isAdult } from '../fightRecord/service';
 import { getProfile } from '../me/service';
 
@@ -31,6 +32,7 @@ export async function fightCampStatus(userId: string, today: string): Promise<Fi
       fcEnabled('shareKit', userId) && isAdult(getProfile(userId))
         ? { joined: (await engageRepo().inviteesOf(userId)).length }
         : null,
+    recap: fcEnabled('enrol', userId) ? recapOffer(userId, today) : null,
   };
 }
 

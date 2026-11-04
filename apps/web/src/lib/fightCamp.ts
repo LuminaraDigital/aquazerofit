@@ -22,6 +22,7 @@ import type {
   SquadCornerInput,
   SquadCornerView,
   SquadMemberView,
+  SeasonRecap,
   ShareKindP1,
   ShareLinkView,
   SquadPeekView,
@@ -297,5 +298,17 @@ export function useShareLink(kind: ShareKindP1, enabled: boolean) {
       unwrap<ShareLinkView>(await api<unknown>('/share/links', { method: 'POST', body: { kind } }), 'shareLink'),
     enabled,
     staleTime: Infinity,
+  });
+}
+
+// ---------- season recap ----------
+
+export function useSeasonRecap(seasonNumber: number | null) {
+  return useQuery({
+    queryKey: ['progress', 'recap', seasonNumber],
+    queryFn: async () =>
+      unwrap<SeasonRecap>(await api<unknown>(`/fight-camp/recap/${seasonNumber}`), 'recap'),
+    enabled: seasonNumber !== null,
+    retry: false,
   });
 }

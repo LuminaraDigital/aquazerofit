@@ -251,7 +251,7 @@ export function planCutManBridges(
  * high-water mark is the widest such window — found by sliding one over the
  * sorted dates rather than re-walking from every endpoint.
  */
-function longestRun(
+export function longestRun(
   sortedDates: readonly string[],
   bridged: ReadonlySet<string> = NO_BRIDGES,
 ): number {

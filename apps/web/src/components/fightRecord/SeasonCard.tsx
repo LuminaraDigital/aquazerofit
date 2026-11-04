@@ -71,6 +71,15 @@ export function SeasonCard() {
         {camp && (
           <p className="mt-3 text-sm text-on-surface text-pretty">{camp.theme.coachLine}</p>
         )}
+        {camp?.recap && (
+          <button
+            type="button"
+            onClick={() => navigate(`/fight-record/recap/${camp.recap!.seasonNumber}`)}
+            className="mt-3 flex min-h-[44px] items-center text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            Your Season {camp.recap.seasonNumber} recap is ready
+          </button>
+        )}
         {camp?.grace && <CutManChip grace={camp.grace} />}
         {camp?.cheers && camp.cheers.unseen > 0 && (
           <button

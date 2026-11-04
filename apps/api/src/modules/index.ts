@@ -20,6 +20,7 @@ import { visionRouter } from './vision/router';
 import { recommendationsRouter } from './recommendations/router';
 import { challengesRouter } from './challenges/router';
 import { fightRecordRouter } from './fightRecord/router';
+import { fightCampRouter } from './fightCamp/router';
 import { coachesRouter } from './coaches/router';
 import { telegramWebhookRouter } from './payments/router';
 import { billingRouter } from './billing/router';
@@ -154,6 +155,7 @@ export function buildRouter(): Router {
   router.use('/recipes', recipesRouter);
   router.use('/challenges', challengesRouter);
   router.use('/fight-record', fightRecordRouter);
+  router.use('/fight-camp', fightCampRouter);
   router.use('/coaches', coachesRouter);
   router.use('/admin', adminRouter);
   router.use('/export', exportRouter);

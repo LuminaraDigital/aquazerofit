@@ -11,6 +11,7 @@ import type {
   BeltAwardView,
   BeltTier,
   EmojiStatusSetting,
+  FightCampStatus,
   FightRecordStatus,
 } from '@aquazerofit/shared';
 import { api } from './api';
@@ -26,17 +27,50 @@ import type { ShareCardPayload } from './shareCard';
 export const fightRecordKey = ['progress', 'fightRecord'] as const;
 
 /**
- * Null when the feature is off for this account: the caller renders nothing.
+ * The whole GET /fight-record body. One cache entry, one queryFn, and each
+ * hook below carves its slice with `select` (the rule in lib/queries.ts:
+ * same key, same raw shape). `fightCamp` is read by hand rather than with
+ * `unwrap`, which answers the whole body when a key is absent.
+ */
+export interface FightRecordEnvelope {
+  fightRecord: FightRecordStatus | null;
+  /** Absent unless a Fight Camp feature is on (AZF-P1 §5.3). */
+  fightCamp: FightCampStatus | null;
+}
+
+async function fetchFightRecord(): Promise<FightRecordEnvelope> {
+  const body = await api<unknown>('/fight-record');
+  return {
+    fightRecord: unwrap<FightRecordStatus>(body, 'fightRecord'),
+    fightCamp: (body as { fightCamp?: FightCampStatus } | null)?.fightCamp ?? null,
+  };
+}
+
+/**
  * `staleTime: 0` for the same reason as useProgression: this is the surface
  * that announces a new belt, so a cached answer right after a log is wrong at
  * exactly the moment it matters.
  */
+const fightRecordQuery = { queryKey: fightRecordKey, queryFn: fetchFightRecord, staleTime: 0 } as const;
+
+/** Null when the feature is off for this account: the caller renders nothing. */
 export function useFightRecord(): UseQueryResult<FightRecordStatus | null> {
-  return useQuery({
-    queryKey: fightRecordKey,
-    queryFn: async () => unwrap<FightRecordStatus>(await api<unknown>('/fight-record'), 'fightRecord'),
-    staleTime: 0,
-  });
+  return useQuery({ ...fightRecordQuery, select: (envelope) => envelope.fightRecord });
+}
+
+/** Null unless a Fight Camp feature is on: callers render only what exists. */
+export function useFightCamp(): UseQueryResult<FightCampStatus | null> {
+  return useQuery({ ...fightRecordQuery, select: (envelope) => envelope.fightCamp });
+}
+
+/** Update the cached record in place, leaving the Fight Camp block alone. */
+function patchRecord(
+  qc: ReturnType<typeof useQueryClient>,
+  patch: (record: FightRecordStatus) => FightRecordStatus,
+): void {
+  qc.setQueryData<FightRecordEnvelope>(fightRecordKey, (envelope) =>
+    envelope?.fightRecord ? { ...envelope, fightRecord: patch(envelope.fightRecord) } : envelope,
+  );
 }
 
 /**
@@ -50,8 +84,8 @@ export function useAckBelt() {
     mutationFn: (awardId: string) =>
       api<void>('/fight-record/ack', { method: 'POST', body: { awardId } }),
     onMutate: (awardId) => {
-      qc.setQueryData<FightRecordStatus | null>(fightRecordKey, (record) =>
-        record && record.celebrate?.id === awardId ? { ...record, celebrate: null } : record,
+      patchRecord(qc, (record) =>
+        record.celebrate?.id === awardId ? { ...record, celebrate: null } : record,
       );
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: fightRecordKey }),
@@ -68,9 +102,7 @@ export function useSetEmojiStatus() {
       ),
     onSuccess: (emojiStatus) => {
       if (!emojiStatus) return;
-      qc.setQueryData<FightRecordStatus | null>(fightRecordKey, (record) =>
-        record ? { ...record, emojiStatus } : record,
-      );
+      patchRecord(qc, (record) => ({ ...record, emojiStatus }));
     },
   });
 }

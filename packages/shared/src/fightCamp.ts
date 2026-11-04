@@ -63,3 +63,78 @@ export const enrolInputSchema = z.object({
   source: z.enum(ENROL_SOURCES).default('dashboard'),
 });
 export type EnrolInput = z.infer<typeof enrolInputSchema>;
+
+// ---------- copy ----------
+
+/**
+ * Words no Fight Camp surface may use (PRD §6.1, W3-05 §2.7). Stems rather
+ * than whole words, so "streaks", "resetting" and "failed" fail too. Both the
+ * API messages and every rendered Phase 1 string are scanned with it.
+ */
+export const BANNED_COPY =
+  /\b(streak\w*|lost|los(e|es|ing)|reset\w*|fail\w*|broke\w*|break\w*|missed out|last place|lazy|hurr\w*|last chance|expir\w*)\b/i;
+
+// ---------- seasons ----------
+
+/**
+ * One accent per season, keyed by `seasonNumber % 6` (US-A2). Used for bands,
+ * borders and glyphs only, never as a text colour, so no accent has to clear
+ * a contrast bar against both themes. The id names the static story art.
+ */
+export const SEASON_ACCENTS = [
+  { id: 'gold', colour: '#c9a227' },
+  { id: 'red', colour: '#d1495b' },
+  { id: 'teal', colour: '#2a9d8f' },
+  { id: 'blue', colour: '#3d7bd9' },
+  { id: 'amber', colour: '#e08e2b' },
+  { id: 'violet', colour: '#8b5cf6' },
+] as const;
+export type SeasonAccentId = (typeof SEASON_ACCENTS)[number]['id'];
+
+/** The season's coach line, same index as the accent. Effort, never outcome. */
+const SEASON_COACH_LINES = [
+  'Title run. Same work, every day you can.',
+  'Camp is open. Show up, then show up again.',
+  'Ground game is patience. One honest day at a time.',
+  'Second wind finds the people who keep moving.',
+  'Ring craft is built in quiet rounds. Keep yours.',
+  'The long game rewards the ones who come back.',
+] as const;
+
+export interface SeasonTheme {
+  accentId: SeasonAccentId;
+  accent: string;
+  coachLine: string;
+}
+
+export function seasonTheme(seasonNumber: number): SeasonTheme {
+  const index = ((Math.floor(seasonNumber) % 6) + 6) % 6;
+  const accent = SEASON_ACCENTS[index]!;
+  return { accentId: accent.id, accent: accent.colour, coachLine: SEASON_COACH_LINES[index]! };
+}
+
+/**
+ * Where the "Join Fight Camp" prompt sits: the card's one primary action in
+ * a season's fresh-start window, a quiet link after it (US-A1 AC4).
+ */
+export type EnrolPrompt = 'primary' | 'secondary';
+
+// ---------- responses ----------
+
+export interface EnrolmentView {
+  seasonNumber: number;
+  seasonName: string;
+  source: EnrolSource;
+  enrolledAt: string;
+}
+
+/**
+ * Additive block beside `fightRecord` on GET /fight-record. Absent unless at
+ * least one Fight Camp feature is on for the caller; each part is null while
+ * its own feature is off, so a client renders exactly the parts that exist.
+ */
+export interface FightCampStatus {
+  theme: SeasonTheme;
+  /** FC_ENROL. */
+  enrolment: { enrolled: boolean; prompt: EnrolPrompt } | null;
+}

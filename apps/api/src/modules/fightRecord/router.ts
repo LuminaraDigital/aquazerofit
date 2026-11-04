@@ -22,19 +22,28 @@ import {
   readFightRecord,
   setEmojiStatusPreference,
 } from './service';
+import { fightCampStatus } from '../fightCamp/status';
 
 export const fightRecordRouter = Router();
 
 fightRecordRouter.use(requireAuth);
 
-fightRecordRouter.get('/', (req, res) => {
-  const userId = userIdOf(req);
-  if (!fightRecordEnabledFor(userId)) {
-    res.json({ fightRecord: null });
-    return;
-  }
-  res.json({ fightRecord: readFightRecord(userId, todayFor(req)) });
-});
+fightRecordRouter.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    if (!fightRecordEnabledFor(userId)) {
+      res.json({ fightRecord: null });
+      return;
+    }
+    const today = todayFor(req);
+    const fightRecord = readFightRecord(userId, today);
+    // Fight Camp is additive (AZF-P1 §5.3): the key is absent unless one of
+    // its features is on, so R1a clients, Android included, see no change.
+    const fightCamp = await fightCampStatus(userId, today);
+    res.json(fightCamp ? { fightRecord, fightCamp } : { fightRecord });
+  }),
+);
 
 /**
  * 204 whether or not anything was marked: an id that is not the caller's, or

@@ -13,17 +13,23 @@
  * does not have. The /fight-record page carries the loading and error states.
  * Also hosts the celebration, which is why every new belt is announced on the
  * next dashboard visit.
+ *
+ * Fight Camp (AZF-P1) adds to the card only what is switched on for the
+ * account: the season's accent and coach line, then the enrolment action.
+ * With every Fight Camp flag off the card renders exactly as it did in R1a.
  */
 import { useNavigate } from 'react-router-dom';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { formatDate } from '@/lib/format';
-import { beltName, nextBeltCopy, useFightRecord } from '@/lib/fightRecord';
+import { beltName, nextBeltCopy, useFightCamp, useFightRecord } from '@/lib/fightRecord';
+import { EnrolAction } from '@/components/fightCamp/EnrolAction';
 import { BeltBadge } from './BeltBadge';
 import { BeltCelebration } from './BeltCelebration';
 
 export function SeasonCard() {
   const navigate = useNavigate();
   const record = useFightRecord().data;
+  const camp = useFightCamp().data ?? null;
   if (!record) return null;
 
   const { season, activeDays, daysLeft, tier, next } = record.current;
@@ -49,16 +55,22 @@ export function SeasonCard() {
         </p>
         <p className="mt-1 text-sm text-on-surface-variant text-pretty">{nextBeltCopy(record)}</p>
 
-        {/* Toward the next belt. The meter never marks an individual day. */}
+        {/* Toward the next belt. The meter never marks an individual day. Its
+            fill is the season's one accent when Fight Camp is on. */}
         <div
           className="mt-3 h-2 w-full overflow-hidden rounded-full bg-outline-variant/40"
           aria-hidden="true"
         >
           <div
-            className="h-full rounded-full bg-primary transition-[width] duration-500"
-            style={{ width: `${pct}%` }}
+            className="h-full rounded-full bg-primary transition-[width] duration-500 motion-reduce:transition-none"
+            style={{ width: `${pct}%`, ...(camp ? { backgroundColor: camp.theme.accent } : {}) }}
           />
         </div>
+
+        {camp && (
+          <p className="mt-3 text-sm text-on-surface text-pretty">{camp.theme.coachLine}</p>
+        )}
+        {camp?.enrolment && <EnrolAction enrolment={camp.enrolment} season={season} />}
 
         <div className="mt-3 flex items-center justify-between gap-3">
           <p className="text-xs tabular-nums text-on-surface-variant">

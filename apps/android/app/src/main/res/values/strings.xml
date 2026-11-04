@@ -1506,4 +1506,25 @@
 
     <!-- First-launch intro video -->
     <string name="intro_skip">Skip</string>
+
+    <!-- Enterprise device security & managed configuration (EN-2.1, EN-2.2, EN-3.3) -->
+    <string name="settings_security_heading">Device security</string>
+    <string name="security_app_lock_title">Require device unlock</string>
+    <string name="security_app_lock_body">Ask for your device screen lock or biometric after 5 minutes in the background.</string>
+    <string name="security_app_lock_managed_body">Enforced by your organisation\'s device policy.</string>
+    <string name="security_app_lock_prompt_title">Unlock AquaZeroFit</string>
+    <string name="security_app_lock_prompt_description">Confirm your device screen lock to continue.</string>
+    <string name="security_screen_capture_title">Block screenshots &amp; recents preview</string>
+    <string name="security_screen_capture_body">Hide health and nutrition screens in the app switcher and block screenshots.</string>
+    <string name="security_screen_capture_managed_body">Enforced by your organisation\'s device policy.</string>
+    <string name="settings_export_disabled_by_policy">Data export is disabled by your organisation\'s device policy.</string>
+    <string name="restriction_force_app_lock_title">Require device unlock after backgrounding</string>
+    <string name="restriction_force_app_lock_desc">Forces the device credential / biometric lock check on resume after 5 minutes in the background.</string>
+    <string name="restriction_force_screen_capture_title">Force screenshot and recents protection</string>
+    <string name="restriction_force_screen_capture_desc">Forces FLAG_SECURE on the application window so screens cannot be captured or shown in recents.</string>
+    <string name="restriction_disable_data_export_title">Disable JSON data export</string>
+    <string name="restriction_disable_data_export_desc">Disables the local JSON data export share action on managed devices.</string>
+    <string name="restriction_allowed_email_domain_title">Allowed sign-in email domain</string>
+    <string name="restriction_allowed_email_domain_desc">Optional organisation email domain hint (for example example.com). Consents can never be granted via managed configuration.</string>
+    <string name="signin_error_email_domain">Use an @%1$s email address required by your organisation.</string>
 </resources>

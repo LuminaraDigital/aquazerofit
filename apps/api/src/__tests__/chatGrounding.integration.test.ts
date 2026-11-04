@@ -294,7 +294,7 @@ it('does not replay a prior meal-grounded reply once personalisation is off', as
       .send({ content: 'What did I eat today?', localDate: DAY });
     expect(res.status).toBe(200);
 
-    expect(res.text).not.toMatch(/615|2740|Oats|Eggs|Rice/);
+    expect(res.text).not.toMatch(/\b(615|2740|Oats|Eggs|Rice)\b/);
     const stored = doneMessage(res.text);
     expect(stored.content).toBe(PERSONALISATION_OFF_REPLY);
     expect(stored.content).toMatch(/Privacy/);

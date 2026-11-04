@@ -27,6 +27,8 @@
  *  2. Keep the legal disclosure in sync. The Privacy notice names the live
  *     providers via `aiProviders` in apps/web/src/pages/legal/operator.tsx —
  *     update that list for every deployment that turns the new key on.
+ *     __tests__/aiProviderDisclosure.test.ts fails until PROVIDERS and that
+ *     list agree, so this step cannot be skipped silently.
  *  3. Re-verify each provider's data-handling terms (training-use defaults,
  *     retention, sub-processors) and set `aiProvidersVerifiedOn` in
  *     operator.tsx to the date you checked. Terms drift; an undated claim

@@ -50,6 +50,7 @@ apps/api/uploads/
 # history. Ignore both locations, not just the one the default points at.
 /.data/
 *.tsbuildinfo
+sbom-npm.cdx.json
 
 # Loose screenshots dropped at the repo root during development. Deliberately
 # root-only (`/`), so genuine image assets under apps/, design/ and docs/ are

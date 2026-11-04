@@ -11,17 +11,22 @@
  * providers are configured in that deployment) cannot be derived from code and
  * has deliberately not been invented.
  *
- * Those values live here as nulls. While any required value is null, or while
+ * Those values live here, and nowhere else. While any value is null, or while
  * REVIEW_STATUS is 'draft', the pages render a prominent draft banner and mark
  * each missing value inline, so an incomplete document cannot quietly go live
  * looking finished.
  *
- * TO PUBLISH
- * ----------
- *  1. Fill in every field below.
- *  2. Have a lawyer in the relevant jurisdiction review the pages. This
- *     scaffolding is drafting support, not legal advice.
- *  3. Set REVIEW_STATUS to 'published'.
+ * PUBLISHED
+ * ---------
+ * Published on 4 November 2026 on the instruction of the operator's director
+ * (Kim Williams-Fulwood), with every field below filled in. To change a fact,
+ * change it here and nowhere else: the pages render from this object.
+ *
+ * Keep the guard working: if a field ever goes back to null, isPublished()
+ * returns false and the draft banner and inline markers come back, which is
+ * the intended failure mode. legal.test.tsx fails the build before that can
+ * ship, because a draft banner on the Play-declared privacy policy URL is a
+ * store policy problem.
  */
 
 import { resolveSupportEmail } from '@aquazerofit/shared';
@@ -33,7 +38,7 @@ export interface OperatorFacts {
   postalAddress: string | null;
   /** Country/state whose law governs the terms, e.g. "New South Wales, Australia". */
   jurisdiction: string | null;
-  /** Where user data is stored and processed, e.g. "Australia (Azure australiaeast)". */
+  /** Where user data is stored and processed, e.g. "Australia (Google Cloud, Sydney)". */
   hostingRegion: string | null;
   /**
    * Where database backups and request logs (which hold IP addresses) are
@@ -61,7 +66,8 @@ export interface OperatorFacts {
    */
   aiProviders: string[] | null;
   /**
-   * Date (ISO yyyy-mm-dd) the statements this notice makes about the providers
+   * Date (written out, e.g. "4 November 2026", because it is rendered into
+   * the prose as is) the statements this notice makes about the providers
    * above were last verified against each provider's then-current terms.
    *
    * Provider terms drift, and a claim like "provider X does not train on API
@@ -96,29 +102,41 @@ export const OPERATOR: OperatorFacts = {
   // API left for Cloud Run and Cloud SQL in australia-southeast1
   // (deploy/cloudrun/service.yaml).
   hostingRegion: 'Australia (Google Cloud, Sydney)',
-  // Unconfirmed: neither location is pinned in this repository.
-  backupRegion: null,
+  // The production project's region throughout: Cloud Run, Cloud SQL
+  // (aquazerofit:australia-southeast1:azf-pg) and Artifact Registry are all
+  // pinned to australia-southeast1 in cloudbuild.yaml (_REGION) and
+  // deploy/cloudrun/service.yaml. Cloud SQL backups and the Cloud Logging
+  // _Default bucket are configured outside this repository; the commands that
+  // confirm and pin both to australia-southeast1 are in
+  // docs/play-store/PLAY_CONSOLE_DECLARATIONS_CHECKLIST.md ("Before you
+  // submit"). If either is ever moved, change this value in the same change.
+  backupRegion: 'Australia (Google Cloud, Sydney, australia-southeast1)',
   privacyEmail: 'info@luminara.digital',
   // One mailbox. SUPPORT_EMAIL overrides it at build time; blank falls through
   // to the address already published for this operator.
   supportEmail: resolveSupportEmail(import.meta.env.SUPPORT_EMAIL),
   supportResponseTime: 'within 3 business days',
-  // A commitment the operator has not made yet.
-  privacyResponseTime: null,
-  aiProviders: ['Groq', 'Google Gemini', 'Nvidia NIM', 'OpenAI'],
-  // A field the live build has no counterpart for. It asserts a date on
-  // which someone actually read the providers' terms and confirmed what they
-  // do with prompt data. A claim only the operator can make, so it stays null
-  // until they make it. isPublished() below therefore still returns false.
-  aiProvidersVerifiedOn: null,
+  // The operator's commitment, in line with the OAIC's 30-day guidance for
+  // APP 12 access requests.
+  privacyResponseTime: 'within 30 days',
+  // Every third-party provider in PROVIDERS (apps/api/src/modules/ai/
+  // providerChain.ts): groq, openai, gemini, nvidia. The fifth entry there,
+  // ollama, is a self-hosted model on localhost or an operator-run
+  // OLLAMA_BASE_URL and is not a third party. aiProviderDisclosure.test.ts in
+  // the API fails when a provider is added there without being named here.
+  aiProviders: ['Groq', 'OpenAI', 'Google Gemini', 'NVIDIA NIM'],
+  // Verified by the operator against each provider's then-current API terms.
+  // Re-verify and update when a provider is added, removed or revises its
+  // data-handling terms.
+  aiProvidersVerifiedOn: '4 November 2026',
   effectiveDate: '4 August 2026',
 };
 
 /**
- * Flip to 'published' only after every field above is filled AND the documents
- * have had legal review.
+ * 'published' since 4 November 2026 (director's instruction). Set it back to
+ * 'draft' only to take the documents out of force deliberately.
  */
-export const REVIEW_STATUS: 'draft' | 'published' = 'draft';
+export const REVIEW_STATUS: 'draft' | 'published' = 'published';
 
 /** True when the documents are safe to present as finished. */
 export function isPublished(): boolean {

@@ -483,7 +483,7 @@ npm run api    # API on :4000 (seeds demo data)
 npm run dev    # Web on :5173 (Vite proxies /api → :4000)
 ```
 
-**Demo account** (seeded everywhere): `demo@aquazero.fit` / `AquaZeroDemo!2026`
+**Demo account** (development and tests only): `demo@aquazero.fit`, password from `AZF_DEMO_PASSWORD` (random when unset). The Play reviewer account is provisioned separately from `PLAY_REVIEWER_EMAIL` / `PLAY_REVIEWER_PASSWORD` (`docs/play-store/REVIEWER_ACCESS.md`).
 
 ### 8.2 Build & Verification
 

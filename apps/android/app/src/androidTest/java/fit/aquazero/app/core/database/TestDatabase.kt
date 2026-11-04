@@ -2,9 +2,7 @@ package fit.aquazero.app.core.database
 
 import android.content.Context
 import androidx.room3.Room
-import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
-import kotlinx.coroutines.Dispatchers
 
 /**
  * Builds the real [AzfDatabase] against real SQLite, in memory.
@@ -17,14 +15,13 @@ import kotlinx.coroutines.Dispatchers
  * agreeing with it after the query changed. These tests run the statements
  * SQLite will actually run in production.
  *
- * The driver and the query dispatcher are set exactly as `DatabaseModule` sets
- * them, so the tests observe the same threading and the same SQLite
- * implementation the app ships with.
+ * The driver and the query dispatcher are set via [configureAzfSqlite] just as
+ * [DatabaseModule] sets them, so the tests observe the same threading and the
+ * same SQLite implementation the app ships with.
  */
 internal fun createInMemoryDatabase(): AzfDatabase {
     val context = ApplicationProvider.getApplicationContext<Context>()
     return Room.inMemoryDatabaseBuilder(context, AzfDatabase::class.java)
-        .setDriver(AndroidSQLiteDriver())
-        .setQueryCoroutineContext(Dispatchers.IO)
+        .configureAzfSqlite()
         .build()
 }

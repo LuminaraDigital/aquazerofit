@@ -263,15 +263,15 @@ export default function TermsPage() {
 
       <Section id="liability" index={12} heading="Warranties and liability">
         <P>
-          The service is provided without warranties beyond those that cannot lawfully be excluded.
-          Nothing in these terms limits rights you have under consumer law that cannot be limited.
+          Our services come with guarantees that cannot be excluded under the Australian Consumer
+          Law. Nothing in these terms excludes, restricts or modifies those guarantees, or any other
+          right you have under consumer law that cannot lawfully be limited.
         </P>
         <P>
-          The remaining limitations of liability, their scope and any cap, must be drafted for{' '}
-          <Fact name="jurisdiction" hint="governing jurisdiction" /> by a lawyer before these terms
-          are relied upon. Consumer protection law in many jurisdictions restricts what a service
-          like this may exclude, and a boilerplate clause copied from elsewhere is as likely to be
-          unenforceable as it is to be unfair.
+          Subject to those rights, the service is provided without any other warranty. AquaZeroFit
+          gives general wellness and fitness information, not medical advice, and to the extent the
+          law allows we are not liable for loss that comes from relying on it in place of advice
+          from a qualified health professional.
         </P>
       </Section>
 

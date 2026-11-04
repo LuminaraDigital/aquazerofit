@@ -18,6 +18,8 @@ import fit.aquazero.app.core.model.NutritionEmphasis
 import fit.aquazero.app.core.model.ProfileInputDto
 import fit.aquazero.app.core.model.UnitPreference
 import fit.aquazero.app.core.model.WellnessProfileDto
+import fit.aquazero.app.core.security.DeviceSecurityController
+import fit.aquazero.app.core.security.DeviceSecurityState
 import fit.aquazero.app.core.sync.ConnectivityMonitor
 import fit.aquazero.app.core.sync.OutboxDrainCoordinator
 import fit.aquazero.app.core.ui.reminders.ReminderPrefsStore
@@ -76,6 +78,8 @@ data class SettingsUiState(
      * cancel it, and the dialog has to say so.
      */
     val playSubscriptionActive: Boolean = false,
+    /** Device security toggles and enterprise managed restrictions (EN-2.1, EN-2.2, EN-3.3). */
+    val deviceSecurity: DeviceSecurityState = DeviceSecurityState(),
 ) {
     /** False while a profile write is in flight, so a second tap cannot race it. */
     val profileEditable: Boolean get() = profile != null && !savingProfile
@@ -110,6 +114,7 @@ class SettingsViewModel @Inject constructor(
     private val reminderScheduler: ReminderScheduler,
     private val connectivityMonitor: ConnectivityMonitor,
     private val outboxDrainCoordinator: OutboxDrainCoordinator,
+    private val deviceSecurityController: DeviceSecurityController,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -125,7 +130,14 @@ class SettingsViewModel @Inject constructor(
         observeConsents()
         observeOutbox()
         observeEntitlements()
+        observeDeviceSecurity()
         refresh()
+    }
+
+    private fun observeDeviceSecurity() = viewModelScope.launch {
+        deviceSecurityController.state.collect { security ->
+            _uiState.value = _uiState.value.copy(deviceSecurity = security)
+        }
     }
 
     private fun observeEntitlements() = viewModelScope.launch {
@@ -336,10 +348,22 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // ----- data export -----
+    // ----- device security & data export -----
+
+    fun setAppLockEnabled(enabled: Boolean) {
+        deviceSecurityController.setUserAppLockEnabled(enabled)
+    }
+
+    fun setScreenCaptureProtectionEnabled(enabled: Boolean) {
+        deviceSecurityController.setUserScreenCaptureProtectionEnabled(enabled)
+    }
 
     /** Fetch the account bundle and hand it to the share sheet. */
     fun exportData() {
+        if (!_uiState.value.deviceSecurity.dataExportAllowed) {
+            emit(R.string.settings_export_disabled_by_policy, isError = true)
+            return
+        }
         if (_uiState.value.exporting) return
         _uiState.value = _uiState.value.copy(exporting = true)
         viewModelScope.launch {

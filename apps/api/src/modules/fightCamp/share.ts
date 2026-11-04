@@ -15,14 +15,14 @@
  *    names of those who are now in the same squad.
  */
 import { randomInt } from 'node:crypto';
-import { seasonFor, type ShareKindP1, type ShareLinkView, type ShareSummary, type User } from '@aquazerofit/shared';
+import { SHARE_START_PREFIX, seasonFor, type ShareKindP1, type ShareLinkView, type ShareSummary } from '@aquazerofit/shared';
 import { config } from '../../platform/config';
-import { getStore } from '../../platform/store';
 import { getProfile } from '../me/service';
 import { logError, logEvent } from '../../platform/telemetry';
 import { fcEnabled } from './flags';
 import { engageRepo, type ShareLinkRow, type Surface } from './repo';
-import { adultMembers, displayNameOf } from './squads';
+import { adultMembers } from './squads';
+import { accountYoungerThan, displayNameOf } from './people';
 
 const CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 /** An account this young can still be credited to a share link. */
@@ -38,7 +38,7 @@ function viewOf(link: ShareLinkRow): ShareLinkView {
   return {
     code: link.code,
     url: `${config.appPublicUrl}/r/${link.code}`,
-    tgStartParam: `sh_${link.code}`,
+    tgStartParam: `${SHARE_START_PREFIX}${link.code}`,
   };
 }
 
@@ -88,18 +88,17 @@ export async function landOn(code: string, surface: Surface, count = true): Prom
       .catch((err: unknown) => logError(err, { route: 'share.landing' }));
     logEvent('share_link_landed', { kind: link.kind, surface });
   }
-  return `${home}?ref=sh_${link.code}`;
+  return `${home}?ref=${SHARE_START_PREFIX}${link.code}`;
 }
 
 /**
  * Under a day old, and not known to be a minor. An age not given yet still
  * counts: a new account usually claims before onboarding asks for it.
  */
-function isNewAccount(userId: string, now: Date): boolean {
-  const createdAt = getStore().byId<User>('users', userId)?.createdAt;
+function attributable(userId: string, now: Date): boolean {
   const age = getProfile(userId)?.age;
   if (typeof age === 'number' && age < 18) return false;
-  return createdAt !== undefined && now.getTime() - Date.parse(createdAt) < ATTRIBUTION_WINDOW_MS;
+  return accountYoungerThan(userId, ATTRIBUTION_WINDOW_MS, now);
 }
 
 /**
@@ -107,7 +106,8 @@ function isNewAccount(userId: string, now: Date): boolean {
  * way: the caller learns nothing about codes, accounts or earlier claims.
  */
 export async function claimShareAttribution(userId: string, code: string, surface: Surface, now: Date = new Date()): Promise<void> {
-  if (!fcEnabled('shareKit', userId) || !isNewAccount(userId, now)) return;
+  // The router has already checked the Share Kit is on for this person.
+  if (!attributable(userId, now)) return;
   const link = await engageRepo().shareLinkByCode(code);
   if (!link || link.userId === userId) return;
   const recorded = await engageRepo().attribute({
@@ -122,7 +122,7 @@ export async function claimShareAttribution(userId: string, code: string, surfac
 
 /** A new account that joined a squad by its invite counts for that squad. */
 export async function attributeSquadJoin(userId: string, squadId: string, surface: Surface, now: Date = new Date()): Promise<void> {
-  if (!fcEnabled('shareKit', userId) || !isNewAccount(userId, now)) return;
+  if (!fcEnabled('shareKit', userId) || !attributable(userId, now)) return;
   const recorded = await engageRepo().attribute({
     inviteeUserId: userId,
     shareCode: null,

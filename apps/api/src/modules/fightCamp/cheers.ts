@@ -24,7 +24,7 @@ import { getStore, newId } from '../../platform/store';
 import { logEvent } from '../../platform/telemetry';
 import { engageRepo, type CheerCursor, type CheerRow } from './repo';
 import { sendNudge } from './nudges';
-import { displayNameOf, requireSquadAdult, telegramSafe } from './squads';
+import { FORMER_MATE, accountYoungerThan, displayNameOf, telegramSafe } from './people';
 import { fcEnabled } from './flags';
 import { localDateFor } from '../../platform/dates';
 import { isAdult } from '../fightRecord/service';
@@ -37,15 +37,9 @@ export const CHEER_PAGE_SIZE = 20;
 export const NEW_ACCOUNT_DAYS = 7;
 
 const DAY_MS = 86_400_000;
-const FORMER_MATE = 'A former squad mate';
 
 function notSquadMate(): never {
   throw new AppError('FORBIDDEN', 'You can cheer the people in your squad.', { reason: 'not_squad_mate' });
-}
-
-function isNewAccount(userId: string, now: Date): boolean {
-  const createdAt = getStore().byId<User>('users', userId)?.createdAt;
-  return createdAt !== undefined && now.getTime() - Date.parse(createdAt) < NEW_ACCOUNT_DAYS * DAY_MS;
 }
 
 /**
@@ -113,7 +107,6 @@ export async function sendCheer(
   today: string,
   now: Date = new Date(),
 ): Promise<{ id: string; cheer: CheerView['cheer']; createdAt: string }> {
-  requireSquadAdult(senderId);
   const repo = engageRepo();
   const me = await repo.activeMembership(senderId, seasonFor(today).number);
   // The ref is looked up inside the sender's own squad only, so it cannot
@@ -154,7 +147,7 @@ export async function sendCheer(
   logEvent('cheer_sent', {
     cheer: input.cheer,
     from_kind: 'member',
-    is_new_recipient: isNewAccount(target.userId, now),
+    is_new_recipient: accountYoungerThan(target.userId, NEW_ACCOUNT_DAYS * DAY_MS, now),
   });
   // Not awaited: the sender never waits on Telegram, and sendNudge never throws.
   void sendNudge(
@@ -193,9 +186,4 @@ export async function markCheersSeen(userId: string, ids: readonly string[], now
 
 export async function unseenCheers(userId: string, now: Date = new Date()): Promise<number> {
   return engageRepo().unseenCheerCount(userId, new Date(now.getTime() - CHEER_INBOX_DAYS * DAY_MS).toISOString());
-}
-
-/** User ids the sender has cheered on their local `today`. */
-export async function cheeredToday(senderId: string, today: string): Promise<Set<string>> {
-  return new Set((await engageRepo().cheersSentOn(senderId, today)).map((c) => c.toUserId));
 }

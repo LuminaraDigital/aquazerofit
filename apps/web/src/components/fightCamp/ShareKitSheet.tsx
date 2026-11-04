@@ -17,9 +17,9 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import {
   SHARE_FORMATS,
+  seasonTheme,
   storyArtPath,
   storyCaption,
-  type SeasonAccentId,
   type ShareFormat,
 } from '@aquazerofit/shared';
 import { BottomSheet } from '@/pages/training/BottomSheet';
@@ -39,11 +39,9 @@ const FORMAT_LABEL: Record<ShareFormat, string> = { story: 'Story', feed: 'Feed'
 const LOCKED = ['No weight', 'No photos', 'No food'] as const;
 
 export interface ShareKitSheetProps {
-  open: boolean;
   onClose: () => void;
   /** The card, minus the link and name the sheet decides. Keep it referentially stable: a new object redraws the canvas. */
   card: Omit<EffortCardInput, 'link' | 'firstName'>;
-  accentId: SeasonAccentId;
   /**
    * A link to print instead of the person's share link: a squad invite
    * carries the squad's own invite URL. `tgStartParam` opens the Mini App on it.
@@ -51,7 +49,8 @@ export interface ShareKitSheetProps {
   link?: { url: string; tgStartParam: string };
 }
 
-export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }: ShareKitSheetProps) {
+/** Mounted while it is open: the caller renders it to open it. */
+export function ShareKitSheet({ onClose, card, link: fixedLink }: ShareKitSheetProps) {
   const toast = useToast();
   const sizeName = useId();
   const nameLabel = useId();
@@ -60,15 +59,15 @@ export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }
   const [image, setImage] = useState<{ url: string; blob: Blob } | null>(null);
   const [renderError, setRenderError] = useState(false);
   const firstName = useFightCamp().data?.shareKit?.firstName ?? null;
-  const shareLink = useShareLink(card.kind, open && !fixedLink);
-  const summary = useShareSummary(open).data;
+  const shareLink = useShareLink(card.kind, !fixedLink);
+  const summary = useShareSummary(true).data;
   const link = fixedLink ?? shareLink.data ?? null;
   const unavailable = renderError || (!fixedLink && shareLink.isError);
   const saveByHand = isTMA() && typeof navigator.share !== 'function';
 
   useEffect(() => {
-    if (open) void trackGrowth('share_kit_opened', { kind: card.kind });
-  }, [open, card.kind]);
+    void trackGrowth('share_kit_opened', { kind: card.kind });
+  }, [card.kind]);
 
   // Keyed on the URL, not the link object: a caller's inline `link` must not redraw.
   const linkUrl = link?.url ?? null;
@@ -85,7 +84,7 @@ export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }
     // choice that made it has changed.
     setImage(null);
     setRenderError(false);
-    if (!open || !content) return;
+    if (!content) return;
     let url: string | null = null;
     let cancelled = false;
     void renderEffortCard(content, format)
@@ -101,9 +100,7 @@ export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [open, content, format]);
-
-  if (!open) return null;
+  }, [content, format]);
 
   const fileName = `aquazerofit-${card.kind}-${format}.png`;
   const download = () => {
@@ -143,7 +140,7 @@ export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }
   const story = () => {
     if (!link || !content) return;
     const tgLink = telegramStartAppUrl(link.tgStartParam).replace(/^https:\/\//, '');
-    const mediaUrl = `${window.location.origin}${storyArtPath(card.kind, card.belt, accentId)}`;
+    const mediaUrl = `${window.location.origin}${storyArtPath(card.kind, card.belt, seasonTheme(card.season.number).accentId)}`;
     if (shareToStory(mediaUrl, storyCaption(content.alt, tgLink))) {
       void trackGrowth('share_story', { kind: card.kind });
     }

@@ -123,7 +123,7 @@ function Recap({ recap }: { recap: SeasonRecap }) {
             You finished the season with <span className="font-semibold">{recap.squadName}</span>.
           </p>
         )}
-        {camp?.shareKit && record?.adult && (
+        {camp?.shareKit && (
           <PrimaryButton className="mt-5" onClick={() => setSharing(true)}>
             Share your season
           </PrimaryButton>
@@ -139,7 +139,7 @@ function Recap({ recap }: { recap: SeasonRecap }) {
       )}
 
       {sharing && (
-        <ShareKitSheet open onClose={() => setSharing(false)} accentId={theme.accentId} card={card} />
+        <ShareKitSheet onClose={() => setSharing(false)} card={card} />
       )}
     </div>
   );

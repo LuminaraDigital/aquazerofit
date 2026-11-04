@@ -34,7 +34,6 @@ import { unwrap } from './envelopes';
 import { fightRecordKey, type FightRecordEnvelope } from './fightRecord';
 import { claimStoredShareAttribution } from './startApp';
 import { isTMA } from './telegram';
-import { telegramStartAppUrl } from './telegramLink';
 
 export function useEnrol() {
   const qc = useQueryClient();
@@ -188,11 +187,6 @@ export function useShowMyNumbers(squadId: string) {
       );
     },
   });
-}
-
-/** t.me/<bot>/<app>?startapp=sq_<code>: opens the Mini App on the invite. */
-export function squadTelegramUrl(squad: Pick<SquadView, 'tgStartParam'>): string {
-  return telegramStartAppUrl(squad.tgStartParam);
 }
 
 /** Squad Corner: what the launching group's squad is, and act on it. */

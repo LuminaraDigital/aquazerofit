@@ -14,6 +14,7 @@
  */
 import { createHmac } from 'node:crypto';
 import {
+  SQUAD_START_PREFIX,
   seasonFor,
   type SquadCornerInput,
   type SquadCornerView,
@@ -26,7 +27,9 @@ import { logEvent } from '../../platform/telemetry';
 import { validateTelegramInitData } from '../auth/telegram';
 import { botConfigured, savePreparedInlineMessage } from '../payments/telegramBot';
 import { engageRepo } from './repo';
-import { createSquad, joinSquad, membershipIn, peekOf, requireSquadAdult, telegramSafe } from './squads';
+import { createSquad, joinSquad, membershipIn, peekOf } from './squads';
+import { requireAdult } from './flags';
+import { telegramSafe } from './people';
 
 const GROUP_CHAT_TYPES = new Set(['group', 'supergroup']);
 
@@ -77,7 +80,7 @@ export async function squadCorner(userId: string, input: SquadCornerInput, today
   const secret = fightCampConfig.engageHmacSecret;
   if (!secret) throw new AppError('NOT_FOUND', 'Resource not found');
   const hash = groupHashFor(userId, input.tgInitData, secret);
-  requireSquadAdult(userId);
+  requireAdult(userId);
 
   const season = seasonFor(today).number;
   if (input.action === 'create') {
@@ -116,7 +119,7 @@ export async function prepareSquadInvite(userId: string, squadId: string): Promi
     text: `Join "${telegramSafe(squad.name, 'my squad')}", my Fight Camp squad on AquaZeroFit. We cheer each other on for showing up.`,
     button: {
       text: 'Join the squad',
-      url: `${fightCampConfig.telegramMiniAppLink}?startapp=sq_${squad.inviteCode}`,
+      url: `${fightCampConfig.telegramMiniAppLink}?startapp=${SQUAD_START_PREFIX}${squad.inviteCode}`,
     },
   });
   if (!prepared.ok) {

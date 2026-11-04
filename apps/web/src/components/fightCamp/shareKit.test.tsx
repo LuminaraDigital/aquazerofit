@@ -130,9 +130,7 @@ describe('ShareKitSheet', () => {
     const { kind: _k, ...card } = base;
     return renderWithClient(
       <ShareKitSheet
-        open
         onClose={() => undefined}
-        accentId={seasonTheme(SEASON.number).accentId}
         card={{ ...card, kind: 'season' }}
         {...props}
       />,
@@ -175,7 +173,7 @@ describe('ShareKitSheet', () => {
       return null;
     });
     renderWithClient(
-      <ShareKitSheet open onClose={() => undefined} accentId={seasonTheme(SEASON.number).accentId} card={{ ...base, kind: 'week' }} />,
+      <ShareKitSheet onClose={() => undefined} card={{ ...base, kind: 'week' }} />,
     );
     expect((await screen.findByRole('alert')).textContent).toMatch(/could not be made/);
   });
@@ -247,9 +245,7 @@ describe('arriving through a share link', () => {
   it('claims the attribution once per code after sign-in', async () => {
     adoptAttribution({ ref: 'sh_AbCdEfGh' });
     mocks.api.mockResolvedValue(undefined);
-    const { rerender } = renderHook(({ on }) => useClaimShareAttribution(on), { initialProps: { on: false } });
-    expect(mocks.api).not.toHaveBeenCalled();
-    rerender({ on: true });
+    renderHook(() => useClaimShareAttribution());
     await waitFor(() =>
       expect(mocks.api).toHaveBeenCalledWith('/share/attributions', {
         method: 'POST',
@@ -257,7 +253,7 @@ describe('arriving through a share link', () => {
       }),
     );
     await waitFor(() => expect(localStorage.getItem('azf_share_claim_v1')).toBe('AbCdEfGh'));
-    renderHook(() => useClaimShareAttribution(true));
+    renderHook(() => useClaimShareAttribution());
     expect(mocks.api).toHaveBeenCalledTimes(1);
   });
 });

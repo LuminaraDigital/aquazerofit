@@ -35,12 +35,12 @@ import { ShareKitSheet } from '@/components/fightCamp/ShareKitSheet';
 import { ToggleSwitch } from '@/components/fightCamp/ToggleSwitch';
 import { GiftButton, GiftReceived, useGiftPrice } from '@/components/fightCamp/Gift';
 import { BottomSheet } from '@/pages/training/BottomSheet';
+import { telegramStartAppUrl } from '@/lib/telegramLink';
 import { formatDate } from '@/lib/format';
 import { beltName, useFightCamp } from '@/lib/fightRecord';
 import {
   prepareSquadInvite,
   squadErrorMessage,
-  squadTelegramUrl,
   useCreateSquad,
   useJoinSquad,
   useLeaveSquad,
@@ -245,7 +245,7 @@ function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
         await shareMessage(prepared);
         return;
       }
-      const url = squadTelegramUrl(squad);
+      const url = telegramStartAppUrl(squad.tgStartParam);
       openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
       return;
     }
@@ -311,9 +311,7 @@ function Member({ squad, canCheer }: { squad: SquadView; canCheer: boolean }) {
       )}
       {kitCard && (
         <ShareKitSheet
-          open
           onClose={() => setKit(null)}
-          accentId={seasonTheme(squad.seasonNumber).accentId}
           card={kitCard}
           link={kit === 'squad_invite' ? { url: squad.inviteUrl, tgStartParam: squad.tgStartParam } : undefined}
         />

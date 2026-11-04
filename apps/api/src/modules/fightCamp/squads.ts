@@ -30,7 +30,7 @@ import {
   SQUAD_CODE_PREFIX,
   SQUAD_CONSENT_VERSION,
   SQUAD_MAX_MEMBERS,
-  containsProfanity,
+  SQUAD_START_PREFIX,
   seasonByNumber,
   seasonFor,
   squadWeekPoints,
@@ -38,16 +38,16 @@ import {
   type SquadMemberView,
   type SquadPeekView,
   type SquadView,
-  type User,
 } from '@aquazerofit/shared';
 import { config } from '../../platform/config';
 import { AppError } from '../../platform/errors';
-import { getStore, newId } from '../../platform/store';
+import { newId } from '../../platform/store';
 import { logEvent } from '../../platform/telemetry';
 import { auditDataAccess, getProfile } from '../me/service';
 import { activeDatesOf, loadActivity } from '../progress/service';
 import { isAdult, seasonBeltTier } from '../fightRecord/service';
-import { fcEnabled } from './flags';
+import { fcEnabled, requireAdult } from './flags';
+import { accountYoungerThan, displayNameOf } from './people';
 import { engageRepo, type MemberRow, type SquadRow } from './repo';
 
 export type JoinVia = 'code' | 'link' | 'corner';
@@ -71,58 +71,12 @@ function randomFrom(alphabet: string, length: number): string {
 const issueCode = () => `${SQUAD_CODE_PREFIX}-${randomFrom(CODE_ALPHABET, SQUAD_CODE_LENGTH)}`;
 export const issueMemberRef = () => `m_${randomFrom(REF_ALPHABET, 12)}`;
 
-const FALLBACK_NAME = 'Fight Camp member';
-
-/**
- * Text that goes into a Telegram message the bot sends. Plain-text mode
- * stops markup, but Telegram still turns URLs and @mentions into links, so a
- * name like "evil.example/login" would arrive as a link from our bot. Only
- * letters, numbers, spaces, apostrophes and hyphens get through; anything
- * else becomes the fallback.
- */
-export function telegramSafe(text: string, fallback: string): string {
-  return /^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N} '’-]*$/u.test(text) ? text : fallback;
-}
-
-/**
- * The person's first name, or null when it is not one to show. Names the
- * account never chose (the email local part registration fills in,
- * Telegram's numbered fallback) are not shown: they can identify someone
- * who never typed them.
- */
-export function firstNameOf(userId: string): string | null {
-  const user = getStore().byId<User>('users', userId);
-  const name = user?.displayName?.trim() ?? '';
-  const autoFilled = name === user?.email.split('@')[0] || /^Telegram user \d+$/.test(name);
-  const first = name.split(/\s+/)[0] ?? '';
-  return first && !autoFilled && !containsProfanity(first) ? first : null;
-}
-
-/** A member's first name, masked like huddle names. */
-export function displayNameOf(userId: string): string {
-  return firstNameOf(userId) ?? FALLBACK_NAME;
-}
-
 function fail(code: 'FORBIDDEN' | 'CONFLICT' | 'NOT_FOUND', reason: string, message: string): never {
   throw new AppError(code, message, { reason });
 }
 
 function notFound(): never {
   fail('NOT_FOUND', 'squad_not_found', 'That squad code does not match a squad this season.');
-}
-
-/**
- * Adults only. An unknown age is its own reason so a new account arriving
- * by invite can be sent to add it, rather than being told it is a minor.
- */
-export function requireSquadAdult(userId: string): void {
-  const age = getProfile(userId)?.age;
-  if (typeof age !== 'number') {
-    fail('FORBIDDEN', 'squad_age_unknown', 'Add your age in your wellness essentials to join a squad.');
-  }
-  if (!isAdult({ age })) {
-    fail('FORBIDDEN', 'squad_adult_only', 'Squads are for members aged 18 and over. Your belts stay on your own Fight Record.');
-  }
 }
 
 function newMember(squad: SquadRow, userId: string, role: MemberRow['role'], at: string): MemberRow {
@@ -203,11 +157,9 @@ const WEEK_MS = 7 * 86_400_000;
  */
 async function welcomeFor(viewerId: string, members: readonly MemberRow[], now: Date = new Date()): Promise<ReadonlySet<string>> {
   if (!fcEnabled('cheers', viewerId)) return new Set();
-  const fresh = members.filter((m) => {
-    if (m.userId === viewerId || now.getTime() - Date.parse(m.joinedAt) >= WEEK_MS) return false;
-    const createdAt = getStore().byId<User>('users', m.userId)?.createdAt;
-    return createdAt !== undefined && now.getTime() - Date.parse(createdAt) < WEEK_MS;
-  });
+  const fresh = members.filter(
+    (m) => m.userId !== viewerId && now.getTime() - Date.parse(m.joinedAt) < WEEK_MS && accountYoungerThan(m.userId, WEEK_MS, now),
+  );
   const out = new Set<string>();
   for (const m of fresh) if (!(await engageRepo().hasCheered(viewerId, m.userId))) out.add(m.userId);
   return out;
@@ -230,7 +182,7 @@ async function viewOf(squad: SquadRow, viewerId: string, today: string): Promise
     seasonNumber: squad.seasonNumber,
     inviteCode: squad.inviteCode,
     inviteUrl: `${config.appPublicUrl}/s/${squad.inviteCode}`,
-    tgStartParam: `sq_${squad.inviteCode}`,
+    tgStartParam: `${SQUAD_START_PREFIX}${squad.inviteCode}`,
     isCorner: squad.cornerHash !== null,
     weekStart,
     members: distinctNames(members.map((m) => memberView(m, viewerId, today, weekStart, cheered, welcome))),
@@ -283,8 +235,7 @@ export async function currentSquad(userId: string, today: string): Promise<Squad
 }
 
 /** The `squads` part of GET /fight-record: just enough to link to /squad. */
-export async function squadsStatus(userId: string, today: string): Promise<{ current: { id: string; name: string } | null } | null> {
-  if (!isAdult(getProfile(userId))) return null;
+export async function squadsStatus(userId: string, today: string): Promise<{ current: { id: string; name: string } | null }> {
   const membership = await engageRepo().activeMembership(userId, seasonFor(today).number);
   const squad = membership ? await engageRepo().squad(membership.squadId) : null;
   return { current: squad ? { id: squad.id, name: squad.name } : null };
@@ -362,7 +313,7 @@ export async function createSquad(
   now: Date = new Date(),
   opts: { cornerHash?: string } = {},
 ): Promise<SquadView> {
-  requireSquadAdult(userId);
+  requireAdult(userId);
   const repo = engageRepo();
   const since = new Date(now.getTime() - 24 * HOUR_MS).toISOString();
   if ((await repo.squadsCreatedSince(userId, since)) >= SQUAD_CREATES_PER_DAY) {
@@ -409,7 +360,7 @@ export async function joinSquad(
   via: JoinVia,
   now: Date = new Date(),
 ): Promise<SquadView> {
-  requireSquadAdult(userId);
+  requireAdult(userId);
   if (squad.seasonNumber !== seasonFor(today).number) notFound();
   // Departed minors free their places before capacity is judged.
   await adultMembers(squad.id, now);
@@ -444,7 +395,7 @@ export async function joinSquadByCode(
   via: JoinVia,
   now: Date = new Date(),
 ): Promise<SquadView> {
-  requireSquadAdult(userId);
+  requireAdult(userId);
   await requireNoSquad(userId, today);
   refuseIfGuessing(userId, now);
   const squad = await liveSquadByCode(code, today);

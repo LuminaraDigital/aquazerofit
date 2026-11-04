@@ -77,7 +77,7 @@ describe('squadBoard', () => {
 
 describe('telegramSafe', () => {
   it('passes plain names and refuses anything Telegram could turn into a link', async () => {
-    const { telegramSafe } = await import('../modules/fightCamp/squads');
+    const { telegramSafe } = await import('../modules/fightCamp/people');
     for (const ok of ['Rizal', 'Zoë', "O'Neil", 'Jean-Luc', '李', 'Gym Crew 2']) expect(telegramSafe(ok, 'x')).toBe(ok);
     for (const bad of ['evil.example/login', '@someone', 'http://x', 'a:b', '#tag', '', ' lead']) {
       expect(telegramSafe(bad, 'fallback')).toBe('fallback');

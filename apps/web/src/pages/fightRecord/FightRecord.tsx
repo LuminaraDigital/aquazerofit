@@ -86,7 +86,7 @@ function Record({ record }: { record: FightRecordStatus }) {
   const { season, activeDays, daysLeft, tier } = record.current;
   const [sharing, setSharing] = useState<BeltAwardView | null>(null);
   const camp = useFightCamp().data;
-  const shareKit = Boolean(camp?.shareKit) && record.adult;
+  const shareKit = Boolean(camp?.shareKit);
   // With the Share Kit on, every share goes through it; off, R1a's belt sheet.
   const [kit, setKit] = useState<{ kind: 'belt' | 'season'; belt: BeltTier | null; seasonNumber: number } | null>(null);
   const kitCard = useMemo(
@@ -215,9 +215,7 @@ function Record({ record }: { record: FightRecordStatus }) {
       <BeltShareSheet award={sharing} adult={record.adult} onClose={() => setSharing(null)} />
       {kit && kitCard && camp && (
         <ShareKitSheet
-          open
           onClose={() => setKit(null)}
-          accentId={seasonTheme(kit.seasonNumber).accentId}
           card={kitCard}
         />
       )}

@@ -158,9 +158,7 @@ describe('Phase 1 screens pass axe (WCAG 2.2 A and AA)', () => {
     serveAll(SQUAD);
     renderWithClient(
       <ShareKitSheet
-        open
         onClose={() => undefined}
-        accentId={seasonTheme(SEASON.number).accentId}
         card={{ kind: 'season', season: SEASON, accent: seasonTheme(SEASON.number).accent, belt: 'blue', activeDays: 14 }}
       />,
     );

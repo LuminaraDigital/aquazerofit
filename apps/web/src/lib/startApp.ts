@@ -11,15 +11,15 @@
  */
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { shareCodeSchema, squadCodeSchema } from '@aquazerofit/shared';
+import { SHARE_START_PREFIX, SQUAD_START_PREFIX, shareCodeSchema, squadCodeSchema } from '@aquazerofit/shared';
 import { API_BASE, api } from './api';
 import { adoptAttribution, getAttribution } from './attribution';
 import { getTelegramStartParam, isTMA } from './telegram';
 
 /** The path a Fight Camp start payload opens, or null for any other payload. */
 export function fightCampStartPath(startParam: string | null): string | null {
-  if (!startParam?.startsWith('sq_')) return null;
-  const code = squadCodeSchema.safeParse(startParam.slice(3));
+  if (!startParam?.startsWith(SQUAD_START_PREFIX)) return null;
+  const code = squadCodeSchema.safeParse(startParam.slice(SQUAD_START_PREFIX.length));
   return code.success ? `/s/${code.data}` : null;
 }
 
@@ -43,7 +43,7 @@ export function useFightCampStartApp(): void {
     const startParam = getTelegramStartParam();
     const share = shareCodeIn(startParam);
     if (share) {
-      adoptAttribution({ ref: `sh_${share}` });
+      adoptAttribution({ ref: `${SHARE_START_PREFIX}${share}` });
       // A beacon: the API answers 204 for the Mini App and records the open,
       // once per code per session so a reload is not a second visit.
       if (firstLaunchWith(share)) void fetch(`${API_BASE}/share/r/${share}?surface=tma`).catch(() => undefined);
@@ -89,9 +89,9 @@ export async function claimStoredShareAttribution(): Promise<void> {
   }
 }
 
-/** Claim once signed in; a squad join claims first itself (first touch wins). */
-export function useClaimShareAttribution(signedIn: boolean): void {
+/** Claim once, on the signed-in shell; a squad join claims first itself (first touch wins). */
+export function useClaimShareAttribution(): void {
   useEffect(() => {
-    if (signedIn) void claimStoredShareAttribution();
-  }, [signedIn]);
+    void claimStoredShareAttribution();
+  }, []);
 }

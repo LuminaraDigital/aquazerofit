@@ -32,7 +32,7 @@ import { timezoneOf, todayFor } from '../../platform/dates';
 import { logError } from '../../platform/telemetry';
 import { enrol } from './enrolment';
 import { seasonRecap } from './recap';
-import { requireFeature, requireFeatureSwitch } from './flags';
+import { requireAdult, requireFeature, requireFeatureSwitch } from './flags';
 import { prepareSquadInvite, squadCorner } from './corner';
 import { cheerInbox, decodeCursor, markCheersSeen, sendCheer } from './cheers';
 import { syncEarlyCheers } from './earlyCheers';
@@ -49,7 +49,6 @@ import {
   leaveSquad,
   peekSquad,
   removeMember,
-  requireSquadAdult,
   rotateInviteCode,
   setShowStats,
 } from './squads';
@@ -125,7 +124,7 @@ squadsRouter.get(
     const userId = userIdOf(req);
     const today = todayFor(req);
     await leaveIfNoLongerAdult(userId, today);
-    requireSquadAdult(userId);
+    requireAdult(userId);
     res.json({ squad: await currentSquad(userId, today) });
   }),
 );
@@ -213,7 +212,7 @@ cheersRouter.use(requireAuth);
 cheersRouter.use((req, _res, next) => {
   const userId = userIdOf(req);
   requireFeature('cheers', userId);
-  requireSquadAdult(userId);
+  requireAdult(userId);
   next();
 });
 
@@ -307,7 +306,7 @@ shareRouter.post(
   '/links',
   asyncHandler(async (req, res) => {
     const userId = userIdOf(req);
-    requireSquadAdult(userId);
+    requireAdult(userId);
     const { kind } = createShareLinkInputSchema.parse(req.body);
     res.json({ shareLink: await shareLinkFor(userId, kind, todayFor(req)) });
   }),
@@ -327,7 +326,7 @@ shareRouter.get(
   '/summary',
   asyncHandler(async (req, res) => {
     const userId = userIdOf(req);
-    requireSquadAdult(userId);
+    requireAdult(userId);
     res.json({ summary: await shareSummary(userId, todayFor(req)) });
   }),
 );

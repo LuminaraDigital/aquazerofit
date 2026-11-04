@@ -299,6 +299,14 @@ export function useShareLink(kind: ShareKindP1, enabled: boolean) {
   });
 }
 
+/** A Stars invoice for a week of Premium for the squad mate `to` (US-G1). */
+export function useGiftInvoice() {
+  return useMutation({
+    mutationFn: (to: string) =>
+      api<{ invoiceLink: string }>('/gifts/premium/invoice', { method: 'POST', body: { to } }),
+  });
+}
+
 /** How many people joined from the person's cards (US-F3 AC3). */
 export function useShareSummary(enabled: boolean) {
   return useQuery({

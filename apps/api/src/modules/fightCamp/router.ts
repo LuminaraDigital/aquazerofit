@@ -23,6 +23,7 @@ import {
   nudgeSettingsInputSchema,
   sendCheerInputSchema,
   updateMySquadSettingsSchema,
+  createGiftInvoiceInputSchema,
 } from '@aquazerofit/shared';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { config } from '../../platform/config';
@@ -36,6 +37,8 @@ import { prepareSquadInvite, squadCorner } from './corner';
 import { cheerInbox, decodeCursor, markCheersSeen, sendCheer } from './cheers';
 import { syncEarlyCheers } from './earlyCheers';
 import { attributeSquadJoin, claimShareAttribution, landOn, shareLinkFor, shareSummary } from './share';
+import { createGiftInvoice } from './gifts';
+import { fightCampConfig } from '../../platform/fightCampConfig';
 import { engageRepo } from './repo';
 import { syncGrace } from './grace';
 import {
@@ -324,5 +327,27 @@ shareRouter.get(
     const userId = userIdOf(req);
     requireSquadAdult(userId);
     res.json({ summary: await shareSummary(userId, todayFor(req)) });
+  }),
+);
+
+// ---------- gifts (Epic G, optional) ----------
+
+export const giftsRouter = Router();
+
+giftsRouter.use(requireAuth);
+
+/** Off, or no price set: gifting does not exist, so it answers like nothing is here. */
+giftsRouter.use((req, _res, next) => {
+  requireFeature('gifting', userIdOf(req));
+  if (fightCampConfig.giftPremium7dStars === null) throw new AppError('NOT_FOUND', 'Resource not found');
+  next();
+});
+
+/** 201 with the Stars invoice link the Mini App opens; 403 gift_not_eligible, 409 recipient_has_premium. */
+giftsRouter.post(
+  '/premium/invoice',
+  asyncHandler(async (req, res) => {
+    const { to } = createGiftInvoiceInputSchema.parse(req.body);
+    res.status(201).json(await createGiftInvoice(userIdOf(req), to));
   }),
 );

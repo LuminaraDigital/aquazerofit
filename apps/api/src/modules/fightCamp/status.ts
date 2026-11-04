@@ -15,6 +15,7 @@ import { firstNameOf, squadsStatus } from './squads';
 import { unseenCheers } from './cheers';
 import { syncEarlyCheers } from './earlyCheers';
 import { recapOffer } from './recap';
+import { giftingStatus } from './gifts';
 import { isAdult } from '../fightRecord/service';
 import { getProfile } from '../me/service';
 
@@ -34,6 +35,7 @@ export async function fightCampStatus(
       fcEnabled('cheers', userId) && isAdult(getProfile(userId)) ? await cheersStatus(userId, today, timezone) : null,
     shareKit: fcEnabled('shareKit', userId) && isAdult(getProfile(userId)) ? { firstName: firstNameOf(userId) } : null,
     recap: fcEnabled('enrol', userId) ? recapOffer(userId, today) : null,
+    gifting: fcEnabled('gifting', userId) && isAdult(getProfile(userId)) ? await giftingStatus(userId) : null,
   };
 }
 

@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MemoryEngageRepo } from '../modules/fightCamp/repo/memory';
 import { PgEngageRepo } from '../modules/fightCamp/repo/pg';
 import type { CheerRow, EngageRepo, GraceRow, MemberRow, SquadRow } from '../modules/fightCamp/repo/types';
+import type { GiftRow } from '../modules/fightCamp/repo/gifts';
 import { pgliteDatabase, serverDatabase, type TestDatabase } from './helpers/engageDatabases';
 
 const T0 = Date.parse('2026-10-20T08:00:00.000Z');
@@ -511,6 +512,74 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
     });
   });
 
+  describe('gifts', () => {
+    const giftRow = (over: Partial<GiftRow> = {}): GiftRow => ({
+      id: uid('gift'),
+      gifterUserId: uid('gifter'),
+      recipientUserId: uid('recipient'),
+      squadId: null,
+      product: 'premium_7d',
+      rail: 'stars',
+      starsAmount: 150,
+      invoicePayload: `gift:${uid('payload')}`,
+      telegramPaymentChargeId: null,
+      status: 'pending',
+      createdAt: at(0),
+      grantedAt: null,
+      refundedAt: null,
+      ...over,
+    });
+
+    it('marks a pending gift paid once, under a charge id no other gift can take', async () => {
+      const a = giftRow();
+      const b = giftRow();
+      await repo.gifts.insert(a);
+      await repo.gifts.insert(b);
+      const charge = uid('charge');
+      expect(await repo.gifts.markPaid(a.invoicePayload, charge)).toBe('paid');
+      expect(await repo.gifts.markPaid(a.invoicePayload, charge)).toBe('duplicate');
+      expect(await repo.gifts.markPaid(b.invoicePayload, charge)).toBe('duplicate');
+      expect(await repo.gifts.markPaid('gift:nobody', uid('charge'))).toBe('missing');
+      expect(await repo.gifts.byCharge(charge)).toMatchObject({ id: a.id, status: 'paid' });
+      expect(await repo.gifts.byPayload(b.invoicePayload)).toMatchObject({ status: 'pending', telegramPaymentChargeId: null });
+    });
+
+    it('only moves a gift forward, and reads the newest one granted to someone', async () => {
+      const gift = giftRow();
+      await repo.gifts.insert(gift);
+      await repo.gifts.markPaid(gift.invoicePayload, uid('charge'));
+      await repo.gifts.settle(gift.id, 'granted', at(5));
+      await repo.gifts.settle(gift.id, 'failed', at(6));
+      expect(await repo.gifts.byPayload(gift.invoicePayload)).toMatchObject({ status: 'granted', grantedAt: at(5) });
+      expect(await repo.gifts.latestGrantedTo(gift.recipientUserId!, at(4))).toMatchObject({ id: gift.id });
+      expect(await repo.gifts.latestGrantedTo(gift.recipientUserId!, at(6))).toBeNull();
+      await repo.gifts.settle(gift.id, 'refunded', at(7));
+      expect(await repo.gifts.byPayload(gift.invoicePayload)).toMatchObject({ status: 'refunded', refundedAt: at(7) });
+    });
+
+    it('exports each side without the other person, and erasure keeps the row', async () => {
+      const gift = giftRow();
+      await repo.gifts.insert(gift);
+      await repo.gifts.markPaid(gift.invoicePayload, uid('charge'));
+      const sent = await repo.exportUser(gift.gifterUserId!);
+      expect(sent.giftsSent).toEqual([
+        { id: gift.id, starsAmount: 150, status: 'paid', createdAt: at(0), grantedAt: null, refundedAt: null },
+      ]);
+      expect(JSON.stringify(sent)).not.toContain(gift.recipientUserId!);
+      expect((await repo.exportUser(gift.recipientUserId!)).giftsReceived).toEqual([
+        { id: gift.id, status: 'paid', grantedAt: null },
+      ]);
+      await repo.eraseUser(gift.gifterUserId!, at(9));
+      await repo.eraseUser(gift.recipientUserId!, at(9));
+      expect(await repo.gifts.byPayload(gift.invoicePayload)).toMatchObject({
+        gifterUserId: null,
+        recipientUserId: null,
+        starsAmount: 150,
+        status: 'paid',
+      });
+    });
+  });
+
   describe('privacy', () => {
     it('exports what the user holds without naming anyone else', async () => {
       const { squad, owner } = await seedSquad(repo, { name: 'Export Crew' });
@@ -567,6 +636,8 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
         experiments: [],
         shareLinks: [],
         attribution: null,
+        giftsSent: [],
+        giftsReceived: [],
       });
       expect((await repo.squad(squad.id))?.createdBy).toBeNull();
       expect((await repo.activeMembers(squad.id)).map((m) => [m.userId, m.role])).toEqual([[mate, 'owner']]);

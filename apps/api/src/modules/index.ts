@@ -20,7 +20,7 @@ import { visionRouter } from './vision/router';
 import { recommendationsRouter } from './recommendations/router';
 import { challengesRouter } from './challenges/router';
 import { fightRecordRouter } from './fightRecord/router';
-import { cheersRouter, fightCampRouter, graceRouter, shareRouter, squadsRouter } from './fightCamp/router';
+import { cheersRouter, fightCampRouter, giftsRouter, graceRouter, shareRouter, squadsRouter } from './fightCamp/router';
 import { coachesRouter } from './coaches/router';
 import { telegramWebhookRouter } from './payments/router';
 import { billingRouter } from './billing/router';
@@ -160,6 +160,7 @@ export function buildRouter(): Router {
   router.use('/squads', squadsRouter);
   router.use('/cheers', cheersRouter);
   router.use('/share', shareRouter);
+  router.use('/gifts', giftsRouter);
   router.use('/coaches', coachesRouter);
   router.use('/admin', adminRouter);
   router.use('/export', exportRouter);

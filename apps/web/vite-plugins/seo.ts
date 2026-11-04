@@ -150,10 +150,17 @@ function noscriptBlock(route: MarketingRoute, cfg: SiteConfig): string {
   const telegram = `https://t.me/${cfg.telegramBotUsername}${
     cfg.telegramMiniAppShortName ? `/${cfg.telegramMiniAppShortName}` : ''
   }`;
+  const sections = (route.noscriptSections ?? []).map(
+    (section) =>
+      `      <h2>${escapeHtml(section.heading)}</h2><ul>${section.items
+        .map((item) => `<li>${escapeHtml(item)}</li>`)
+        .join('')}</ul>`,
+  );
   return [
     '    <noscript>',
     `      <h1>${escapeHtml(route.title.split(' | ')[0])}</h1>`,
     `      <p>${escapeHtml(route.summary)}</p>`,
+    ...sections,
     `      <p><a href="${telegram}">Open AquaZeroFit in Telegram</a> or <a href="/sign-in">use it in your browser</a>.</p>`,
     `      <nav><ul>${links}</ul></nav>`,
     '    </noscript>',

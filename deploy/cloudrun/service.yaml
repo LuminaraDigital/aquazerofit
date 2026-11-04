@@ -161,6 +161,21 @@ spec:
                 secretKeyRef:
                   name: PLAY_RTDN_SECRET
                   key: latest
+            # Google Play reviewer account (docs/play-store/REVIEWER_ACCESS.md).
+            # Commented out until both Secret Manager ids exist: a reference to
+            # a missing secret fails the revision. The live service gets them
+            # with `gcloud run services update --update-secrets`, as that doc
+            # describes; uncomment here once they exist so this file matches.
+            # - name: PLAY_REVIEWER_EMAIL
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: PLAY_REVIEWER_EMAIL
+            #       key: latest
+            # - name: PLAY_REVIEWER_PASSWORD
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: PLAY_REVIEWER_PASSWORD
+            #       key: latest
             # Firebase Admin uses Application Default Credentials (the Cloud
             # Run service account azf-api) when no key path and no
             # FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY

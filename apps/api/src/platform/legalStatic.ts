@@ -12,7 +12,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RequestHandler } from 'express';
 
-const LEGAL_PAGES = new Set(['terms', 'privacy', 'refund']);
+const LEGAL_PAGES = new Set([
+  'terms',
+  'privacy',
+  'refund',
+  // The privacy policy and account deletion URLs declared in Play Console.
+  'google-play/privacy-policy',
+  'account/deletion',
+]);
 
 /** Absolute path of the prerendered HTML, or null when this request is not one of those pages. */
 export function prerenderedLegalFile(spaDir: string, pathname: string): string | null {

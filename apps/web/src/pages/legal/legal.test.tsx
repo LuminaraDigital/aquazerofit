@@ -3,9 +3,11 @@
  * These pages make binding statements, so the assertions here are about
  * honesty rather than layout:
  *
- *  - while operator details are missing, every page must SAY it is a draft,
- *    because a legal document that looks finished and is not is the worst
- *    possible failure mode for this file;
+ *  - the documents are published: no page carries the draft banner or a
+ *    bracketed placeholder, because https://aquazerofit.com/privacy and
+ *    /google-play/privacy-policy are declared in Play Console;
+ *  - the draft machinery still works, so a fact that goes back to null is
+ *    marked conspicuously instead of leaving a blank that reads as finished;
  *  - the retention periods quoted must match the constants the server enforces;
  *  - the disclosures the project's own privacy review made mandatory before
  *    launch (the Open Food Facts barcode transfer) must be present;
@@ -64,35 +66,54 @@ afterEach(() => {
 });
 
 describe('legal pages', () => {
-  it('declare themselves a draft until every operator fact is supplied', () => {
-    // Guard the guard: if this ever fails, the pages are publishable and the
-    // draft assertions below need revisiting deliberately, not deleted.
-    expect(isPublished()).toBe(false);
-
-    for (const [path, element] of [
+  const ALL_PAGES = () =>
+    [
       ['/privacy', <PrivacyPage key="p" />],
       ['/google-play/privacy-policy', <GooglePlayPrivacyPage key="gp" />],
       ['/terms', <TermsPage key="t" />],
       ['/refund', <RefundPage key="r" />],
       ['/support', <SupportPage key="s" />],
       ['/account/deletion', <AccountDeletionPage key="d" />],
-    ] as const) {
-      renderAt(path, element);
-      expect(screen.getByText(/draft: not yet in force/i)).toBeTruthy();
+    ] as const;
+
+  it('are published: no draft banner and no bracketed placeholder on any page', () => {
+    expect(isPublished()).toBe(true);
+
+    for (const [path, element] of ALL_PAGES()) {
+      const { container } = renderAt(path, element);
+      expect(screen.queryByText(/draft: not yet in force/i), path).toBeNull();
+      // A Fact with no value renders as "[hint]". Any bracketed lower-case
+      // phrase in the text is one of those, or a hand-written placeholder.
+      expect(container.textContent?.match(/\[[a-z][a-z ,]*\]/g) ?? [], path).toEqual([]);
+      expect(container.textContent, path).not.toMatch(/relied upon|legal review|working draft/i);
       cleanup();
     }
   });
 
-  it('marks a missing operator fact visibly rather than leaving a blank', () => {
-    // Retargeted when the nine facts already in force on the live deployment
-    // were ported into OPERATOR. The guarantee is unchanged - an unsupplied
-    // fact must render as a conspicuous marker rather than a silent gap that
-    // reads like a finished sentence - but it now has to be asserted against a
-    // field that is genuinely still null, or it proves nothing.
-    expect(OPERATOR.aiProvidersVerifiedOn).toBeNull();
+  it('falls back to the draft banner and a visible marker if a fact is ever removed', () => {
+    // Guard the guard. The pages are published, but a fact reverting to null
+    // must still render as a conspicuous marker under the draft banner rather
+    // than a silent gap that reads like a finished sentence.
+    const saved = OPERATOR.aiProvidersVerifiedOn;
+    OPERATOR.aiProvidersVerifiedOn = null;
+    try {
+      expect(isPublished()).toBe(false);
+      renderAt('/privacy', <PrivacyPage />);
+      expect(screen.getByText(/draft: not yet in force/i)).toBeTruthy();
+      expect(screen.getAllByText(/\[date provider terms last verified\]/i).length).toBeGreaterThan(0);
+    } finally {
+      OPERATOR.aiProvidersVerifiedOn = saved;
+    }
+    expect(isPublished()).toBe(true);
+  });
+
+  it('states when the AI providers\' terms were last verified', () => {
     renderAt('/privacy', <PrivacyPage />);
 
-    expect(screen.getAllByText(/\[date provider terms last verified\]/i).length).toBeGreaterThan(0);
+    expect(OPERATOR.aiProvidersVerifiedOn).toBe('4 November 2026');
+    expect(screen.getByText(/last verified those terms on/i).textContent).toContain(
+      '4 November 2026',
+    );
   });
 
   it('renders the supplied operator facts, so the notice reads as prose', () => {
@@ -139,10 +160,12 @@ describe('privacy notice', () => {
 
     expect(screen.getAllByText(/Australia \(Google Cloud, Sydney\)/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Replit/)).toBeNull();
-    // Cloud SQL backups and Cloud Logging default to multi-region or global
-    // locations, so where they live is an operator fact, not a given.
-    const backups = OPERATOR.backupRegion ?? '[backup and log locations]';
-    expect(screen.getAllByText(backups, { exact: false }).length).toBeGreaterThan(0);
+    // Backups and request logs: the production region, australia-southeast1
+    // (cloudbuild.yaml _REGION, deploy/cloudrun/service.yaml Cloud SQL
+    // instance). Three places in the notice state it.
+    expect(OPERATOR.backupRegion).toMatch(/australia-southeast1/);
+    expect(screen.getAllByText(/australia-southeast1/, { exact: false })).toHaveLength(3);
+    expect(screen.queryByText(/\[backup and log locations\]/)).toBeNull();
   });
 
   it('lists every outbound integration with what reaches it and where', () => {
@@ -178,6 +201,23 @@ describe('privacy notice', () => {
     expect(table.closest('[role="region"]')?.getAttribute('tabindex')).toBe('0');
   });
 
+  it('discloses the Health Connect reads and the microphone, as Play requires', () => {
+    // HealthConnectManager.permissions: READ_STEPS, READ_HEART_RATE,
+    // READ_SLEEP, READ_TOTAL_CALORIES_BURNED. Play's Health Connect review
+    // checks the privacy policy names them and states Limited Use.
+    renderAt('/google-play/privacy-policy', <GooglePlayPrivacyPage />);
+    const hc = screen.getByText(/Health Connect, if you connect it/).textContent ?? '';
+    for (const type of ['steps', 'heart rate', 'sleep', 'total calories burned']) {
+      expect(hc).toContain(type);
+    }
+    expect(hc).toMatch(/not sent to our servers, not shared with anyone/);
+    expect(screen.getByText(/Limited Use requirements/)).toBeTruthy();
+    // createSpeechRecognizer, not createOnDeviceSpeechRecognizer: the policy
+    // must not claim the audio stays on the device.
+    expect(screen.getByText(/may process the audio off the device/)).toBeTruthy();
+    expect(screen.getByText(/We never record, receive or store audio/)).toBeTruthy();
+  });
+
   it('states the APP 8 overseas disclosure, naming the countries', () => {
     const { container } = renderAt('/privacy', <PrivacyPage />);
     const overseas = container.querySelector('section#overseas') as HTMLElement;
@@ -196,11 +236,11 @@ describe('privacy notice', () => {
     expect(screen.getByRole('link', { name: 'oaic.gov.au' }).getAttribute('href')).toBe(
       'https://www.oaic.gov.au',
     );
-    // The response time is the operator's commitment, rendered from OPERATOR
-    // (or marked as missing), never a figure written into the page.
-    const responseTime = OPERATOR.privacyResponseTime ?? '[privacy response time]';
-    expect(screen.getAllByText(responseTime, { exact: false })).toHaveLength(2);
-    expect(screen.queryByText(/within 30 days/)).toBeNull();
+    // The response time is the operator's commitment, rendered from OPERATOR,
+    // never a figure written into the page.
+    expect(OPERATOR.privacyResponseTime).toBe('within 30 days');
+    expect(screen.getAllByText(/within 30 days/, { exact: false })).toHaveLength(2);
+    expect(screen.queryByText(/\[privacy response time\]/)).toBeNull();
   });
 
   it('points at the export that exists instead of denying there is one', () => {
@@ -269,6 +309,32 @@ describe('account deletion page', () => {
 
     expect(screen.getAllByText(/anonymised/i).length).toBeGreaterThan(0);
     expect(container.querySelector('a[href="/privacy#retention"]')).toBeTruthy();
+  });
+
+  it('is prerendered with its substance visible without JavaScript', () => {
+    // Play Console declares this URL, and Google's check may not run the SPA.
+    // The prerendered shell's <noscript> carries the steps, the timeline and
+    // what is erased and kept; this keeps that copy agreeing with the page.
+    const route = marketingRoute('/account/deletion');
+    expect(route?.noscriptSections?.length).toBeGreaterThan(0);
+    const noscript = route!.noscriptSections!.flatMap((section) => section.items).join('\n');
+    expect(noscript).toMatch(/Settings, choose “Delete account”, and confirm/);
+    expect(noscript).toMatch(/any web browser, without the app installed/);
+    expect(noscript).toMatch(/erased automatically after 30 days/);
+    expect(noscript).toContain(OPERATOR.privacyEmail!);
+
+    const { container } = renderAt('/account/deletion', <AccountDeletionPage />);
+    const page = container.textContent ?? '';
+    for (const sentence of [
+      'Your account is flagged and erased automatically after 30 days. Confirming a second time within that window erases it immediately.',
+      'Signing in on the web or in the Android app cancels a pending deletion. Opening the Telegram Mini App does not.',
+      'Deletion removes your profile, logs, plans, coach conversations, remembered facts and any meal photographs still on disk.',
+      'Credit and security-audit records survive, with your identity stripped out of them.',
+      'Your account record, sign-in credentials and any linked Telegram identity.',
+    ]) {
+      expect(noscript).toContain(sentence);
+      expect(page).toContain(sentence);
+    }
   });
 
   it('offers the export before the irreversible step', () => {

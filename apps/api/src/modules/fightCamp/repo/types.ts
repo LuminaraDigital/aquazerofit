@@ -98,6 +98,8 @@ export interface ShareLinkRow {
 
 export type Surface = 'web' | 'tma';
 
+export type ExperimentArm = 'treatment' | 'holdout';
+
 export interface AttributionRow {
   inviteeUserId: string;
   shareCode: string | null;
@@ -156,6 +158,7 @@ export interface EngageExport {
   grace: GraceRow[];
   nudges: Array<{ localDate: string; kind: string; sentAt: string }>;
   nudgeSettings: Array<{ kind: NudgeKind; enabled: boolean; updatedAt: string }>;
+  experiments: Array<{ experiment: string; arm: ExperimentArm; assignedAt: string }>;
   shareLinks: ShareLinkRow[];
   attribution: Omit<AttributionRow, 'inviteeUserId'> | null;
 }
@@ -202,6 +205,12 @@ export interface EngageRepo {
   /** Cheers given and received with sender-local dates in [from, to]. */
   cheerTally(userId: string, from: string, to: string): Promise<{ given: number; received: number }>;
   coachCheersTo(userId: string): Promise<CheerRow[]>;
+  /** Whether this sender has ever cheered this recipient. */
+  hasCheered(fromUserId: string, toUserId: string): Promise<boolean>;
+
+  // ----- experiments -----
+  /** Record the arm once; true only for the call that recorded it. */
+  assignArm(userId: string, experiment: 'early_cheers', arm: ExperimentArm, at: string): Promise<boolean>;
 
   // ----- Cut Man grace -----
   /** Every ledger row for the user, in write order. */
@@ -268,6 +277,7 @@ export const ENGAGE_TABLE_PRIVACY = {
   grace_ledger: { userData: true, exportedAs: 'grace', erasure: 'delete' },
   nudge_log: { userData: true, exportedAs: 'nudges', erasure: 'delete' },
   nudge_settings: { userData: true, exportedAs: 'nudgeSettings', erasure: 'delete' },
+  experiment_arms: { userData: true, exportedAs: 'experiments', erasure: 'delete' },
   share_links: { userData: true, exportedAs: 'shareLinks', erasure: 'delete' },
   referral_attributions: { userData: true, exportedAs: 'attribution', erasure: 'delete' },
 } as const satisfies Record<

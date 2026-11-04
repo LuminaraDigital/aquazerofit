@@ -345,6 +345,14 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       await expect(repo.insertCheer({ ...row, toUserId: uid('to') })).rejects.toThrow();
     });
 
+    it('says whether a sender has ever cheered a recipient', async () => {
+      const row = cheerRow();
+      expect(await repo.hasCheered(row.fromUserId!, row.toUserId)).toBe(false);
+      await repo.insertCheer(row);
+      expect(await repo.hasCheered(row.fromUserId!, row.toUserId)).toBe(true);
+      expect(await repo.hasCheered(row.toUserId, row.fromUserId!)).toBe(false);
+    });
+
     it('tallies given and received inside a date range', async () => {
       const me = uid('me');
       await repo.insertCheer(cheerRow({ fromUserId: me, localDate: '2026-10-20' }));
@@ -422,6 +430,17 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
     });
   });
 
+  describe('experiments', () => {
+    it('records a person\u2019s arm once, whatever later calls ask for', async () => {
+      const userId = uid('u');
+      expect(await repo.assignArm(userId, 'early_cheers', 'treatment', at(0))).toBe(true);
+      expect(await repo.assignArm(userId, 'early_cheers', 'holdout', at(1))).toBe(false);
+      expect((await repo.exportUser(userId)).experiments).toEqual([
+        { experiment: 'early_cheers', arm: 'treatment', assignedAt: at(0) },
+      ]);
+    });
+  });
+
   describe('share links and attribution', () => {
     it('reports a taken code before a reused link when both clash', async () => {
       const userId = uid('u');
@@ -489,6 +508,7 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
       await repo.withGraceLedger(owner, (ledger) => ledger.append([graceRow(owner)]));
       await repo.claimNudge(owner, '2026-10-20', 'cheer', at(0));
       await repo.setNudgeSetting(owner, 'cheer', false, at(0));
+      await repo.assignArm(owner, 'early_cheers', 'holdout', at(0));
       const code = `Ef${String(++seq).padStart(6, '0')}`;
       await repo.insertShareLink({ code, userId: owner, kind: 'belt', seasonNumber: 1, createdAt: at(0) });
       const invitee = uid('invitee');
@@ -507,6 +527,7 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
         grace: [],
         nudges: [],
         nudgeSettings: [],
+        experiments: [],
         shareLinks: [],
         attribution: null,
       });

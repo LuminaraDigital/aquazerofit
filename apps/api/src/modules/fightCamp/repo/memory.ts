@@ -19,6 +19,7 @@ import type {
   EngageExport,
   EngageRepo,
   EnrolmentRow,
+  ExperimentArm,
   GraceLedger,
   GraceRow,
   InsertShareLinkOutcome,
@@ -49,6 +50,7 @@ export class MemoryEngageRepo implements EngageRepo {
   private grace: GraceRow[] = [];
   private nudges: Array<{ userId: string; localDate: string; kind: string; sentAt: string }> = [];
   private nudgePrefs: Array<{ userId: string; kind: NudgeKind; enabled: boolean; updatedAt: string }> = [];
+  private arms: Array<{ userId: string; experiment: string; arm: ExperimentArm; assignedAt: string }> = [];
   private links: ShareLinkRow[] = [];
   private attributions: AttributionRow[] = [];
 
@@ -262,6 +264,18 @@ export class MemoryEngageRepo implements EngageRepo {
       .map(copy);
   }
 
+  async hasCheered(fromUserId: string, toUserId: string): Promise<boolean> {
+    return this.cheers.some((c) => c.fromUserId === fromUserId && c.toUserId === toUserId);
+  }
+
+  // ----- experiments -----
+
+  async assignArm(userId: string, experiment: 'early_cheers', arm: ExperimentArm, at: string): Promise<boolean> {
+    if (this.arms.some((a) => a.userId === userId && a.experiment === experiment)) return false;
+    this.arms.push({ userId, experiment, arm, assignedAt: at });
+    return true;
+  }
+
   // ----- Cut Man grace -----
 
   /** Array order is write order: rows are only ever appended. */
@@ -400,6 +414,9 @@ export class MemoryEngageRepo implements EngageRepo {
       nudgeSettings: this.nudgePrefs
         .filter((p) => p.userId === userId)
         .map(({ kind, enabled, updatedAt }) => ({ kind, enabled, updatedAt })),
+      experiments: this.arms
+        .filter((a) => a.userId === userId)
+        .map(({ experiment, arm, assignedAt }) => ({ experiment, arm, assignedAt })),
       shareLinks: this.links.filter((l) => l.userId === userId).map(copy),
       attribution: attribution
         ? (({ inviteeUserId: _omit, ...rest }) => rest)(attribution)
@@ -423,6 +440,7 @@ export class MemoryEngageRepo implements EngageRepo {
     this.grace = this.grace.filter((g) => g.userId !== userId);
     this.nudges = this.nudges.filter((n) => n.userId !== userId);
     this.nudgePrefs = this.nudgePrefs.filter((p) => p.userId !== userId);
+    this.arms = this.arms.filter((a) => a.userId !== userId);
     const codes = new Set(this.links.filter((l) => l.userId === userId).map((l) => l.code));
     this.links = this.links.filter((l) => l.userId !== userId);
     this.attributions = this.attributions.filter((a) => a.inviteeUserId !== userId);

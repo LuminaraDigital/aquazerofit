@@ -13,6 +13,7 @@ import { fcEnabled } from './flags';
 import { syncGrace } from './grace';
 import { squadsStatus } from './squads';
 import { unseenCheers } from './cheers';
+import { syncEarlyCheers } from './earlyCheers';
 import { isAdult } from '../fightRecord/service';
 import { getProfile } from '../me/service';
 
@@ -24,7 +25,12 @@ export async function fightCampStatus(userId: string, today: string): Promise<Fi
     enrolment: fcEnabled('enrol', userId) ? await enrolmentStatus(userId, today) : null,
     grace: fcEnabled('grace', userId) ? (await syncGrace(userId, today)).view : null,
     squads: fcEnabled('squads', userId) ? await squadsStatus(userId, today) : null,
-    cheers:
-      fcEnabled('cheers', userId) && isAdult(getProfile(userId)) ? { unseen: await unseenCheers(userId) } : null,
+    cheers: fcEnabled('cheers', userId) && isAdult(getProfile(userId)) ? await cheersStatus(userId, today) : null,
   };
+}
+
+async function cheersStatus(userId: string, today: string): Promise<{ unseen: number }> {
+  // A new person's coach cheers land before the count is read.
+  await syncEarlyCheers(userId, today);
+  return { unseen: await unseenCheers(userId) };
 }

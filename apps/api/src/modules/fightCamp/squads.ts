@@ -177,9 +177,29 @@ async function cheeredBy(viewerId: string, today: string): Promise<ReadonlySet<s
   return new Set((await engageRepo().cheersSentOn(viewerId, today)).map((c) => c.toUserId));
 }
 
+const WEEK_MS = 7 * 86_400_000;
+
+/**
+ * Members the viewer should be offered one "just joined" cheer for: new to
+ * AquaZeroFit and to this squad within the week, and never cheered by the
+ * viewer. Once the viewer cheers them the prompt is gone for good.
+ */
+async function welcomeFor(viewerId: string, members: readonly MemberRow[], now: Date = new Date()): Promise<ReadonlySet<string>> {
+  if (!fcEnabled('cheers', viewerId)) return new Set();
+  const fresh = members.filter((m) => {
+    if (m.userId === viewerId || now.getTime() - Date.parse(m.joinedAt) >= WEEK_MS) return false;
+    const createdAt = getStore().byId<User>('users', m.userId)?.createdAt;
+    return createdAt !== undefined && now.getTime() - Date.parse(createdAt) < WEEK_MS;
+  });
+  const out = new Set<string>();
+  for (const m of fresh) if (!(await engageRepo().hasCheered(viewerId, m.userId))) out.add(m.userId);
+  return out;
+}
+
 async function viewOf(squad: SquadRow, viewerId: string, today: string): Promise<SquadView> {
   const members = await adultMembers(squad.id);
   const cheered = await cheeredBy(viewerId, today);
+  const welcome = await welcomeFor(viewerId, members);
   const me = members.find((m) => m.userId === viewerId);
   if (!me) notFound();
   const weekStart = weekStartOf(today);
@@ -196,7 +216,7 @@ async function viewOf(squad: SquadRow, viewerId: string, today: string): Promise
     tgStartParam: `sq_${squad.inviteCode}`,
     isCorner: squad.cornerHash !== null,
     weekStart,
-    members: members.map((m) => memberView(m, viewerId, today, weekStart, cheered)),
+    members: members.map((m) => memberView(m, viewerId, today, weekStart, cheered, welcome)),
     me: { ref: me.memberRef, showStats: me.showStats, role: me.role },
   };
 }
@@ -207,6 +227,7 @@ function memberView(
   today: string,
   weekStart: string,
   cheered: ReadonlySet<string>,
+  welcome: ReadonlySet<string> = new Set(),
 ): SquadMemberView {
   const isMe = m.userId === viewerId;
   // One activity load per member, shared by the belt and the week count.
@@ -220,6 +241,7 @@ function memberView(
     // Your own numbers are always yours to see; anyone else's only by choice.
     weekActiveDays: isMe || m.showStats ? squadWeekPoints(activeDates, weekStart) : null,
     cheeredToday: cheered.has(m.userId),
+    welcome: welcome.has(m.userId),
   };
 }
 

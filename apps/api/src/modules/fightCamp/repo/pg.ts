@@ -23,6 +23,7 @@ import type {
   EngageExport,
   EngageRepo,
   EnrolmentRow,
+  ExperimentArm,
   GraceLedger,
   GraceRow,
   InsertShareLinkOutcome,
@@ -445,6 +446,25 @@ export class PgEngageRepo implements EngageRepo {
     return rows.map(toCheer);
   }
 
+  async hasCheered(fromUserId: string, toUserId: string): Promise<boolean> {
+    const { rows } = await this.db.query(
+      'SELECT 1 FROM engage.cheers WHERE from_user_id = $1 AND to_user_id = $2 LIMIT 1',
+      [fromUserId, toUserId],
+    );
+    return rows.length > 0;
+  }
+
+  // ----- experiments -----
+
+  async assignArm(userId: string, experiment: 'early_cheers', arm: ExperimentArm, at: string): Promise<boolean> {
+    const { rows } = await this.db.query(
+      `INSERT INTO engage.experiment_arms (user_id, experiment, arm, assigned_at) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, experiment) DO NOTHING RETURNING user_id`,
+      [userId, experiment, arm, at],
+    );
+    return rows.length > 0;
+  }
+
   // ----- Cut Man grace -----
 
   async graceEntries(userId: string): Promise<GraceRow[]> {
@@ -559,7 +579,7 @@ export class PgEngageRepo implements EngageRepo {
 
   async exportUser(userId: string): Promise<EngageExport> {
     const q = (text: string) => this.db.query(text, [userId]).then((r) => r.rows);
-    const [enrolments, memberships, squads, sent, received, grace, nudges, nudgePrefs, links, attribution] =
+    const [enrolments, memberships, squads, sent, received, grace, nudges, nudgePrefs, arms, links, attribution] =
       await Promise.all([
         q(`SELECT ${ENROLMENT_COLUMNS} FROM engage.season_enrolments WHERE user_id = $1`),
         q(`SELECT m.squad_id, m.user_id, m.member_ref, m.season_number, m.role, m.show_stats,
@@ -572,6 +592,7 @@ export class PgEngageRepo implements EngageRepo {
         q(`SELECT ${GRACE_COLUMNS} FROM engage.grace_ledger WHERE user_id = $1 ORDER BY seq`),
         q(`SELECT local_date::text AS local_date, kind, sent_at FROM engage.nudge_log WHERE user_id = $1`),
         q(`SELECT kind, enabled, updated_at FROM engage.nudge_settings WHERE user_id = $1`),
+        q(`SELECT experiment, arm, assigned_at FROM engage.experiment_arms WHERE user_id = $1`),
         q(`SELECT ${LINK_COLUMNS} FROM engage.share_links WHERE user_id = $1`),
         q(`SELECT share_code, squad_id, surface, created_at FROM engage.referral_attributions
            WHERE invitee_user_id = $1`),
@@ -616,6 +637,11 @@ export class PgEngageRepo implements EngageRepo {
         enabled: Boolean(r.enabled),
         updatedAt: iso(r.updated_at),
       })),
+      experiments: arms.map((r) => ({
+        experiment: String(r.experiment),
+        arm: r.arm as ExperimentArm,
+        assignedAt: iso(r.assigned_at),
+      })),
       shareLinks: links.map(toLink),
       attribution: attribution[0]
         ? {
@@ -649,6 +675,7 @@ export class PgEngageRepo implements EngageRepo {
         'DELETE FROM engage.grace_ledger WHERE user_id = $1',
         'DELETE FROM engage.nudge_log WHERE user_id = $1',
         'DELETE FROM engage.nudge_settings WHERE user_id = $1',
+        'DELETE FROM engage.experiment_arms WHERE user_id = $1',
         // Referral rows that pointed at these links keep the invitee and lose
         // the code (ON DELETE SET NULL), so the inviter is unlinkable.
         'DELETE FROM engage.share_links WHERE user_id = $1',

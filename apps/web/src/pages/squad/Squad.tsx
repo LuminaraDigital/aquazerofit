@@ -32,6 +32,7 @@ import { useToast } from '@/components/ui/Toast';
 import { BeltBadge } from '@/components/fightRecord/BeltBadge';
 import { CheerButton } from '@/components/fightCamp/Cheers';
 import { ShareKitSheet } from '@/components/fightCamp/ShareKitSheet';
+import { ToggleSwitch } from '@/components/fightCamp/ToggleSwitch';
 import { BottomSheet } from '@/pages/training/BottomSheet';
 import { formatDate } from '@/lib/format';
 import { beltName, useFightCamp } from '@/lib/fightRecord';
@@ -500,27 +501,13 @@ function ShowMyNumbers({ squad }: { squad: SquadView }) {
             Your squad sees how many days you showed up this week. Nothing else, ever.
           </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={on}
-          aria-labelledby="show-numbers-label"
-          aria-describedby="show-numbers-help"
+        <ToggleSwitch
+          checked={on}
+          labelledBy="show-numbers-label"
+          describedBy="show-numbers-help"
           disabled={setShow.isPending}
-          onClick={() =>
-            setShow.mutate(!on, { onError: () => toast.error('Could not change that. Try again.') })
-          }
-          className={`relative mt-1 h-7 w-12 shrink-0 rounded-full transition-colors motion-reduce:transition-none before:absolute before:-inset-2 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60 ${
-            on ? 'bg-primary' : 'bg-outline-variant'
-          }`}
-        >
-          <span
-            aria-hidden="true"
-            className={`absolute top-1 h-5 w-5 rounded-full bg-surface transition-transform motion-reduce:transition-none ${
-              on ? 'translate-x-6' : 'translate-x-1'
-            }`}
-          />
-        </button>
+          onChange={(next) => setShow.mutate(next, { onError: () => toast.error('Could not change that. Try again.') })}
+        />
       </div>
     </GlassCard>
   );

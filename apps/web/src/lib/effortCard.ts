@@ -198,7 +198,7 @@ export async function renderEffortCard(card: EffortCard, format: ShareFormat): P
 
   try {
     return await new Promise((resolve, reject) => {
-      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG encode failed'))), 'image/png');
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Could not encode the PNG'))), 'image/png');
     });
   } finally {
     // A 1080x1920 backing store is large; iOS caps the total a page may hold.

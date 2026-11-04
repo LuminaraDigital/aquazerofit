@@ -96,7 +96,9 @@ function Recap({ recap }: { recap: SeasonRecap }) {
   return (
     <div className="mt-4 space-y-5">
       <GlassCard className="p-5">
-        <p className="text-xs font-semibold" style={{ color: theme.accent }}>
+        {/* The accent marks, never colours text: it has no contrast promise. */}
+        <p className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
+          <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: theme.accent }} />
           {recap.seasonName}
         </p>
         <h2 className="heading-display mt-1 font-heading text-3xl text-on-surface text-balance">

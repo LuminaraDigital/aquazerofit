@@ -421,7 +421,7 @@ export async function joinSquad(
       case 'already_member':
         fail('CONFLICT', 'squad_already_member', 'You are already in a squad this season.');
       case 'removed':
-        fail('FORBIDDEN', 'squad_removed', 'You were taken out of this squad, so you can not rejoin it this season.');
+        fail('FORBIDDEN', 'squad_removed', 'You were taken out of this squad, so you cannot rejoin it this season.');
       default:
         notFound();
     }

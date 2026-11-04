@@ -322,12 +322,22 @@ Each environment's endpoint (`<APP_PUBLIC_URL>/api/v1/billing/stripe/webhook`, A
 
 ## Deploying to production
 
-Merging to `main` deploys nothing, and production has two parts that move separately. Deploy both from a clean checkout of `main`.
+Merging to `main` deploys nothing. `.github/workflows/deploy.yml` runs the verify and smoke gates only. Production has two parts that move separately. Deploy both from a clean checkout of `main`.
 
-1. **API (Cloud Run):** run the `gcloud builds submit` command at the top of `cloudbuild.yaml`. A new revision only takes traffic by itself while the service routes to latest; if traffic is pinned to a named revision, finish with `gcloud run services update-traffic aquazerofit-api --to-latest --project=aquazerofit --region=australia-southeast1`.
-2. **Frontend (Cloudflare Worker):** `aquazerofit.com` serves `apps/web/dist` as Worker assets, not the copy inside the API image. Run `VITE_SITE_ORIGIN=https://aquazerofit.com npm run build --workspace apps/web`, then `npx wrangler deploy` from `cloudflare/`. A clean checkout matters: `apps/web/.env` is gitignored and would add Firebase web keys to the build. Pass `VITE_TG_ANALYTICS_TOKEN` and `VITE_TG_ANALYTICS_APP_NAME` to the build as well, or Telegram Mini App Analytics stays off.
+1. **API (Cloud Run):** run the `gcloud builds submit` command at the top of `cloudbuild.yaml`. That command is `gcloud run deploy` with no `--no-traffic`, so the new revision takes traffic. If a later check shows an older revision still serving, finish with `gcloud run services update-traffic aquazerofit-api --to-latest --project=aquazerofit --region=australia-southeast1`. The image also contains a web build. `aquazerofit.com` does not serve that copy.
+2. **Frontend (Cloudflare Worker):** `cloudflare/wrangler.jsonc` serves `apps/web/dist` as Worker assets and proxies `/api`, `/uploads`, `/health` and `/ready` to Cloud Run. From a clean checkout, with `apps/web/.env` absent (it is gitignored, and a local file would bake Firebase web keys into the bundle; production sign-in stays `POST /auth/login`):
 
-`gate-staging` proves nothing until `STAGING_PUBLIC_URL` is set. Confirm a release with `GET /ready`, whose `version` is the deployed commit.
+   ```bash
+   VITE_SITE_ORIGIN=https://aquazerofit.com \
+   VITE_TG_ANALYTICS_TOKEN=<token-from-tganalytics> \
+   VITE_TG_ANALYTICS_APP_NAME=<app-name-from-tganalytics> \
+   npm run build --workspace apps/web
+   cd cloudflare && npm install && npx wrangler deploy
+   ```
+
+   Omit either Telegram variable and Mini App Analytics stays off. DNS, the Worker secret and the custom domains are in `docs/CLOUDFLARE_CUTOVER.md`.
+
+`gate-staging` exits 0 with a warning when `STAGING_PUBLIC_URL` is unset, so a green gate is not a smoke of a host. Confirm a release with `GET /ready` on the public host or the Cloud Run URL. `version` is `APP_VERSION`, which the deploy sets to `COMMIT_SHA`.
 
 ## Local verification
 

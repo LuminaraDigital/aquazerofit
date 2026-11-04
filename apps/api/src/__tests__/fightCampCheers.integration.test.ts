@@ -93,13 +93,19 @@ describe('sending (US-D1)', () => {
     const board = (await get(people[0]!, '/squads/current')).body.squad;
     expect(board.members.find((m: { displayName: string }) => m.displayName === 'Mate1').cheeredToday).toBe(true);
 
-    // The rule is the sender's local day: at 09:00 UTC it is still
-    // yesterday at UTC-12, a different day, so that cheer is fine.
-    const otherDay = await request(h.app)
+    // The day comes from the sender's stored timezone, not the header: a
+    // header claiming another zone cannot buy a second cheer...
+    const sender = getStore().byId<{ id: string }>('users', people[0]!.userId)!;
+    getStore().upsert('users', { ...sender, timezone: 'UTC' });
+    const headerTrick = await request(h.app)
       .post(`${h.base}/cheers`)
       .set({ ...people[0]!.auth(), 'X-Timezone': 'Etc/GMT+12' })
       .send({ to: refOf(1), cheer: 'fire' });
-    expect(otherDay.status).toBe(201);
+    expect(headerTrick.status).toBe(409);
+    // ...while a real change of zone (at 09:00 UTC it is still yesterday at
+    // UTC-12) is a different day.
+    getStore().upsert('users', { ...sender, timezone: 'Etc/GMT+12' });
+    expect((await cheer(people[0]!, refOf(1))).status).toBe(201);
   });
 
   it('refuses outsiders, unknown refs, oneself and a cheer that is not one of the five, alike', async () => {
@@ -118,6 +124,21 @@ describe('sending (US-D1)', () => {
     }
     expect((await cheer(people[0]!, refOf(1), 'trophy')).status).toBe(400);
     expect((await post(people[0]!, '/cheers', { to: refOf(1), cheer: 'fire', note: 'hi' })).status).toBe(201);
+  });
+
+  it('does not reach a mate outside the rollout, whose Fight Camp is off', async () => {
+    h.enable('squads', 'cheers');
+    const { rolloutBucket } = await import('../modules/fightRecord/service');
+    // Find a squad where the second member buckets above the first.
+    let pair: Awaited<ReturnType<typeof squadOf>> | null = null;
+    for (let i = 0; i < 20 && !pair; i += 1) {
+      const candidate = await squadOf(2);
+      const [a, b] = candidate.people.map((p) => rolloutBucket(p.userId)) as [number, number];
+      if (a < b) pair = candidate;
+    }
+    expect(pair).not.toBeNull();
+    process.env.FIGHT_RECORD_ROLLOUT_PERCENT = String(rolloutBucket(pair!.people[1]!.userId));
+    expect((await cheer(pair!.people[0]!, pair!.refOf(1))).status).toBe(403);
   });
 
   it('does not reach a mate who is no longer known to be an adult', async () => {
@@ -202,8 +223,28 @@ describe('the inbox', () => {
     // A cursor this API did not issue reads from the start rather than failing.
     expect((await get(mia, '/cheers?cursor=not-a-cursor')).body.cheers[0].id).toBe('cheer-page-00');
 
-    expect((await post(mia, '/cheers/seen', { ids: ['cheer-page-00', 'cheer-page-01', 'someone-elses'] })).status).toBe(204);
+    const other = await h.register('Other');
+    await engageRepo().insertCheer({
+      id: 'cheer-for-someone-else',
+      fromKind: 'member',
+      fromUserId: 'sender-x',
+      coachId: null,
+      toUserId: other.userId,
+      squadId: null,
+      cheer: 'fire',
+      localDate: DAY,
+      createdAt: new Date(base).toISOString(),
+      seenAt: null,
+    });
+    expect(
+      (await post(mia, '/cheers/seen', { ids: ['cheer-page-00', 'cheer-page-01', 'cheer-for-someone-else'] })).status,
+    ).toBe(204);
     expect((await get(mia, '/fight-record')).body.fightCamp.cheers).toEqual({ unseen: 23 });
+    // Someone else's cheer stays unseen: marking is scoped to the recipient.
+    expect((await engageRepo().cheersTo(other.userId, { since: '2000-01-01T00:00:00.000Z', limit: 5 }))[0]!.seenAt).toBeNull();
+    // A cursor that only looks like a date reads from the start, never a 500.
+    const sneaky = Buffer.from(JSON.stringify(['1', 'x'])).toString('base64url');
+    expect((await get(mia, `/cheers?cursor=${sneaky}`)).body.cheers[0].id).toBe('cheer-page-00');
     expect((await post(mia, '/cheers/seen', { ids: Array.from({ length: 51 }, (_, i) => `x${i}`) })).status).toBe(400);
   });
 });
@@ -272,6 +313,16 @@ describe('bot nudges (US-D3)', () => {
     await cheer(noTimezone.people[0]!, noTimezone.refOf(1));
     await settle();
 
+    const noTelegram = await squadOf(2);
+    saveConsents(noTelegram.people[1]!.userId, {
+      wellnessDataProcessing: true,
+      aiPersonalisation: false,
+      anonymisedAnalytics: false,
+      reminders: true,
+    });
+    await cheer(noTelegram.people[0]!, noTelegram.refOf(1));
+    await settle();
+
     const noConsent = await squadOf(2);
     const user = getStore().byId<{ id: string }>('users', noConsent.people[1]!.userId)!;
     getStore().upsert('users', { ...user, tgId: 9_999_001, timezone: 'Australia/Sydney' });
@@ -290,7 +341,11 @@ describe('the cheer rate limit', () => {
     resetRateLimiter();
     try {
       const statuses: number[] = [];
-      for (let i = 0; i < 31; i += 1) statuses.push((await cheer(people[0]!, 'm_zzzzzzzzzzzz')).status);
+      for (let i = 0; i < 31; i += 1) {
+        // Alternating case: Express routes /CHEERS to the same handler, so the lane must count it.
+        const path = i % 2 === 0 ? '/cheers' : '/CHEERS';
+        statuses.push((await post(people[0]!, path, { to: 'm_zzzzzzzzzzzz', cheer: 'fire' })).status);
+      }
       expect(statuses.slice(0, 30).every((s) => s === 403)).toBe(true);
       expect(statuses[30]).toBe(429);
       // Reading the inbox is not in that lane.

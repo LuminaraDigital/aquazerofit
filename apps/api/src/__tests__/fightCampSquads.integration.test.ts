@@ -266,6 +266,17 @@ describe('the squad view (US-B1, US-C5)', () => {
     expect(events.filter((d) => d.action === 'fightCamp.squad.viewed')).toHaveLength(1);
   });
 
+  it('numbers repeated fallback names so every row says who it is', async () => {
+    h.enable('squads');
+    const { people } = await squadOf(3);
+    for (const person of people.slice(1)) {
+      const user = getStore().byId<{ id: string; email: string }>('users', person.userId)!;
+      getStore().upsert('users', { ...user, displayName: user.email.split('@')[0] });
+    }
+    const names = (await current(people[0]!)).body.squad.members.map((m: { displayName: string }) => m.displayName);
+    expect(names).toEqual(['Member0', 'Fight Camp member', 'Fight Camp member 2']);
+  });
+
   it('shows first names only, never an auto-filled name', async () => {
     h.enable('squads');
     const full = await h.register('Rizal Pratama');

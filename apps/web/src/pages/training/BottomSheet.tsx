@@ -54,7 +54,7 @@ export function BottomSheet({
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
               <span className="material-symbols-outlined" aria-hidden="true">
                 close

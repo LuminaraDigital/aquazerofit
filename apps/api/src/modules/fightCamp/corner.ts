@@ -26,7 +26,7 @@ import { logEvent } from '../../platform/telemetry';
 import { validateTelegramInitData } from '../auth/telegram';
 import { botConfigured, savePreparedInlineMessage } from '../payments/telegramBot';
 import { engageRepo } from './repo';
-import { createSquad, joinSquad, membershipIn, peekOf, requireSquadAdult } from './squads';
+import { createSquad, joinSquad, membershipIn, peekOf, requireSquadAdult, telegramSafe } from './squads';
 
 const GROUP_CHAT_TYPES = new Set(['group', 'supergroup']);
 
@@ -41,7 +41,21 @@ export function cornerHash(chatInstance: string, secret: string): string {
  * route cannot be used to ask about a group the caller was not launched from.
  */
 function groupHashFor(userId: string, tgInitData: string, secret: string): string {
-  const tgUser = validateTelegramInitData(tgInitData);
+  let tgUser;
+  try {
+    tgUser = validateTelegramInitData(tgInitData);
+  } catch (err) {
+    // 403, not the 401 the sign-in route answers: launch data goes stale ten
+    // minutes after the Mini App opened, while the session itself is fine.
+    // A 401 here would send the client to refresh, fail again with the same
+    // launch data, and sign a perfectly good session out.
+    if (err instanceof AppError && (err.code === 'AUTH_TG_STALE' || err.code === 'AUTH_TG_INVALID')) {
+      throw new AppError('FORBIDDEN', 'Open AquaZeroFit again from the group to use its Squad Corner.', {
+        reason: err.code === 'AUTH_TG_STALE' ? 'tg_launch_stale' : 'tg_launch_invalid',
+      });
+    }
+    throw err;
+  }
   const user = getStore().byId<User>('users', userId);
   if (typeof user?.tgId !== 'number' || user.tgId !== tgUser.id) {
     throw new AppError('FORBIDDEN', 'Open AquaZeroFit from Telegram with the account you signed in with.', {
@@ -78,7 +92,10 @@ export async function squadCorner(userId: string, input: SquadCornerInput, today
   if (!squad) return { state: 'none', squad: null };
   const peek = await peekOf(squad);
   const mine = await engageRepo().activeMembership(userId, season);
-  const state = mine?.squadId === squad.id ? 'member' : peek.full ? 'full' : 'joinable';
+  // Someone the owner removed is not offered the squad again: to them it is
+  // as closed as a full one.
+  const removed = await engageRepo().wasRemoved(squad.id, userId);
+  const state = mine?.squadId === squad.id ? 'member' : peek.full || removed ? 'full' : 'joinable';
   return { state, squad: peek };
 }
 
@@ -95,8 +112,8 @@ export async function prepareSquadInvite(userId: string, squadId: string): Promi
   const prepared = await savePreparedInlineMessage(tgId, {
     id: newId('inv').slice(0, 64),
     title: 'Join my squad on AquaZeroFit',
-    description: squad.name,
-    text: `Join "${squad.name}", my Fight Camp squad on AquaZeroFit. We cheer each other on for showing up.`,
+    description: telegramSafe(squad.name, 'Fight Camp squad'),
+    text: `Join "${telegramSafe(squad.name, 'my squad')}", my Fight Camp squad on AquaZeroFit. We cheer each other on for showing up.`,
     button: {
       text: 'Join the squad',
       url: `${fightCampConfig.telegramMiniAppLink}?startapp=sq_${squad.inviteCode}`,

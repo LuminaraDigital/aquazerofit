@@ -125,7 +125,7 @@ export type CreateSquadOutcome =
 
 export type JoinSquadOutcome =
   | { ok: true; member: MemberRow }
-  | { ok: false; reason: 'not_found' | 'archived' | 'full' | 'already_member' };
+  | { ok: false; reason: 'not_found' | 'archived' | 'full' | 'already_member' | 'removed' };
 
 export type InsertShareLinkOutcome = 'inserted' | 'exists' | 'code_taken';
 
@@ -187,7 +187,9 @@ export interface EngageRepo {
    * joined active member; when nobody is left the squad is archived. False
    * when the user was not an active member.
    */
-  leaveSquad(squadId: string, userId: string, at: string): Promise<boolean>;
+  leaveSquad(squadId: string, userId: string, at: string, opts?: { removed?: boolean }): Promise<boolean>;
+  /** Whether the owner took this person out of this squad (they cannot rejoin it). */
+  wasRemoved(squadId: string, userId: string): Promise<boolean>;
   setShowStats(squadId: string, userId: string, showStats: boolean): Promise<MemberRow | null>;
   /** Replace a live squad's invite code. */
   setInviteCode(squadId: string, inviteCode: string): Promise<'ok' | 'code_taken' | 'not_found'>;

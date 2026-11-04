@@ -123,11 +123,17 @@ describe('Squad Corner (US-C3)', () => {
   it('rejects forged, stale, private-chat and someone-else’s launch data', async () => {
     enable();
     const rizal = await tgPerson('Rizal');
+    // 403, never 401: a 401 would make the client think the session itself
+    // had gone and sign a good session out.
     const forged = launch(rizal.tgId, GROUP).replace(/hash=[0-9a-f]+/, `hash=${'0'.repeat(64)}`);
-    expect((await corner(rizal, { action: 'peek', tgInitData: forged })).status).toBe(401);
+    const forgedRes = await corner(rizal, { action: 'peek', tgInitData: forged });
+    expect(forgedRes.status).toBe(403);
+    expect(forgedRes.body.details.reason).toBe('tg_launch_invalid');
 
     const stale = launch(rizal.tgId, GROUP, Math.floor(Date.now() / 1000) - 3 * 24 * 3600);
-    expect((await corner(rizal, { action: 'peek', tgInitData: stale })).status).toBe(401);
+    const staleRes = await corner(rizal, { action: 'peek', tgInitData: stale });
+    expect(staleRes.status).toBe(403);
+    expect(staleRes.body.details.reason).toBe('tg_launch_stale');
 
     const privateChat = await corner(rizal, { action: 'peek', tgInitData: launch(rizal.tgId, { type: 'private', instance: '1' }) });
     expect(privateChat.status).toBe(400);
@@ -151,6 +157,33 @@ describe('Squad Corner (US-C3)', () => {
     const res = await corner(teen, { action: 'peek', tgInitData: launch(teen.tgId, GROUP) });
     expect(res.status).toBe(403);
     expect(res.body.details.reason).toBe('squad_adult_only');
+  });
+});
+
+describe('removal from a corner', () => {
+  it('sticks: the person cannot rejoin through the group or by code this season', async () => {
+    enable();
+    const OWN_GROUP = { type: 'group', instance: '-5550001112223334' };
+    const owner = await tgPerson('Owner');
+    await corner(owner, { action: 'create', tgInitData: launch(owner.tgId, OWN_GROUP), name: 'Gym Crew', consent: true });
+    const mate = await tgPerson('Mate');
+    await corner(mate, { action: 'join', tgInitData: launch(mate.tgId, OWN_GROUP), consent: true });
+    const view = (await request(h.app).get(`${h.base}/squads/current`).set(owner.auth())).body.squad;
+    const mateRef = view.members.find((m: { displayName: string }) => m.displayName === 'Mate').ref;
+    expect(
+      (await request(h.app).post(`${h.base}/squads/${view.id}/members/${mateRef}/remove`).set(owner.auth())).status,
+    ).toBe(204);
+
+    const peek = await corner(mate, { action: 'peek', tgInitData: launch(mate.tgId, OWN_GROUP) });
+    expect(peek.body.corner.state).toBe('full');
+    const again = await corner(mate, { action: 'join', tgInitData: launch(mate.tgId, OWN_GROUP), consent: true });
+    expect(again.status).toBe(403);
+    expect(again.body.details.reason).toBe('squad_removed');
+    const byCode = await request(h.app)
+      .post(`${h.base}/squads/join`)
+      .set(mate.auth())
+      .send({ code: view.inviteCode, consent: true });
+    expect(byCode.status).toBe(403);
   });
 });
 
@@ -181,10 +214,25 @@ describe('prepared invite messages (US-C4)', () => {
     expect(res.body).toEqual({ preparedMessageId: 'prep-1' });
     const call = calls.find((c) => c.url.endsWith('/savePreparedInlineMessage'))!;
     expect(call.body).toMatchObject({ user_id: rizal.tgId, allow_group_chats: true, allow_user_chats: true });
-    const result = call.body.result as { reply_markup: { inline_keyboard: Array<Array<{ url: string }>> } };
+    const result = call.body.result as {
+      title: string;
+      input_message_content: { message_text: string };
+      reply_markup: { inline_keyboard: Array<Array<{ url: string }>> };
+    };
     expect(result.reply_markup.inline_keyboard[0]![0]!.url).toBe(
       `https://t.me/AquaZeroFitBot/app?startapp=sq_${made.body.squad.inviteCode}`,
     );
+    expect(result.title).toBe('Join my squad on AquaZeroFit');
+    expect(result.input_message_content.message_text).toBe(
+      'Join "Gym Crew", my Fight Camp squad on AquaZeroFit. We cheer each other on for showing up.',
+    );
+
+    // A name Telegram would turn into a link never reaches the message.
+    const linky = await tgPerson('Linky');
+    const odd = await request(h.app).post(`${h.base}/squads`).set(linky.auth()).send({ name: 'evil.example/x', consent: true });
+    await request(h.app).post(`${h.base}/squads/${odd.body.squad.id}/invite-message`).set(linky.auth());
+    const oddCall = calls.filter((c) => c.url.endsWith('/savePreparedInlineMessage')).at(-1)!;
+    expect(JSON.stringify(oddCall.body)).not.toContain('evil.example');
     expect(JSON.stringify(call.body)).not.toMatch(/chat_id/);
   });
 

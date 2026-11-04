@@ -22,6 +22,7 @@ import { getStore } from '../../platform/store';
 import { logEvent } from '../../platform/telemetry';
 import { hasConsent } from '../me/service';
 import { botConfigured, sendBotMessage } from '../payments/telegramBot';
+import { fcEnabled } from './flags';
 import { engageRepo } from './repo';
 
 export const QUIET_HOURS = { from: 21, until: 8 } as const;
@@ -49,6 +50,9 @@ export async function sendNudge(userId: string, kind: NudgeKind, text: string, n
   try {
     const user = getStore().byId<User>('users', userId);
     if (!botConfigured() || typeof user?.tgId !== 'number' || !hasConsent(userId, 'reminders')) return false;
+    // The recipient's own gate: nobody outside the rollout hears from Fight
+    // Camp. Every nudge kind today belongs to cheers.
+    if (!fcEnabled('cheers', userId)) return false;
     if ((await engageRepo().nudgeSettings(userId))[kind] === false) return false;
     const timeZone = user.timezone;
     const hour = timeZone ? localHour(timeZone, now) : null;

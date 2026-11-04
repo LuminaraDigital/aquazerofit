@@ -20,9 +20,20 @@ export function CheerButton({ member }: { member: SquadMemberView }) {
   const toast = useToast();
   const send = useSendCheer();
   const [open, setOpen] = useState(false);
+  const sentHere = useRef(false);
+  const sent = useRef<HTMLSpanElement>(null);
+  // The sheet and the button that opened it both go once the cheer is out;
+  // focus moves to the line that replaced them instead of dropping to the page.
+  useEffect(() => {
+    if (member.cheeredToday && sentHere.current) sent.current?.focus();
+  }, [member.cheeredToday]);
 
   if (member.cheeredToday) {
-    return <span className="shrink-0 text-xs font-semibold text-on-surface-variant">Sent today</span>;
+    return (
+      <span ref={sent} tabIndex={-1} className="shrink-0 text-xs font-semibold text-on-surface-variant outline-none">
+        Sent today
+      </span>
+    );
   }
   return (
     <>
@@ -48,6 +59,7 @@ export function CheerButton({ member }: { member: SquadMemberView }) {
                   { to: member.ref, cheer: kind },
                   {
                     onSuccess: () => {
+                      sentHere.current = true;
                       setOpen(false);
                       toast.success(`Cheer sent to ${member.displayName}.`);
                     },

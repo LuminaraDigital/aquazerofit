@@ -10,7 +10,8 @@
  * All copy resolves through ./consistencyCopy — see that file for the full
  * vocabulary.
  */
-import type { ConsistencyStatus } from '@aquazerofit/shared';
+import type { ConsistencyStatus, GraceView } from '@aquazerofit/shared';
+import { CutManNote } from '@/components/fightCamp/CutMan';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Chip } from '@/components/ui/Chip';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -25,10 +26,13 @@ import {
 
 export function ConsistencyCard({
   consistency,
+  grace = null,
   loading = false,
   className = '',
 }: {
   consistency: ConsistencyStatus | null | undefined;
+  /** Cut Man (AZF-P1 Epic E), only while that feature is on for the account. */
+  grace?: GraceView | null;
   loading?: boolean;
   className?: string;
 }) {
@@ -101,6 +105,8 @@ export function ConsistencyCard({
           {best !== null && <li>{best}</li>}
         </ul>
       )}
+
+      {grace && <CutManNote grace={grace} lastActiveDate={consistency.lastActiveDate} />}
     </GlassCard>
   );
 }

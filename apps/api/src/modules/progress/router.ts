@@ -29,7 +29,8 @@ import { isLaneAllowed } from '../ai/tierPolicy';
 import { loadPrompt } from '../ai/prompts';
 import { hasConsent } from '../me/service';
 import { asyncHandler, byIdDoc, getUser, nowIso, upsertDoc } from '../ai/util';
-import { getProgressSummary } from './service';
+import { activeDatesOf, getProgressSummary, loadActivity } from './service';
+import { bridgesForDisplay } from '../fightCamp/grace';
 import {
   NOT_ENOUGH_DATA_NARRATIVE,
   computeChanges,
@@ -42,9 +43,18 @@ import {
 export const progressRouter = Router();
 progressRouter.use(requireAuth);
 
-progressRouter.get('/summary', (req, res) => {
-  res.json(getProgressSummary(userIdOf(req), todayFor(req)));
-});
+progressRouter.get(
+  '/summary',
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    const today = todayFor(req);
+    // Cut Man days shape the consistency run only while that feature is on;
+    // off, this is the R1a summary with no Fight Camp query at all.
+    const activity = loadActivity(userId);
+    const bridged = await bridgesForDisplay(userId, today, activeDatesOf(activity), { write: true });
+    res.json(getProgressSummary(userId, today, bridged, activity));
+  }),
+);
 
 // ---------------------------------------------------------------------------
 

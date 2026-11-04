@@ -19,6 +19,7 @@ import type {
   EngageExport,
   EngageRepo,
   EnrolmentRow,
+  GraceLedger,
   GraceRow,
   InsertShareLinkOutcome,
   JoinSquadOutcome,
@@ -252,14 +253,29 @@ export class MemoryEngageRepo implements EngageRepo {
 
   // ----- Cut Man grace -----
 
+  /** Array order is write order: rows are only ever appended. */
   async graceEntries(userId: string): Promise<GraceRow[]> {
-    return this.grace
-      .filter((g) => g.userId === userId)
-      .sort((a, b) => byCodePoint(a.createdAt, b.createdAt) || byCodePoint(a.id, b.id))
-      .map(copy);
+    return this.grace.filter((g) => g.userId === userId).map(copy);
   }
 
-  async addGrace(rows: readonly GraceRow[]): Promise<number> {
+  private graceLocks = new Map<string, Promise<unknown>>();
+
+  async withGraceLedger<T>(userId: string, fn: (ledger: GraceLedger) => Promise<T>): Promise<T> {
+    const previous = this.graceLocks.get(userId) ?? Promise.resolve();
+    const run = previous.then(() =>
+      fn({ entries: () => this.graceEntries(userId), append: (rows) => this.appendGrace(rows) }),
+    );
+    // The chain continues whether this holder succeeds or throws.
+    const settled = run.catch(() => undefined);
+    this.graceLocks.set(userId, settled);
+    try {
+      return await run;
+    } finally {
+      if (this.graceLocks.get(userId) === settled) this.graceLocks.delete(userId);
+    }
+  }
+
+  private async appendGrace(rows: readonly GraceRow[]): Promise<number> {
     let added = 0;
     for (const row of rows) {
       const clash = this.grace.some((g) =>

@@ -39,6 +39,7 @@ export function campWith(overrides: Partial<FightCampStatus> = {}): FightCampSta
   return {
     theme: seasonTheme(SEASON.number),
     enrolment: null,
+    grace: null,
     ...overrides,
   };
 }

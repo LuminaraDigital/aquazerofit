@@ -20,7 +20,8 @@ import { asyncHandler } from '../../platform/errors';
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { timezoneOf, todayFor } from '../../platform/dates';
 import { getStore } from '../../platform/store';
-import { getProgressSummary } from '../progress/service';
+import { activeDatesOf, getProgressSummary, loadActivity } from '../progress/service';
+import { bridgesForDisplay } from '../fightCamp/grace';
 import { createCoachInvoice, starsAvailable } from '../payments/stars';
 import { acknowledgeReactions, buildReactions, recordDelivery } from './reactions';
 import {
@@ -92,12 +93,16 @@ coachesRouter.post('/select', (req, res) => {
  * Current progression plus whatever the coach has to say about it — the
  * dashboard's coach card reads from here.
  */
-coachesRouter.get('/progression', (req, res) => {
+coachesRouter.get('/progression', asyncHandler(async (req, res) => {
   const userId = userIdOf(req);
   const today = todayFor(req);
   const state = getCoachState(userId);
   const experience = experienceOf(userId, timezoneOf(req));
-  const summary = getProgressSummary(userId, today);
+  // The coach describes the same run the consistency card shows, Cut Man
+  // days included, but only reads: the summary route is what writes them.
+  const activity = loadActivity(userId);
+  const bridged = await bridgesForDisplay(userId, today, activeDatesOf(activity), { write: false });
+  const summary = getProgressSummary(userId, today, bridged, activity);
   const bondXp = bondXpFor(state, state.activeCoachId, experience.totalXp);
 
   const body: ProgressionStatus = {
@@ -117,7 +122,7 @@ coachesRouter.get('/progression', (req, res) => {
   // exactly that. Nothing is consumed here — see recordDelivery.
   saveCoachState(recordDelivery(state, experience, summary));
   res.json(body);
-});
+}));
 
 /**
  * Mark the current reactions as delivered. Separate from the read so that

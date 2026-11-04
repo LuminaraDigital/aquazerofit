@@ -16,6 +16,7 @@ import { ackBeltSchema, emojiStatusPreferenceSchema } from '@aquazerofit/shared'
 import { requireAuth, userIdOf } from '../../platform/auth';
 import { AppError, asyncHandler } from '../../platform/errors';
 import { todayFor } from '../../platform/dates';
+import { logError } from '../../platform/telemetry';
 import {
   acknowledgeBelt,
   fightRecordEnabledFor,
@@ -40,7 +41,14 @@ fightRecordRouter.get(
     const fightRecord = readFightRecord(userId, today);
     // Fight Camp is additive (AZF-P1 §5.3): the key is absent unless one of
     // its features is on, so R1a clients, Android included, see no change.
-    const fightCamp = await fightCampStatus(userId, today);
+    // A Fight Camp database fault omits the block rather than failing the
+    // belt read that worked before Fight Camp existed.
+    let fightCamp = null;
+    try {
+      fightCamp = await fightCampStatus(userId, today);
+    } catch (err) {
+      logError(err, { route: 'fightRecord.fightCamp' });
+    }
     res.json(fightCamp ? { fightRecord, fightCamp } : { fightRecord });
   }),
 );

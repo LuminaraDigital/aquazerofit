@@ -51,8 +51,11 @@ describe('SeasonCard with Fight Camp', () => {
     expect(container.textContent ?? '').not.toMatch(BANNED_COPY);
 
     fireEvent.click(join);
-    expect(await screen.findByText('In Fight Camp for Season 3')).toBeTruthy();
+    const confirmed = await screen.findByText('In Fight Camp for Season 3');
     expect(screen.queryByRole('button', { name: /Join Fight Camp/ })).toBeNull();
+    // Focus follows the action that replaced the button, and one tap posted once.
+    await waitFor(() => expect(document.activeElement).toBe(confirmed));
+    expect(mocks.api.mock.calls.filter(([path]) => path === '/fight-camp/enrolments')).toHaveLength(1);
   });
 
   it('steps back to a quiet text action after the fresh-start window', async () => {

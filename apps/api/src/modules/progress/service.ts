@@ -13,6 +13,7 @@ import {
   CONSISTENCY_GRACE_DAYS,
   CONSISTENCY_STEADY_DAYS,
   CONSISTENCY_WINDOW_DAYS,
+  GRACE_BRIDGE_WINDOW_DAYS,
   type AchievementDefinition,
   type ConsistencyState,
   type ConsistencyStatus,
@@ -111,16 +112,30 @@ export function activeDatesOf(activity: UserActivity): Set<string> {
   return activeDates;
 }
 
+const NO_BRIDGES: ReadonlySet<string> = new Set();
+
 /**
  * Missed days between two active dates, or null when the gap is wider than
  * `limit`. Stepping with `addDays` keeps the arithmetic on ISO strings; the
  * limit caps the walk so a year-long gap costs the same as a one-day one.
+ *
+ * A bridged (Cut Man) date inside the gap is neither active nor missed: it
+ * is stepped over without counting, so the walk may go `bridged.size` days
+ * further than `limit`.
  */
-function missedDaysBetween(earlier: string, later: string, limit: number): number | null {
+function missedDaysBetween(
+  earlier: string,
+  later: string,
+  limit: number,
+  bridged: ReadonlySet<string> = NO_BRIDGES,
+): number | null {
   let cursor = earlier;
-  for (let missed = 0; missed <= limit; missed += 1) {
+  let missed = 0;
+  for (let step = 0; step <= limit + bridged.size; step += 1) {
     cursor = addDays(cursor, 1);
     if (cursor === later) return missed;
+    if (!bridged.has(cursor)) missed += 1;
+    if (missed > limit) return null;
   }
   return null;
 }
@@ -130,6 +145,8 @@ interface Run {
   graceUsed: number;
   /** Oldest active date in the run, or null when no run reaches `from`. */
   startDate: string | null;
+  /** Bridged (Cut Man) dates inside the run. */
+  bridgesCrossed: number;
 }
 
 /**
@@ -139,20 +156,33 @@ interface Run {
  * Grace is only *charged* once it has bridged to another active day: the
  * trailing misses that end the walk fall outside the run, so a user with no
  * recent activity is not billed for grace they never used.
+ *
+ * `bridged` dates are gaps that cost nothing: neither an active day nor a
+ * charge against the built-in grace. With none, the walk is the R1a walk.
  */
-function runEndingAt(activeDates: ReadonlySet<string>, from: string): Run {
+function runEndingAt(
+  activeDates: ReadonlySet<string>,
+  from: string,
+  bridged: ReadonlySet<string> = NO_BRIDGES,
+): Run {
   let cursor = from;
   let days = 0;
   let graceUsed = 0;
   let pendingGrace = 0;
+  let pendingBridges = 0;
+  let bridgesCrossed = 0;
   let startDate: string | null = null;
 
   for (;;) {
     if (activeDates.has(cursor)) {
       days += 1;
       graceUsed += pendingGrace;
+      bridgesCrossed += pendingBridges;
       pendingGrace = 0;
+      pendingBridges = 0;
       startDate = cursor;
+    } else if (bridged.has(cursor)) {
+      pendingBridges += 1;
     } else {
       if (graceUsed + pendingGrace + 1 > CONSISTENCY_GRACE_DAYS) break;
       pendingGrace += 1;
@@ -160,7 +190,59 @@ function runEndingAt(activeDates: ReadonlySet<string>, from: string): Run {
     cursor = addDays(cursor, -1);
   }
 
-  return { days, graceUsed, startDate };
+  return { days, graceUsed, startDate, bridgesCrossed };
+}
+
+export interface CutManPlan {
+  /** Bridges to write now: each has an active day after it, so the person is back. */
+  commit: string[];
+  /**
+   * Bridges that would carry the run but are not spent yet, because nothing
+   * has been logged since the gap. Shown, not charged: the bank is used when
+   * the person comes back, never while they are away.
+   */
+  standBy: string[];
+}
+
+/**
+ * Which missed dates banked Cut Man days should bridge (AZF-P1 US-E2).
+ *
+ * The run already absorbs one miss with the built-in grace day. Bridging the
+ * k newest misses inside the last GRACE_BRIDGE_WINDOW_DAYS leaves that grace
+ * day for the next miss further back, which covers the longest unbroken
+ * stretch of misses k Cut Man days can cover. So: try k = 0 up to the bank,
+ * and take the smallest k that gives the longest run. A k that does not
+ * lengthen the run is never chosen, so grace is not spent on misses before
+ * someone's first active day or on a gap that leads back to nothing.
+ *
+ * Today is never a miss (it is not over), so the bridgeable dates are the six
+ * before it.
+ */
+export function planCutManBridges(
+  activeDates: ReadonlySet<string>,
+  today: string,
+  bridged: ReadonlySet<string>,
+  bank: number,
+): CutManPlan {
+  const from = activeDates.has(today) ? today : addDays(today, -1);
+  const windowStart = addDays(today, -(GRACE_BRIDGE_WINDOW_DAYS - 1));
+  const candidates: string[] = [];
+  for (let date = from; date >= windowStart; date = addDays(date, -1)) {
+    if (!activeDates.has(date) && !bridged.has(date)) candidates.push(date);
+  }
+
+  let best = { k: 0, days: runEndingAt(activeDates, from, bridged).days };
+  for (let k = 1; k <= Math.min(bank, candidates.length); k += 1) {
+    const days = runEndingAt(activeDates, from, new Set([...bridged, ...candidates.slice(0, k)])).days;
+    if (days > best.days) best = { k, days };
+  }
+
+  const chosen = candidates.slice(0, best.k);
+  const hasActiveAfter = (date: string) => [...activeDates].some((d) => d > date && d <= today);
+  return {
+    commit: chosen.filter(hasActiveAfter),
+    standBy: chosen.filter((date) => !hasActiveAfter(date)),
+  };
 }
 
 /**
@@ -169,7 +251,10 @@ function runEndingAt(activeDates: ReadonlySet<string>, from: string): Run {
  * high-water mark is the widest such window — found by sliding one over the
  * sorted dates rather than re-walking from every endpoint.
  */
-function longestRun(sortedDates: readonly string[]): number {
+function longestRun(
+  sortedDates: readonly string[],
+  bridged: ReadonlySet<string> = NO_BRIDGES,
+): number {
   const gapBefore: number[] = new Array<number>(sortedDates.length).fill(0);
   let start = 0;
   let gapSum = 0;
@@ -177,7 +262,12 @@ function longestRun(sortedDates: readonly string[]): number {
 
   for (let i = 0; i < sortedDates.length; i += 1) {
     if (i > 0) {
-      const gap = missedDaysBetween(sortedDates[i - 1]!, sortedDates[i]!, CONSISTENCY_GRACE_DAYS);
+      const gap = missedDaysBetween(
+        sortedDates[i - 1]!,
+        sortedDates[i]!,
+        CONSISTENCY_GRACE_DAYS,
+        bridged,
+      );
       if (gap === null) {
         // Unbridgeable break: the next run starts here.
         start = i;
@@ -204,20 +294,27 @@ function longestRun(sortedDates: readonly string[]): number {
  * mark. Pure over `activity` so it is cheap to test and cannot drift from the
  * store.
  */
-export function computeConsistency(activity: UserActivity, today: string): ConsistencyStatus {
+export function computeConsistency(
+  activity: UserActivity,
+  today: string,
+  opts: { bridgedDates?: ReadonlySet<string> } = {},
+): ConsistencyStatus {
+  // Bridged (Cut Man) dates shape the run only. They are never added to the
+  // active set, so the window count, belts and squad points cannot see them.
+  const bridged = opts.bridgedDates ?? NO_BRIDGES;
   const activeDates = activeDatesOf(activity);
   const sorted = [...activeDates].sort();
   const lastActiveDate = sorted[sorted.length - 1] ?? null;
 
   // Same concession as `computeStreak`: an incomplete today does not punish.
-  const run = runEndingAt(activeDates, activeDates.has(today) ? today : addDays(today, -1));
+  const run = runEndingAt(activeDates, activeDates.has(today) ? today : addDays(today, -1), bridged);
 
   const windowStart = addDays(today, -(CONSISTENCY_WINDOW_DAYS - 1));
   const inWindow = sorted.filter((d) => d >= windowStart && d <= today);
 
   // The run has genuinely ended once the last active date sits further back
-  // than grace can reach.
-  const restingBefore = addDays(today, -(CONSISTENCY_GRACE_DAYS + 1));
+  // than grace can reach. Every bridged day inside the run reaches one further.
+  const restingBefore = addDays(today, -(CONSISTENCY_GRACE_DAYS + 1 + run.bridgesCrossed));
   const resting = lastActiveDate === null || lastActiveDate < restingBefore;
 
   // They came back: activity inside the window that predates the current run.
@@ -234,7 +331,7 @@ export function computeConsistency(activity: UserActivity, today: string): Consi
     currentDays: run.days,
     // `longestRun` covers the current run too; the max is belt-and-braces for
     // the contract's "never decreases" promise.
-    bestDays: Math.max(longestRun(sorted), run.days),
+    bestDays: Math.max(longestRun(sorted, bridged), run.days),
     activeDays: inWindow.length,
     windowDays: CONSISTENCY_WINDOW_DAYS,
     graceRemaining: Math.max(0, CONSISTENCY_GRACE_DAYS - run.graceUsed),
@@ -292,12 +389,25 @@ function evaluateAchievement(
   }
 }
 
-export function getProgressSummary(userId: string, today: string): ProgressSummary {
+/**
+ * `bridgedDates` are Cut Man days (AZF-P1 US-E2), supplied only while that
+ * feature is on. They change the consistency the card shows and nothing
+ * else: achievements keep reading the un-bridged run, so every badge is
+ * still earned by showing up.
+ */
+export function getProgressSummary(
+  userId: string,
+  today: string,
+  bridgedDates?: ReadonlySet<string>,
+  activity: UserActivity = loadActivity(userId),
+): ProgressSummary {
   const store = getStore();
-  const activity = loadActivity(userId);
   const profile = getProfile(userId);
   const streakDays = computeStreak(activity, today);
   const consistency = computeConsistency(activity, today);
+  const shownConsistency = bridgedDates
+    ? computeConsistency(activity, today, { bridgedDates })
+    : consistency;
 
   const definitions = store
     .where<AchievementDefinition>('content', (d) => d.type === 'achievementDefinition')
@@ -312,7 +422,7 @@ export function getProgressSummary(userId: string, today: string): ProgressSumma
     targetWeightKg: profile?.targetWeightKg ?? null,
     weightSeries: activity.weights.map((w) => ({ date: w.localDate, value: w.weightKg })),
     streakDays,
-    consistency,
+    consistency: shownConsistency,
     workoutsCompleted: activity.completedSessions.length,
     totalKcalBurned: Math.round(
       activity.completedSessions.reduce((s, w) => s + (w.kcalBurned ?? 0), 0),

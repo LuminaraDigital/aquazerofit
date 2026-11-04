@@ -10,6 +10,7 @@ import { seasonFor, seasonTheme, type FightCampStatus } from '@aquazerofit/share
 import { FC_FEATURES } from '../../platform/fightCampConfig';
 import { enrolmentStatus } from './enrolment';
 import { fcEnabled } from './flags';
+import { syncGrace } from './grace';
 
 export async function fightCampStatus(userId: string, today: string): Promise<FightCampStatus | null> {
   if (!FC_FEATURES.some((feature) => fcEnabled(feature, userId))) return null;
@@ -17,5 +18,6 @@ export async function fightCampStatus(userId: string, today: string): Promise<Fi
   return {
     theme: seasonTheme(season.number),
     enrolment: fcEnabled('enrol', userId) ? await enrolmentStatus(userId, today) : null,
+    grace: fcEnabled('grace', userId) ? (await syncGrace(userId, today)).view : null,
   };
 }

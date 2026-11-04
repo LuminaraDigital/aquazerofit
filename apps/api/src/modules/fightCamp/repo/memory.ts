@@ -282,11 +282,19 @@ export class MemoryEngageRepo implements EngageRepo {
 
   // ----- experiments -----
 
-  async assignArm(row: ArmRow): Promise<{ arm: ExperimentArm; recorded: boolean }> {
-    const held = this.arms.find((a) => a.userId === row.userId && a.experiment === row.experiment);
-    if (held) return { arm: held.arm, recorded: false };
+  async heldArm(
+    userId: string,
+    experiment: 'early_cheers',
+  ): Promise<{ arm: ExperimentArm; dayZero: string } | null> {
+    const held = this.arms.find((a) => a.userId === userId && a.experiment === experiment);
+    return held ? { arm: held.arm, dayZero: held.dayZero } : null;
+  }
+
+  async assignArm(row: ArmRow): Promise<{ arm: ExperimentArm; dayZero: string; recorded: boolean }> {
+    const held = await this.heldArm(row.userId, row.experiment);
+    if (held) return { ...held, recorded: false };
     this.arms.push({ ...row });
-    return { arm: row.arm, recorded: true };
+    return { arm: row.arm, dayZero: row.dayZero, recorded: true };
   }
 
   // ----- Cut Man grace -----

@@ -225,12 +225,15 @@ export interface EngageRepo {
   hasCheered(fromUserId: string, toUserId: string): Promise<boolean>;
 
   // ----- experiments -----
+  /** The arm on record, without writing one. */
+  heldArm(userId: string, experiment: 'early_cheers'): Promise<{ arm: ExperimentArm; dayZero: string } | null>;
   /**
    * Record `arm` unless the person already has one, and return the arm on
-   * record, which is the one to use. `recorded` is true only for the call
+   * record, which is the one to use. `dayZero` is the stored first day, never
+   * the one a later call tried to write. `recorded` is true only for the call
    * that wrote it.
    */
-  assignArm(row: ArmRow): Promise<{ arm: ExperimentArm; recorded: boolean }>;
+  assignArm(row: ArmRow): Promise<{ arm: ExperimentArm; dayZero: string; recorded: boolean }>;
 
   // ----- Cut Man grace -----
   /** Every ledger row for the user, in write order. */

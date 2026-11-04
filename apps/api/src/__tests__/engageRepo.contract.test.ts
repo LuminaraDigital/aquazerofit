@@ -435,11 +435,17 @@ describe.each(adapters)('EngageRepo contract: $name', ({ open }) => {
     it('records a person\u2019s arm once and hands that arm to every later call', async () => {
       const userId = uid('u');
       const row = { userId, experiment: 'early_cheers' as const, dayZero: '2026-10-21' };
-      expect(await repo.assignArm({ ...row, arm: 'treatment', assignedAt: at(0) })).toEqual({ arm: 'treatment', recorded: true });
+      expect(await repo.assignArm({ ...row, arm: 'treatment', assignedAt: at(0) })).toEqual({
+        arm: 'treatment',
+        dayZero: '2026-10-21',
+        recorded: true,
+      });
       expect(await repo.assignArm({ ...row, arm: 'holdout', dayZero: '2026-10-22', assignedAt: at(1) })).toEqual({
         arm: 'treatment',
+        dayZero: '2026-10-21',
         recorded: false,
       });
+      expect(await repo.heldArm(userId, 'early_cheers')).toEqual({ arm: 'treatment', dayZero: '2026-10-21' });
       expect((await repo.exportUser(userId)).experiments).toEqual([
         { experiment: 'early_cheers', arm: 'treatment', dayZero: '2026-10-21', assignedAt: at(0) },
       ]);

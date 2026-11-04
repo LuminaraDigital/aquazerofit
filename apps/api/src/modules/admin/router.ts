@@ -22,6 +22,7 @@ import { refundStarsSubscription } from '../payments/starsSubscription';
 import { todayFor } from '../../platform/dates';
 import { verifyAuditChain } from '../../platform/auditChain';
 import { retentionReport } from './retention';
+import { engageMetrics } from '../fightCamp/metrics';
 
 export const adminRouter = Router();
 /**
@@ -101,6 +102,26 @@ adminRouter.get('/audit/verify', (req, res) => {
   });
   res.json({ verification });
 });
+
+/**
+ * Fight Camp metrics (AZF-P1 §7.2): aggregate counts and rates only, for the
+ * kill-criteria report (tools/engage/kill-report.mjs). Not behind the Fight
+ * Camp flags: an admin reads them to decide whether to switch features on or
+ * off. Audited, because it walks every member's activity.
+ */
+const engageMetricsQuerySchema = z.object({
+  season: z.coerce.number().int().min(1).max(10_000).optional(),
+});
+
+adminRouter.get(
+  '/engage/metrics',
+  asyncHandler(async (req, res) => {
+    const { season } = engageMetricsQuerySchema.parse(req.query);
+    const metrics = await engageMetrics(todayFor(req), season);
+    auditDataAccess(req.user!.id, 'admin.engage.metrics.read', { season: metrics.season.number });
+    res.json({ metrics });
+  }),
+);
 
 /**
  * Content update: attribution fields (licence, licenceAuthor, sourceId) are

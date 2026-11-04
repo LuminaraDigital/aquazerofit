@@ -48,6 +48,8 @@ COPY apps/api apps/api
 # Packaging and documentation tests read these from the repo root. The
 # runtime stage does not copy them; it copies source explicitly below.
 COPY .gcloudignore cloudbuild.yaml .env.example .env.staging.example .env.production.example ./
+# The kill report builder, which the metrics test imports.
+COPY tools/engage tools/engage
 COPY deploy/cloudrun/service.yaml deploy/cloudrun/service.yaml
 # The provider-disclosure test reads aiProviders out of this file. The rest of
 # apps/web is copied only after the API gate, so this one file has to land first

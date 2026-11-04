@@ -240,6 +240,20 @@ export interface EngageRepo {
   /** Invitees attributed to any of this user's share links. */
   inviteesOf(userId: string): Promise<string[]>;
 
+  // ----- metrics (admin, aggregate only) -----
+  /** Count one share-link open; no code and no person is kept. */
+  recordLanding(day: string, kind: ShareKindP1, surface: Surface): Promise<void>;
+  landingsSince(day: string): Promise<number>;
+  /** Attributions to a share link created at or after `since`. */
+  shareAttributionsSince(since: string): Promise<number>;
+  /** Each person's first squad join, ever. */
+  squadFirstJoins(): Promise<Array<{ userId: string; joinedAt: string }>>;
+  enrolledUsers(seasonNumber: number): Promise<string[]>;
+  armsOf(experiment: 'early_cheers'): Promise<Array<{ userId: string; arm: ExperimentArm }>>;
+  graceAppliedIn(seasonNumber: number): Promise<number>;
+  /** Member cheers sent per sender with sender-local dates in [from, to]. */
+  cheersPerSender(from: string, to: string): Promise<number[]>;
+
   // ----- privacy -----
   exportUser(userId: string): Promise<EngageExport>;
   /**
@@ -280,6 +294,7 @@ export const ENGAGE_TABLE_PRIVACY = {
   nudge_log: { userData: true, exportedAs: 'nudges', erasure: 'delete' },
   nudge_settings: { userData: true, exportedAs: 'nudgeSettings', erasure: 'delete' },
   experiment_arms: { userData: true, exportedAs: 'experiments', erasure: 'delete' },
+  share_landings: { userData: false },
   share_links: { userData: true, exportedAs: 'shareLinks', erasure: 'delete' },
   referral_attributions: { userData: true, exportedAs: 'attribution', erasure: 'delete' },
 } as const satisfies Record<

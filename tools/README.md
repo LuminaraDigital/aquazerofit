@@ -1,6 +1,6 @@
 # tools/
 
-Six generators and one config helper. None of them run in CI and none are needed to build or test
+Six generators, one report and one config helper. None of them run in CI and none are needed to build or test
 the application — they exist to turn source material (character renders, card
 masters, screen captures, Markdown) into the committed artefacts the app and
 the document set consume.
@@ -20,6 +20,7 @@ Root-level npm scripts exist for each, so they are discoverable from
 | `npm run screenshots:optimise` | `tools/screenshots/optimise.mjs` |
 | `npm run assets:belts` | `tools/belts/build-belt-art.mjs` |
 | `npm run assets:share` | `tools/share/build-story-art.mjs` |
+| `npm run report:engage -- <metrics.json>` | `tools/engage/kill-report.mjs` |
 | `npm run docs:setup` then `npm run docs:build -- <in.md> <out.docx>` | `tools/docgen/md-to-docx.js` |
 | `npm run assetlinks:add -- <SHA-256>` | `tools/assetlinks/add-fingerprint.mjs` |
 
@@ -222,6 +223,23 @@ number or anything about the person, and their link rides in the caption.
 Colours and season names mirror `packages/shared/src/fightCamp.ts`; change
 them there and re-run. The web test `shareKit.test.tsx` fails if any image the
 app can ask for is missing.
+
+---
+
+## `tools/engage/` — Fight Camp kill-criteria report
+
+```bash
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "https://aquazerofit.com/api/v1/admin/engage/metrics?season=1" > metrics.json
+node tools/engage/kill-report.mjs metrics.json > kill-report.md
+```
+
+Turns the admin metrics (`GET /api/v1/admin/engage/metrics`, aggregate counts
+only) into the AZF-P1 §7.3 table: each Phase 1 feature, its rule, the measured
+value and KEEP, REDESIGN or NOT YET. It applies the PRD's thresholds and makes
+no decision; the guardrails row (complaints, refunds, platform warnings,
+counsel) is always left for a person to check. The API suite imports its pure
+builder (`fightCampMetrics.integration.test.ts`), so the rules are tested.
 
 ---
 

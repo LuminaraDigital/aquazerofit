@@ -66,6 +66,7 @@ export async function landOn(code: string, surface: Surface): Promise<string> {
   const home = `${config.appPublicUrl}/`;
   const link = await engageRepo().shareLinkByCode(code);
   if (!link) return home;
+  await engageRepo().recordLanding(new Date().toISOString().slice(0, 10), link.kind, surface);
   logEvent('share_link_landed', { kind: link.kind, surface });
   return `${home}?ref=sh_${link.code}`;
 }

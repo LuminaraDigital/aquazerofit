@@ -15,6 +15,7 @@
     "test": "npm run test --workspace packages/shared --if-present && npm run test --workspace apps/api --if-present && npm run test --workspace apps/web --if-present && npm test --prefix cloudflare",
     "test:coverage": "npm run test:coverage --workspace apps/api && npm run test:coverage --workspace apps/web",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "sbom": "npm sbom --sbom-format cyclonedx --workspaces --omit=dev > sbom-npm.cdx.json && node apps/android/scripts/generate-sbom.mjs",
     "seed": "npm run seed --workspace apps/api",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "eval": "tsx evals/runner.ts",
@@ -27,6 +28,7 @@
     "assets:belts": "node tools/belts/build-belt-art.mjs",
     "assets:share": "node tools/share/build-story-art.mjs",
     "screenshots:optimise": "node tools/screenshots/optimise.mjs",
+    "assetlinks:add": "node tools/assetlinks/add-fingerprint.mjs",
     "docs:setup": "npm --prefix tools/docgen install",
     "docs:build": "node tools/docgen/md-to-docx.js"
   },

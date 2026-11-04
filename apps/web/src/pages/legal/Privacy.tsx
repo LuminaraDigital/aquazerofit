@@ -133,16 +133,32 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
           which is why the AI features that use it are gated behind consent rather than on by
           default.
         </P>
+        <P>
+          On Android, three device features are used only when you turn them on, and what they
+          reach stays narrow:
+        </P>
+        <List
+          items={[
+            'Health Connect, if you connect it in Settings: the app reads your steps, heart rate (the day’s average and lowest), total calories burned and last night’s sleep duration, for today and last night only. These figures are read and shown on your device. They are not sent to our servers, not shared with anyone, not used for advertising and not used to train AI. Disconnect at any time in Settings or in Health Connect.',
+            'The microphone, only after you tap the microphone in the coach, and only while it is listening. Android’s default speech recognition service turns what you say into text. That service may process the audio off the device; the audio is not sent to us. We receive only the text you then choose to send, handled like any other coach message. We never record, receive or store audio.',
+            'The camera, only when you photograph a meal or scan a barcode. Barcodes are read on your device.',
+          ]}
+        />
+        <P>
+          Our use of information received from Health Connect adheres to the Health Connect
+          Permissions policy, including its Limited Use requirements. The activity recognition
+          permission is requested only because Android requires it before an app can show an
+          ongoing workout notification; the app does not read activity data with it.
+        </P>
         <Notice icon="info">
           We set no advertising or third-party cookies and run no third-party analytics on the web.
           The Android app sends crash reports and usage analytics to Firebase only if you turn on
           anonymised analytics. The referral values above are stored in your browser&apos;s local
           storage, under the key{' '}
           <code className="rounded bg-surface-variant/60 px-1 py-0.5 text-[0.9em]">azf_attr_v1</code>
-          , so a huddle invite still works after you sign up. Clearing site data removes it. Whether
-          this deployment needs to ask consent before storing it depends on the law of{' '}
-          <Fact name="jurisdiction" hint="governing jurisdiction" /> and must be settled before this
-          notice is relied upon.
+          , so a huddle invite still works after you sign up. Clearing site data removes it. It is
+          used only for that invite and is never used for advertising or to follow you across other
+          sites.
         </Notice>
       </Section>
 
@@ -156,9 +172,12 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
           ]}
         />
         <P>
-          The lawful basis for each purpose under your local data protection law —{' '}
-          <Fact name="jurisdiction" hint="governing jurisdiction" /> — must be stated here before
-          this notice is relied upon.
+          We handle personal information under the Privacy Act 1988 (Cth) and the Australian
+          Privacy Principles. Your wellness profile and logs are health information, and we collect
+          them with your consent, which you give when you turn on wellness data processing and
+          enter them. AI personalisation, anonymised analytics and food photo training each have
+          their own consent, are off until you turn them on, and can be withdrawn at any time in
+          Settings.
         </P>
       </Section>
 
@@ -176,9 +195,9 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
             'Facts you reject are kept briefly — so the same suggestion is not made again — and then erased.',
             <>
               The providers in use on this deployment are{' '}
-              <Fact name="aiProviders" hint="configured AI providers" />. Their own terms govern
-              what they do with data they receive, and that must be checked before this notice is
-              relied upon. The operator last verified those terms on{' '}
+              <Fact name="aiProviders" hint="configured AI providers" />, reached through their
+              APIs. Their own API terms govern what they do with the data they receive. We
+              last verified those terms on{' '}
               <Fact name="aiProvidersVerifiedOn" hint="date provider terms last verified" />;
               provider terms change, so this date is re-checked whenever a provider is added,
               removed or revises its terms.
@@ -388,7 +407,12 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
         <Notice icon="delete" tone="coral">
           Deletion is real: your profile, logs, plans, conversations, remembered facts and any meal
           photographs still on disk are erased. Only the anonymised ledger and audit entries remain,
-          and they no longer point at you.
+          and they no longer point at you. Step-by-step instructions, including how to delete your
+          account from a browser without the app, are on the{' '}
+          <Link to="/account/deletion" className="text-primary hover:text-secondary">
+            account deletion page
+          </Link>
+          .
         </Notice>
       </Section>
 
@@ -412,10 +436,10 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
       <Section id="children" index={12} heading="Age">
         <P>
           The service is not designed for children. The wellness profile accepts ages from{' '}
-          {RANGES.age.min} upward, and accounts should not be created for anyone younger. Some
-          jurisdictions set a higher minimum age for consenting to this kind of processing; the
-          applicable minimum for <Fact name="jurisdiction" hint="governing jurisdiction" /> must be
-          confirmed here before this notice is relied upon.
+          {RANGES.age.min} upward, and accounts should not be created for anyone younger. If you
+          are under 18, check with a parent or guardian before using the service, and do not use it
+          if the law where you live sets a higher minimum age for consenting to this kind of
+          processing.
         </P>
       </Section>
 

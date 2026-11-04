@@ -151,7 +151,7 @@ figure does not mean renumbering the ones after it.
 **House rule, enforced by the build:** no em dashes or en dashes outside fenced
 code blocks. Word autocorrect and pasted text reintroduce them constantly and
 they are banned in this document set, so the renderer fails with line numbers
-rather than let one reach a submitted file. Code fences are exempt, because a
+rather than let one reach a committed file. Code fences are exempt, because a
 document quoting source must quote it verbatim.
 
 Page numbers are fields filled by Word on *Update Field*, not guessed at build

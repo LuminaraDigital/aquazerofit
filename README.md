@@ -67,10 +67,16 @@ npm run api    # API on http://localhost:4000 (seeds demo data on first boot)
 npm run dev    # Web app on http://localhost:5173 (proxies /api to :4000)
 ```
 
-Demo account (seeded in every environment so the product opens populated, AQF-06 §7):
+Demo account (seeded in development and tests, never in production, so the
+product opens populated, AQF-06 §7):
 
 - **Email:** `demo@aquazero.fit`
-- **Password:** `AquaZeroDemo!2026`
+- **Password:** whatever you set as `AZF_DEMO_PASSWORD` in your `.env` before
+  the first boot. Unset, the account is seeded under a random password.
+
+The password that used to be printed here was public and is compromised; do not
+reuse it anywhere. Google Play review uses a separate account provisioned from
+secrets: [docs/play-store/REVIEWER_ACCESS.md](docs/play-store/REVIEWER_ACCESS.md).
 
 Other commands:
 

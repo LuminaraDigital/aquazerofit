@@ -87,11 +87,13 @@ beforeAll(async () => {
   }
 });
 
-afterAll(() => {
+afterAll(async () => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   for (const key of ['FIGHT_RECORD_ENABLED', 'FIGHT_RECORD_ROLLOUT_PERCENT', 'AZF_SEED_DEMO']) delete process.env[key];
-  fs.rmSync(dataDir, { recursive: true, force: true });
+  // Writes still queued would land in a directory that is gone.
+  await getStore().flush();
+  fs.rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 });
 
 describe('every Fight Camp flag off', () => {

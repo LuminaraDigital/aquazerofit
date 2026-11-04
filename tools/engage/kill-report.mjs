@@ -36,12 +36,14 @@ export function killRows(m) {
   const rows = [];
 
   const share = m.share;
+  // Either measured miss is enough to redesign; KEEP needs both measured and met.
+  const missed = (v, rule) => v !== null && v < rule;
   const shareVerdict =
-    share.shareRate === null || share.shareToInstall === null
-      ? 'NOT YET'
-      : share.shareRate >= RULES.shareRate && share.shareToInstall >= RULES.shareToInstall
-        ? 'KEEP'
-        : 'REDESIGN';
+    missed(share.shareRate, RULES.shareRate) || missed(share.shareToInstall, RULES.shareToInstall)
+      ? 'REDESIGN'
+      : share.shareRate === null || share.shareToInstall === null
+        ? 'NOT YET'
+        : 'KEEP';
   rows.push([
     'Share Kit',
     'share rate >= 3% of WAU and share-to-install >= 2% (28 days)',

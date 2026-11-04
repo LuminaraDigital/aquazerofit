@@ -75,8 +75,15 @@ beforeAll(async () => {
   h.seedActive(people.soloKept!.userId, [day(SIGNUP), day(60)]);
   h.seedActive(people.soloGone!.userId, [day(SIGNUP)]);
   // Early cheers arms: treatment completed week one (3 of first 7 days), holdout did not.
-  await engageRepo().assignArm(people.treatDone!.userId, 'early_cheers', 'treatment', `${day(SIGNUP)}T09:00:00.000Z`);
-  await engageRepo().assignArm(people.holdNot!.userId, 'early_cheers', 'holdout', `${day(SIGNUP)}T09:00:00.000Z`);
+  for (const [who, arm] of [['treatDone', 'treatment'], ['holdNot', 'holdout']] as const) {
+    await engageRepo().assignArm({
+      userId: people[who]!.userId,
+      experiment: 'early_cheers',
+      arm,
+      dayZero: day(SIGNUP),
+      assignedAt: `${day(SIGNUP)}T09:00:00.000Z`,
+    });
+  }
   h.seedActive(people.treatDone!.userId, [day(SIGNUP), day(SIGNUP + 1), day(SIGNUP + 2), day(TODAY - 1)]);
   h.seedActive(people.holdNot!.userId, [day(SIGNUP), day(TODAY - 2)]);
   // Weekly actives (days 60 to 66): sharer, treatDone, holdNot, soloKept. One of them shared.
@@ -97,6 +104,26 @@ beforeAll(async () => {
     await engageRepo().insertCheer({ id: `m-c${i}`, fromKind: 'member', fromUserId: 'loud', coachId: null, toUserId: `t${i}`, squadId: null, cheer: 'fire', localDate: day(d), createdAt: `${day(d)}T09:00:00.000Z`, seenAt: null });
   }
   await engageRepo().insertCheer({ id: 'm-c9', fromKind: 'member', fromUserId: 'quiet', coachId: null, toUserId: 't9', squadId: null, cheer: 'clap', localDate: day(41), createdAt: `${day(41)}T09:00:00.000Z`, seenAt: null });
+
+  // A late joiner (day 10 after signup) is in neither cohort; someone who
+  // signed up two days ago and joined a squad cannot be measured yet, and
+  // must not hold the whole lift back.
+  people.lateJoiner = await h.register('lateJoiner');
+  pin(TODAY - 2);
+  people.fresh = await h.register('fresh');
+  for (const [who, joinedDay, s] of [['lateJoiner', SIGNUP + 10, 'late'], ['fresh', TODAY - 2, 'fresh']] as const) {
+    await engageRepo().createSquad(
+      {
+        id: `sqd-${s}`, seasonNumber: 1, name: `${s} Crew`, inviteCode: `SQD-${s.toUpperCase().padEnd(10, 'X')}`,
+        cornerHash: null, maxMembers: 5, createdBy: people[who]!.userId,
+        createdAt: `${day(joinedDay)}T09:00:00.000Z`, archivedAt: null,
+      },
+      {
+        squadId: `sqd-${s}`, userId: people[who]!.userId, memberRef: `m_metrics${s.padEnd(5, 'x')}`.slice(0, 14), seasonNumber: 1,
+        role: 'owner', showStats: false, joinedAt: `${day(joinedDay)}T09:00:00.000Z`, leftAt: null,
+      },
+    );
+  }
 
   pin(TODAY);
   admin = await h.refresh(admin);
@@ -129,8 +156,10 @@ describe('GET /admin/engage/metrics', () => {
       attributed28d: 1,
       shareToInstall: 0.25,
     });
-    // Solo: the five other members from the same signup week (the admin is
-    // staff and excluded, as in the retention report); one active on day 60.
+    // Solo: the five other members from the same signup week who never
+    // joined a squad (the admin is staff and excluded, as in the retention
+    // report; the late joiner is in a squad; the fresh signup is inside its
+    // 30 days); one active on day 60.
     expect(m.squads).toEqual({ squadUsers: 1, squadD30: 1, soloUsers: 5, soloD30: 0.2, liftPts: 80 });
     expect(m.earlyCheers).toMatchObject({
       treatment: { users: 1, completed: 1 },
@@ -173,6 +202,9 @@ describe('tools/engage/kill-report.mjs', () => {
     ]);
     const below = killRows({ ...m, share: { ...m.share, shareRate: 0.01 } });
     expect(below[0]![3]).toBe('REDESIGN');
+    // One measured miss is enough, even while the other figure is not in yet.
+    expect(killRows({ ...m, share: { ...m.share, shareRate: 0.01, shareToInstall: null } })[0]![3]).toBe('REDESIGN');
+    expect(killRows({ ...m, share: { ...m.share, shareToInstall: null } })[0]![3]).toBe('NOT YET');
     expect(killReport(m)).toMatch(/^# Fight Camp kill-criteria report/);
   });
 });

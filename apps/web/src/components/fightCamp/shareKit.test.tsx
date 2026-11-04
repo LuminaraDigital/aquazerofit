@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   canShareToStory: vi.fn(() => true),
   shareToStory: vi.fn(() => true),
   track: vi.fn(),
+  startParam: vi.fn((): string | null => null),
 }));
 vi.mock('@/lib/api', async (original) => ({
   ...(await original<typeof import('@/lib/api')>()),
@@ -30,6 +31,7 @@ vi.mock('@/lib/telegram', async (original) => ({
   ...(await original<typeof import('@/lib/telegram')>()),
   canShareToStory: mocks.canShareToStory,
   shareToStory: mocks.shareToStory,
+  getTelegramStartParam: mocks.startParam,
 }));
 vi.mock('@/lib/growth', () => ({ trackGrowth: mocks.track }));
 vi.mock('@/lib/effortCard', async (original) => ({
@@ -40,7 +42,8 @@ vi.mock('@/lib/effortCard', async (original) => ({
 
 import { ANONYMOUS_NAME, effortCard, type EffortCardInput } from '@/lib/effortCard';
 import { ShareKitSheet } from './ShareKitSheet';
-import { shareCodeIn, useClaimShareAttribution } from '@/lib/startApp';
+import { shareCodeIn, useClaimShareAttribution, useFightCampStartApp } from '@/lib/startApp';
+import { MemoryRouter } from 'react-router-dom';
 import { adoptAttribution } from '@/lib/attribution';
 import { renderHook } from '@testing-library/react';
 
@@ -197,6 +200,14 @@ describe('ShareKitSheet', () => {
     expect(mocks.track).toHaveBeenCalledWith('share_story', { kind: 'season' });
   });
 
+  it('counts a download as a share', async () => {
+    open();
+    const download = await screen.findByRole('button', { name: 'Download' });
+    await waitFor(() => expect((download as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(download);
+    expect(mocks.track).toHaveBeenCalledWith('share_copied', { kind: 'season', format: 'story', channel: 'download' });
+  });
+
   it('prints a squad invite’s own link instead of a share link', async () => {
     open({ link: { url: 'https://aquazerofit.com/s/SQD-ABC2345678', tgStartParam: 'sq_SQD-ABC2345678' } });
     const copy = await screen.findByRole('button', { name: 'Copy link' });
@@ -214,6 +225,23 @@ describe('arriving through a share link', () => {
     expect(shareCodeIn('sh_short')).toBeNull();
     expect(shareCodeIn('sq_SQD-ABC2345678')).toBeNull();
     expect(shareCodeIn(null)).toBeNull();
+  });
+
+  it('reports a Mini App launch from a share link once per session, not on every reload', async () => {
+    const beacon = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', beacon);
+    mocks.startParam.mockReturnValue('sh_AbCdEfGh');
+    sessionStorage.clear();
+    try {
+      const wrapper = ({ children }: { children: React.ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
+      renderHook(() => useFightCampStartApp(), { wrapper });
+      renderHook(() => useFightCampStartApp(), { wrapper });
+      expect(beacon).toHaveBeenCalledTimes(1);
+      expect(String((beacon.mock.calls[0] as unknown[])[0])).toMatch(/\/share\/r\/AbCdEfGh\?surface=tma$/);
+    } finally {
+      mocks.startParam.mockReturnValue(null);
+      vi.unstubAllGlobals();
+    }
   });
 
   it('claims the attribution once per code after sign-in', async () => {

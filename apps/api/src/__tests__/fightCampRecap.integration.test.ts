@@ -78,6 +78,21 @@ describe('GET /fight-camp/recap/:seasonNumber', () => {
     expect(JSON.stringify(res.body)).not.toMatch(/weight|kcal|calor|macro|photo|meal/i);
   });
 
+  it('counts the longest run the way the consistency card does, Cut Man days included', async () => {
+    h.enable('enrol');
+    const kim = await h.register('Kim');
+    // Days 0-13 and 16-29: a two-day gap the built-in grace alone cannot carry.
+    h.seedActive(kim.userId, [...Array.from({ length: 14 }, (_, i) => day(i)), ...Array.from({ length: 14 }, (_, i) => day(16 + i))]);
+    const unbridged = (await recap(kim, 1)).body.recap.longestRun;
+    await engageRepo().withGraceLedger(kim.userId, (ledger) =>
+      ledger.append([14, 15].map((d) => ({
+        id: `g-kim-${d}`, userId: kim.userId, entry: 'applied' as const, seasonNumber: 1,
+        localDate: day(d), milestone: null, createdAt: `${day(d + 2)}T09:00:00.000Z`,
+      }))),
+    );
+    expect((await recap(kim, 1)).body.recap.longestRun).toBeGreaterThan(unbridged);
+  });
+
   it('names the squad the person ended the season in', async () => {
     h.enable('enrol', 'squads');
     pin(10);
@@ -110,7 +125,10 @@ describe('the recap offer', () => {
     const absent = await h.register('Absent');
     expect((await status(absent)).recap).toBeNull();
 
-    pin(SEASON_TWO + 15);
+    // Day 14 after the season's last day is the last day it is offered.
+    pin(SEASON_TWO + 13);
+    expect((await status(await h.refresh(mia))).recap).toEqual({ seasonNumber: 1, seasonName: 'Fight Camp' });
+    pin(SEASON_TWO + 14);
     expect((await status(await h.refresh(mia))).recap).toBeNull();
   });
 

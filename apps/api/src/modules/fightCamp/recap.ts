@@ -38,10 +38,13 @@ export async function seasonRecap(userId: string, seasonNumber: number, today: s
   const dates = seasonDates(activeDates, seasonNumber);
   if (dates.length === 0) return null;
   const repo = engageRepo();
-  const [tally, membership] = await Promise.all([
+  const [tally, membership, grace] = await Promise.all([
     repo.cheerTally(userId, season.startsOn, season.endsOn),
     repo.activeMembership(userId, seasonNumber),
+    repo.graceEntries(userId),
   ]);
+  // Cut Man days bridge the run here exactly as they do on the consistency card.
+  const bridged = new Set(grace.filter((g) => g.entry === 'applied').map((g) => g.localDate));
   const squad = membership ? await repo.squad(membership.squadId) : null;
   logEvent('fc_recap_built', { season: seasonNumber });
   return {
@@ -52,7 +55,7 @@ export async function seasonRecap(userId: string, seasonNumber: number, today: s
     // The season's own end, so the belt is the one held for that season.
     belt: seasonBeltTier(userId, season.endsOn, activeDates),
     activeDays: dates.length,
-    longestRun: longestRun(dates),
+    longestRun: longestRun(dates, bridged),
     cheersGiven: tally.given,
     cheersReceived: tally.received,
     squadName: squad?.name ?? null,

@@ -27,7 +27,9 @@ import { trackGrowth } from '@/lib/growth';
 export default function RecapPage() {
   const { seasonNumber = '' } = useParams();
   const n = Number(seasonNumber);
-  const recap = useSeasonRecap(Number.isInteger(n) && n >= 1 ? n : null);
+  const valid = Number.isInteger(n) && n >= 1;
+  const recap = useSeasonRecap(valid ? n : null);
+  if (!valid) return <Navigate to="/fight-record" replace />;
 
   let body;
   if (recap.isPending) {

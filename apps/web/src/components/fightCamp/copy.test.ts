@@ -35,15 +35,26 @@ const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
 const JSX_COMMENT = /\{\s*\/\*[\s\S]*?\*\/\s*\}/g;
 const LINE_COMMENT = /(^|[^:'"`\\])\/\/.*$/gm;
 const LITERAL = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
-const JSX_TEXT = />([^<>{}]*[A-Za-z][^<>{}]*)</g;
+const JSX_TEXT = />([^<>]*)</g;
+const EXPRESSION = /\{[^{}]*\}/g;
 /** Enum values, codes and event names ('failed', 'gift_paid'): protocol, not copy. */
 const MACHINE_TOKEN = /^[a-z][a-z0-9_]*$/;
+
+/**
+ * The words between two tags, with any `{expression}` inside them taken out,
+ * so "Your streak is {n} days" is read as copy. A fragment left with an
+ * unmatched brace is code that spans elements (a `.map(` or a `&& (`), not copy.
+ */
+function jsxText(fragment: string): string {
+  const words = fragment.replace(EXPRESSION, ' ');
+  return /[{}]/.test(words) || !/[A-Za-z]/.test(words) ? '' : words.replace(/\s+/g, ' ').trim();
+}
 
 function copyStrings(source: string): string[] {
   const code = source.replace(JSX_COMMENT, '').replace(BLOCK_COMMENT, '').replace(LINE_COMMENT, '$1');
   return [
     ...[...code.matchAll(LITERAL)].map((m) => m[1] ?? m[2] ?? m[3] ?? ''),
-    ...[...code.matchAll(JSX_TEXT)].map((m) => m[1]!.trim()),
+    ...[...code.matchAll(JSX_TEXT)].map((m) => jsxText(m[1]!)),
   ].filter((s) => s && !MACHINE_TOKEN.test(s));
 }
 
@@ -51,6 +62,8 @@ describe('Fight Camp web copy', () => {
   it('reads literals and JSX text, not comments', () => {
     expect(copyStrings(`const a = 'X'; // 'streak'\n<p>Showed up</p>{/* lost */}`)).toEqual(['X', 'Showed up']);
     expect(copyStrings(`if (status === 'failed') say('You failed.')`)).toEqual(['You failed.']);
+    expect(copyStrings(`<p>Your streak is {n} days</p>`)).toEqual(['Your streak is days']);
+    expect(copyStrings(`<ul>{items.map((x) => (<li key={x}>Hi</li>))}</ul>`)).toEqual(['Hi']);
   });
 
   it.each(PHASE_ONE)('%s uses no banned words', (file) => {

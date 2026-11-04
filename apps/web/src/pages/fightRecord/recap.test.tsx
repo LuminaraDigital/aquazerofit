@@ -92,6 +92,12 @@ describe('RecapPage', () => {
     renderAt('/fight-record/recap/9');
     expect(await screen.findByText('Fight Record page')).toBeTruthy();
   });
+
+  it('goes back to Fight Record for a season number that is not one', async () => {
+    serve(RECAP);
+    renderAt('/fight-record/recap/abc');
+    expect(await screen.findByText('Fight Record page')).toBeTruthy();
+  });
 });
 
 describe('the season card', () => {

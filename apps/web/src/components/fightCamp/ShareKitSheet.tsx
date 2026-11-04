@@ -112,6 +112,7 @@ export function ShareKitSheet({ open, onClose, card, accentId, link: fixedLink }
     a.href = image.url;
     a.download = fileName;
     a.click();
+    void trackGrowth('share_copied', { kind: card.kind, format, channel: 'download' });
   };
   const share = async () => {
     if (!image || !content || !link) return;

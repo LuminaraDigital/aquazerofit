@@ -132,6 +132,24 @@ describe('the treatment arm', () => {
     expect((await inbox(sam)).body.cheers).toHaveLength(1);
     expect((await engageRepo().coachCheersTo(sam.userId)).map((c) => c.localDate)).toEqual([START]);
   });
+
+  it('keeps later reads on the stored day zero when the calendar changes', async () => {
+    h.enable('cheers');
+    process.env.FC_EARLY_CHEERS_PERCENT = '100';
+    // 02:00 UTC is still the evening before in Los Angeles, so day zero is START.
+    vi.setSystemTime(new Date(`${addDays(START, 1)}T02:00:00.000Z`));
+    const sam = await h.register('Sam', { timezone: 'America/Los_Angeles' });
+    expect((await inbox(sam)).body.cheers).toEqual([]);
+    expect((await engageRepo().exportUser(sam.userId)).experiments[0]?.dayZero).toBe(START);
+
+    // UTC reads the signup as START+1. START+7 is still inside that shifted
+    // week and outside the stored one, so showing up then must not cheer.
+    vi.setSystemTime(new Date(`${addDays(START, 7)}T12:00:00.000Z`));
+    h.seedActive(sam.userId, [addDays(START, 7)]);
+    const later = await h.refresh(sam, 'UTC');
+    expect((await inbox(later)).body.cheers).toEqual([]);
+    expect(await engageRepo().coachCheersTo(sam.userId)).toEqual([]);
+  });
 });
 
 describe('the holdout and everyone else', () => {

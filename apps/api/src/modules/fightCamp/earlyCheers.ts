@@ -18,6 +18,9 @@
  *
  * Synchronised on read like belts and grace: idempotent on the one coach
  * cheer per recipient per day the schema allows, so a retry writes nothing.
+ * Week one is the seven days from the day zero stored with the arm. A later
+ * read in another timezone does not move it, which is the same day the
+ * kill-criteria report counts.
  */
 import { createHash } from 'node:crypto';
 import { COACHES, DEFAULT_COACH_ID, type CheerKind, type User } from '@aquazerofit/shared';
@@ -51,8 +54,9 @@ function coachIdFor(userId: string): string {
 /**
  * Bring a new person's coach cheers up to date. A no-op while the experiment
  * is not running, outside week one, for the holdout, and once all three are
- * sent. `timezone` is the zone `today` was read in, so the first day is
- * counted in the same calendar as today.
+ * sent. `timezone` is the zone `today` was read in. It places day zero only
+ * on the read that records the arm, so that first day and `today` share a
+ * calendar. Every later read uses the stored day.
  */
 export async function syncEarlyCheers(
   userId: string,
@@ -63,20 +67,35 @@ export async function syncEarlyCheers(
   if (fightCampConfig.earlyCheersPercent === 0) return;
   const user = getStore().byId<User>('users', userId);
   if (!user) return;
-  const first = localDateFor(timezone ?? user.timezone, new Date(user.createdAt));
-  const day = daysBetween(first, today);
-  if (day < 0 || day >= WEEK_ONE_DAYS) return;
 
   const repo = engageRepo();
-  const { arm, recorded } = await repo.assignArm(userId, 'early_cheers', earlyCheersArm(userId), now.toISOString());
-  if (recorded) logEvent('early_cheers_arm', { arm });
-  if (arm !== 'treatment') return;
+  let placed = await repo.heldArm(userId, 'early_cheers');
+  let recorded = false;
+  if (!placed) {
+    const candidate = localDateFor(timezone ?? user.timezone, new Date(user.createdAt));
+    const firstLook = daysBetween(candidate, today);
+    // A first look after week one records nothing: the person was never in the experiment.
+    if (firstLook < 0 || firstLook >= WEEK_ONE_DAYS) return;
+    const assigned = await repo.assignArm({
+      userId,
+      experiment: 'early_cheers',
+      arm: earlyCheersArm(userId),
+      dayZero: candidate,
+      assignedAt: now.toISOString(),
+    });
+    placed = { arm: assigned.arm, dayZero: assigned.dayZero };
+    recorded = assigned.recorded;
+  }
+  if (recorded) logEvent('early_cheers_arm', { arm: placed.arm });
+  const day = daysBetween(placed.dayZero, today);
+  if (day < 0 || day >= WEEK_ONE_DAYS) return;
+  if (placed.arm !== 'treatment') return;
 
   const sent = new Set((await repo.coachCheersTo(userId)).map((c) => c.localDate));
   if (sent.size >= EARLY_CHEER_DAYS) return;
   const yesterday = addDays(today, -1);
   const due = [...activeDatesOf(loadActivity(userId))]
-    .filter((date) => date <= today && date >= first)
+    .filter((date) => date <= today && date >= placed.dayZero)
     .sort()
     .slice(0, EARLY_CHEER_DAYS)
     .filter((date) => date >= yesterday && !sent.has(date))

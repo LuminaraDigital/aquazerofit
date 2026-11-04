@@ -86,6 +86,26 @@ describe('landing', () => {
     // The Mini App reports its own launch without being redirected anywhere.
     expect((await land(code, '?surface=tma')).status).toBe(204);
   });
+
+  it('counts a visit, not a link preview, and never loses the ref to a counter fault', async () => {
+    h.enable('shareKit');
+    const mia = await h.register('Mia');
+    const { code } = (await link(mia, 'week')).body.shareLink;
+    const browser = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1';
+    const before = await engageRepo().landingsSince('2000-01-01');
+    await land(code).set('User-Agent', browser);
+    for (const preview of ['TelegramBot (like TwitterBot)', 'WhatsApp/2.23.20.0', 'Slackbot-LinkExpanding 1.0']) {
+      expect((await land(code).set('User-Agent', preview)).headers.location).toBe(`${config.appPublicUrl}/?ref=sh_${code}`);
+    }
+    expect((await engageRepo().landingsSince('2000-01-01')) - before).toBe(1);
+
+    const spy = vi.spyOn(engageRepo(), 'recordLanding').mockRejectedValueOnce(new Error('database away'));
+    try {
+      expect((await land(code).set('User-Agent', browser)).headers.location).toBe(`${config.appPublicUrl}/?ref=sh_${code}`);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe('attribution (US-F3 AC2, AC3)', () => {

@@ -3,13 +3,16 @@
  * with four months of history, all reading GET /squads/current at once.
  *
  * Each board read loads every member's activity and belt, so its cost grows
- * with squad size times history; this pins that it stays a per-request
- * figure and not something that scales with everyone in the store. Run on
- * the in-memory engage adapter: the Postgres reads are indexed lookups of at
- * most five rows (contract suite), and the activity loads measured here are
- * the same on both. Measured on a Windows dev machine: p50 about 40 ms and
- * p95 about 60 to 75 ms at 20 requests in flight, most of it queueing on the
- * one event loop. The budget leaves room for a shared CI runner.
+ * with squad size times history. Six hundred more people with history of
+ * their own share the store, so a read that scanned everyone instead of the
+ * squad would show here. Run on the in-memory engage adapter: the Postgres
+ * reads are indexed lookups of at most five rows (contract suite), and the
+ * activity loads measured here are the same on both.
+ *
+ * Measured on a Windows dev machine: p95 about 60 to 75 ms at 20 requests in
+ * flight, most of it queueing on the one event loop. The gate is the best of
+ * three rounds, so one scheduling stall on a shared CI runner cannot fail it
+ * while a slower read, which slows every round, still does.
  */
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -24,6 +27,8 @@ const SQUADS = 40;
 const PER_SQUAD = 5;
 const HISTORY_DAYS = 120;
 const CONCURRENCY = 20;
+const BYSTANDERS = 600;
+const ROUNDS = 3;
 /**
  * CI runs this suite under coverage instrumentation, which makes every read
  * several times slower (a p95 near 300 ms on a shared runner). The budget is
@@ -93,6 +98,14 @@ beforeAll(async () => {
       people.push(await h.refresh({ userId, token: '', auth: () => ({}) }));
     }
   }
+  for (let b = 0; b < BYSTANDERS; b += 1) {
+    const userId = `usr-bystander-${b}`;
+    getStore().upsert('users', {
+      id: userId, type: 'user', email: `${userId}@example.com`, emailVerified: true,
+      role: 'user', tier: 'free', displayName: `Bystander${b}`, createdAt,
+    });
+    h.seedActive(userId, Array.from({ length: 60 }, (_, d) => addDays(TODAY, -2 * d)));
+  }
 }, 120_000);
 
 afterAll(async () => {
@@ -105,21 +118,24 @@ describe('squad board load', () => {
     // One warm-up read: module and index setup is not what this measures.
     expect((await request(h.app).get(`${h.base}/squads/current`).set(people[0]!.auth())).status).toBe(200);
 
-    const timings: number[] = [];
-    for (let i = 0; i < people.length; i += CONCURRENCY) {
-      await Promise.all(
-        people.slice(i, i + CONCURRENCY).map(async (person) => {
-          const started = performance.now();
-          const res = await request(h.app).get(`${h.base}/squads/current`).set(person.auth());
-          timings.push(performance.now() - started);
-          expect(res.status).toBe(200);
-          expect(res.body.squad.members).toHaveLength(PER_SQUAD);
-        }),
-      );
-    }
-    timings.sort((a, b) => a - b);
-    const p50 = timings[Math.floor(timings.length * 0.5)]!;
-    const p95 = timings[Math.ceil(timings.length * 0.95) - 1]!;
-    expect(p95, `p50 ${p50.toFixed(1)} ms`).toBeLessThan(P95_BUDGET_MS);
+    const round = async (): Promise<number> => {
+      const timings: number[] = [];
+      for (let i = 0; i < people.length; i += CONCURRENCY) {
+        await Promise.all(
+          people.slice(i, i + CONCURRENCY).map(async (person) => {
+            const started = performance.now();
+            const res = await request(h.app).get(`${h.base}/squads/current`).set(person.auth());
+            timings.push(performance.now() - started);
+            expect(res.status).toBe(200);
+            expect(res.body.squad.members).toHaveLength(PER_SQUAD);
+          }),
+        );
+      }
+      timings.sort((a, b) => a - b);
+      return timings[Math.ceil(timings.length * 0.95) - 1]!;
+    };
+    const p95s: number[] = [];
+    for (let r = 0; r < ROUNDS; r += 1) p95s.push(await round());
+    expect(Math.min(...p95s), `p95 by round: ${p95s.map((p) => p.toFixed(1)).join(', ')} ms`).toBeLessThan(P95_BUDGET_MS);
   }, 120_000);
 });

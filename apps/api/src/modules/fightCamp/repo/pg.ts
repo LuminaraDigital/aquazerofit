@@ -475,26 +475,32 @@ export class PgEngageRepo implements EngageRepo {
 
   // ----- experiments -----
 
-  async assignArm(row: ArmRow): Promise<{ arm: ExperimentArm; recorded: boolean }> {
+  async heldArm(
+    userId: string,
+    experiment: 'early_cheers',
+  ): Promise<{ arm: ExperimentArm; dayZero: string } | null> {
+    const { rows } = await this.db.query<{ arm: ExperimentArm; day_zero: string }>(
+      'SELECT arm, day_zero::text AS day_zero FROM engage.experiment_arms WHERE user_id = $1 AND experiment = $2',
+      [userId, experiment],
+    );
+    const row = rows[0];
+    return row ? { arm: row.arm, dayZero: row.day_zero } : null;
+  }
+
+  async assignArm(row: ArmRow): Promise<{ arm: ExperimentArm; dayZero: string; recorded: boolean }> {
     const { userId, experiment, arm } = row;
     // Read first: after the first read of week one this is the only query. A
     // lost insert race reads the winner's row, committed once DO NOTHING returns.
-    const held = async () =>
-      (
-        await this.db.query<{ arm: ExperimentArm }>(
-          'SELECT arm FROM engage.experiment_arms WHERE user_id = $1 AND experiment = $2',
-          [userId, experiment],
-        )
-      ).rows[0]?.arm;
-    const before = await held();
-    if (before) return { arm: before, recorded: false };
+    const before = await this.heldArm(userId, experiment);
+    if (before) return { ...before, recorded: false };
     const { rows } = await this.db.query(
       `INSERT INTO engage.experiment_arms (user_id, experiment, arm, day_zero, assigned_at) VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (user_id, experiment) DO NOTHING RETURNING user_id`,
       [userId, experiment, arm, row.dayZero, row.assignedAt],
     );
-    if (rows.length > 0) return { arm, recorded: true };
-    return { arm: (await held()) ?? arm, recorded: false };
+    if (rows.length > 0) return { arm, dayZero: row.dayZero, recorded: true };
+    const after = await this.heldArm(userId, experiment);
+    return { arm: after?.arm ?? arm, dayZero: after?.dayZero ?? row.dayZero, recorded: false };
   }
 
   // ----- Cut Man grace -----

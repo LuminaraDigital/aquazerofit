@@ -14,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,14 +32,14 @@ fun PrimaryButton(
     loading: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val fill = if (enabled) LocalAzfExtended.current.primaryFixedDim else MaterialTheme.colorScheme.surfaceContainerHigh
     Box(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
             .pressScale(interaction)
             .clip(AzfShapes.Inner)
-            .background(LocalAzfExtended.current.primaryFixedDim)
-            .alpha(if (enabled) 1f else 0.5f)
+            .background(fill)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -60,7 +59,9 @@ fun PrimaryButton(
             Text(
                 text = text,
                 style = MaterialTheme.typography.titleMedium,
-                color = AzfColors.OnPrimaryFixed,
+                // Disabled is a different surface, not a dimmed accent, so
+                // "not yet" never reads as "press me".
+                color = if (enabled) AzfColors.OnPrimaryFixed else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
             )
         }

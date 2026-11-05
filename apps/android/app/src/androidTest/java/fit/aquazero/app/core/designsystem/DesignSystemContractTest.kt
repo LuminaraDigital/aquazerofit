@@ -6,11 +6,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -96,6 +98,17 @@ class DesignSystemContractTest {
             .assertHeightIsAtLeast(48.dp)
             .performClick()
         assertEquals(1, retries)
+    }
+
+    /** A stat is one stop for TalkBack, with the unit spoken after the figure. */
+    @Test
+    fun statRowSpeaksLabelValueAndUnitOnce() {
+        composeRule.setContent {
+            AzfTheme { AzfStatRow(label = "Left today", value = "1,240", unit = "kcal") }
+        }
+
+        composeRule.onNodeWithContentDescription("Left today: 1,240 kcal").assertIsDisplayed()
+        composeRule.onAllNodesWithText("1,240").assertCountEquals(0)
     }
 
     /** The frame shows its content whether or not it is lit. */

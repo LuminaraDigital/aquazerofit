@@ -195,7 +195,7 @@ export function premiumCheckoutDecision(query: SubscriptionCheckoutQuery): Premi
   if (!anchor) return unavailable;
   if (payloadRefunded(query.invoice_payload)) return unavailable;
   if (query.currency !== 'XTR' || query.total_amount < anchor.stars) return unavailable;
-  if (!payloadPaid(query.invoice_payload) && tierOf(anchor.userId) === 'premium') {
+  if (tierOf(anchor.userId) === 'premium' && !payloadPaid(query.invoice_payload)) {
     return { ok: false, reason: 'already_premium' };
   }
   return { ok: true };
@@ -266,6 +266,12 @@ export function completeSubscriptionPayment(payment: SubscriptionPaymentInput): 
     return { status: 'rejected', reason: 'Telegram did not report an expiration.' };
   }
 
+  // Premium can land elsewhere between pre-checkout and this payment. Telegram
+  // has already taken the Stars, so the grant stands; the event tells support
+  // to refund one of the two charges.
+  const overlapsOtherPremium =
+    tierOf(anchor.userId) === 'premium' && !payloadPaid(payment.invoicePayload);
+
   const telegramUserId =
     typeof payment.telegramUserId === 'number' && payment.telegramUserId > 0 ? payment.telegramUserId : null;
   const record: StarsSubscriptionPayment = {
@@ -295,6 +301,7 @@ export function completeSubscriptionPayment(payment: SubscriptionPaymentInput): 
   }
 
   const premiumUntil = grantForPayment(record);
+  if (overlapsOtherPremium) logEvent('stars_subscription_overlap', { stars: payment.totalAmount });
   logEvent('stars_subscription_completed', {
     stars: payment.totalAmount,
     recurring: record.isRecurring,

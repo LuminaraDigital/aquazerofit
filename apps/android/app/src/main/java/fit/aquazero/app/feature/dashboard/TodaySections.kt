@@ -18,6 +18,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.LunchDining
 import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -61,25 +64,29 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
-import fit.aquazero.app.core.designsystem.ActiveFrame
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfHeroSurface
 import fit.aquazero.app.core.designsystem.AzfMotion
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
+import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.Scoreboard
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.designsystem.currentLocale
 import fit.aquazero.app.core.designsystem.pressScale
+import fit.aquazero.app.core.designsystem.rememberCountUp
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.ui.CoachAvatar
 import fit.aquazero.app.core.ui.CoachPersona
-import fit.aquazero.app.core.ui.FuelRing
-import fit.aquazero.app.core.ui.MacroMiniBars
 import fit.aquazero.app.core.ui.NutritionFormat
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -118,7 +125,7 @@ internal fun HomeGreeting(
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f).padding(end = 48.dp)) {
             Text(
-                text = greeting,
+                text = greeting.uppercase(),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -160,11 +167,16 @@ internal fun WeekStrip(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().clearAndSetSemantics { },
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             for (offset in 0 until DAYS_IN_WEEK) {
                 val day = monday.plusDays(offset)
-                DayCell(day = day, isToday = day == today, logged = day.toString() in loggedDays)
+                DayCell(
+                    day = day,
+                    isToday = day == today,
+                    logged = day.toString() in loggedDays,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
         if (activeDays != null && activeDays > 0) {
@@ -191,12 +203,12 @@ internal fun WeekStrip(
 }
 
 @Composable
-private fun DayCell(day: LocalDate, isToday: Boolean, logged: Boolean) {
+private fun DayCell(day: LocalDate, isToday: Boolean, logged: Boolean, modifier: Modifier = Modifier) {
     val extended = LocalAzfExtended.current
     Column(
-        modifier = Modifier
-            .width(42.dp)
-            .clip(AzfShapes.Pill)
+        modifier = modifier
+            .heightIn(min = AzfSpacing.TouchTarget)
+            .clip(AzfShapes.Inner)
             .then(
                 if (isToday) {
                     Modifier.background(extended.primaryFixedDim)
@@ -204,19 +216,19 @@ private fun DayCell(day: LocalDate, isToday: Boolean, logged: Boolean) {
                     Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)
                 },
             )
-            .padding(vertical = 10.dp),
+            .padding(vertical = AzfSpacing.ElementGapSmall),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val ink = if (isToday) AzfColors.OnPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+        val ink = if (isToday) AzfColors.OnPrimaryFixed else MaterialTheme.colorScheme.onSurfaceVariant
         Text(
             text = day.dayOfWeek.getDisplayName(TextStyle.NARROW, currentLocale()),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = ink,
         )
         Text(
             text = day.dayOfMonth.toString(),
             style = MaterialTheme.typography.titleMedium,
-            color = if (isToday) AzfColors.OnPrimary else MaterialTheme.colorScheme.onSurface,
+            color = ink,
         )
         Spacer(Modifier.height(4.dp))
         Box(
@@ -226,7 +238,7 @@ private fun DayCell(day: LocalDate, isToday: Boolean, logged: Boolean) {
                 .background(
                     when {
                         !logged -> Color.Transparent
-                        isToday -> AzfColors.OnPrimary
+                        isToday -> AzfColors.OnPrimaryFixed
                         else -> extended.secondaryFixedDim
                     },
                 ),
@@ -257,9 +269,9 @@ internal fun TodayHero(
     Column(modifier = modifier.fillMaxWidth()) {
         AzfHeroSurface(onClick = { expanded = !expanded }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                FuelRing(nutrition = nutrition, proteinFirst = proteinFirst)
-                Spacer(Modifier.width(20.dp))
-                MacroMiniBars(nutrition = nutrition, modifier = Modifier.weight(1f))
+                FuelScoreboard(nutrition = nutrition, proteinFirst = proteinFirst)
+                Spacer(Modifier.width(AzfSpacing.CardPadding + AzfSpacing.ElementGapSmall))
+                MacroTape(nutrition = nutrition, modifier = Modifier.weight(1f))
             }
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -294,6 +306,118 @@ internal fun TodayHero(
     }
 }
 
+/** Fuel left as the card's one dominant figure, with a thin track under it. */
+@Composable
+private fun FuelScoreboard(nutrition: LocalDailyNutrition, proteinFirst: Boolean) {
+    val extended = LocalAzfExtended.current
+    val remaining = if (proteinFirst) {
+        nutrition.proteinTarget - nutrition.proteinConsumed
+    } else {
+        nutrition.kcalRemaining
+    }
+    val progress = if (proteinFirst) {
+        NutritionFormat.clampFraction(nutrition.proteinConsumed, nutrition.proteinTarget)
+    } else {
+        NutritionFormat.clampFraction(nutrition.kcalConsumed, nutrition.kcalTarget)
+    }
+    val shown = rememberCountUp(remaining.coerceAtLeast(0.0).toInt())
+    val description = if (proteinFirst) {
+        stringResource(
+            R.string.dashboard_protein_cd,
+            NutritionFormat.fmt1(nutrition.proteinConsumed),
+            NutritionFormat.fmt1(nutrition.proteinTarget),
+        )
+    } else {
+        stringResource(
+            R.string.dashboard_calories_cd,
+            NutritionFormat.fmtInt(nutrition.kcalConsumed),
+            NutritionFormat.fmtInt(nutrition.kcalTarget),
+        )
+    }
+    Column(
+        modifier = Modifier
+            .width(IntrinsicSize.Max)
+            .clearAndSetSemantics { contentDescription = description },
+    ) {
+        Text(
+            text = NutritionFormat.fmtInt(shown.toDouble()),
+            style = Scoreboard,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
+        Text(
+            text = stringResource(
+                if (proteinFirst) R.string.dashboard_protein_left else R.string.dashboard_kcal_left,
+            ).uppercase(),
+            style = StatLabel,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(AzfShapes.Pill)
+                .background(extended.ringTrack),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress)
+                    .height(4.dp)
+                    .clip(AzfShapes.Pill)
+                    .background(extended.primaryFixedDim),
+            )
+        }
+    }
+}
+
+/** Protein, carbs, fat as a ruled tale of the tape: label left, figure right. */
+@Composable
+private fun MacroTape(nutrition: LocalDailyNutrition, modifier: Modifier = Modifier) {
+    val extended = LocalAzfExtended.current
+    Column(modifier = modifier) {
+        MacroTapeRow(
+            R.string.macro_protein,
+            nutrition.proteinConsumed,
+            nutrition.proteinTarget,
+            extended.secondaryFixedDim,
+        )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        MacroTapeRow(R.string.macro_carbs, nutrition.carbsConsumed, nutrition.carbsTarget, extended.primaryFixedDim)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        MacroTapeRow(R.string.macro_fat, nutrition.fatConsumed, nutrition.fatTarget, extended.coral)
+    }
+}
+
+@Composable
+private fun MacroTapeRow(@StringRes labelRes: Int, consumed: Double, target: Double, color: Color) {
+    val label = stringResource(labelRes)
+    val description = stringResource(R.string.macro_progress_cd, label, consumed.toInt(), target.toInt())
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 36.dp)
+            .clearAndSetSemantics { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Text(
+            text = label.uppercase(),
+            style = StatLabel,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f).padding(start = AzfSpacing.ElementGapSmall),
+        )
+        Text(
+            text = "${NutritionFormat.fmtInt(consumed)}/${NutritionFormat.fmtInt(target)}g",
+            style = DataSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
+    }
+}
+
 /** The one thing worth doing now, in the coach's voice, with its button. */
 @Composable
 internal fun NextStepCard(
@@ -307,14 +431,7 @@ internal fun NextStepCard(
 ) {
     val next = loop.next
     val closed = loop.closed
-    ActiveFrame(
-        active = next != null,
-        shape = AzfShapes.Card,
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(AzfShapes.Card)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow),
-    ) {
+    AzfCard(modifier = modifier.fillMaxWidth()) {
         AnimatedContent(
             targetState = next to closed,
             transitionSpec = {
@@ -323,12 +440,8 @@ internal fun NextStepCard(
             },
             label = "nextStep",
         ) { (step, isClosed) ->
-            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.home_next_label),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = LocalAzfExtended.current.primaryFixedDim,
-                )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                AzfSectionHeading(text = stringResource(R.string.home_next_label))
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = nextLine(step, isClosed, hour, workoutFocus),
@@ -411,10 +524,8 @@ internal fun DayLoopList(
         wasClosed = loop.closed
     }
     AzfCard(modifier = modifier.fillMaxWidth(), tier = AzfCardTier.Compact) {
-        Text(
+        AzfSectionHeading(
             text = stringResource(R.string.home_loop_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 8.dp),
         )
         loop.steps.forEach { step ->
@@ -437,9 +548,7 @@ internal fun DayLoopList(
 
 @Composable
 private fun DayStepRow(step: DayStep, detail: String?, onClick: () -> Unit) {
-    val extended = LocalAzfExtended.current
     val done = step.state == DayStepState.Done
-    val isNext = step.state == DayStepState.Next
     val title = stringResource(step.kind.titleRes())
     val doneDescription = stringResource(R.string.home_step_done_cd, title)
     Row(
@@ -447,9 +556,6 @@ private fun DayStepRow(step: DayStep, detail: String?, onClick: () -> Unit) {
             .fillMaxWidth()
             .heightIn(min = 56.dp)
             .clip(AzfShapes.Inner)
-            .background(
-                if (isNext) extended.primaryFixedDim.copy(alpha = 0.08f) else Color.Transparent,
-            )
             .padding(horizontal = 8.dp, vertical = 6.dp)
             .then(
                 if (done) {
@@ -462,7 +568,7 @@ private fun DayStepRow(step: DayStep, detail: String?, onClick: () -> Unit) {
     ) {
         Box(
             modifier = Modifier
-                .size(38.dp)
+                .size(40.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentAlignment = Alignment.Center,
@@ -470,7 +576,7 @@ private fun DayStepRow(step: DayStep, detail: String?, onClick: () -> Unit) {
             Icon(
                 imageVector = step.kind.icon(),
                 contentDescription = null,
-                tint = if (done) MaterialTheme.colorScheme.onSurfaceVariant else extended.primaryFixedDim,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -484,7 +590,7 @@ private fun DayStepRow(step: DayStep, detail: String?, onClick: () -> Unit) {
             if (detail != null) {
                 Text(
                     text = detail,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -507,23 +613,25 @@ private fun DoneTick() {
         animationSpec = spring(dampingRatio = 0.45f, stiffness = 500f),
         label = "doneTick",
     )
-    Box(
-        modifier = Modifier
-            .size(28.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(CircleShape)
-            .background(LocalAzfExtended.current.secondaryFixedDim),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Check,
-            contentDescription = null,
-            tint = AzfColors.OnSecondary,
-            modifier = Modifier.size(18.dp),
-        )
+    Box(modifier = Modifier.size(AzfSpacing.TouchTarget), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .clip(CircleShape)
+                .background(LocalAzfExtended.current.secondaryFixedDim),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Check,
+                contentDescription = null,
+                tint = AzfColors.OnSecondary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }
 
@@ -531,7 +639,6 @@ private fun DoneTick() {
 private fun StepAction(step: DayStep, onClick: () -> Unit) {
     val extended = LocalAzfExtended.current
     val interaction = remember { MutableInteractionSource() }
-    val isNext = step.state == DayStepState.Next
     val label = when (step.kind) {
         DayStepKind.Water -> R.string.home_action_add_glass
         DayStepKind.Workout -> R.string.home_action_start
@@ -540,18 +647,20 @@ private fun StepAction(step: DayStep, onClick: () -> Unit) {
     }
     Box(
         modifier = Modifier
-            .heightIn(min = 40.dp)
+            .heightIn(min = AzfSpacing.TouchTarget)
+            .widthIn(min = 72.dp)
             .pressScale(interaction)
             .clip(AzfShapes.Pill)
-            .background(if (isNext) extended.primaryFixedDim else extended.primaryFixedDim.copy(alpha = 0.14f))
+            .background(extended.primaryFixedDim.copy(alpha = 0.14f))
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = stringResource(label),
             style = MaterialTheme.typography.labelLarge,
-            color = if (isNext) AzfColors.OnPrimary else extended.primaryFixedDim,
+            color = extended.primaryFixedDim,
+            maxLines = 1,
         )
     }
 }

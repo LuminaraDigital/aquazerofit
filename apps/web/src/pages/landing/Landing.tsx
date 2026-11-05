@@ -1,178 +1,127 @@
 /**
- * AquaZeroFit marketing landing page  -  the web front door, served in place at
- * `/` for signed-out browser visitors.
+ * AquaZeroFit marketing landing page, served in place at `/` for signed-out
+ * browser visitors.
  *
- * Its single job is conversion into Telegram, where the product actually
- * lives. The web is marketing; Telegram is the app. So the primary CTA leaves
- * this origin, and the browser sign-up sits beside it as the deliberate
- * second path for anyone whose network blocks Telegram  -  see BrowserPath.
- * The Google Play badge is the third path, and leads on Android phones  -  see
- * AppCtas in Chrome.tsx.
+ * Brief
+ * - Audience: people who track, or have tried to track, food and training,
+ *   arriving cold from a link or the Play listing. Their job here is to pick a
+ *   way in: install the Android app, open the Mini App, or sign up on the web.
+ * - The one message: your targets are arithmetic you can check, and the app
+ *   shows you the working.
+ * - Constraints: the brand's own tokens (aqua primary, mint secondary, Barlow
+ *   Condensed over DM Sans, a dark ground), a prerendered shell, the
+ *   Telegram-first conversion contract in Landing.test.tsx, no invented proof.
  *
- * There are no auth or Telegram redirects in here any more. RequireAuth
- * decides who sees this page (signed-out, not in Telegram, at `/`) and this
- * component trusts that decision  -  a second copy of the rule inside a page
- * rendered *at* `/` could only ever redirect `/` to `/`.
+ * Direction: precise product clarity on a dark instrument panel. Borrowed
+ * moves: the Nutrition Facts label (heavy rules, a big figure, tabular rows),
+ * Apple's health pages (one real number set huge, product shown at 1:1), and
+ * Linear (surfaces that step up in lightness, hairlines instead of glows).
  *
- * Motion budget: one WebGL draw call (HeroOrb), CSS transforms driven by
- * custom properties, and IntersectionObserver reveals. No animation library,
- * no 3D library, no scroll listeners doing layout reads - and every effect
- * collapses to a static page under prefers-reduced-motion.
+ * Signature move: the live targets label in the first frame. It runs the
+ * shared `computeTargets` and prints its working, so the headline's claim is
+ * something the visitor can test before they install anything.
  *
- * Header and footer live in Chrome.tsx, shared with /features.
+ * Primary action: Telegram, with the browser beside it as the deliberate
+ * second path and Google Play leading on Android phones (AppCtas, Chrome.tsx).
+ * RequireAuth decides who sees this page; nothing here redirects.
+ *
+ * Motion budget: one-shot reveals (scale 0.98 and opacity), the screen
+ * crossfade, the coach bubbles. No WebGL, no scroll listeners doing layout
+ * reads, and everything collapses to static under prefers-reduced-motion.
  */
-import { lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
+import { AQUA_CHARACTER } from '@aquazerofit/shared';
 import { useSeo } from '../../lib/seo';
 import { AppCtas, Footer, TopBar } from './Chrome';
-
-const AppBackground = lazy(() =>
-  import('../../components/layout/AppBackground').then((m) => ({ default: m.AppBackground })),
-);
-const HeroOrb = lazy(() => import('./HeroOrb').then((m) => ({ default: m.HeroOrb })));
-import { PhoneShowcase } from './PhoneShowcase';
 import { Reveal, useHashScroll } from './motion';
-import { AkinStage } from '../../components/brand/AkinStage';
-import { AQUA_CHARACTER } from '@aquazerofit/shared';
-import {
-  CoachDemo,
-  Features,
-  Gallery,
-  HowItWorks,
-  Marquee,
-  Platform,
-  Safety,
-  Stats,
-} from './LandingSections';
+import { TargetsLabel } from './TargetsLabel';
+import { CoachDemo, Gallery, Safety, Split, WaysIn } from './LandingSections';
 
 function Hero() {
   return (
-    <section id="top" className="relative overflow-hidden pt-28 pb-16 sm:pt-36 sm:pb-24">
-      <div className="lp-floor" aria-hidden="true" />
-
-      <div className="relative mx-auto grid max-w-6xl items-center gap-16 px-5 lg:grid-cols-[1.05fr_1fr]">
-        <div>
+    <section className="relative pt-28 pb-20 sm:pt-36 sm:pb-28">
+      {/* One quiet light source: the water the product is named for, falling
+          from the top edge. It frames the label without being a shape. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[70vh] bg-[radial-gradient(60%_60%_at_70%_0%,rgb(var(--azf-primary)/0.10),transparent_70%)]"
+        aria-hidden="true"
+      />
+      <div className="relative mx-auto grid max-w-[1240px] items-start gap-14 px-5 sm:px-8 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-16">
+        <div className="min-w-0 lg:pt-6">
           <Reveal>
-            <div className="mb-6 max-w-[13.5rem]">
-              <AkinStage size="hero" priority />
-            </div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/90">
-              <span className="h-1.5 w-1.5 rounded-full bg-secondary shadow-[0_0_10px_#45dfa4]" />
-              {AQUA_CHARACTER.tagline}
-            </span>
-          </Reveal>
-
-          <Reveal delay={90}>
-            <h1 className="mt-6 font-heading text-[44px] font-semibold leading-[1.02] tracking-tight text-on-surface sm:text-[64px]">
-              AquaZeroFit
-              <br />
-              <span className="lp-gradient-text">Your day, measured.</span>
+            <h1 className="font-heading font-semibold text-on-surface">
+              <span className="flex items-center gap-2.5 font-body text-[15px] font-normal text-on-surface-variant">
+                <img
+                  src={AQUA_CHARACTER.characterUrl}
+                  alt=""
+                  width={682}
+                  height={1024}
+                  loading="eager"
+                  decoding="async"
+                  className="h-8 w-8 rounded-full bg-black object-cover object-top"
+                />
+                <span>
+                  <span className="font-semibold text-on-surface">AquaZeroFit</span> · food,
+                  training, coaching
+                </span>
+              </span>
+              {/* Two explicit lines, each unbreakable: the fonts load async,
+                  and a wider fallback would otherwise wrap this to three lines
+                  and shift the whole hero when Barlow Condensed arrives. */}
+              <span className="mt-6 block whitespace-nowrap text-[clamp(3.5rem,2.2rem+6vw,7.25rem)] leading-[0.9] tracking-[-0.025em]">
+                Your day,{' '}
+                <br />
+                <span className="text-primary">measured.</span>
+              </span>
             </h1>
           </Reveal>
 
-          <Reveal delay={160}>
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-on-surface-variant/75 sm:text-lg">
-              Photograph a meal and see it counted. Get calorie, macro and hydration targets you
-              could recompute by hand, home training that fits your equipment, and {AQUA_CHARACTER.title}{' '}
-              answering from your actual day - inside boundaries it will not cross.
+          <Reveal delay={70}>
+            <p className="mt-7 max-w-[30em] text-[18px] leading-relaxed text-on-surface-variant [text-wrap:pretty] sm:text-[20px]">
+              Photograph a meal and see it counted. Your calorie, macro and water targets come from
+              a published formula you can check yourself, right here. Home training fits your
+              equipment, and the coach answers from what you actually logged.
             </p>
           </Reveal>
 
-          <Reveal delay={230}>
-            <div className="mt-9">
-              {/* The note is named right under the buttons rather than buried
-                  in a FAQ. The visitor deciding between them is exactly the
-                  person who needs to know the browser path is a real product
-                  and not a demo. */}
+          <Reveal delay={140}>
+            <div className="mt-10">
+              {/* The note sits right under the buttons rather than in a FAQ:
+                  the visitor choosing between them is exactly the person who
+                  needs to know the browser path is a real product. */}
               <AppCtas
                 placement="hero"
                 note={
-                  <p className="-mt-1 text-[12px] leading-relaxed text-on-surface-variant/60">
-                    The Mini App opens inside Telegram with no install. Blocked at work? The
-                    browser version is the same app, same account.
+                  <p className="-mt-1 max-w-[34em] text-[14px] leading-relaxed text-on-surface-variant">
+                    The Mini App opens inside Telegram with no install. Blocked at work? The browser
+                    version is the same app, same account.
                   </p>
                 }
               />
             </div>
           </Reveal>
 
-          <Reveal delay={300}>
-            <p className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-on-surface-variant">
-              <span className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[15px]" aria-hidden="true">
-                  lock
-                </span>
-                Personalisation is opt-in
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[15px]" aria-hidden="true">
-                  code
-                </span>
-                Open source (AGPL v3)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[15px]" aria-hidden="true">
-                  bolt
-                </span>
-                Free to start
-              </span>
-            </p>
-          </Reveal>
-        </div>
-
-        {/* 3D showcase: raymarched orb behind a CSS-3D device */}
-        <div className="relative">
-          {/* Offset from the device's centre so the drop's lit rim clears the
-              phone instead of hiding entirely behind it. */}
-          <Suspense fallback={null}>
-            <HeroOrb className="pointer-events-none absolute left-[58%] top-[38%] h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 sm:h-[660px] sm:w-[660px]" />
-          </Suspense>
-          <div
-            className="lp-orbit pointer-events-none absolute left-1/2 top-1/2 h-[380px] w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/10 sm:h-[460px] sm:w-[460px]"
-            aria-hidden="true"
-          />
-          <div
-            className="lp-orbit-reverse pointer-events-none absolute left-1/2 top-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-secondary/10 sm:h-[360px] sm:w-[360px]"
-            aria-hidden="true"
-          />
           <Reveal delay={200}>
-            <div className="relative py-6">
-              <PhoneShowcase />
-            </div>
+            <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2 border-t border-on-surface/10 pt-5 text-[14px] text-on-surface-variant">
+              <li>Free to start</li>
+              <li>Personalisation is opt-in</li>
+              <li>Open source, AGPL v3</li>
+              <li>
+                <Link
+                  to="/sign-in"
+                  className="-my-2 inline-block py-2 font-semibold text-on-surface underline decoration-on-surface/30 underline-offset-4 transition-colors duration-150 hover:decoration-primary"
+                >
+                  Sign in
+                </Link>
+              </li>
+            </ul>
           </Reveal>
         </div>
-      </div>
-    </section>
-  );
-}
 
-function FinalCta() {
-  return (
-    <section className="relative overflow-hidden">
-      <Reveal>
-        <div className="lp-card relative px-6 py-16 text-center sm:px-16 sm:py-20">
-          <div
-            className="pointer-events-none absolute left-1/2 top-0 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(47,217,244,0.22),transparent_65%)] blur-2xl"
-            aria-hidden="true"
-          />
-          <h2 className="relative font-heading text-3xl font-semibold leading-tight text-on-surface sm:text-[44px]">
-            Start with one honest number
-          </h2>
-          <p className="relative mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-on-surface-variant/75 sm:text-base">
-            Open the Mini App, answer a few questions, and see your targets computed from your
-            own figures. Everything after that is just logging your day.
-          </p>
-          <div className="relative mt-9">
-            <AppCtas placement="final" centered />
-          </div>
-          <p className="relative mt-5 text-[12px] text-on-surface-variant/60">
-            Already have an account?{' '}
-            <Link to="/sign-in" className="text-primary transition-colors hover:text-secondary">
-              Sign in
-            </Link>
-          </p>
-        </div>
-      </Reveal>
+        <Reveal delay={120} className="min-w-0">
+          <TargetsLabel />
+        </Reveal>
+      </div>
     </section>
   );
 }
@@ -186,41 +135,30 @@ export default function Landing() {
   useHashScroll();
 
   return (
-    <div className="relative min-h-screen bg-surface text-on-surface">
-      <Suspense fallback={null}>
-        <AppBackground />
-      </Suspense>
-
+    <div className="relative min-h-screen overflow-x-clip bg-surface text-on-surface">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-[#001f25]"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-on-primary"
       >
         Skip to content
       </a>
 
-      <div className="azf-content">
-        <TopBar onLanding />
+      <TopBar onLanding />
 
-        <main id="main">
-          <Hero />
+      <main id="main">
+        <Hero />
 
-          <Marquee />
-
-          <div className="mx-auto max-w-6xl space-y-24 px-5 py-24 sm:space-y-32 sm:py-32">
-            <Stats />
-            <Features />
-            <Gallery />
-            <HowItWorks />
-            <CoachDemo />
-            <Safety />
-            <Platform />
-            <FinalCta />
-          </div>
-        </main>
-
-        <div className="mx-auto max-w-6xl px-5">
-          <Footer onLanding />
+        <div className="mx-auto max-w-[1240px] space-y-[clamp(5.5rem,3.5rem+6vw,9rem)] px-5 pb-[clamp(5.5rem,3.5rem+6vw,8rem)] sm:px-8">
+          <Gallery />
+          <Split />
+          <CoachDemo />
+          <Safety />
+          <WaysIn />
         </div>
+      </main>
+
+      <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
+        <Footer onLanding />
       </div>
     </div>
   );

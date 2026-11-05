@@ -44,9 +44,11 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AkinPose
 import fit.aquazero.app.core.designsystem.AkinStage
 import fit.aquazero.app.core.designsystem.AzfShapes
+import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.model.CoachRankDto
 import fit.aquazero.app.core.model.ExperienceStatusDto
@@ -159,7 +161,7 @@ fun CelebrationOverlay(
 
             Text(
                 text = label.uppercase(),
-                style = MaterialTheme.typography.labelMedium,
+                style = StatLabel,
                 color = extended.secondaryFixedDim,
                 textAlign = TextAlign.Center,
             )
@@ -170,7 +172,7 @@ fun CelebrationOverlay(
                 textAlign = TextAlign.Center,
             )
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(16.dp))
 
             CoachReactionCard(
                 persona = persona,
@@ -199,7 +201,7 @@ fun CelebrationOverlay(
                 textAlign = TextAlign.Center,
             )
 
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(32.dp))
 
             PrimaryButton(
                 text = stringResource(R.string.celebration_dismiss),
@@ -237,14 +239,14 @@ private fun CoachReactionCard(
         modifier = modifier
             .clip(AzfShapes.Card)
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(BorderStroke(1.dp, persona.colour.copy(alpha = 0.5f)), AzfShapes.Card)
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), AzfShapes.Card)
+            .padding(AzfSpacing.CardPadding),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
             text = persona.firstName.uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = persona.colour,
+            style = StatLabel,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = reaction,

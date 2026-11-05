@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material.icons.outlined.PhotoCamera
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -41,9 +43,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
-import fit.aquazero.app.core.designsystem.ActiveFrame
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
@@ -87,16 +90,26 @@ fun QuickLogSheet(
                 .padding(bottom = AzfSpacing.Gutter),
             verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
-            Text(
-                text = stringResource(R.string.quick_log_title),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.quick_log_title).uppercase(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+                IconButton(onClick = onDismiss, modifier = Modifier.size(AzfSpacing.TouchTarget)) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.redesign_today_close),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             AskCoachRow(onClick = onAskCoach)
             FlowRow(
                 maxItemsInEachRow = TILES_PER_ROW,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
+                verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
             ) {
                 QuickLogAction.entries.forEach { action ->
                     QuickLogTile(
@@ -113,9 +126,7 @@ fun QuickLogSheet(
 @Composable
 private fun AskCoachRow(onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    ActiveFrame(
-        active = true,
-        shape = AzfShapes.Inner,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .pressScale(interaction)
@@ -154,14 +165,8 @@ private fun AskCoachRow(onClick: () -> Unit) {
 
 @Composable
 private fun QuickLogTile(action: QuickLogAction, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val extended = LocalAzfExtended.current
     val interaction = remember { MutableInteractionSource() }
-    val tint: Color = when (action) {
-        QuickLogAction.Photo, QuickLogAction.Barcode, QuickLogAction.Search -> extended.primaryFixedDim
-        QuickLogAction.Water -> extended.info
-        QuickLogAction.Weight -> extended.coral
-        QuickLogAction.Workout -> extended.secondaryFixedDim
-    }
+    val tint: Color = MaterialTheme.colorScheme.onSurfaceVariant
     Column(
         modifier = modifier
             .pressScale(interaction)
@@ -173,14 +178,14 @@ private fun QuickLogTile(action: QuickLogAction, onClick: () -> Unit, modifier: 
                 role = Role.Button,
                 onClick = onClick,
             )
-            .padding(vertical = 14.dp, horizontal = 8.dp),
+            .padding(vertical = AzfSpacing.Gutter, horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(tint.copy(alpha = 0.16f)),
+                .background(MaterialTheme.colorScheme.surfaceContainerLow),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

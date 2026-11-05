@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Bolt
@@ -45,10 +46,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
-import fit.aquazero.app.core.designsystem.AkinPose
-import fit.aquazero.app.core.designsystem.AkinStage
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
@@ -65,50 +65,6 @@ import fit.aquazero.app.core.ui.HydrationCard
 import fit.aquazero.app.core.ui.MacroRow
 import fit.aquazero.app.core.ui.NutritionFormat
 
-/** Date line, greeting and the Akin mascot — the screen's personal opener. */
-@Composable
-internal fun GreetingHeader(
-    localDate: String,
-    firstName: String?,
-    loading: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = NutritionFormat.formatLocalDate(localDate),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(2.dp))
-            if (loading && firstName == null) {
-                Skeleton(
-                    modifier = Modifier
-                        .padding(top = 4.dp)
-                        .width(160.dp)
-                        .height(28.dp),
-                )
-            } else {
-                Text(
-                    text = firstName
-                        ?.let { stringResource(R.string.dashboard_greeting_named, it) }
-                        ?: stringResource(R.string.dashboard_greeting),
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-        AkinStage(
-            size = 88.dp,
-            initialPose = AkinPose.Idle,
-            modifier = Modifier.padding(start = AzfSpacing.ElementGapMedium),
-        )
-    }
-}
-
 /**
  * The calorie ring hero. Macro semantics are fixed and must not be
  * re-themed: protein = secondary green, carbs = primary aqua, fat = coral.
@@ -123,15 +79,13 @@ internal fun CalorieHeroCard(
     modifier: Modifier = Modifier,
 ) {
     val extended = LocalAzfExtended.current
-    AzfCard(modifier = modifier.fillMaxWidth(), tier = AzfCardTier.Hero) {
+    AzfCard(modifier = modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
+                AzfSectionHeading(
                     text = stringResource(
                         if (proteinFirst) R.string.dashboard_protein_title else R.string.dashboard_nutrition_title,
-                    ).uppercase(),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
                 )
                 Text(
                     text = stringResource(
@@ -146,7 +100,7 @@ internal fun CalorieHeroCard(
                     text = stringResource(
                         if (proteinFirst) R.string.dashboard_protein_consumed else R.string.dashboard_consumed,
                     ).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
@@ -209,14 +163,14 @@ internal fun CalorieHeroCard(
                             NutritionFormat.fmtInt(ringRemaining.coerceAtLeast(0.0))
                         },
                         style = DataLarge,
-                        color = if (proteinFirst) extended.secondaryFixedDim else MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = stringResource(
                             if (proteinFirst) R.string.dashboard_protein_left else R.string.dashboard_kcal_left,
                         ).uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -315,7 +269,6 @@ internal fun CalorieDerivationRow(
         DerivationCell(
             value = NutritionFormat.fmtInt(nutrition.kcalRemaining),
             label = stringResource(R.string.nutrition_remaining),
-            accent = true,
             modifier = Modifier.weight(1f),
         )
     }
@@ -326,21 +279,16 @@ private fun DerivationCell(
     value: String,
     label: String,
     modifier: Modifier = Modifier,
-    accent: Boolean = false,
 ) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = value,
             style = DataSmall,
-            color = if (accent) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 2.dp),
@@ -369,10 +317,8 @@ internal fun TodayWorkoutCard(
         AzfCard(modifier = modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.workout_rest_title).uppercase(),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
+                    AzfSectionHeading(
+                        text = stringResource(R.string.workout_rest_title),
                     )
                     Text(
                         text = stringResource(R.string.workout_rest_body),
@@ -395,10 +341,8 @@ internal fun TodayWorkoutCard(
     AzfCard(modifier = modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.workout_today_title).uppercase(),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                AzfSectionHeading(
+                    text = stringResource(R.string.workout_today_title),
                 )
                 Text(
                     text = workout.focus,
@@ -410,6 +354,7 @@ internal fun TodayWorkoutCard(
                 text = stringResource(
                     if (workout.completed) R.string.workout_status_done else R.string.workout_status_planned,
                 ),
+                done = workout.completed,
             )
         }
 
@@ -469,21 +414,19 @@ internal fun SuggestMealCard(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(AzfShapes.Pill)
-                    .background(LocalAzfExtended.current.primaryFixedDim),
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Outlined.AutoAwesome,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(
-                    text = stringResource(R.string.suggest_title).uppercase(),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                AzfSectionHeading(
+                    text = stringResource(R.string.suggest_title),
                 )
             }
         }
@@ -510,7 +453,7 @@ internal fun SuggestMealCard(
                             NutritionFormat.fmtInt(suggestion.kcal),
                         ),
                         style = DataSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 Text(
@@ -534,7 +477,7 @@ internal fun SuggestMealCard(
                 }
                 Text(
                     text = stringResource(R.string.suggest_ai_disclaimer),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp),
                 )
@@ -590,10 +533,8 @@ internal fun WeightTrendCard(
 ) {
     AzfCard(modifier = modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(R.string.weight_trend_title).uppercase(),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+            AzfSectionHeading(
+                text = stringResource(R.string.weight_trend_title),
                 modifier = Modifier.weight(1f),
             )
             val interaction = remember { MutableInteractionSource() }
@@ -611,7 +552,7 @@ internal fun WeightTrendCard(
                     // Label + chevron are only ~34dp tall; the tap area is
                     // padded back out without moving the pixels.
                     .minimumInteractiveComponentSize()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
             ) {
                 Text(
                     text = stringResource(R.string.weight_view_all),
@@ -677,10 +618,8 @@ internal fun AchievementsStrip(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.achievements_title).uppercase(),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+        AzfSectionHeading(
+            text = stringResource(R.string.achievements_title),
         )
         Spacer(Modifier.height(12.dp))
         when {
@@ -742,13 +681,13 @@ private fun AchievementTile(achievement: AchievementUi) {
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier.padding(top = 8.dp),
             )
             Text(
                 text = stringResource(
                     if (achievement.earned) R.string.achievement_earned else R.string.achievement_locked,
                 ).uppercase(),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp),
             )
@@ -757,16 +696,16 @@ private fun AchievementTile(achievement: AchievementUi) {
 }
 
 @Composable
-private fun StatusPill(text: String) {
-    val accent = LocalAzfExtended.current.secondaryFixedDim
+private fun StatusPill(text: String, done: Boolean) {
+    val accent = if (done) LocalAzfExtended.current.secondaryFixedDim else MaterialTheme.colorScheme.onSurfaceVariant
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelMedium,
         color = accent,
         modifier = Modifier
             .clip(AzfShapes.Pill)
             .background(accent.copy(alpha = 0.12f))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
     )
 }
 
@@ -792,7 +731,7 @@ private fun MetricChip(
             text = value,
             style = DataSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 6.dp),
+            modifier = Modifier.padding(start = 8.dp),
         )
     }
 }

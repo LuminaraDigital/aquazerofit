@@ -141,7 +141,7 @@ everything switched off.
 |---|---|
 | Full name | Baba Ogun Celsus |
 | Ring name | The Daemon King |
-| Born | Washington D.C., USA, 22 July, age 37 |
+| Born | Washington D.C., USA, 22 July, age 48 |
 | Height and Reach | 6 ft 6 in, 84 in reach |
 | Weight class | Light Heavyweight, 205 lb |
 | Disciplines | MMA, Taekwondo, Muay Thai. The complete fighter. |

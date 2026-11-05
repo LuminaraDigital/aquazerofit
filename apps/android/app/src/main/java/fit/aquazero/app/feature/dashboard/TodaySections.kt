@@ -209,13 +209,9 @@ private fun DayCell(day: LocalDate, isToday: Boolean, logged: Boolean, modifier:
         modifier = modifier
             .heightIn(min = AzfSpacing.TouchTarget)
             .clip(AzfShapes.Inner)
-            .then(
-                if (isToday) {
-                    Modifier.background(extended.primaryFixedDim)
-                } else {
-                    Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)
-                },
-            )
+            // Only today is filled: seven filled tiles outweighed the day's
+            // figure beneath them.
+            .then(if (isToday) Modifier.background(extended.primaryFixedDim) else Modifier)
             .padding(vertical = AzfSpacing.ElementGapSmall),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

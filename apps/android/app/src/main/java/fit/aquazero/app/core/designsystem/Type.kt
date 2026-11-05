@@ -197,8 +197,8 @@ val AzfTypography: Typography = Typography(
     labelSmall = TextStyle(
         fontFamily = DmSans,
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
         letterSpacing = 0.02.em,
     ),
 )

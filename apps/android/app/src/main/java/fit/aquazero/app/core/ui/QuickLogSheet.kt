@@ -43,9 +43,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
+import fit.aquazero.app.core.designsystem.ActiveFrame
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
-import fit.aquazero.app.core.designsystem.GlowFrame
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.pressScale
 
@@ -77,7 +77,7 @@ fun QuickLogSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = AzfShapes.Hero,
+        shape = AzfShapes.Card,
     ) {
         Column(
             modifier = Modifier
@@ -113,7 +113,7 @@ fun QuickLogSheet(
 @Composable
 private fun AskCoachRow(onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    GlowFrame(
+    ActiveFrame(
         active = true,
         shape = AzfShapes.Inner,
         modifier = Modifier

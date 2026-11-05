@@ -73,6 +73,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.audio.SpeechInputState
 import fit.aquazero.app.core.database.ChatMessageEntity
+import fit.aquazero.app.core.designsystem.ActiveFrame
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
@@ -81,7 +82,6 @@ import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.GlowFrame
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
@@ -769,12 +769,12 @@ private fun Composer(
             }
         }
 
-        GlowFrame(
+        ActiveFrame(
             active = isListening || state.streaming || hasText,
-            shape = AzfShapes.Composer,
+            shape = AzfShapes.Card,
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(AzfShapes.Composer)
+                .clip(AzfShapes.Card)
                 .background(MaterialTheme.colorScheme.surfaceContainerLow),
         ) {
             Column(modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp)) {
@@ -868,11 +868,7 @@ private fun SendButton(enabled: Boolean, onClick: () -> Unit) {
             .pressScale(interaction)
             .clip(CircleShape)
             .background(
-                if (enabled) {
-                    extended.ctaGradient
-                } else {
-                    SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh)
-                },
+                if (enabled) extended.primaryFixedDim else MaterialTheme.colorScheme.surfaceContainerHigh,
             )
             .clickable(
                 enabled = enabled,

@@ -35,7 +35,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FlashlightOff
@@ -673,7 +672,7 @@ private fun SquareIconButton(
     Box(
         modifier = Modifier
             .size(56.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AzfShapes.Card)
             .background(Color.White.copy(alpha = if (enabled) 0.14f else 0.05f)),
         contentAlignment = Alignment.Center,
     ) {

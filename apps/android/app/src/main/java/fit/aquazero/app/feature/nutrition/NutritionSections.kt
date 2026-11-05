@@ -45,7 +45,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -419,9 +418,9 @@ internal fun MealSection(
                         .clip(CircleShape)
                         .background(
                             if (logs.isEmpty()) {
-                                extended.ctaGradient
+                                extended.primaryFixedDim
                             } else {
-                                SolidColor(extended.primaryFixedDim.copy(alpha = 0.14f))
+                                extended.primaryFixedDim.copy(alpha = 0.14f)
                             },
                         ),
                     contentAlignment = Alignment.Center,
@@ -646,7 +645,7 @@ private fun KcalBar(
                     .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                     .then(
                         if (selected) {
-                            Modifier.background(extended.ctaGradient)
+                            Modifier.background(extended.primaryFixedDim)
                         } else if (point.value > 0) {
                             Modifier.background(extended.primaryFixedDim.copy(alpha = 0.25f))
                         } else {

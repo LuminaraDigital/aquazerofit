@@ -56,7 +56,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
-import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
@@ -66,9 +65,9 @@ import fit.aquazero.app.core.ui.CoachAvatar
 import fit.aquazero.app.core.ui.CoachPersona
 import fit.aquazero.app.core.ui.CoachRoster
 
-/** Bubble corner radii: the tail corner is tight, the rest are card-round. */
-private val UserBubbleShape = RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp)
-private val AssistantBubbleShape = RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp)
+/** Bubble corner radii: card-round, with a control-tight tail corner. */
+private val UserBubbleShape = RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
+private val AssistantBubbleShape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp)
 
 /**
  * Compiled once, not once per recomposition.
@@ -80,7 +79,11 @@ private val AssistantBubbleShape = RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp)
  */
 private val CAMEL_BOUNDARY = Regex("([a-z])([A-Z])")
 
-/** The user's own turn: gradient fill, right-aligned, no affordances. */
+/**
+ * The user's own turn: a raised neutral surface, right-aligned, no
+ * affordances. Neutral on purpose: aqua marks the next thing to do, and the
+ * coach's reply is what the user came to read.
+ */
 @Composable
 fun UserBubble(
     content: String,
@@ -95,13 +98,13 @@ fun UserBubble(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
                 .clip(UserBubbleShape)
-                .background(LocalAzfExtended.current.ctaGradient)
-                .padding(14.dp),
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .padding(16.dp),
         ) {
             Text(
                 text = content,
                 style = MaterialTheme.typography.bodyMedium,
-                color = AzfColors.OnPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
         if (timestamp != null) {
@@ -295,14 +298,14 @@ fun ActionChipGroup(
                 // ~32dp while the tap area is Material's minimum; putting the
                 // minimum inside would have inflated the visible pill instead.
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(AzfShapes.Inner)
                     .clickable(enabled = !executed, role = Role.Button) {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         executedActionIds = executedActionIds + action.id
                         onActionClick(action)
                     }
                     .minimumInteractiveComponentSize()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(AzfShapes.Inner)
                     .background(bg)
                     .border(
                         BorderStroke(
@@ -313,7 +316,7 @@ fun ActionChipGroup(
                                 MaterialTheme.colorScheme.outlineVariant
                             },
                         ),
-                        RoundedCornerShape(12.dp),
+                        AzfShapes.Inner,
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,

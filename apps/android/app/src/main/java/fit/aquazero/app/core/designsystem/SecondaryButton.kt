@@ -37,10 +37,10 @@ fun SecondaryButton(
             .fillMaxWidth()
             .heightIn(min = 56.dp)
             .pressScale(interaction)
-            .clip(AzfShapes.Pill)
+            .clip(AzfShapes.Inner)
             .border(
                 BorderStroke(1.dp, LocalAzfExtended.current.primaryFixedDim.copy(alpha = 0.7f)),
-                AzfShapes.Pill,
+                AzfShapes.Inner,
             )
             .alpha(if (enabled) 1f else 0.5f)
             .clickable(

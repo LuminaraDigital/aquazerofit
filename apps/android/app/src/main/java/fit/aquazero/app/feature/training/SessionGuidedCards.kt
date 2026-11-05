@@ -96,7 +96,7 @@ internal fun SessionProgressHeader(state: WorkoutSessionUiState) {
                                 .fillMaxWidth(fill)
                                 .height(8.dp)
                                 .clip(AzfShapes.Pill)
-                                .background(extended.ctaGradient),
+                                .background(extended.primaryFixedDim),
                         )
                     }
                 }
@@ -222,7 +222,7 @@ private fun TapTarget(
             .size(TAP_TARGET_SIZE.dp)
             .pressScale(interaction)
             .clip(AzfShapes.Pill)
-            .background(LocalAzfExtended.current.ctaGradient)
+            .background(LocalAzfExtended.current.primaryFixedDim)
             .clickable(
                 interactionSource = interaction,
                 indication = null,

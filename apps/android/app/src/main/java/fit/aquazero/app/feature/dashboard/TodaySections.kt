@@ -52,7 +52,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -65,13 +64,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
+import fit.aquazero.app.core.designsystem.ActiveFrame
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfHeroSurface
 import fit.aquazero.app.core.designsystem.AzfMotion
 import fit.aquazero.app.core.designsystem.AzfShapes
-import fit.aquazero.app.core.designsystem.GlowFrame
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.currentLocale
@@ -200,7 +199,7 @@ private fun DayCell(day: LocalDate, isToday: Boolean, logged: Boolean) {
             .clip(AzfShapes.Pill)
             .then(
                 if (isToday) {
-                    Modifier.background(extended.ctaGradient)
+                    Modifier.background(extended.primaryFixedDim)
                 } else {
                     Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)
                 },
@@ -308,7 +307,7 @@ internal fun NextStepCard(
 ) {
     val next = loop.next
     val closed = loop.closed
-    GlowFrame(
+    ActiveFrame(
         active = next != null,
         shape = AzfShapes.Card,
         modifier = modifier
@@ -544,7 +543,7 @@ private fun StepAction(step: DayStep, onClick: () -> Unit) {
             .heightIn(min = 40.dp)
             .pressScale(interaction)
             .clip(AzfShapes.Pill)
-            .background(if (isNext) extended.ctaGradient else SolidColor(extended.primaryFixedDim.copy(alpha = 0.14f)))
+            .background(if (isNext) extended.primaryFixedDim else extended.primaryFixedDim.copy(alpha = 0.14f))
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,

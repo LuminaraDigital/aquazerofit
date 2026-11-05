@@ -21,8 +21,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 /**
- * Primary CTA: the aqua→sea-green 135° gradient with press-scale feedback
- * (0.97) and a 56dp minimum height per DESIGN.md.
+ * Primary CTA: a flat aqua fill with dark ink (10.1:1), press-scale feedback
+ * (0.97) and a 56dp minimum height. One per view (docs/design.md).
  */
 @Composable
 fun PrimaryButton(
@@ -38,8 +38,8 @@ fun PrimaryButton(
             .fillMaxWidth()
             .heightIn(min = 56.dp)
             .pressScale(interaction)
-            .clip(AzfShapes.Pill)
-            .background(LocalAzfExtended.current.ctaGradient)
+            .clip(AzfShapes.Inner)
+            .background(LocalAzfExtended.current.primaryFixedDim)
             .alpha(if (enabled) 1f else 0.5f)
             .clickable(
                 interactionSource = interaction,
@@ -53,14 +53,14 @@ fun PrimaryButton(
         if (loading) {
             CircularProgressIndicator(
                 modifier = Modifier.padding(8.dp),
-                color = AzfColors.OnPrimary,
+                color = AzfColors.OnPrimaryFixed,
                 strokeWidth = 2.dp,
             )
         } else {
             Text(
                 text = text,
                 style = MaterialTheme.typography.titleMedium,
-                color = AzfColors.OnPrimary,
+                color = AzfColors.OnPrimaryFixed,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
             )
         }

@@ -369,7 +369,7 @@ fun AchievementTile(
                 .clip(CircleShape)
                 .then(
                     if (earned) {
-                        Modifier.background(LocalAzfExtended.current.ctaGradient)
+                        Modifier.background(LocalAzfExtended.current.primaryFixedDim)
                     } else {
                         Modifier
                             .background(MaterialTheme.colorScheme.surfaceContainerLowest)

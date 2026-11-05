@@ -284,7 +284,7 @@ private fun OvershootLevelBar(
                     transformOrigin = TransformOrigin(0f, 0.5f)
                 }
                 .clip(AzfShapes.Pill)
-                .background(extended.ctaGradient),
+                .background(extended.primaryFixedDim),
         )
         Box(
             modifier = Modifier

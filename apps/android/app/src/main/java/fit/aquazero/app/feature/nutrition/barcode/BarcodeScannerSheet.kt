@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FlashlightOff
@@ -578,7 +577,7 @@ private fun ScanReticle(modifier: Modifier = Modifier) {
         modifier = modifier
             .width(RETICLE_WIDTH)
             .height(RETICLE_HEIGHT)
-            .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(12.dp)),
+            .border(1.dp, accent.copy(alpha = 0.35f), AzfShapes.Inner),
     ) {
         Corner(accent, Alignment.TopStart)
         Corner(accent, Alignment.TopEnd)
@@ -828,7 +827,7 @@ internal fun NutriscoreBadge(grade: Nutriscore) {
     Box(
         modifier = Modifier
             .size(28.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(AzfShapes.Inner)
             .background(background)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,

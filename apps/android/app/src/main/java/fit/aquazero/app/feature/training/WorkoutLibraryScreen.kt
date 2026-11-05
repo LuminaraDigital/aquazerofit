@@ -61,7 +61,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.SubcomposeAsyncImage
 import fit.aquazero.app.R
 import fit.aquazero.app.core.database.ExerciseThumbnail
-import fit.aquazero.app.core.designsystem.AquaAura
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
@@ -168,7 +167,6 @@ private fun WorkoutLibraryContent(
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     val activeFilters = listOf(state.filters.muscle, state.filters.equipment).count(String::isNotEmpty)
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        AquaAura()
         Column(modifier = Modifier.fillMaxSize()) {
             AzfAppHeader(title = stringResource(R.string.screen_workouts), onBack = null)
             LazyColumn(
@@ -486,7 +484,7 @@ private fun PlanWeekStrip(
                     .clip(AzfShapes.Pill)
                     .then(
                         if (isToday) {
-                            Modifier.background(LocalAzfExtended.current.ctaGradient)
+                            Modifier.background(LocalAzfExtended.current.primaryFixedDim)
                         } else {
                             Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)
                         },

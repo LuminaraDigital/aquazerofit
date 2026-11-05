@@ -470,7 +470,7 @@ internal fun SuggestMealCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(AzfShapes.Pill)
-                    .background(LocalAzfExtended.current.ctaGradient),
+                    .background(LocalAzfExtended.current.primaryFixedDim),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(

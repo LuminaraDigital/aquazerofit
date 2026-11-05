@@ -318,13 +318,13 @@ fun MacroDonut(
             modifier = Modifier
                 .padding(start = 20.dp)
                 .clearAndSetSemantics { },
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             segments.forEach { (labelRes, color, pair) ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
+                            .size(12.dp)
                             .clip(CircleShape)
                             .background(color),
                     )

@@ -567,7 +567,9 @@ export default function WorkoutLibrary() {
         )}
       </section>
 
-      {/* ---- Today's workout hero ---- */}
+      {/* ---- Today's workout hero: absent until there is a plan or a session, so
+          screen readers do not land on an empty region ---- */}
+      {(todayQuery.isPending || todayQuery.isError || today || plan) && (
       <section aria-label="Today's workout" className="mt-8">
         {todayQuery.isPending ? (
           <Skeleton className="h-64 w-full rounded-card" />
@@ -633,6 +635,7 @@ export default function WorkoutLibrary() {
           </GlassCard>
         )}
       </section>
+      )}
 
       {/* ---- Exercise library ---- */}
       <section aria-label="Exercise library" className="mt-8">

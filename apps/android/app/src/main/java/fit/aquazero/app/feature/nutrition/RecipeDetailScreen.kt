@@ -1,31 +1,32 @@
 package fit.aquazero.app.feature.nutrition
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,10 +35,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -46,11 +50,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfChip
 import fit.aquazero.app.core.designsystem.AzfColors
-import fit.aquazero.app.core.designsystem.AzfShapes
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.DataMedium
+import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
@@ -111,7 +117,7 @@ fun RecipeDetailScreen(
                 modifier = Modifier
                     .padding(innerPadding)
                     .padding(AzfSpacing.ContainerMargin),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
             ) {
                 Skeleton(modifier = Modifier.fillMaxWidth().height(180.dp))
                 Skeleton(modifier = Modifier.fillMaxWidth().height(80.dp))
@@ -131,7 +137,7 @@ fun RecipeDetailScreen(
                             R.string.recipe_error
                         },
                     ),
-                    retryLabel = stringResource(R.string.memory_retry),
+                    retryLabel = stringResource(R.string.action_retry),
                     onRetry = { viewModel.load(recipeId) },
                 )
             }
@@ -161,10 +167,10 @@ private fun RecipeBody(
         contentPadding = PaddingValues(
             start = AzfSpacing.ContainerMargin,
             end = AzfSpacing.ContainerMargin,
-            top = AzfSpacing.ContainerMargin,
-            bottom = 40.dp,
+            top = AzfSpacing.ElementGapSmall,
+            bottom = AzfSpacing.SectionGap,
         ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
     ) {
         item {
             Column {
@@ -174,23 +180,20 @@ private fun RecipeBody(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 if (recipe.description.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = recipe.description,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
                     )
                 }
                 if (recipe.tags.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        recipe.tags.take(4).forEach { tag ->
-                            AzfChip(text = tag, selected = false, onClick = {})
-                        }
-                    }
+                    Text(
+                        text = recipe.tags.take(MAX_TAGS).joinToString(" · "),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
             }
         }
@@ -205,7 +208,7 @@ private fun RecipeBody(
                     text = stringResource(R.string.recipe_prep, recipe.prepMinutes),
                 )
                 MetaItem(
-                    icon = Icons.Outlined.Restaurant,
+                    icon = Icons.Outlined.LocalFireDepartment,
                     text = stringResource(R.string.recipe_cook, recipe.cookMinutes),
                 )
                 MetaItem(
@@ -230,61 +233,45 @@ private fun RecipeBody(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.recipe_servings_heading).uppercase(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
+                    Column(modifier = Modifier.weight(1f)) {
+                        AzfSectionHeading(stringResource(R.string.recipe_servings_heading))
                         Text(
                             text = stringResource(R.string.recipe_servings_body),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = { onServingsChange(-1) },
+                        CircleIconControl(
+                            icon = Icons.Outlined.Remove,
+                            contentDescription = stringResource(R.string.recipe_servings_less),
                             enabled = state.servings > RecipeMath.MIN_SERVINGS,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Remove,
-                                contentDescription = stringResource(
-                                    R.string.recipe_servings_less,
-                                ),
-                                tint = AzfColors.PrimaryFixedDim,
-                            )
-                        }
+                            tint = MaterialTheme.colorScheme.primary,
+                            onClick = { onServingsChange(-1) },
+                        )
                         Text(
                             text = state.servings.toString(),
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = DataMedium,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.clearAndSetSemantics {},
+                            modifier = Modifier
+                                .padding(horizontal = AzfSpacing.ElementGapMedium)
+                                .clearAndSetSemantics {},
                         )
-                        IconButton(
-                            onClick = { onServingsChange(1) },
+                        CircleIconControl(
+                            icon = Icons.Outlined.Add,
+                            contentDescription = stringResource(R.string.recipe_servings_more),
                             enabled = state.servings < RecipeMath.MAX_SERVINGS,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Add,
-                                contentDescription = stringResource(
-                                    R.string.recipe_servings_more,
-                                ),
-                                tint = AzfColors.PrimaryFixedDim,
-                            )
-                        }
+                            tint = MaterialTheme.colorScheme.primary,
+                            onClick = { onServingsChange(1) },
+                        )
                     }
                 }
             }
         }
 
         item {
-            Text(
-                text = stringResource(R.string.recipe_ingredients_heading).uppercase(),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp),
-            )
+            AzfSectionHeading(stringResource(R.string.recipe_ingredients_heading))
         }
         // Ingredients and method steps sit in the same lazy list, so both get a
         // namespaced key and a contentType. Without them the slot that held
@@ -295,6 +282,7 @@ private fun RecipeBody(
             key = { index, _ -> "ingredient-$index" },
             contentType = { _, _ -> "ingredient" },
         ) { index, ingredient ->
+            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             IngredientRow(
                 ingredient = ingredient,
                 checked = index in state.checked,
@@ -303,32 +291,14 @@ private fun RecipeBody(
         }
 
         if (recipe.method.isNotEmpty()) {
-            item {
-                Text(
-                    text = stringResource(R.string.recipe_method_heading).uppercase(),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 4.dp),
-                )
-            }
+            item { AzfSectionHeading(stringResource(R.string.recipe_method_heading)) }
             itemsIndexed(
                 items = recipe.method,
                 key = { index, _ -> "step-$index" },
                 contentType = { _, _ -> "step" },
             ) { index, step ->
-                AzfCard(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = stringResource(R.string.recipe_step, index + 1).uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AzfColors.PrimaryFixedDim,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = step,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                StepRow(number = index + 1, text = step)
             }
         }
 
@@ -340,9 +310,8 @@ private fun RecipeBody(
                         recipe.source.ifBlank { "—" },
                         recipe.licence.ifBlank { "—" },
                     ),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp),
                 )
             }
         }
@@ -361,7 +330,7 @@ private fun RecipeBody(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(R.string.recipe_log_confirm),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
@@ -372,73 +341,71 @@ private fun RecipeBody(
 }
 
 @Composable
-private fun MetaItem(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+private fun MetaItem(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = AzfColors.PrimaryFixedDim,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(16.dp),
         )
-        Spacer(modifier = Modifier.size(6.dp))
+        Spacer(modifier = Modifier.size(8.dp))
         Text(
             text = text,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
+/** Per-serving nutrition as ruled rows. */
 @Composable
 private fun MacroGrid(perServing: FoodNutrientsDto) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        MacroTile(
+    AzfCard(modifier = Modifier.fillMaxWidth()) {
+        AzfSectionHeading(stringResource(R.string.recipe_per_serving_heading))
+        val grams = stringResource(R.string.nutrition_unit_g)
+        AzfStatRow(
             label = stringResource(R.string.recipe_calories),
             value = NutritionFormat.fmtInt(perServing.kcal),
-            color = AzfColors.PrimaryFixedDim,
-            modifier = Modifier.weight(1f),
+            unit = stringResource(R.string.nutrition_unit_kcal),
         )
-        MacroTile(
+        AzfStatRow(
             label = stringResource(R.string.recipe_protein),
-            value = stringResource(R.string.recipe_grams, perServing.proteinG.roundToInt()),
-            color = AzfColors.SecondaryFixedDim,
-            modifier = Modifier.weight(1f),
+            value = perServing.proteinG.roundToInt().toString(),
+            unit = grams,
         )
-        MacroTile(
+        AzfStatRow(
             label = stringResource(R.string.recipe_carbs),
-            value = stringResource(R.string.recipe_grams, perServing.carbsG.roundToInt()),
-            color = AzfColors.PrimaryFixedDim,
-            modifier = Modifier.weight(1f),
+            value = perServing.carbsG.roundToInt().toString(),
+            unit = grams,
         )
-        MacroTile(
+        AzfStatRow(
             label = stringResource(R.string.recipe_fat),
-            value = stringResource(R.string.recipe_grams, perServing.fatG.roundToInt()),
-            color = AzfColors.Coral,
-            modifier = Modifier.weight(1f),
+            value = perServing.fatG.roundToInt().toString(),
+            unit = grams,
+            divider = false,
         )
     }
 }
 
 @Composable
-private fun MacroTile(
-    label: String,
-    value: String,
-    color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .background(AzfColors.SurfaceContainerLow, AzfShapes.Inner)
-            .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+private fun StepRow(number: Int, text: String) {
+    val spoken = stringResource(R.string.recipe_step, number)
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = AzfSpacing.ElementGapSmall)) {
         Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
+            text = number.toString(),
+            style = DataMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .width(32.dp)
+                .semantics { contentDescription = spoken },
         )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(text = value, style = MaterialTheme.typography.titleMedium, color = color)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f).padding(top = 2.dp),
+        )
     }
 }
 
@@ -451,9 +418,8 @@ private fun IngredientRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AzfColors.SurfaceContainerLow, AzfShapes.Inner)
             .toggleable(value = checked, role = Role.Checkbox, onValueChange = { onToggle() })
-            .padding(12.dp),
+            .heightIn(min = AzfSpacing.TouchTarget),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Checkbox(
@@ -466,7 +432,7 @@ private fun IngredientRow(
             ),
             modifier = Modifier.clearAndSetSemantics {},
         )
-        Spacer(modifier = Modifier.size(12.dp))
+        Spacer(modifier = Modifier.size(AzfSpacing.Gutter))
         Text(
             text = ingredient.name,
             style = MaterialTheme.typography.bodyMedium,
@@ -476,14 +442,14 @@ private fun IngredientRow(
         if (ingredient.quantity.isNotBlank()) {
             Text(
                 text = ingredient.quantity,
-                style = MaterialTheme.typography.labelMedium,
-                color = AzfColors.PrimaryFixedDim,
+                style = DataSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
 
-/** The declared-allergy match. Coral, not red — a warning, not an alarm. */
+/** The declared-allergy match: needs attention, so warning amber. */
 @Composable
 private fun AllergenWarning(matched: List<Allergen>) {
     // Resolved before the lambda: `stringResource` is composable, and a
@@ -494,21 +460,17 @@ private fun AllergenWarning(matched: List<Allergen>) {
             Icon(
                 imageVector = Icons.Outlined.Warning,
                 contentDescription = null,
-                tint = AzfColors.Coral,
+                tint = AzfColors.Warning,
                 modifier = Modifier.size(20.dp),
             )
-            Spacer(modifier = Modifier.size(12.dp))
+            Spacer(modifier = Modifier.size(AzfSpacing.Gutter))
             Column {
-                Text(
-                    text = stringResource(R.string.recipe_allergens_heading).uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = AzfColors.Coral,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                AzfSectionHeading(stringResource(R.string.recipe_allergens_heading))
                 Text(
                     text = stringResource(R.string.recipe_allergens_yours, names),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
         }
@@ -521,9 +483,8 @@ private fun AllergenNote(allergens: List<Allergen>) {
     val names = allergenNames(allergens)
     Text(
         text = stringResource(R.string.recipe_allergens_body, names),
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 4.dp),
     )
 }
 
@@ -583,3 +544,5 @@ private fun RecipeDetailPreview() {
         )
     }
 }
+
+private const val MAX_TAGS = 4

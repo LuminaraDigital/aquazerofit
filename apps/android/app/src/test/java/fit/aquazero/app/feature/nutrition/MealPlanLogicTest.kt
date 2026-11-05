@@ -70,4 +70,21 @@ class MealPlanLogicTest {
         val failure = ApiResult.Failure.Network(IOException("offline"))
         assertEquals(R.string.meal_plan_slot_failed, mealPlanFailureMessageRes(failure))
     }
+
+    @Test
+    fun `credits are exhausted only when every slot settled on the credits failure`() {
+        fun slot(type: MealType, failed: Boolean, res: Int) =
+            MealPlanSlot(type, loading = false, failed = failed, failureMessageRes = res)
+
+        val allCredits = MealPlanUiState(
+            slots = MealType.entries.map { slot(it, true, R.string.meal_plan_slot_credits) },
+        )
+        val mixed = allCredits.copy(
+            slots = allCredits.slots.take(3) + slot(MealType.SNACK, true, R.string.meal_plan_slot_failed),
+        )
+
+        assertEquals(true, allCredits.creditsExhausted)
+        assertEquals(false, mixed.creditsExhausted)
+        assertEquals(false, MealPlanUiState().creditsExhausted)
+    }
 }

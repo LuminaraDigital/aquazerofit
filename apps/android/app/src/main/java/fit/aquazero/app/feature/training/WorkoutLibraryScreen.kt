@@ -475,18 +475,13 @@ private fun PlanWeekStrip(
                 day?.focus?.ifBlank { restWord } ?: restWord,
                 stateWord,
             )
-            val ink = if (isToday) AzfColors.OnPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+            val ink = if (isToday) AzfColors.OnPrimaryFixed else MaterialTheme.colorScheme.onSurfaceVariant
+            // Same cell as Today's day strip: only the current day is filled.
             Column(
                 modifier = Modifier
                     .width(42.dp)
-                    .clip(AzfShapes.Pill)
-                    .then(
-                        if (isToday) {
-                            Modifier.background(LocalAzfExtended.current.primaryFixedDim)
-                        } else {
-                            Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)
-                        },
-                    )
+                    .clip(AzfShapes.Inner)
+                    .then(if (isToday) Modifier.background(LocalAzfExtended.current.primaryFixedDim) else Modifier)
                     .semantics(mergeDescendants = true) { contentDescription = dayLabel }
                     .padding(vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,

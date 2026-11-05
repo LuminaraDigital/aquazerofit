@@ -443,8 +443,8 @@
     <string name="nutrition_prev_day">Previous day</string>
     <string name="nutrition_next_day">Next day</string>
     <string name="nutrition_open_calendar">Open the calendar</string>
-    <string name="nutrition_error_title">This day didn\'t load</string>
-    <string name="nutrition_error_message">Anything you log stays on this device until you\'re back online.</string>
+    <string name="nutrition_error_title">We couldn\'t load this day</string>
+    <string name="nutrition_error_message">Anything you log is kept on this device and syncs when it can.</string>
     <string name="nutrition_goal">Goal</string>
     <string name="nutrition_food">Food</string>
     <string name="nutrition_exercise">Exercise</string>
@@ -570,7 +570,7 @@
     <string name="analysis_scanning_title">Reading your plate…</string>
     <string name="analysis_scanning_body">Identifying the food and working out the macros. Nothing is logged yet.</string>
     <string name="analysis_load_error_title">This analysis didn\'t load</string>
-    <string name="analysis_load_error_body">Check your connection and try again - nothing has been logged.</string>
+    <string name="analysis_load_error_body">We couldn\'t load this analysis. Nothing has been logged.</string>
     <string name="analysis_failed_title">We couldn\'t read that photo</string>
     <string name="analysis_failed_body">Try again, or add the food by hand instead.</string>
     <string name="analysis_item_name">Item</string>
@@ -668,8 +668,7 @@
     <string name="trust_fat_total_hint">With cooking fat estimates: %1$d kcal (adjust matched foods before logging)</string>
     <string name="barcode_trust_copy">Label values are per 100 g. Confirm your portion before logging.</string>
 
-    <!-- ===================================================================
-         Character select
+    <!-- ============================================================         Character select
          =================================================================== -->
     <string name="coach_select_heading">Your corner</string>
     <string name="coach_select_sub">Every coach gives the same safe, measured advice. What changes is who is saying it.</string>
@@ -817,8 +816,7 @@
     <string name="coach_ogun_domain">Elite &amp; advanced performance</string>
     <string name="coach_ogun_voice">Sovereign</string>
 
-    <!-- ===================================================================
-         Gamification
+    <!-- ============================================================         Gamification
          =================================================================== -->
     <string name="xp_level">Level %1$d</string>
     <string name="xp_full_day_banked">Full day banked</string>
@@ -1336,7 +1334,6 @@
     <string name="challenges_code_too_short">Enter the full code from your invite.</string>
 
     <!-- Meal plan -->
-    <string name="meal_plan_heading">Meal plan</string>
     <string name="meal_plan_intro"></string>
     <string name="meal_plan_regenerate_all">Regenerate every meal</string>
     <string name="meal_plan_regenerate_one">Regenerate the %1$s suggestion</string>
@@ -1350,7 +1347,7 @@
     <string name="meal_plan_logged_toast">Added to your log.</string>
     <string name="meal_plan_log_failed">Could not log that meal - please try again.</string>
     <string name="meal_plan_slot_failed">Couldn\'t generate a suggestion.</string>
-    <string name="meal_plan_slot_credits">You\'re out of AI credits for today. They refresh daily, and Premium raises the daily cap. Logging a meal by hand stays free.</string>
+    <string name="meal_plan_slot_credits">You\'re out of AI credits for today.</string>
     <string name="meal_plan_slot_retry">Retry</string>
     <string name="meal_plan_offline_title">Meal ideas need a connection</string>
     <string name="meal_plan_offline_body">Suggestions are generated on the server, so they are online-only. Your logged meals and targets are unaffected.</string>
@@ -1550,4 +1547,13 @@
     <!-- redesign: fight record -->
     <string name="fight_record_error_title">Fight record unavailable</string>
     <string name="fight_record_active_days_label">Active days</string>
+=======
+    <!-- redesign: nutrition -->
+    <string name="nutrition_over">Over goal</string>
+    <string name="nutrition_unit_kcal">kcal</string>
+    <string name="nutrition_unit_g">g</string>
+    <string name="nutrition_day_summary">%1$s eaten of %2$s goal</string>
+    <string name="nutrition_day_summary_burned">%1$s eaten of %2$s goal, %3$s from exercise</string>
+    <string name="meal_plan_credits_title">Out of AI credits</string>
+    <string name="recipe_per_serving_heading">Per serving</string>
 </resources>

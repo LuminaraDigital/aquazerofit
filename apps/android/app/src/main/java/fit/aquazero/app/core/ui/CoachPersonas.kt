@@ -328,7 +328,7 @@ object CoachRoster {
         CoachPersona(
             id = "terry",
             name = "Terry Bauer",
-            ringName = "The Outlaw",
+            ringName = "The Motor",
             taglineRes = R.string.coach_terry_tagline,
             disciplineRes = R.string.coach_terry_discipline,
             domainRes = R.string.coach_terry_domain,

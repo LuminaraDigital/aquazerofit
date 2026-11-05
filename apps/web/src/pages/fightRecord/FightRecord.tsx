@@ -16,7 +16,6 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { tierRank, type BeltAwardView, type FightRecordStatus } from '@aquazerofit/shared';
 import { AppHeader } from '@/components/ui/AppHeader';
-import { AppBackground } from '@/components/layout/AppBackground';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -40,7 +39,6 @@ export default function FightRecordPage() {
 
   return (
     <>
-      <AppBackground />
       <div className="azf-content relative mx-auto min-h-screen max-w-md safe-bottom">
         <div className="px-5 pb-28">
           <AppHeader title="Fight Record" back />

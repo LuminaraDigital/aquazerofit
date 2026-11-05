@@ -25,7 +25,6 @@ import { buildShareUrl, inviteRefFromUserId } from '@/lib/attribution';
 import { ANDROID_PLAY_STORE_URL, isAndroidMobileBrowser, joinChallengeUrl } from '@/lib/challenges';
 import { trackGrowth } from '@/lib/growth';
 import { BottomNav } from '@/components/ui/BottomNav';
-import { AppBackground } from '@/components/layout/AppBackground';
 
 /**
  * Display labels for the buddy-challenge kinds. `logging_streak` is the wire
@@ -120,7 +119,6 @@ export default function Challenges() {
 
   return (
     <>
-      <AppBackground />
       <div className="azf-content relative mx-auto min-h-screen max-w-md safe-bottom">
         <div className="px-5 pb-28">
           <AppHeader title="Buddy huddles" back />

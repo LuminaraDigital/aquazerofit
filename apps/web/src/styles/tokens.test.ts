@@ -110,3 +110,31 @@ describe('design tokens', () => {
     expect(declared).toHaveLength(Object.keys(SHIPPED_PALETTE).length);
   });
 });
+
+/**
+ * The surface contract both platforms share (docs/design.md, "Corner Card"):
+ * Android's AzfShapes uses 16dp containers and 8dp controls, and its cards
+ * are flat tonal steps. If the web drifts back to glass or gradients, the
+ * Mini App and the Android app stop looking like one product.
+ */
+describe('Corner Card surfaces', () => {
+  const rule = (selector: string) => {
+    const start = stylesheet.indexOf(`
+  ${selector} {`);
+    return start < 0 ? '' : stylesheet.slice(start, stylesheet.indexOf('}', start));
+  };
+
+  it('uses the same two radii as Android', () => {
+    expect(tailwindConfig).toMatch(/card:\s*'16px'/);
+    expect(tailwindConfig).toMatch(/xl:\s*'8px'/);
+  });
+
+  it.each(['.card-hero', '.glass-card', '.card-compact', '.cta-gradient'])(
+    '%s is flat: no blur, no gradient, no shadow',
+    (selector) => {
+      const body = rule(selector);
+      expect(body).not.toBe('');
+      expect(body).not.toMatch(/backdrop-filter|gradient\(|box-shadow/);
+    },
+  );
+});

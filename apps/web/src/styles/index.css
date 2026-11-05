@@ -118,81 +118,15 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* ---- WebGL animated background (fixed, behind everything) ---- */
-.azf-bg-canvas {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  opacity: 0.85;
-  pointer-events: none;
-}
-
-/* Diagonal hatch overlay - subtle texture on top of WebGL */
-.azf-bg-hatch {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background-image: repeating-linear-gradient(
-    115deg,
-    rgba(138, 235, 255, 0.02) 0px,
-    rgba(138, 235, 255, 0.02) 1px,
-    transparent 1px,
-    transparent 56px
-  );
-}
-
-/* Vignette to darken edges and focus content center */
-.azf-bg-vignette {
-  position: fixed;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse at center,
-    transparent 30%,
-    rgb(var(--azf-surface) / 0.6) 100%
-  );
-}
-
-/* Inside a bound Telegram theme the host's background colour is the one the
-   user chose, and an opaque full-screen aurora would hide it completely.
-   The shader stays - it is brand - but drops to a texture the host colour
-   can read through. Only ever set when lib/telegram.ts actually bound a
-   theme, so the browser target never sees this rule apply. */
-html[data-tg-theme] .azf-bg-canvas {
-  opacity: 0.3;
-}
-
-/* Static stand-in for the aurora when WebGL is gated inside Telegram
-   (Android, light scheme, low memory, low core count, reduced motion).
-   The class is never applied outside a Mini App. */
-.azf-bg-static {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(120% 70% at 15% -10%, rgba(47, 217, 244, 0.22), transparent 55%),
-    radial-gradient(90% 50% at 100% 0%, rgba(69, 223, 164, 0.14), transparent 48%),
-    rgb(var(--azf-surface));
-}
-
-html[data-tg-theme='light'] .azf-bg-static {
-  background:
-    radial-gradient(120% 70% at 15% -10%, rgba(15, 111, 130, 0.18), transparent 55%),
-    radial-gradient(90% 50% at 100% 0%, rgba(4, 120, 87, 0.12), transparent 48%),
-    rgb(var(--azf-surface));
-}
-
 /* CTA label. Defaults to the shipped ink (#001f25). A light Mini App theme
    sets --azf-cta-text so the same buttons stay readable on the darkened ramp. */
 .azf-cta-text {
   color: var(--azf-cta-text, #001f25);
+}
+
+/* Disabled is a different surface, not a dimmed accent (docs/design.md). */
+.azf-cta-text:disabled {
+  color: rgb(var(--azf-on-surface-variant));
 }
 
 /* Mini App viewport and safe areas. The variables exist only under
@@ -237,65 +171,46 @@ html.tg-active .min-h-screen {
 }
 
 @layer components {
-  /* ---- Card system: glassmorphism with depth ---- */
+  /* ---- Card system (docs/design.md, "Corner Card") ----
+     Flat tonal surfaces and hairlines, the same two radii as Android: depth
+     comes from a lighter surface, never from blur, glow or shadow. */
 
-  /* Hero card: the primary surface for the most important content.
-     Glassmorphism with aqua-tinted gradient, inner highlight, deep shadow. */
+  /* Lead card: one per view, one step lighter with a quiet aqua hairline. */
   .card-hero {
-    background:
-      linear-gradient(180deg, rgb(var(--azf-surface-tint) / 0.08) 0%, transparent 40%),
-      rgb(var(--azf-surface-container-low) / 0.6);
-    backdrop-filter: blur(20px) saturate(1.2);
-    -webkit-backdrop-filter: blur(20px) saturate(1.2);
-    border: 1px solid rgba(47, 217, 244, 0.2);
+    background: rgb(var(--azf-surface-container));
+    border: 1px solid rgb(var(--azf-primary-fixed-dim) / 0.4);
     @apply rounded-card;
-    box-shadow:
-      0 1px 0 0 rgba(138, 235, 255, 0.1) inset,
-      0 20px 40px -12px rgba(0, 0, 0, 0.4);
   }
 
-  /* Standard glass card: the workhorse surface */
+  /* Standard card: the workhorse surface. */
   .glass-card {
-    background: rgb(var(--azf-surface-container-low) / 0.55);
-    backdrop-filter: blur(16px) saturate(1.1);
-    -webkit-backdrop-filter: blur(16px) saturate(1.1);
-    border: 1px solid rgb(var(--azf-primary) / 0.1);
+    background: rgb(var(--azf-surface-container-low));
+    border: 1px solid rgb(var(--azf-outline-variant) / 0.6);
     @apply rounded-card;
-    box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.3);
   }
 
-  /* Compact card: borderless, tonal only */
+  /* Compact tile inside a section: tonal only, control radius. */
   .card-compact {
-    background: rgb(var(--azf-surface-container) / 0.4);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgb(var(--azf-surface-container));
+    border: 1px solid rgb(var(--azf-outline-variant) / 0.4);
     @apply rounded-xl;
   }
 
-  /* Navigation blur */
+  /* Sticky chrome over scrolling content: the one place blur earns its keep. */
   .glass-blur {
-    background: rgb(var(--azf-surface) / 0.5);
-    backdrop-filter: blur(24px) saturate(1.3);
-    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    background: rgb(var(--azf-surface) / 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
-  /* ---- CTA gradient with inner light ---- */
+  /* Primary action fill: flat aqua under dark ink (10.1:1). The name is kept
+     so the call sites read the same; there is no gradient any more. */
   .cta-gradient {
-    background: linear-gradient(
-      135deg,
-      rgb(var(--azf-surface-tint)) 0%,
-      rgb(var(--azf-secondary)) 100%
-    );
-    box-shadow:
-      0 1px 0 0 rgb(255 255 255 / 0.25) inset,
-      0 4px 12px -4px rgb(var(--azf-surface-tint) / 0.35);
+    background: rgb(var(--azf-primary-fixed-dim));
   }
 
-  .cta-gradient:active:not(:disabled) {
-    box-shadow:
-      0 1px 0 0 rgb(255 255 255 / 0.12) inset,
-      0 2px 6px -2px rgb(var(--azf-surface-tint) / 0.2);
+  .cta-gradient:disabled {
+    background: rgb(var(--azf-surface-container-high));
   }
 
   .heading-display {
@@ -363,15 +278,15 @@ html.tg-active .min-h-screen {
   /* ---- Staggered entrance animations ---- */
   .reveal {
     opacity: 0;
-    transform: translateY(16px);
-    animation: reveal-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform: translateY(8px);
+    animation: reveal-up 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
-  .reveal-2 { animation-delay: 0.08s; }
-  .reveal-3 { animation-delay: 0.16s; }
-  .reveal-4 { animation-delay: 0.24s; }
-  .reveal-5 { animation-delay: 0.32s; }
-  .reveal-6 { animation-delay: 0.40s; }
+  .reveal-2 { animation-delay: 0.04s; }
+  .reveal-3 { animation-delay: 0.08s; }
+  .reveal-4 { animation-delay: 0.12s; }
+  .reveal-5 { animation-delay: 0.16s; }
+  .reveal-6 { animation-delay: 0.2s; }
 
   @keyframes reveal-up {
     to {

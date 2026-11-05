@@ -221,7 +221,7 @@ back rather than the face.
 
 ---
 
-## 03. ANDERSON COUTURE, "THE GIANT"
+## 03. ANDERSON PIKE, "THE GIANT"
 
 ### Tale of the Tape
 
@@ -288,7 +288,7 @@ contrast is the character.
 
 ---
 
-## 04. JACARE ALDO, "THE PRINCE"
+## 04. TIAGO ARRUDA, "THE PRINCE"
 
 ### Tale of the Tape
 
@@ -309,7 +309,7 @@ contrast is the character.
 
 ### The Fighter
 
-Jacare carries himself like royalty because in the neighbourhood that raised
+Tiago carries himself like royalty because in the neighbourhood that raised
 him he genuinely is: the local boy who fought his way out and sends every
 purse home. The title is half swagger, half obligation. He is flamboyant,
 fast talking, theatrical, and he means every second of it.
@@ -327,7 +327,7 @@ without mercy while wanting him to be better.
 
 A scrambler. Every position is an attack, every exchange sets up the next
 one, and he will happily lose a position to reach a better one. The player
-who loves Jacare is the player who loves being two moves ahead.
+who loves Tiago is the player who loves being two moves ahead.
 
 ### Special Techniques
 
@@ -417,7 +417,7 @@ like a prayer.
 
 ---
 
-## 06. KAZUSHI HORIUCHI, "THE HUNTER"
+## 06. SHUHEI HORIUCHI, "THE HUNTER"
 
 ### Tale of the Tape
 
@@ -482,7 +482,7 @@ looking uninterested. That is the character.
 
 ---
 
-## 07. UTHMAN NURMAKHMEDOV, "THE CRUSHER"
+## 07. UTHMAN SADYKOV, "THE CRUSHER"
 
 ### Tale of the Tape
 
@@ -613,13 +613,13 @@ to be there.
 
 ---
 
-## 09. MATAEMON AOKI, "TOBIKAN"
+## 09. MATAEMON KURODA, "THE LOCKSMITH"
 
 ### Tale of the Tape
 
 | | |
 |---|---|
-| Ring name | Tobikan, the Leaping Blade |
+| Ring name | The Locksmith |
 | Born | Shizuoka, Japan, age 27 |
 | Height and Reach | 5 ft 11 in, 71 in reach |
 | Weight class | Welterweight, 170 lb |
@@ -685,21 +685,21 @@ Face relaxed, slightly amused, unconcerned by physics.
 |---|---|---|---|---|---|---|---|---|
 | 01 | Akin Celsus | Middle | 100 | +1 | 6 | STANDING | Knockout | I |
 | 02 | Ogun Celsus | Sovereign | 120 | +2 twice | 6 | Any | Knockout | Sovereign |
-| 03 | Anderson Couture | Heavy | 100 | +3 | 5 | GROUND | Decision | II |
-| 04 | Jacare Aldo | Middle | 100 | +1 | 6 | GROUND | Submission | I |
+| 03 | Anderson Pike | Heavy | 100 | +3 | 5 | GROUND | Decision | II |
+| 04 | Tiago Arruda | Middle | 100 | +1 | 6 | GROUND | Submission | I |
 | 05 | King Yamsiri | Welter | 100 | +0 | 7 | STANDING | Knockout | I |
-| 06 | Kazushi Horiuchi | Welter | 100 | +0 | 7 | GROUND | Submission | II |
-| 07 | Uthman Nurmakhmedov | Middle | 100 | +1 | 6 | GROUND | Decision | III |
+| 06 | Shuhei Horiuchi | Welter | 100 | +0 | 7 | GROUND | Submission | II |
+| 07 | Uthman Sadykov | Middle | 100 | +1 | 6 | GROUND | Decision | III |
 | 08 | Sanzo | Heavy | 100 | +3 | 5 | STANDING | Knockout | I |
-| 09 | Mataemon Aoki | Welter | 100 | +0 | 7 | GROUND | Submission | III |
+| 09 | Mataemon Kuroda | Welter | 100 | +0 | 7 | GROUND | Submission | III |
 
 **Balance reading.** Five GROUND homes against three STANDING and one Any;
 the next intake should lean STANDING. Every special technique above is a real
 technique with its real name; that bar holds for all twenty four fighters
 still to come.
 
-**Name clearance.** The five names flagged in AQF-25 v1 Appendix B still
-await a decision before any monetised printing.
+**Name clearance.** Settled 5 November 2026: ten coaches whose names sat close to
+real fighters were renamed; coach ids are unchanged.
 
 ---
 

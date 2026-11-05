@@ -170,11 +170,11 @@ export const MARKETING_ROUTES: readonly MarketingRoute[] = [
   },
   {
     path: '/google-play',
-    title: 'AquaZeroFit for Android: coming soon to Google Play',
+    title: 'AquaZeroFit for Android on Google Play',
     description:
-      'AquaZeroFit is coming soon to Google Play. Track meals, hydration, workouts and progress with an AI wellness coach built around your real day.',
+      'Get AquaZeroFit on Google Play. Track meals, hydration, workouts and progress with an AI wellness coach built around your real day.',
     summary:
-      'AquaZeroFit for Android is coming soon to Google Play. The app brings meal logging by photograph, barcode or search, calorie and macro targets computed from your own profile, home training and Aqua Coach to a native Android app, connected to the same AquaZeroFit service. Until the listing is published, the live Telegram Mini App offers the core experience.',
+      'AquaZeroFit for Android is available on Google Play (package fit.aquazero.app). The app brings meal logging by photograph, barcode or search, calorie and macro targets computed from your own profile, home training and Aqua Coach to a native Android app, on the same account as the Telegram Mini App and the web app.',
     priority: 0.6,
   },
   {

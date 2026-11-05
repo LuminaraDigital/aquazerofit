@@ -6,6 +6,8 @@
  * lives. The web is marketing; Telegram is the app. So the primary CTA leaves
  * this origin, and the browser sign-up sits beside it as the deliberate
  * second path for anyone whose network blocks Telegram  -  see BrowserPath.
+ * The Google Play badge is the third path, and leads on Android phones  -  see
+ * AppCtas in Chrome.tsx.
  *
  * There are no auth or Telegram redirects in here any more. RequireAuth
  * decides who sees this page (signed-out, not in Telegram, at `/`) and this
@@ -22,7 +24,7 @@
 import { lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useSeo } from '../../lib/seo';
-import { Footer, TelegramCta, TopBar, WebFallbackLink } from './Chrome';
+import { AppCtas, Footer, TopBar } from './Chrome';
 
 const AppBackground = lazy(() =>
   import('../../components/layout/AppBackground').then((m) => ({ default: m.AppBackground })),
@@ -77,18 +79,21 @@ function Hero() {
           </Reveal>
 
           <Reveal delay={230}>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <TelegramCta placement="hero" />
-              <WebFallbackLink placement="hero" />
+            <div className="mt-9">
+              {/* The note is named right under the buttons rather than buried
+                  in a FAQ. The visitor deciding between them is exactly the
+                  person who needs to know the browser path is a real product
+                  and not a demo. */}
+              <AppCtas
+                placement="hero"
+                note={
+                  <p className="-mt-1 text-[12px] leading-relaxed text-on-surface-variant/60">
+                    The Mini App opens inside Telegram with no install. Blocked at work? The
+                    browser version is the same app, same account.
+                  </p>
+                }
+              />
             </div>
-            {/* Named right under the CTA rather than buried in a FAQ. The
-                visitor deciding between these two buttons is exactly the
-                person who needs to know the second one is a real product and
-                not a demo. */}
-            <p className="mt-3 text-[12px] leading-relaxed text-on-surface-variant/60">
-              No install. The Mini App opens inside Telegram. Blocked at work?
-              The browser version is the same app, same account.
-            </p>
           </Reveal>
 
           <Reveal delay={300}>
@@ -157,9 +162,8 @@ function FinalCta() {
             Open the Mini App, answer a few questions, and see your targets computed from your
             own figures. Everything after that is just logging your day.
           </p>
-          <div className="relative mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-            <TelegramCta placement="final" />
-            <WebFallbackLink placement="final" />
+          <div className="relative mt-9">
+            <AppCtas placement="final" centered />
           </div>
           <p className="relative mt-5 text-[12px] text-on-surface-variant/60">
             Already have an account?{' '}

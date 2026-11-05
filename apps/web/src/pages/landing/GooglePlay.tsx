@@ -1,15 +1,15 @@
 /**
  * /google-play — public page for the Android app.
  *
- * Deliberately says "Available soon" rather than linking to a listing that is
- * not published yet. When it is, the status card in the hero is the one place
- * to put the verified Play Store URL.
+ * The app is live on Google Play, so the Play badge is this page's primary
+ * action in place of Telegram, which stays available in the closing block.
  *
  * Every claim in the privacy panel is a summary of /privacy, which the Play
  * policy at /google-play/privacy-policy renders verbatim; change them together.
  */
 import { Link } from 'react-router-dom';
 import { WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
+import { PlayStoreBadge } from './Chrome';
 import { MarketingPage, PageCta, PageHero } from './Page';
 import { Reveal } from './motion';
 
@@ -46,26 +46,17 @@ export default function GooglePlayPage() {
           <>
             Your wellness coach,
             <br />
-            <span className="lp-gradient-text">coming soon to Google Play.</span>
+            <span className="lp-gradient-text">now on Google Play.</span>
           </>
         }
-        lead="The AquaZeroFit Android app is in development. Its Google Play listing will be linked here once it is published; until then, the live Telegram Mini App has the core experience."
+        lead="AquaZeroFit for Android is on Google Play: meal logging by photograph, barcode or search, targets computed from your own profile, home training and Aqua Coach, on the same account as the Mini App and the web."
+        primary={
+          <span className="self-start">
+            <PlayStoreBadge placement="google-play-hero" />
+          </span>
+        }
         secondary={{ to: '/google-play/privacy-policy', label: 'Read the app privacy policy' }}
-      >
-        <Reveal delay={300}>
-          <div className="mt-10 inline-flex min-h-[58px] items-center gap-3 rounded-2xl border border-secondary/25 bg-secondary/[0.07] px-5">
-            <span className="material-symbols-outlined text-[26px] text-secondary" aria-hidden="true">
-              android
-            </span>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-                Google Play
-              </p>
-              <p className="mt-0.5 text-sm font-medium text-on-surface">Available soon</p>
-            </div>
-          </div>
-        </Reveal>
-      </PageHero>
+      />
 
       <div className="mx-auto max-w-6xl space-y-20 px-5 pb-24 sm:space-y-28 sm:pb-32">
         <section aria-labelledby="android-features">
@@ -134,10 +125,14 @@ export default function GooglePlayPage() {
         </section>
 
         <PageCta
-          title="Start in Telegram today."
-          lead="The live Mini App has the core AquaZeroFit experience now. When the Android app is published, this page will link to its Google Play listing."
+          title="Get AquaZeroFit on Google Play."
+          lead="Not on Android? The same account works in the Telegram Mini App and in any browser."
           disclaimer={WELLNESS_DISCLAIMER}
-        />
+        >
+          <div className="mt-7 flex justify-center">
+            <PlayStoreBadge placement="google-play-final" />
+          </div>
+        </PageCta>
       </div>
     </MarketingPage>
   );

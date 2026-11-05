@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
@@ -92,12 +94,20 @@ internal fun AquaCalendarPicker(
                 .padding(horizontal = AzfSpacing.ContainerMargin)
                 .padding(bottom = AzfSpacing.ContainerMargin),
         ) {
-            Text(
-                text = stringResource(R.string.calendar_title).uppercase(),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AzfSectionHeading(
+                    text = stringResource(R.string.calendar_title),
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.nutrition_sheet_close),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
 
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
@@ -138,7 +148,7 @@ internal fun AquaCalendarPicker(
                 WEEK_START_ORDER.forEach { day ->
                     Text(
                         text = day.getDisplayName(TextStyle.NARROW, locale),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.weight(1f),
@@ -223,7 +233,7 @@ private fun DayCell(
             )
             Box(
                 modifier = Modifier
-                    .padding(top = 3.dp)
+                    .padding(top = 4.dp)
                     .size(4.dp)
                     .clip(AzfShapes.Pill)
                     .background(

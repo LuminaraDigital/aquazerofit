@@ -1,6 +1,5 @@
 package fit.aquazero.app.feature.nutrition
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,8 +12,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,13 +26,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
-import fit.aquazero.app.core.designsystem.AzfShapes
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.DataSmall
@@ -73,15 +73,23 @@ internal fun EditMealSheet(
                 .padding(horizontal = AzfSpacing.ContainerMargin)
                 .padding(bottom = AzfSpacing.ContainerMargin),
         ) {
-            Text(
-                text = stringResource(
-                    R.string.edit_meal_title,
-                    stringResource(NutritionFormat.mealLabelRes(state.mealType)),
-                ).uppercase(),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AzfSectionHeading(
+                    text = stringResource(
+                        R.string.edit_meal_title,
+                        stringResource(NutritionFormat.mealLabelRes(state.mealType)),
+                    ),
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.nutrition_sheet_close),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
 
             val rowKeys = rememberRowKeys(state)
             LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
@@ -90,15 +98,16 @@ internal fun EditMealSheet(
                     key = { _, row -> rowKeys.keyFor(row) },
                     contentType = { _, _ -> "edit-row" },
                 ) { index, row ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     EditRow(
                         row = row,
                         canRemove = state.rows.size > 1,
                         onGramsChange = { grams -> onGramsChange(index, grams) },
                         onRemove = { onRemoveRow(index) },
                     )
-                    Spacer(Modifier.height(12.dp))
                 }
             }
+            Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
 
             PrimaryButton(
                 text = stringResource(
@@ -150,9 +159,7 @@ private fun EditRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(AzfShapes.Inner)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(12.dp),
+            .padding(vertical = AzfSpacing.ElementGapSmall),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -166,7 +173,7 @@ private fun EditRow(
             Text(
                 text = stringResource(R.string.kcal_value, NutritionFormat.fmtInt(item.kcal)),
                 style = DataSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(start = 12.dp),
             )
         }
@@ -200,7 +207,7 @@ private fun EditRow(
                             R.string.edit_remove_item,
                             item.name,
                         ),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.error,
                     )
                 }
             }
@@ -247,13 +254,11 @@ private fun EditMealRowsPreview() {
     )
     AzfTheme {
         Column(Modifier.padding(16.dp)) {
-            Text(
+            AzfSectionHeading(
                 text = stringResource(
                     R.string.edit_meal_title,
                     stringResource(NutritionFormat.mealLabelRes(MealType.BREAKFAST)),
-                ).uppercase(),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                ),
             )
             Spacer(Modifier.height(12.dp))
             EditRow(

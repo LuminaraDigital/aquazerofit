@@ -160,7 +160,7 @@ fun NutritionContent(
                         PaddingValues(
                             start = AzfSpacing.ContainerMargin,
                             end = AzfSpacing.ContainerMargin,
-                            bottom = AzfSpacing.Gutter,
+                            bottom = AzfSpacing.SectionGap,
                         ),
                     ),
             ) {
@@ -186,9 +186,9 @@ fun NutritionContent(
                     }
 
                     state.nutrition == null -> {
-                        CardSkeleton(height = 240.dp, modifier = Modifier.revealOnEnter(1))
+                        CardSkeleton(height = 232.dp, modifier = Modifier.revealOnEnter(1))
                         Spacer(Modifier.height(AzfSpacing.Gutter))
-                        CardSkeleton(height = 96.dp, modifier = Modifier.revealOnEnter(2))
+                        CardSkeleton(height = 120.dp, modifier = Modifier.revealOnEnter(2))
                         Spacer(Modifier.height(AzfSpacing.Gutter))
                         CardSkeleton(height = 180.dp, modifier = Modifier.revealOnEnter(3))
                     }
@@ -291,7 +291,7 @@ private fun MealTimeline(
 ) {
     Column(
         modifier = Modifier.revealOnEnter(3),
-        verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
+        verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapMedium),
     ) {
         NutritionFormat.MEAL_TYPES.forEach { mealType ->
             MealSection(

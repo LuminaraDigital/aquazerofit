@@ -35,9 +35,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FlashlightOff
 import androidx.compose.material.icons.outlined.FlashlightOn
 import androidx.compose.material.icons.outlined.Warning
@@ -86,6 +86,7 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfChip
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
@@ -104,6 +105,7 @@ import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.model.Nutriscore
 import fit.aquazero.app.core.ui.NutritionFormat
 import fit.aquazero.app.feature.nutrition.CameraPermission
+import fit.aquazero.app.feature.nutrition.CircleIconControl
 import fit.aquazero.app.feature.nutrition.NutritionMath
 import fit.aquazero.app.feature.nutrition.awaitOnMain
 import fit.aquazero.app.feature.nutrition.findActivity
@@ -248,14 +250,22 @@ fun BarcodeScannerSheet(
                 .padding(bottom = AzfSpacing.ContainerMargin),
             verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
         ) {
-            Text(
-                text = stringResource(R.string.barcode_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AzfSectionHeading(
+                    text = stringResource(R.string.barcode_title),
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.nutrition_sheet_close),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             Text(
                 text = stringResource(R.string.barcode_trust_copy),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
@@ -502,7 +512,7 @@ private fun CameraSurface(
             .fillMaxWidth()
             .aspectRatio(4f / 3f)
             .clip(AzfShapes.Inner)
-            .background(Color.Black),
+            .background(ScanBackdrop),
     ) {
         surfaceRequest?.let { request ->
             CameraXViewfinder(
@@ -512,33 +522,27 @@ private fun CameraSurface(
         }
         ScanReticle(modifier = Modifier.align(Alignment.Center))
         if (hasTorch) {
-            IconButton(
+            CircleIconControl(
+                icon = if (torchOn) Icons.Outlined.FlashlightOn else Icons.Outlined.FlashlightOff,
+                contentDescription = stringResource(
+                    if (torchOn) R.string.capture_torch_off_cd else R.string.capture_torch_on_cd,
+                ),
                 onClick = onToggleTorch,
+                tint = ScanInk,
+                container = ScanControlFill,
+                ring = Color.Transparent,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f)),
-            ) {
-                Icon(
-                    imageVector = if (torchOn) {
-                        Icons.Outlined.FlashlightOn
-                    } else {
-                        Icons.Outlined.FlashlightOff
-                    },
-                    contentDescription = stringResource(
-                        if (torchOn) {
-                            R.string.capture_torch_off_cd
-                        } else {
-                            R.string.capture_torch_on_cd
-                        },
-                    ),
-                    tint = Color.White,
-                )
-            }
+                    .padding(8.dp),
+            )
         }
     }
 }
+
+// White-on-camera colours: the image behind is unknowable, so they are fixed.
+private val ScanBackdrop = Color.Black
+private val ScanInk = Color.White
+private val ScanControlFill = Color.Black.copy(alpha = 0.5f)
 
 private val RETICLE_WIDTH = 240.dp
 private val RETICLE_HEIGHT = 140.dp
@@ -660,8 +664,7 @@ internal fun BarcodeResultCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = food.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
@@ -702,7 +705,7 @@ internal fun BarcodeResultCard(
         if (result.showOffAttribution) {
             Text(
                 text = stringResource(R.string.barcode_off_attribution),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 12.dp),
             )
@@ -714,11 +717,7 @@ internal fun BarcodeResultCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            text = stringResource(R.string.barcode_portion),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        AzfSectionHeading(text = stringResource(R.string.barcode_portion))
         GramsStepper(grams = grams, onGramsChange = onGramsChange)
     }
 
@@ -769,23 +768,23 @@ internal fun BarcodeResultCard(
  */
 @Composable
 private fun AllergenWarning(result: BarcodeResultUi) {
-    val coral = LocalAzfExtended.current.coral
+    val warning = LocalAzfExtended.current.warning
     val hitLabels = result.verdict.hits.map { stringResource(NutritionMath.allergenLabel(it)) }
     val names = hitLabels.joinToString(", ")
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(AzfShapes.Inner)
-            .border(1.dp, coral, AzfShapes.Inner)
-            .background(coral.copy(alpha = 0.12f))
-            .padding(14.dp)
+            .border(1.dp, warning, AzfShapes.Inner)
+            .background(warning.copy(alpha = 0.12f))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .semantics { liveRegion = LiveRegionMode.Assertive },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.Outlined.Warning,
                 contentDescription = null,
-                tint = coral,
+                tint = warning,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -793,7 +792,7 @@ private fun AllergenWarning(result: BarcodeResultUi) {
                 text = stringResource(R.string.barcode_allergen_title),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
-                color = coral,
+                color = warning,
             )
         }
         Text(
@@ -804,9 +803,9 @@ private fun AllergenWarning(result: BarcodeResultUi) {
                 },
                 names,
             ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 8.dp),
         )
     }
 }
@@ -844,15 +843,10 @@ internal fun NutriscoreBadge(grade: Nutriscore) {
 
 @Composable
 private fun DietChip(label: String) {
-    val accent = LocalAzfExtended.current.secondaryFixedDim
     Text(
         text = label,
-        style = MaterialTheme.typography.labelSmall,
-        color = accent,
-        modifier = Modifier
-            .clip(AzfShapes.Pill)
-            .background(accent.copy(alpha = 0.15f))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
@@ -864,7 +858,7 @@ private fun InlineNotice(text: String, tone: Color, assertive: Boolean = false) 
             .clip(AzfShapes.Inner)
             .border(1.dp, tone.copy(alpha = 0.5f), AzfShapes.Inner)
             .background(tone.copy(alpha = 0.08f))
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .semantics {
                 liveRegion = if (assertive) LiveRegionMode.Assertive else LiveRegionMode.Polite
             },

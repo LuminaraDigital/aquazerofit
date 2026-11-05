@@ -70,6 +70,10 @@ data class MealPlanUiState(
 
     val readyCount: Int get() = ready.size
 
+    /** Every slot has settled and failed for lack of AI credits: one notice, not four. */
+    val creditsExhausted: Boolean
+        get() = slots.all { !it.loading && it.failed && it.failureMessageRes == R.string.meal_plan_slot_credits }
+
     val plannedKcal: Double get() = ready.sumOf { it.kcal }
 
     val plannedProteinG: Double get() = ready.sumOf { it.proteinG }

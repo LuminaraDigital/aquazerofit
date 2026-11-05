@@ -283,6 +283,17 @@ class SetupViewModel @Inject constructor(
     private suspend fun fetchTargets(): DerivedTargetsDto? =
         (accountRepository.refreshTargets() as? ApiResult.Success)?.data
 
+    /**
+     * The profile saved but the targets did not come back. `saving` doubles as
+     * "retry in flight" so the reveal shows a skeleton instead of the error.
+     */
+    fun retryTargets() {
+        _uiState.value = _uiState.value.copy(saving = true)
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(saving = false, targets = fetchTargets())
+        }
+    }
+
     /** Leave the reveal (or skip the form entirely). */
     fun finish() {
         viewModelScope.launch { _events.send(SetupEvent.Finished) }

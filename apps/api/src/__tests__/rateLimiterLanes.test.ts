@@ -88,6 +88,11 @@ describe('rate limiter lanes', () => {
   const AI_ROUTES: ReadonlyArray<[label: string, path: string, limit: number]> = [
     ['chat turn', '/api/v1/chat/sessions/s_1/messages', COACH_CHAT_PER_MINUTE],
     ['typed meal draft', '/api/v1/chat/meal-drafts', COACH_CHAT_PER_MINUTE],
+    // Express routes ignore case and a trailing slash, so the lanes must too.
+    ['chat turn with a trailing slash', '/api/v1/chat/sessions/s_1/messages/', COACH_CHAT_PER_MINUTE],
+    ['meal photo with a trailing slash', '/api/v1/meal-photos/', MEAL_PHOTO_PER_MINUTE],
+    ['meal photo in another case', '/api/v1/Meal-Photos', MEAL_PHOTO_PER_MINUTE],
+    ['meal recommendation in another case', '/api/v1/Recommendations/meals', STRICT_LIMIT],
     ['meal photo', '/api/v1/meal-photos', MEAL_PHOTO_PER_MINUTE],
     ['meal recommendation', '/api/v1/recommendations/meals', STRICT_LIMIT],
     ['weekly insight', '/api/v1/progress/insight', STRICT_LIMIT],

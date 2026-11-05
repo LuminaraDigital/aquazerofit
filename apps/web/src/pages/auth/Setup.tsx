@@ -77,10 +77,12 @@ const EMPTY: FormState = {
   weight: '',
   goal: null,
   activityLevel: null,
+  // Every purpose starts off: only a box the person ticks is consent, and
+  // these match the API's DEFAULT_CONSENTS (Setup.consents.test.tsx).
   consentWellness: false,
-  consentAi: true,
-  consentAnalytics: true,
-  consentReminders: true,
+  consentAi: false,
+  consentAnalytics: false,
+  consentReminders: false,
 };
 
 function resolveHeightCm(s: FormState): number {

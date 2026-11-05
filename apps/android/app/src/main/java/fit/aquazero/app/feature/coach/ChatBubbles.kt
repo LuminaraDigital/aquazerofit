@@ -53,7 +53,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
@@ -517,8 +516,8 @@ fun WellnessDisclaimerBar(modifier: Modifier = Modifier) {
             text = stringResource(R.string.coach_disclaimer),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            // Wraps rather than truncates: this is compliance copy, so every
+            // word of it has to stay readable.
             modifier = Modifier.padding(start = 8.dp),
         )
     }

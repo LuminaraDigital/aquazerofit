@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Metric-matched stand-in for Barlow Condensed while the web font loads.
+   The fonts load asynchronously, and a full-width fallback wrapped sub-page
+   headlines onto extra lines, then shifted the page when Barlow arrived
+   (CLS 0.33 on /aqua-coach at 390px). Headings are SemiBold, which falls back
+   to the bold face; Barlow Condensed SemiBold sets text at 0.744 of Arial
+   Bold's width (measured from both fonts' advance widths), so the stand-in
+   wraps where the real face will. */
+@font-face {
+  font-family: 'Barlow Condensed Fallback';
+  src: local('Arial Bold'), local('Arial-BoldMT'), local('Roboto Bold'), local('Roboto-Bold');
+  font-weight: 600 800;
+  size-adjust: 74.4%;
+}
+
 /* ====================================================================
    Design tokens - the single binding point for the palette.
 

@@ -72,7 +72,7 @@ export default {
         coral: 'rgb(var(--azf-coral) / <alpha-value>)',
       },
       fontFamily: {
-        heading: ['"Barlow Condensed"', 'sans-serif'],
+        heading: ['"Barlow Condensed"', '"Barlow Condensed Fallback"', 'sans-serif'],
         body: ['"DM Sans"', 'sans-serif'],
       },
       borderRadius: {

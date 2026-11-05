@@ -15,10 +15,10 @@ import { useScrollProgress } from './motion';
 
 /** In-page sections of the landing route. */
 export const NAV_LINKS = [
-  { href: '#features', label: 'Features' },
+  { href: '#calculator', label: 'Targets' },
   { href: '#screens', label: 'Screens' },
-  { href: '#how', label: 'How it works' },
-  { href: '#coach', label: 'Aqua Coach' },
+  { href: '#features', label: 'How it works' },
+  { href: '#coach', label: 'Coach' },
   { href: '#safety', label: 'Safety' },
 ];
 
@@ -53,12 +53,12 @@ function sectionHref(href: string, onLanding: boolean): string {
 }
 
 const CTA_BASE =
-  'inline-flex items-center justify-center gap-2 rounded-2xl px-6 min-h-[52px] font-heading text-sm font-semibold uppercase tracking-[0.04em] transition-all active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
+  'inline-flex items-center justify-center gap-2 rounded-[14px] px-6 min-h-[52px] text-[15px] font-semibold transition-[background-color,border-color,transform] duration-150 ease-out active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 
 function ctaStyles(variant: 'primary' | 'ghost'): string {
   return variant === 'primary'
-    ? 'cta-gradient text-[#001f25] hover:brightness-110'
-    : 'border border-primary/25 bg-white/[0.03] text-on-surface hover:border-primary/50 hover:bg-white/[0.06]';
+    ? 'bg-primary text-on-primary hover:bg-[rgb(170_241_255)]'
+    : 'border border-on-surface/20 text-on-surface hover:border-on-surface/40 hover:bg-on-surface/[0.04]';
 }
 
 export function CtaButton({
@@ -113,6 +113,7 @@ export function TelegramCta({
          its own handoff. `rel` is still set because the destination is
          cross-origin. */
       rel="noreferrer noopener"
+      data-variant={variant}
       className={`${CTA_BASE} ${ctaStyles(variant)} ${className}`}
     >
       <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
@@ -210,12 +211,12 @@ export function TopBar({ onLanding = false }: { onLanding?: boolean }) {
 
   return (
     <header className="fixed inset-x-0 top-0 z-50">
-      <div className="glass-blur border-b border-white/5">
+      <div className="glass-blur border-b border-on-surface/[0.06]">
         <nav
-          className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5"
+          className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-5 sm:px-8"
           aria-label="Primary"
         >
-          <Link to="/" className="flex items-center gap-2.5">
+          <Link to="/" className="flex min-h-[44px] items-center gap-2.5">
             {/* Fixed top bar - in the viewport from the first paint. */}
             <img
               src="/logo.png"
@@ -232,12 +233,12 @@ export function TopBar({ onLanding = false }: { onLanding?: boolean }) {
             </span>
           </Link>
 
-          <ul className="hidden items-center gap-8 md:flex">
+          <ul className="hidden items-center gap-7 lg:flex">
             {NAV_LINKS.map((link) => (
               <li key={link.href}>
                 <a
                   href={sectionHref(link.href, onLanding)}
-                  className="text-sm text-on-surface-variant transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                  className="inline-block py-3 text-sm text-on-surface-variant transition-colors duration-150 hover:text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
                 >
                   {link.label}
                 </a>
@@ -256,7 +257,7 @@ export function TopBar({ onLanding = false }: { onLanding?: boolean }) {
               href={telegramAppUrl(getAttribution())}
               onClick={() => void trackGrowth('telegram_cta_clicked', { placement: 'topbar' })}
               rel="noreferrer noopener"
-              className="cta-gradient inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 font-heading text-[13px] font-semibold uppercase tracking-[0.04em] text-[#001f25] transition-all active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[12px] bg-primary px-4 text-[14px] font-semibold text-on-primary transition-[background-color,transform] duration-150 ease-out hover:bg-[rgb(170_241_255)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                 send
@@ -268,7 +269,7 @@ export function TopBar({ onLanding = false }: { onLanding?: boolean }) {
       </div>
       {/* Reading progress */}
       <div
-        className="h-px origin-left bg-gradient-to-r from-primary to-secondary"
+        className="h-px origin-left bg-primary/70"
         style={{ transform: `scaleX(${progress})` }}
         aria-hidden="true"
       />
@@ -303,20 +304,20 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
         </div>
 
         <div>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
+          <h2 className="text-[13px] font-semibold text-on-surface">
             Product
           </h2>
-          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant">
+          <ul className="mt-2 text-[15px] text-on-surface-variant">
             {FOOTER_PRODUCT.map((item) => (
               <li key={item.label}>
                 {item.to ? (
-                  <Link to={item.to} className="transition-colors hover:text-primary">
+                  <Link to={item.to} className="inline-block py-1.5 transition-colors duration-150 hover:text-primary">
                     {item.label}
                   </Link>
                 ) : (
                   <a
                     href={sectionHref(item.href!, onLanding)}
-                    className="transition-colors hover:text-primary"
+                    className="inline-block py-1.5 transition-colors duration-150 hover:text-primary"
                   >
                     {item.label}
                   </a>
@@ -327,10 +328,10 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
         </div>
 
         <div>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
+          <h2 className="text-[13px] font-semibold text-on-surface">
             Legal
           </h2>
-          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant">
+          <ul className="mt-2 text-[15px] text-on-surface-variant">
             {[
               { to: '/privacy', label: 'Privacy notice' },
               { to: '/google-play/privacy-policy', label: 'Google Play privacy policy' },
@@ -339,7 +340,7 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
               { to: '/support', label: 'Support' },
             ].map((item) => (
               <li key={item.to}>
-                <Link to={item.to} className="transition-colors hover:text-primary">
+                <Link to={item.to} className="inline-block py-1.5 transition-colors duration-150 hover:text-primary">
                   {item.label}
                 </Link>
               </li>
@@ -348,16 +349,16 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
         </div>
 
         <div>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
+          <h2 className="text-[13px] font-semibold text-on-surface">
             Project
           </h2>
-          <ul className="mt-4 space-y-2.5 text-sm text-on-surface-variant">
+          <ul className="mt-2 text-[15px] text-on-surface-variant">
             <li>
               <a
                 href={SOURCE_CODE_URL}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="transition-colors hover:text-primary"
+                className="inline-block py-1.5 transition-colors duration-150 hover:text-primary"
               >
                 Source code
               </a>
@@ -367,7 +368,7 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
                 href={`${SOURCE_CODE_URL}/blob/main/LICENSE`}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="transition-colors hover:text-primary"
+                className="inline-block py-1.5 transition-colors duration-150 hover:text-primary"
               >
                 Licence (AGPL v3)
               </a>
@@ -377,7 +378,7 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
                 href={`${SOURCE_CODE_URL}/blob/main/SECURITY.md`}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="transition-colors hover:text-primary"
+                className="inline-block py-1.5 transition-colors duration-150 hover:text-primary"
               >
                 Report a vulnerability
               </a>
@@ -388,7 +389,7 @@ export function Footer({ onLanding = false }: { onLanding?: boolean }) {
 
       <div className="mt-12 flex flex-col gap-3 border-t border-white/5 py-8 text-[12px] text-on-surface-variant sm:flex-row sm:items-center sm:justify-between">
         <p>Copyright (C) 2026 AquaZero. Free software under the GNU AGPL v3.</p>
-        <p className="uppercase tracking-[0.18em]">General wellness support only</p>
+        <p>General wellness support only</p>
       </div>
     </footer>
   );

@@ -11,7 +11,6 @@
 import { Navigate, Link } from 'react-router-dom';
 import { isTMA } from '../../lib/telegram';
 import { useSeo } from '../../lib/seo';
-import { AppBackground } from '../../components/layout/AppBackground';
 import { CtaButton, Footer, TelegramCta, TopBar, WebFallbackLink } from './Chrome';
 import { Reveal, useHashScroll } from './motion';
 
@@ -40,11 +39,9 @@ export function MarketingPage({ path, children }: { path: string; children: Reac
 
   return (
     <div className="relative min-h-screen bg-surface text-on-surface">
-      <AppBackground />
-
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-[#001f25]"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-on-primary"
       >
         Skip to content
       </a>
@@ -79,7 +76,6 @@ export function PageHero({
 }) {
   return (
     <section className="relative overflow-hidden pt-28 pb-14 sm:pt-36 sm:pb-16">
-      <div className="lp-floor" aria-hidden="true" />
       <div className="relative mx-auto max-w-6xl px-5">
         <Reveal>
           <nav aria-label="Breadcrumb" className="text-[12px] text-on-surface-variant">

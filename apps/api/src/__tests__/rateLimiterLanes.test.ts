@@ -46,8 +46,8 @@ afterAll(() => {
 });
 
 /** Minimal req/res pair. The limiter keys on the socket when no Worker secret is present. */
-function callOnce(path: string, ip: string): { passed: boolean; status?: number } {
-  const req = { path, headers: {}, ip, socket: { remoteAddress: ip } } as unknown as Request;
+function callOnce(path: string, ip: string, method = 'POST'): { passed: boolean; status?: number } {
+  const req = { method, path, headers: {}, ip, socket: { remoteAddress: ip } } as unknown as Request;
   let status: number | undefined;
   const res = {
     setHeader: () => undefined,
@@ -87,6 +87,12 @@ describe('rate limiter lanes', () => {
    */
   const AI_ROUTES: ReadonlyArray<[label: string, path: string, limit: number]> = [
     ['chat turn', '/api/v1/chat/sessions/s_1/messages', COACH_CHAT_PER_MINUTE],
+    ['typed meal draft', '/api/v1/chat/meal-drafts', COACH_CHAT_PER_MINUTE],
+    // Express routes ignore case and a trailing slash, so the lanes must too.
+    ['chat turn with a trailing slash', '/api/v1/chat/sessions/s_1/messages/', COACH_CHAT_PER_MINUTE],
+    ['meal photo with a trailing slash', '/api/v1/meal-photos/', MEAL_PHOTO_PER_MINUTE],
+    ['meal photo in another case', '/api/v1/Meal-Photos', MEAL_PHOTO_PER_MINUTE],
+    ['meal recommendation in another case', '/api/v1/Recommendations/meals', STRICT_LIMIT],
     ['meal photo', '/api/v1/meal-photos', MEAL_PHOTO_PER_MINUTE],
     ['meal recommendation', '/api/v1/recommendations/meals', STRICT_LIMIT],
     ['weekly insight', '/api/v1/progress/insight', STRICT_LIMIT],
@@ -123,6 +129,51 @@ describe('rate limiter lanes', () => {
     for (let i = 0; i < STRICT_LIMIT * 2; i += 1) {
       expect(callOnce(path, `9.8.7.${path.length}`).passed).toBe(true);
     }
+  });
+
+  /*
+   * Opening the coach screen reads the session list, the history and the
+   * meal drafts. Those reads shared the 10/min chat lane with the model
+   * call, so opening the screen and sending two or three messages inside a
+   * minute answered 429 and the Mini App showed "Could not open the coach".
+   * Only the two chat routes that call a model belong on that lane.
+   */
+  const CHAT_NON_MODEL: ReadonlyArray<[label: string, method: string, path: string]> = [
+    ['listing chat sessions', 'GET', '/api/v1/chat/sessions'],
+    ['starting a chat session', 'POST', '/api/v1/chat/sessions'],
+    ['reading a chat history', 'GET', '/api/v1/chat/sessions/s_1/messages'],
+    ['listing meal drafts', 'GET', '/api/v1/chat/meal-drafts'],
+    ['confirming a meal draft', 'POST', '/api/v1/chat/meal-drafts/d_1/confirm'],
+    ['reporting a message', 'POST', '/api/v1/chat/messages/m_1/report'],
+    // Web and Android poll the job once a second while the model runs.
+    ['polling a meal-photo job', 'GET', '/api/v1/meal-photos/j_1'],
+    ['loading a meal photo', 'GET', '/api/v1/meal-photos/j_1/image'],
+    ['confirming a meal photo', 'POST', '/api/v1/meal-photos/j_1/confirm'],
+  ];
+
+  it.each(CHAT_NON_MODEL)('leaves %s off the model lanes', (_label, method, path) => {
+    for (let i = 0; i < STRICT_LIMIT * 2; i += 1) {
+      expect(callOnce(path, `6.6.6.${path.length}`, method).passed).toBe(true);
+    }
+  });
+
+  it('does not let screen reads spend the chat turns', () => {
+    const ip = '7.7.7.7';
+    for (let i = 0; i < COACH_CHAT_PER_MINUTE * 2; i += 1) {
+      expect(callOnce('/api/v1/chat/sessions', ip, 'GET').passed).toBe(true);
+    }
+    expect(callsUntilBlocked('/api/v1/chat/sessions/s_1/messages', ip, COACH_CHAT_PER_MINUTE + 5)).toBe(
+      COACH_CHAT_PER_MINUTE + 1,
+    );
+  });
+
+  it('does not let a photo job poll spend the photo uploads', () => {
+    const ip = '8.8.4.4';
+    expect(callOnce('/api/v1/meal-photos', ip).passed).toBe(true);
+    for (let i = 0; i < 30; i += 1) {
+      expect(callOnce('/api/v1/meal-photos/j_1', ip, 'GET').passed).toBe(true);
+    }
+    expect(callsUntilBlocked('/api/v1/meal-photos', ip, MEAL_PHOTO_PER_MINUTE + 5)).toBe(MEAL_PHOTO_PER_MINUTE);
   });
 
   it('still lets the default lane refuse eventually', () => {

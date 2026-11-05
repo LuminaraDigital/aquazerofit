@@ -432,13 +432,13 @@ written in their coaching voice. Tuned for 100 health.
 |---|---|---|
 | Akin Celsus | Again, Let Us Go Again | Recover 10 health and draw 2. If you lost the round just scored, recover 20 instead. |
 | Ogun Celsus | Discipline Is The Only Throne | Recover 8 health per round already fought. |
-| Anderson Couture | Slow Is Smooth | Your block totals gain +3 for the whole next round. |
-| Jacare Aldo | You Woke Up | Recover 12 health. Your submissions gain Finisher +5 next round. |
+| Anderson Pike | Slow Is Smooth | Your block totals gain +3 for the whole next round. |
+| Tiago Arruda | You Woke Up | Recover 12 health. Your submissions gain Finisher +5 next round. |
 | King Yamsiri | Breathe With The Rhythm | Recover 15 health and draw 1. |
-| Kazushi Horiuchi | Show Up Tomorrow | Remove every non Lingering Condition and recover 8. |
-| Uthman Nurmakhmedov | No Talk, Work | Your first combo next round cannot be reduced below half its total by blocks. |
+| Shuhei Horiuchi | Show Up Tomorrow | Remove every non Lingering Condition and recover 8. |
+| Uthman Sadykov | No Talk, Work | Your first combo next round cannot be reduced below half its total by blocks. |
 | Sanzo | You Showed Up | Recover 18 health. In round three, recover 25 instead. |
-| Mataemon Aoki | What If We Go Slower | Search your deck for any one card, put it in your hand, shuffle. |
+| Mataemon Kuroda | What If We Go Slower | Search your deck for any one card, put it in your hand, shuffle. |
 
 ## 4.6 Arena cards
 

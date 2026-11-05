@@ -567,7 +567,9 @@ export default function WorkoutLibrary() {
         )}
       </section>
 
-      {/* ---- Today's workout hero ---- */}
+      {/* ---- Today's workout hero: absent until there is a plan or a session, so
+          screen readers do not land on an empty region ---- */}
+      {(todayQuery.isPending || todayQuery.isError || today || plan) && (
       <section aria-label="Today's workout" className="mt-8">
         {todayQuery.isPending ? (
           <Skeleton className="h-64 w-full rounded-card" />
@@ -577,6 +579,7 @@ export default function WorkoutLibrary() {
             retry={() => void todayQuery.refetch()}
           />
         ) : !today ? (
+          // With no plan the weekly strip above already offers to generate one.
           plan ? (
             <GlassCard className="p-5 text-center">
               <span className="material-symbols-outlined text-4xl text-secondary" aria-hidden="true">
@@ -587,16 +590,7 @@ export default function WorkoutLibrary() {
                 Recovery is part of the plan. See you tomorrow.
               </p>
             </GlassCard>
-          ) : (
-            <EmptyState
-              icon="fitness_center"
-              title={emptyPlan.title}
-              body={emptyPlan.body}
-              action={
-                <PrimaryButton onClick={() => setGenerateOpen(true)}>{emptyPlan.action}</PrimaryButton>
-              }
-            />
-          )
+          ) : null
         ) : (
           <GlassCard className="relative overflow-hidden p-6">
             <div
@@ -641,6 +635,7 @@ export default function WorkoutLibrary() {
           </GlassCard>
         )}
       </section>
+      )}
 
       {/* ---- Exercise library ---- */}
       <section aria-label="Exercise library" className="mt-8">

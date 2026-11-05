@@ -46,31 +46,31 @@ const OUT_ROOT = path.join(root, 'apps/web/public/coaches');
 const SOURCES = {
   akin: ['Akin Nguyen Celsus', 'Akin Celsus', 'Akin_Official_color', 'Akin_Official', 'akin'],
   ogun: ['Ogun Celsus', 'ogun'],
-  anderson: ['Anderson Couture', 'anderson'],
-  jacare: ['Jacaré Aldo', 'Jacare Aldo', 'jacare'],
+  anderson: ['Anderson Pike', 'Anderson Couture', 'anderson'],
+  jacare: ['Tiago Arruda', 'Jacaré Aldo', 'Jacare Aldo', 'jacare'],
   king: ['King Yamsiri', 'king'],
-  kazushi: ['Kazushi Horiuchi', 'kazushi'],
-  uthman: ['Uthman Nurmakhmedov', 'uthman'],
+  kazushi: ['Shūhei Horiuchi', 'Kazushi Horiuchi', 'kazushi'],
+  uthman: ['Uthman Sadykov', 'Uthman Nurmakhmedov', 'uthman'],
   sanzo: ['Sanzō', 'Sanzo', 'sanzo'],
-  mataemon: ['Mataemon Aoki', 'mataemon'],
+  mataemon: ['Mataemon Kuroda', 'Mataemon Aoki', 'mataemon'],
   carlos: ['Carlos Mendez', 'Carlos_Mendez', 'carlos'],
   craig: ['Craig Beast', 'Craig_Beast', 'craig'],
-  danial: ['Danial Nickal', 'Danial_Nickal', 'Daniel_Nickal', 'danial'],
+  danial: ['Danial Kessler', 'Danial Nickal', 'Danial_Nickal', 'Daniel_Nickal', 'danial'],
   dmitry: ['Dmitry Volkov', 'Dmitry_Volkov', 'dmitry'],
   fabio: ['Fabio Guedes', 'Fabio_Guedes', 'fabio'],
   frank: ['Frank Mason', 'Frank_Mason', 'frank'],
   gaius: ['Gaius Marcus', 'Gaius_Marcus', 'gaius'],
-  george: ['George Saint', 'George_Saint', 'george'],
+  george: ['Étienne Delorme', 'George Saint', 'George_Saint', 'george'],
   kwon: ['Kwon Won-Ri', 'Kwon_Won_Ri', 'kwon'],
   mike: ['Mike Takayama', 'Mike_Takayama', 'mike'],
   paul: ['Paul Thomas', 'Paul_Thomas', 'paul'],
   randall: ['Randall Stevens', 'Randall_Stevens', 'randall'],
   reinier: ['Reinier Jansen', 'Reinier_Jansen', 'reinier'],
   rolando: ['Rolando Fitch', 'Rolando_Fitch', 'rolando'],
-  ryoto: ['Ryoto Katou', 'Ry_to_Katou', 'Ryoto_Katou', 'ryoto'],
+  ryoto: ['Ryūsei Katou', 'Ryoto Katou', 'Ry_to_Katou', 'Ryoto_Katou', 'ryoto'],
   sergio: ['Sergio Newton', 'Sergio_Newton', 'sergio'],
-  terry: ['Terry Crawford', 'Terry_Crawford', 'terry'],
-  usman: ['Usman Sergei Magomedov', 'Usman_Sergei_Magomedov', 'usman'],
+  terry: ['Terry Bauer', 'Terry Crawford', 'Terry_Crawford', 'terry'],
+  usman: ['Murad Alibekov', 'Usman Sergei Magomedov', 'Usman_Sergei_Magomedov', 'usman'],
   zhang: ['Zhang Kai', 'Zhang_Kai', 'zhang'],
 };
 
@@ -91,6 +91,10 @@ const VARIANTS = {
 };
 
 const PORTRAIT_HEIGHT = 900;
+const PORTRAIT_WIDTH = 600;
+/** Space above the head and under the feet in the upright renders. */
+const HEAD_GAP = 26;
+const FLOOR_GAP = 72;
 const AVATAR_SIZE = 256;
 
 /**
@@ -268,10 +272,18 @@ async function buildCoach(id, files) {
     .toBuffer({ resolveWithObject: true });
   const { width, height } = trimmed.info;
 
-  await sharp(trimmed.data)
-    .resize({ height: PORTRAIT_HEIGHT, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: 82, alphaQuality: 90 })
-    .toFile(path.join(outDir, 'portrait.webp'));
+  // A wide stance fitted to full height would fill the select tile edge to
+  // edge and dwarf every upright figure, so it is fitted inside the same 2:3
+  // frame instead, with the headroom and floor gap the upright renders carry.
+  // Upright figures are unchanged.
+  const wide = width / height > PORTRAIT_WIDTH / PORTRAIT_HEIGHT;
+  const clear = { r: 0, g: 0, b: 0, alpha: 0 };
+  const portrait = wide
+    ? sharp(trimmed.data)
+        .resize({ width: PORTRAIT_WIDTH, height: PORTRAIT_HEIGHT - HEAD_GAP - FLOOR_GAP, fit: 'contain', position: 'bottom', background: clear })
+        .extend({ top: HEAD_GAP, bottom: FLOOR_GAP, background: clear })
+    : sharp(trimmed.data).resize({ height: PORTRAIT_HEIGHT, fit: 'inside', withoutEnlargement: true });
+  await portrait.webp({ quality: 82, alphaQuality: 90 }).toFile(path.join(outDir, 'portrait.webp'));
 
   // Square head crop. Every value is clamped into the image: a squarer source
   // or an aggressive override must produce a worse crop, never a sharp error

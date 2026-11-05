@@ -66,12 +66,15 @@ export function PageHero({
   title,
   lead,
   secondary,
+  primary = <TelegramCta placement="subpage-hero" />,
   children,
 }: {
   crumb: string;
   title: React.ReactNode;
   lead: string;
   secondary: { to: string; label: string };
+  /** The leading action; Telegram unless the page is about another surface. */
+  primary?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   return (
@@ -104,7 +107,7 @@ export function PageHero({
 
         <Reveal delay={220}>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <TelegramCta placement="subpage-hero" />
+            {primary}
             <CtaButton to={secondary.to} variant="ghost">
               {secondary.label}
             </CtaButton>
@@ -166,10 +169,13 @@ export function PageCta({
   title,
   lead,
   disclaimer,
+  children,
 }: {
   title: string;
   lead: string;
   disclaimer: string;
+  /** Rendered between the lead and the Telegram/browser buttons. */
+  children?: React.ReactNode;
 }) {
   return (
     <Reveal>
@@ -178,6 +184,7 @@ export function PageCta({
         <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-on-surface-variant/75">
           {lead}
         </p>
+        {children}
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
           <TelegramCta placement="subpage-final" />
           <WebFallbackLink placement="subpage-final" />

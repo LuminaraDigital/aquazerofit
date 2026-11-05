@@ -9,7 +9,7 @@
  * moved to RequireAuth, and is covered in RequireAuth.routing.test.tsx.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const mocks = vi.hoisted(() => ({
@@ -53,6 +53,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe('Landing', () => {
@@ -104,6 +105,42 @@ describe('Landing', () => {
     expect(fallbacks[0].getAttribute('href')).toBe('/sign-in?mode=register');
     // The segment this exists for has to be told that it exists.
     expect(screen.getAllByText(/blocked/i).length).toBeGreaterThan(0);
+  });
+
+  it('offers the Google Play app below Telegram on a desktop browser', () => {
+    renderAt();
+
+    const badges = screen.getAllByRole('link', { name: /get it on google play/i });
+    expect(badges.length).toBe(2);
+    expect(badges[0].getAttribute('href')).toBe(
+      'https://play.google.com/store/apps/details?id=fit.aquazero.app',
+    );
+    // [0] is the top bar's button; [1] is the hero's.
+    const heroTelegram = screen.getAllByRole('link', { name: /open in telegram/i })[1];
+    expect(heroTelegram.compareDocumentPosition(badges[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heroTelegram.className).toContain('cta-gradient');
+  });
+
+  it('leads with Google Play on an Android phone browser', () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36',
+    );
+    renderAt();
+
+    const [badge] = screen.getAllByRole('link', { name: /get it on google play/i });
+    // [0] is the top bar's button; [1] is the hero's.
+    const heroTelegram = screen.getAllByRole('link', { name: /open in telegram/i })[1];
+    expect(badge.compareDocumentPosition(heroTelegram) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heroTelegram.className).not.toContain('cta-gradient');
+  });
+
+  it('records which placement a Play badge click came from', () => {
+    renderAt();
+
+    const badge = screen.getAllByRole('link', { name: /get it on google play/i })[0];
+    badge.addEventListener('click', (e) => e.preventDefault()); // jsdom cannot navigate
+    fireEvent.click(badge);
+    expect(mocks.trackGrowth).toHaveBeenCalledWith('play_store_cta_clicked', { placement: 'hero' });
   });
 
   it('links to the dedicated product pages from the footer', () => {

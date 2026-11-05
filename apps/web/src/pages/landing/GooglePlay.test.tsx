@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The Android app is not on Google Play yet, so the page must say so rather
- * than link a listing that does not exist, and it must lead to the policy URL
- * Play Console declares.
+ * The Android app is live on Google Play, so the page must link the listing,
+ * and it must lead to the policy URL Play Console declares.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
@@ -47,12 +46,24 @@ describe('Google Play page', () => {
     expect(marketingRoute('/google-play')).toBeDefined();
   });
 
-  it('says the app is coming soon and links no store listing', () => {
-    const { container } = renderPage();
+  it('says the app is on Google Play and links the listing', () => {
+    renderPage();
 
-    expect(screen.getByRole('heading', { level: 1, name: /coming soon to google play/i })).toBeTruthy();
-    expect(screen.getByText('Available soon')).toBeTruthy();
-    expect(container.querySelector('a[href*="play.google.com"]')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: /now on google play/i })).toBeTruthy();
+    const badges = screen.getAllByRole('link', { name: /get it on google play/i });
+    expect(badges.length).toBeGreaterThan(0);
+    for (const badge of badges) {
+      expect(badge.getAttribute('href')).toBe(
+        'https://play.google.com/store/apps/details?id=fit.aquazero.app',
+      );
+    }
+  });
+
+  it('no longer describes the app as unreleased', () => {
+    renderPage();
+
+    expect(screen.queryByText(/coming soon|available soon|in development/i)).toBeNull();
+    expect(marketingRoute('/google-play')!.title).not.toMatch(/coming soon/i);
   });
 
   it('links the Play privacy policy', () => {

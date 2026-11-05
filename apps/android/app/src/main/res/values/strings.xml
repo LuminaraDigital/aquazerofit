@@ -586,7 +586,8 @@
     <!-- Shared -->
     <string name="action_retry">Try again</string>
 
-    <!-- ============================================================         Coach chat
+    <!-- ===================================================================
+         Coach chat
          =================================================================== -->
     <string name="coach_title">Coach %1$s</string>
     <!-- WELLNESS_DISCLAIMER, verbatim from packages/shared/src/constants.ts -->
@@ -668,7 +669,8 @@
     <string name="trust_fat_total_hint">With cooking fat estimates: %1$d kcal (adjust matched foods before logging)</string>
     <string name="barcode_trust_copy">Label values are per 100 g. Confirm your portion before logging.</string>
 
-    <!-- ============================================================         Character select
+    <!-- ===================================================================
+         Character select
          =================================================================== -->
     <string name="coach_select_heading">Your corner</string>
     <string name="coach_select_sub">Every coach gives the same safe, measured advice. What changes is who is saying it.</string>
@@ -816,7 +818,8 @@
     <string name="coach_ogun_domain">Elite &amp; advanced performance</string>
     <string name="coach_ogun_voice">Sovereign</string>
 
-    <!-- ============================================================         Gamification
+    <!-- ===================================================================
+         Gamification
          =================================================================== -->
     <string name="xp_level">Level %1$d</string>
     <string name="xp_full_day_banked">Full day banked</string>
@@ -1527,7 +1530,6 @@
     <string name="action_close">Close</string>
     <!-- redesign: training and progress -->
     <string name="session_set_of_label">Set %1$d of %2$d</string>
-=======
     <!-- redesign: coach -->
     <string name="coach_status_free">Free</string>
     <string name="coach_status_unlocked">Unlocked</string>
@@ -1547,7 +1549,6 @@
     <!-- redesign: fight record -->
     <string name="fight_record_error_title">Fight record unavailable</string>
     <string name="fight_record_active_days_label">Active days</string>
-=======
     <!-- redesign: nutrition -->
     <string name="nutrition_over">Over goal</string>
     <string name="nutrition_unit_kcal">kcal</string>

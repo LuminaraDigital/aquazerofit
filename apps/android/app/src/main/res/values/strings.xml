@@ -202,7 +202,6 @@
     <string name="session_current_exercise">Current exercise</string>
     <string name="session_target">Target: %1$s</string>
     <string name="session_tap_when_done">Tap when done</string>
-    <string name="session_set_counter">%1$d/%2$d</string>
     <string name="session_complete_set_cd">Complete set %1$d of %2$d of %3$s</string>
     <string name="session_skip_exercise">Skip exercise</string>
     <string name="session_rest">Rest</string>
@@ -1527,6 +1526,8 @@
     <string name="restriction_allowed_email_domain_title">Allowed sign-in email domain</string>
     <string name="restriction_allowed_email_domain_desc">Optional organisation email domain hint (for example example.com). Consents can never be granted via managed configuration.</string>
     <string name="signin_error_email_domain">Use an @%1$s email address required by your organisation.</string>
-    <!-- redesign: today -->
-    <string name="redesign_today_close">Close</string>
+    <!-- redesign: shared -->
+    <string name="action_close">Close</string>
+    <!-- redesign: training and progress -->
+    <string name="session_set_of_label">Set %1$d of %2$d</string>
 </resources>

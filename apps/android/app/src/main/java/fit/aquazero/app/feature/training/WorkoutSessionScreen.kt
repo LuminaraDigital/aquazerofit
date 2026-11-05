@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -66,7 +67,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,10 +74,13 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
+import fit.aquazero.app.core.designsystem.AzfHeroSurface
 import fit.aquazero.app.core.designsystem.AzfMotion
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.DataMedium
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.ErrorState
@@ -85,6 +88,7 @@ import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.designsystem.TabularNumbers
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
@@ -334,7 +338,7 @@ private fun LoadingBody() {
         modifier = Modifier
             .fillMaxSize()
             .padding(AzfSpacing.ContainerMargin),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
     ) {
         Skeleton(modifier = Modifier.fillMaxWidth().height(140.dp), shape = AzfShapes.Card)
         Skeleton(modifier = Modifier.fillMaxWidth().height(72.dp), shape = AzfShapes.Card)
@@ -357,16 +361,16 @@ private fun OverviewBody(
                 end = AzfSpacing.ContainerMargin,
                 bottom = AzfSpacing.ElementGapMedium,
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
             item(key = "hero") {
-                AzfCard(tier = AzfCardTier.Hero, modifier = Modifier.fillMaxWidth()) {
+                AzfHeroSurface(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = session.focus.uppercase(),
                         style = MaterialTheme.typography.headlineLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(AzfSpacing.Gutter))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -394,16 +398,12 @@ private fun OverviewBody(
                     Text(
                         text = stringResource(R.string.session_resumed),
                         style = MaterialTheme.typography.bodySmall,
-                        color = LocalAzfExtended.current.secondaryFixedDim,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             item(key = "circuit-header") {
-                Text(
-                    text = stringResource(R.string.session_circuit).uppercase(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                AzfSectionHeading(text = stringResource(R.string.session_circuit))
             }
             itemsIndexed(state.entries, key = { _, entry -> entry.exerciseId }) { index, entry ->
                 AzfCard(tier = AzfCardTier.Compact, modifier = Modifier.fillMaxWidth()) {
@@ -411,7 +411,7 @@ private fun OverviewBody(
                         Text(
                             text = (index + 1).toString(),
                             style = DataSmall,
-                            color = LocalAzfExtended.current.primaryFixedDim,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp),
                             textAlign = TextAlign.Center,
                         )
@@ -507,11 +507,7 @@ private fun GuidedBody(
         state.nextUp?.let { next ->
             Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
             AzfCard(tier = AzfCardTier.Compact, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = stringResource(R.string.session_next_up).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                AzfSectionHeading(text = stringResource(R.string.session_next_up))
                 Text(
                     text = next.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -549,11 +545,20 @@ private fun SummaryBody(
             .padding(horizontal = AzfSpacing.ContainerMargin)
             .padding(bottom = AzfSpacing.SectionGap),
     ) {
-        Text(
-            text = stringResource(R.string.session_summary_title).uppercase(),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.session_summary_title).uppercase(),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onBackToWorkout, enabled = !state.completing) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = stringResource(R.string.action_close),
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
         AzfCard(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -576,7 +581,7 @@ private fun SummaryBody(
         }
 
         state.entries.forEachIndexed { index, entry ->
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(AzfSpacing.Gutter))
             val logs = state.setLogs.getOrElse(index) { emptyList() }
             val done = state.setsDone.getOrElse(index) { 0 }
             AzfCard(tier = AzfCardTier.Compact, modifier = Modifier.fillMaxWidth()) {
@@ -608,7 +613,7 @@ private fun SummaryBody(
                                     logs.size,
                                 ),
                                 style = DataSmall,
-                                color = LocalAzfExtended.current.secondaryFixedDim,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -649,7 +654,7 @@ private fun SummaryBody(
             onClick = { onAskCoach(coachPrompt) },
             enabled = !state.completing,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(AzfSpacing.Gutter))
         PrimaryButton(
             text = if (state.completing) {
                 stringResource(R.string.session_saving)
@@ -677,13 +682,13 @@ private fun MetaStat(value: String, label: String) {
     Column(horizontalAlignment = Alignment.Start) {
         Text(
             text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
+            style = StatLabel,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = value,
-            style = DataSmall.copy(fontSize = 20.sp, lineHeight = 24.sp),
-            color = LocalAzfExtended.current.primaryFixedDim,
+            style = DataMedium,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -701,7 +706,7 @@ internal fun ActualField(
     Column(modifier = modifier) {
         Text(
             text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
+            style = StatLabel,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(

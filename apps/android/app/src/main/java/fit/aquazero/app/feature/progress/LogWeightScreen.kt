@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +29,8 @@ import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,14 +46,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
@@ -60,15 +64,17 @@ import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfChip
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.DataLarge
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.Scoreboard
+import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastController
 import fit.aquazero.app.core.ui.LocaleFormatters
 import java.time.LocalDate
@@ -148,21 +154,13 @@ private fun LogWeightContent(
                 end = AzfSpacing.ContainerMargin,
                 bottom = AzfSpacing.SectionGap,
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
             item(key = "entry") { BigWeightEntry(state = state, onValueChange = onValueChange) }
             item(key = "units") { UnitToggle(state = state, onUnitChange = onUnitChange) }
             item(key = "delta") { DeltaBadge(state = state) }
             item(key = "error") {
-                state.errorRes?.let { res ->
-                    Text(
-                        text = stringResource(res),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                state.errorRes?.let { res -> InlineError(text = stringResource(res)) }
             }
             item(key = "date") { DateRow(state = state, onShiftDate = onShiftDate) }
             item(key = "note") {
@@ -181,6 +179,7 @@ private fun LogWeightContent(
                             text = text,
                             selected = state.note.contains(text),
                             onClick = { onQuickNote(text) },
+                            modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
                         )
                     }
                 }
@@ -199,23 +198,60 @@ private fun LogWeightContent(
             }
             item(key = "recent-header") {
                 Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-                Text(
-                    text = stringResource(R.string.log_weight_recent).uppercase(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                AzfSectionHeading(text = stringResource(R.string.log_weight_recent))
             }
-            if (state.recent.isEmpty()) {
+            if (!state.historyLoaded) {
+                items(count = 2, key = { "recent-skeleton-$it" }) {
+                    Skeleton(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(RECENT_ROW_SKELETON_HEIGHT.dp),
+                        shape = AzfShapes.Card,
+                    )
+                }
+            } else if (state.recent.isEmpty()) {
                 item(key = "recent-empty") {
                     EmptyState(
                         title = stringResource(R.string.log_weight_recent_empty_title),
                         message = stringResource(R.string.log_weight_recent_empty_body),
+                        icon = Icons.Outlined.MonitorWeight,
                     )
                 }
             } else {
                 itemsIndexedRecent(state)
             }
         }
+    }
+}
+
+/**
+ * A rejected entry, said once next to the field it concerns. Validation only:
+ * the save itself is a local write that cannot fail, so there is nothing to
+ * retry. Announced politely so a screen reader hears it without a focus move.
+ */
+@Composable
+private fun InlineError(text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(AzfShapes.Inner)
+            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
+            .padding(AzfSpacing.Gutter)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.ErrorOutline,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = AzfSpacing.Gutter),
+        )
     }
 }
 
@@ -245,10 +281,6 @@ private fun BigWeightEntry(state: LogWeightUiState, onValueChange: (String) -> U
         },
     )
     val description = stringResource(R.string.log_weight_input_cd, unitWord)
-    val entryStyle = DataLarge.copy(
-        fontSize = ENTRY_SIZE_SP.sp,
-        lineHeight = ENTRY_LINE_SP.sp,
-    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -259,15 +291,18 @@ private fun BigWeightEntry(state: LogWeightUiState, onValueChange: (String) -> U
             if (state.value.isEmpty()) {
                 Text(
                     text = stringResource(R.string.log_weight_placeholder),
-                    style = entryStyle,
-                    color = accent.copy(alpha = 0.2f),
+                    style = Scoreboard,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                 )
             }
             BasicTextField(
                 value = state.value,
                 onValueChange = onValueChange,
                 singleLine = true,
-                textStyle = entryStyle.copy(color = accent, textAlign = TextAlign.Center),
+                textStyle = Scoreboard.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                ),
                 cursorBrush = SolidColor(accent),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier
@@ -281,7 +316,7 @@ private fun BigWeightEntry(state: LogWeightUiState, onValueChange: (String) -> U
                 .width(64.dp)
                 .height(4.dp)
                 .clip(AzfShapes.Pill)
-                .background(LocalAzfExtended.current.secondaryFixedDim),
+                .background(accent),
         )
     }
 }
@@ -346,7 +381,7 @@ private fun UnitToggle(state: LogWeightUiState, onUnitChange: (WeightUnit) -> Un
 }
 
 /**
- * "1.2 kg down since last entry". Coral for up, sea green for down — a gain is
+ * "1.2 kg down since last entry". Coral for up, neutral for down — a gain is
  * warm, never an alarm, and neither direction is called good or bad.
  */
 @Composable
@@ -354,7 +389,7 @@ private fun DeltaBadge(state: LogWeightUiState) {
     val delta = state.deltaVsLastKg ?: return
     val extended = LocalAzfExtended.current
     val up = delta > 0
-    val tint = if (up) extended.coral else extended.secondaryFixedDim
+    val tint = if (up) extended.coral else MaterialTheme.colorScheme.onSurfaceVariant
     val magnitude = String.format(
         Locale.US,
         "%.1f",
@@ -373,7 +408,7 @@ private fun DeltaBadge(state: LogWeightUiState) {
                 .clip(AzfShapes.Pill)
                 .background(tint.copy(alpha = 0.12f))
                 .border(BorderStroke(1.dp, tint.copy(alpha = 0.3f)), AzfShapes.Pill)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -403,11 +438,7 @@ private fun DeltaBadge(state: LogWeightUiState) {
 @Composable
 private fun DateRow(state: LogWeightUiState, onShiftDate: (Long) -> Unit) {
     AzfCard(tier = AzfCardTier.Compact, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.log_weight_date).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        AzfSectionHeading(text = stringResource(R.string.log_weight_date))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -426,7 +457,7 @@ private fun DateRow(state: LogWeightUiState, onShiftDate: (Long) -> Unit) {
                 Icon(
                     imageVector = Icons.Outlined.CalendarToday,
                     contentDescription = null,
-                    tint = LocalAzfExtended.current.primaryFixedDim,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp),
                 )
                 Text(
@@ -478,20 +509,20 @@ private fun RecentEntryRow(log: WeightLogEntity, deltaKg: Double?, unit: WeightU
                         longDate(log.localDate),
                         log.note?.takeIf { it.isNotBlank() },
                     ).joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (log.syncState == SyncState.PENDING) {
                     Text(
                         text = stringResource(R.string.log_weight_pending),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     )
                 }
             }
             if (deltaKg != null) {
                 val up = deltaKg > 0
-                val tint = if (up) extended.coral else extended.secondaryFixedDim
+                val tint = if (up) extended.coral else MaterialTheme.colorScheme.onSurfaceVariant
                 Text(
                     text = stringResource(
                         R.string.log_weight_delta_badge,
@@ -503,7 +534,7 @@ private fun RecentEntryRow(log: WeightLogEntity, deltaKg: Double?, unit: WeightU
                     modifier = Modifier
                         .clip(AzfShapes.Pill)
                         .background(tint.copy(alpha = 0.14f))
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
                 )
             }
         }
@@ -536,8 +567,7 @@ private fun longDate(isoDate: String): String = runCatching {
 
 private const val RECENT_DATE_PATTERN = "EEE, d MMM"
 private const val ENTRY_WIDTH = 220
-private const val ENTRY_SIZE_SP = 64
-private const val ENTRY_LINE_SP = 68
+private const val RECENT_ROW_SKELETON_HEIGHT = 64
 
 @Preview(showBackground = true, backgroundColor = 0xFF0E1416)
 @Composable

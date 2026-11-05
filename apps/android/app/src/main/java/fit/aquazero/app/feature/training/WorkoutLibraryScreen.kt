@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,12 +26,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -68,6 +72,7 @@ import fit.aquazero.app.core.designsystem.AzfChip
 import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfHeroSurface
 import fit.aquazero.app.core.designsystem.AzfMotion
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
@@ -176,7 +181,7 @@ private fun WorkoutLibraryContent(
                     end = AzfSpacing.ContainerMargin,
                     bottom = AzfSpacing.SectionGap,
                 ),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
             ) {
                 // ---------- today's workout hero ----------
                 item(key = "today") {
@@ -213,6 +218,7 @@ private fun WorkoutLibraryContent(
                         state.plan == null && state.planError == null && !state.loadingPlan -> EmptyState(
                             title = stringResource(R.string.training_plan_empty_title),
                             message = stringResource(R.string.training_plan_empty_body),
+                            icon = Icons.Outlined.FitnessCenter,
                             actionLabel = stringResource(R.string.training_generate_plan),
                             onAction = onOpenGenerate,
                         )
@@ -254,12 +260,8 @@ private fun WorkoutLibraryContent(
                             onRetry = onRetry,
                         )
 
-                        else -> EmptyState(
-                            title = stringResource(R.string.training_plan_empty_title),
-                            message = stringResource(R.string.training_plan_empty_body),
-                            actionLabel = stringResource(R.string.training_generate_plan),
-                            onAction = onOpenGenerate,
-                        )
+                        // No plan: the Today slot above already shows the empty state.
+                        else -> Unit
                     }
                 }
 
@@ -422,11 +424,7 @@ private fun SectionHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom,
     ) {
-        Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        AzfSectionHeading(text = title)
         if (trailing != null) {
             Text(
                 text = trailing,
@@ -490,7 +488,7 @@ private fun PlanWeekStrip(
                         },
                     )
                     .semantics(mergeDescendants = true) { contentDescription = dayLabel }
-                    .padding(vertical = 10.dp),
+                    .padding(vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
@@ -553,7 +551,7 @@ private fun TodayHeroCard(
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = stringResource(R.string.training_exercise_count, session.exercises.size),
@@ -654,7 +652,7 @@ private fun PillLabel(text: String, color: androidx.compose.ui.graphics.Color) {
             .clip(AzfShapes.Pill)
             .background(color.copy(alpha = 0.12f))
             .border(BorderStroke(1.dp, color.copy(alpha = 0.3f)), AzfShapes.Pill)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
     )
 }
 
@@ -670,8 +668,9 @@ private fun FilterToggle(open: Boolean, activeCount: Int, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .clip(AzfShapes.Pill)
+            .heightIn(min = AzfSpacing.TouchTarget)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 8.dp),
+            .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -688,7 +687,7 @@ private fun FilterToggle(open: Boolean, activeCount: Int, onClick: () -> Unit) {
             },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 6.dp),
+            modifier = Modifier.padding(horizontal = 8.dp),
         )
         Icon(
             imageVector = Icons.Outlined.KeyboardArrowDown,
@@ -715,7 +714,12 @@ private fun FilterChipRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(options, key = { it.first.ifEmpty { "all-$label" } }) { (key, text) ->
-            AzfChip(text = text, selected = selected == key, onClick = { onSelect(key) })
+            AzfChip(
+                text = text,
+                selected = selected == key,
+                onClick = { onSelect(key) },
+                modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
+            )
         }
     }
 }
@@ -797,8 +801,8 @@ private fun ExerciseListCard(card: ExerciseCard, onClick: () -> Unit) {
                     contentDescription = stringResource(equipmentLabelRes(eq)),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
-                        .padding(start = 6.dp)
-                        .size(18.dp),
+                        .padding(start = 8.dp)
+                        .size(20.dp),
                 )
             }
         }
@@ -827,7 +831,7 @@ private fun ExerciseThumbnailImage(
         model = ExerciseAttribution.mediaUrl(thumbnail.url),
         contentDescription = stringResource(R.string.attribution_demonstration, exerciseName),
         contentScale = ContentScale.Crop,
-        modifier = modifier.clip(AzfShapes.Card),
+        modifier = modifier.clip(AzfShapes.Inner),
         loading = { ExercisePlaceholder(equipment = equipment, modifier = Modifier.fillMaxSize()) },
         error = { ExercisePlaceholder(equipment = equipment, modifier = Modifier.fillMaxSize()) },
     )
@@ -849,17 +853,22 @@ private fun GeneratePlanSheetBody(
             .padding(horizontal = AzfSpacing.ContainerMargin)
             .padding(bottom = AzfSpacing.SectionGap),
     ) {
-        Text(
-            text = stringResource(R.string.training_generate_title).uppercase(),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.training_generate_title).uppercase(),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onCancel, enabled = !generating) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = stringResource(R.string.action_close),
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-        Text(
-            text = stringResource(R.string.training_generate_days).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        AzfSectionHeading(text = stringResource(R.string.training_generate_days))
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DAYS_OPTIONS.forEach { option ->
@@ -867,15 +876,12 @@ private fun GeneratePlanSheetBody(
                     text = option.toString(),
                     selected = daysPerWeek == option,
                     onClick = { onDaysPerWeek(option) },
+                    modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
                 )
             }
         }
         Spacer(modifier = Modifier.height(AzfSpacing.ElementGapMedium))
-        Text(
-            text = stringResource(R.string.training_generate_focus).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        AzfSectionHeading(text = stringResource(R.string.training_generate_focus))
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(
@@ -887,6 +893,7 @@ private fun GeneratePlanSheetBody(
                     text = stringResource(res),
                     selected = focus == key,
                     onClick = { onFocus(key) },
+                    modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
                 )
             }
         }

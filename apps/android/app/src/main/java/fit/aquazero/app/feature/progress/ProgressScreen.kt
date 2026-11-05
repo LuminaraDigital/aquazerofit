@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,11 +18,11 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.TrendingDown
-import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.FitnessCenter
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.outlined.MonitorWeight
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -35,23 +36,23 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfChip
+import fit.aquazero.app.core.designsystem.AzfHeroSurface
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.DataLarge
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.ErrorState
-import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.Scoreboard
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastController
@@ -135,7 +136,7 @@ private fun ProgressContent(
                 end = AzfSpacing.ContainerMargin,
                 bottom = AzfSpacing.SectionGap,
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
             // Every slot below declares a `contentType`. This list is entirely
             // heterogeneous — a chip row, two charts, cards, a grid — so
@@ -149,6 +150,7 @@ private fun ProgressContent(
                             text = stringResource(rangeLabelRes(range)),
                             selected = state.range == range,
                             onClick = { onRangeChange(range) },
+                            modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
                         )
                     }
                 }
@@ -184,41 +186,37 @@ private fun ProgressContent(
 
             val summary = state.summary ?: return@LazyColumn
 
+            item(key = "weight-hero", contentType = "weight-hero") {
+                WeightHeroRow(state = state, modifier = Modifier.revealOnEnter(0))
+            }
+
             item(key = "consistency", contentType = "consistency") {
                 ConsistencyCard(
                     consistency = summary.consistency,
-                    modifier = Modifier.revealOnEnter(0),
+                    modifier = Modifier.revealOnEnter(1),
                 )
             }
 
             state.insight?.let { insight ->
                 item(key = "insight", contentType = "insight") {
-                    WeeklyInsightCard(insight = insight, modifier = Modifier.revealOnEnter(1))
+                    WeeklyInsightCard(insight = insight, modifier = Modifier.revealOnEnter(2))
                 }
             }
 
             state.adaptiveExpenditure?.let { adaptive ->
                 item(key = "adaptive-metabolism", contentType = "adaptive-metabolism") {
-                    AdaptiveMetabolicCard(result = adaptive, modifier = Modifier.revealOnEnter(2))
+                    AdaptiveMetabolicCard(result = adaptive, modifier = Modifier.revealOnEnter(3))
                 }
             }
 
-            item(key = "weight-hero", contentType = "weight-hero") {
-                WeightHeroRow(state = state, modifier = Modifier.revealOnEnter(3))
-            }
-
             item(key = "weight-chart", contentType = "weight-chart") {
-                AzfCard(tier = AzfCardTier.Hero, modifier = Modifier.fillMaxWidth()) {
+                AzfCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Bottom,
                     ) {
-                        Text(
-                            text = stringResource(R.string.progress_weight_journey).uppercase(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
+                        AzfSectionHeading(text = stringResource(R.string.progress_weight_journey))
                         state.goalWeightKg?.let { goal ->
                             Text(
                                 text = stringResource(
@@ -226,15 +224,16 @@ private fun ProgressContent(
                                     formatKg(goal),
                                 ),
                                 style = DataSmall,
-                                color = LocalAzfExtended.current.secondaryFixedDim,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(AzfSpacing.Gutter))
                     if (state.weightSeries.isEmpty()) {
                         EmptyState(
                             title = stringResource(R.string.progress_no_weighins_title),
                             message = stringResource(R.string.progress_no_weighins_body),
+                            icon = Icons.Outlined.MonitorWeight,
                         )
                     } else {
                         WeightChart(
@@ -250,12 +249,12 @@ private fun ProgressContent(
                         ) {
                             Text(
                                 text = shortDate(state.weightSeries.first().date),
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
                                 text = shortDate(state.weightSeries.last().date),
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -265,16 +264,13 @@ private fun ProgressContent(
 
             item(key = "kcal", contentType = "kcal-chart") {
                 AzfCard(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = stringResource(R.string.progress_calorie_trend).uppercase(),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    AzfSectionHeading(text = stringResource(R.string.progress_calorie_trend))
+                    Spacer(modifier = Modifier.height(AzfSpacing.Gutter))
                     if (state.kcalSeries.isEmpty()) {
                         EmptyState(
                             title = stringResource(R.string.progress_no_meals_title),
                             message = stringResource(R.string.progress_no_meals_body),
+                            icon = Icons.Outlined.Restaurant,
                         )
                     } else {
                         KcalBars(
@@ -286,7 +282,7 @@ private fun ProgressContent(
                             text = stringResource(R.string.progress_kcal_avg, state.averageKcal),
                             style = DataSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 6.dp),
+                            modifier = Modifier.padding(top = 8.dp),
                         )
                         state.kcalTarget?.let { target ->
                             Text(
@@ -295,7 +291,7 @@ private fun ProgressContent(
                                     target.roundToInt(),
                                 ),
                                 style = DataSmall,
-                                color = LocalAzfExtended.current.secondaryFixedDim,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -303,12 +299,11 @@ private fun ProgressContent(
             }
 
             item(key = "stats", contentType = "stats") {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter)) {
                     MetricCard(
                         label = stringResource(R.string.progress_stat_workouts),
                         value = summary.workoutsCompleted.toString(),
                         icon = Icons.Outlined.FitnessCenter,
-                        accent = LocalAzfExtended.current.secondaryFixedDim,
                         modifier = Modifier.weight(1f),
                     )
                     MetricCard(
@@ -316,8 +311,6 @@ private fun ProgressContent(
                         value = summary.totalKcalBurned.roundToInt().toString(),
                         unit = stringResource(R.string.progress_unit_kcal),
                         icon = Icons.Outlined.Bolt,
-                        // Coral, never red — the product's only "warm" accent.
-                        accent = LocalAzfExtended.current.coral,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -325,12 +318,8 @@ private fun ProgressContent(
 
             item(key = "macros", contentType = "macros") {
                 AzfCard(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = stringResource(R.string.progress_macro_split).uppercase(),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    AzfSectionHeading(text = stringResource(R.string.progress_macro_split))
+                    Spacer(modifier = Modifier.height(AzfSpacing.Gutter))
                     if (state.macros.hasData) {
                         MacroDonut(
                             proteinG = state.macros.proteinG,
@@ -349,11 +338,7 @@ private fun ProgressContent(
 
             item(key = "achievements-header", contentType = "heading") {
                 Spacer(modifier = Modifier.height(AzfSpacing.ElementGapSmall))
-                Text(
-                    text = stringResource(R.string.progress_achievements).uppercase(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                AzfSectionHeading(text = stringResource(R.string.progress_achievements))
             }
 
             item(key = "achievements", contentType = "achievements") {
@@ -361,6 +346,7 @@ private fun ProgressContent(
                     EmptyState(
                         title = stringResource(R.string.progress_no_badges_title),
                         message = stringResource(R.string.progress_no_badges_body),
+                        icon = Icons.Outlined.EmojiEvents,
                     )
                 } else {
                     LazyVerticalGrid(
@@ -368,8 +354,8 @@ private fun ProgressContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(achievementGridHeight(summary.achievements.size).dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
+                        verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
                         userScrollEnabled = false,
                     ) {
                         items(
@@ -394,7 +380,7 @@ private fun ProgressContent(
                     text = stringResource(R.string.progress_log_weight),
                     onClick = onLogWeight,
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(AzfSpacing.Gutter))
                 SecondaryButton(
                     text = stringResource(R.string.progress_export),
                     onClick = onExport,
@@ -413,54 +399,28 @@ private fun ProgressContent(
  */
 @Composable
 private fun WeightHeroRow(state: ProgressUiState, modifier: Modifier = Modifier) {
-    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        AzfCard(modifier = Modifier.weight(1f)) {
+    AzfHeroSurface(modifier = modifier) {
+        AzfSectionHeading(text = stringResource(R.string.progress_current_weight))
+        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 4.dp)) {
             Text(
-                text = stringResource(R.string.progress_current_weight).uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = state.currentWeightKg?.let(::formatKg) ?: "–",
+                style = Scoreboard,
+                color = MaterialTheme.colorScheme.onSurface,
             )
-            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 6.dp)) {
-                Text(
-                    text = state.currentWeightKg?.let(::formatKg) ?: "–",
-                    style = DataLarge.copy(fontSize = 28.sp, lineHeight = 30.sp),
-                    color = LocalAzfExtended.current.primaryFixedDim,
-                )
-                Text(
-                    text = stringResource(R.string.log_weight_unit_kg),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
-                )
-            }
-        }
-        AzfCard(modifier = Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.progress_since_start).uppercase(),
-                style = MaterialTheme.typography.labelSmall,
+                text = stringResource(R.string.log_weight_unit_kg),
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
             )
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                val delta = state.deltaKg
-                Icon(
-                    imageVector = if (delta != null && delta > 0) {
-                        Icons.AutoMirrored.Outlined.TrendingUp
-                    } else {
-                        Icons.AutoMirrored.Outlined.TrendingDown
-                    },
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-                Text(
-                    text = delta?.let { signedKg(it) } ?: "–",
-                    style = DataSmall.copy(fontSize = 18.sp, lineHeight = 22.sp),
-                    // Neutral ink in both directions, deliberately.
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 6.dp),
-                )
-            }
         }
+        // Neutral ink in both directions, deliberately.
+        AzfStatRow(
+            label = stringResource(R.string.progress_since_start),
+            value = state.deltaKg?.let { signedKg(it) } ?: "–",
+            divider = false,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 
@@ -553,7 +513,7 @@ private fun Context.shareText(subject: String, body: String, chooserTitle: Strin
 }
 
 private const val ACHIEVEMENT_COLUMNS = 3
-private const val ACHIEVEMENT_ROW_HEIGHT = 116
+private const val ACHIEVEMENT_ROW_HEIGHT = 136
 private const val ISO_DATE_LENGTH = 10
 private const val SHORT_DATE_PATTERN = "d MMM"
 

@@ -100,7 +100,7 @@ fun QuickLogSheet(
                 IconButton(onClick = onDismiss, modifier = Modifier.size(AzfSpacing.TouchTarget)) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = stringResource(R.string.redesign_today_close),
+                        contentDescription = stringResource(R.string.action_close),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

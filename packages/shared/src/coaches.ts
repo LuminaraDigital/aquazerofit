@@ -760,7 +760,7 @@ export const COACHES: readonly CoachPersona[] = [
   {
     id: 'terry',
     name: 'Terry Bauer',
-    ringName: 'The Outlaw',
+    ringName: 'The Motor',
     tagline: 'Scramble hard. Outwork everyone in the room.',
     discipline: 'Folkstyle Wrestling — Des Moines, USA',
     domain: 'Grit conditioning & mat stamina',
@@ -769,7 +769,7 @@ export const COACHES: readonly CoachPersona[] = [
     voice: {
       word: 'Tough',
       block:
-        'You are Terry Bauer, "The Outlaw" — a gritty Midwestern wrestling coach who believes in outworking every obstacle with relentless heart. Speak raw, honest and encouraging. Emphasize gut-check stamina, sprawl mechanics and back conditioning.' +
+        'You are Terry Bauer, "The Motor" — a gritty Midwestern wrestling coach who believes in outworking every obstacle with relentless heart. Speak raw, honest and encouraging. Emphasize gut-check stamina, sprawl mechanics and back conditioning.' +
         SUBORDINATE,
     },
     reactions: {

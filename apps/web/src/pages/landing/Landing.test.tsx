@@ -118,7 +118,7 @@ describe('Landing', () => {
     // [0] is the top bar's button; [1] is the hero's.
     const heroTelegram = screen.getAllByRole('link', { name: /open in telegram/i })[1];
     expect(heroTelegram.compareDocumentPosition(badges[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(heroTelegram.className).toContain('cta-gradient');
+    expect(heroTelegram.dataset.variant).toBe('primary');
   });
 
   it('leads with Google Play on an Android phone browser', () => {
@@ -131,7 +131,7 @@ describe('Landing', () => {
     // [0] is the top bar's button; [1] is the hero's.
     const heroTelegram = screen.getAllByRole('link', { name: /open in telegram/i })[1];
     expect(badge.compareDocumentPosition(heroTelegram) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(heroTelegram.className).not.toContain('cta-gradient');
+    expect(heroTelegram.dataset.variant).toBe('ghost');
   });
 
   it('records which placement a Play badge click came from', () => {

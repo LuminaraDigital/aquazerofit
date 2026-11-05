@@ -33,7 +33,6 @@ export function LegalPage({
   return (
     <MarketingPage path={path}>
       <section className="relative overflow-hidden pt-28 pb-10 sm:pt-36 sm:pb-12">
-        <div className="lp-floor" aria-hidden="true" />
         <div className="relative mx-auto max-w-6xl px-5">
           <Reveal>
             <nav aria-label="Breadcrumb" className="text-[12px] text-on-surface-variant">

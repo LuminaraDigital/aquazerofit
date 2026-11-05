@@ -311,7 +311,7 @@ export default function CaptureMeal() {
               type="button"
               onClick={() => upload.mutate(file)}
               disabled={upload.isPending}
-              className="mt-6 cta-gradient w-full h-14 rounded-xl text-on-primary font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              className="mt-6 cta-gradient w-full h-14 rounded-xl text-on-primary font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
               <span className="material-symbols-outlined" aria-hidden="true">
                 auto_awesome

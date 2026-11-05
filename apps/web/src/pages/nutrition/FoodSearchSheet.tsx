@@ -184,7 +184,7 @@ export function FoodSearchSheet({
               <GramsStepper value={grams} onChange={setGrams} label={selected.name} />
             </div>
             {preview && (
-              <div className="rounded-xl bg-surface-container-low border border-outline-variant p-4 mb-4 tabular-nums">
+              <div className="rounded-card bg-surface-container-low border border-outline-variant p-4 mb-4 tabular-nums">
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-on-surface-variant">Calories</span>
                   <span className="font-bold text-primary">{fmtInt(preview.kcal)} kcal</span>
@@ -200,7 +200,7 @@ export function FoodSearchSheet({
               type="button"
               onClick={() => preview && !pending && onPick(preview)}
               disabled={pending || !preview}
-              className="cta-gradient w-full h-14 rounded-xl text-on-primary font-bold active:scale-[0.98] transition-transform disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              className="cta-gradient w-full h-14 rounded-xl text-on-primary font-bold active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
               {pending ? 'Adding…' : `Add ${grams}g`}
             </button>

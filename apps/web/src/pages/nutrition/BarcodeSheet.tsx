@@ -372,7 +372,7 @@ export function BarcodeSheet({
               <button
                 type="submit"
                 disabled={code.replace(/[^0-9]/g, '').length < 8 || lookup.isPending}
-                className="cta-gradient h-12 w-full rounded-xl font-bold text-on-primary transition-transform active:scale-[0.98] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                className="cta-gradient h-12 w-full rounded-xl font-bold text-on-primary transition-transform active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               >
                 {lookup.isPending ? 'Looking up…' : 'Look up product'}
               </button>
@@ -415,7 +415,7 @@ export function BarcodeSheet({
             )}
 
             {/* Result card */}
-            <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4">
+            <div className="rounded-card border border-outline-variant bg-surface-container-low p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-bold text-on-surface">{result.food.name}</p>

@@ -45,7 +45,7 @@ export function TargetsNotSetCard({ returnTo }: { returnTo?: string }) {
       </div>
       <Link
         to={setupHref(returnTo)}
-        className="cta-gradient mt-4 w-full min-h-[52px] rounded-2xl font-heading font-semibold uppercase tracking-[0.04em] text-sm text-[#001f25] transition-all active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary flex items-center justify-center gap-2 px-6"
+        className="cta-gradient mt-4 w-full min-h-[56px] rounded-xl font-heading font-semibold uppercase tracking-[0.04em] text-sm text-[#001f25] transition-transform duration-100 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary flex items-center justify-center gap-2 px-6"
       >
         Set up my targets
       </Link>

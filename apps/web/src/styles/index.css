@@ -124,9 +124,14 @@ body {
   color: var(--azf-cta-text, #001f25);
 }
 
-/* Disabled is a different surface, not a dimmed accent (docs/design.md). */
-.azf-cta-text:disabled {
+/* Disabled is a different surface, not a dimmed accent (docs/design.md).
+   Unlayered on purpose: it has to beat both .azf-cta-text and the per-call
+   ink utilities (text-on-primary and friends), or a disabled button keeps
+   dark ink on a dark fill. */
+.cta-gradient:disabled {
+  background: rgb(var(--azf-surface-container-high));
   color: rgb(var(--azf-on-surface-variant));
+  opacity: 1;
 }
 
 /* Mini App viewport and safe areas. The variables exist only under
@@ -207,10 +212,6 @@ html.tg-active .min-h-screen {
      so the call sites read the same; there is no gradient any more. */
   .cta-gradient {
     background: rgb(var(--azf-primary-fixed-dim));
-  }
-
-  .cta-gradient:disabled {
-    background: rgb(var(--azf-surface-container-high));
   }
 
   .heading-display {
@@ -455,23 +456,14 @@ html.tg-active .min-h-screen {
   }
 }
 
-/* Light Mini App surfaces.
-   The glass cards are tuned for a dark ocean: translucent fills, a 7% white
-   edge, and brand inks at partial alpha. On a white host those same rules
-   drop body text and the macro fills under WCAG AA. These overrides apply
-   only while a light Telegram theme is bound. Dark hosts and the browser
-   keep the glass system above. */
+/* Light Mini App surfaces: the same flat cards on a white host, with the
+   stronger outline as the edge so they still read as separate objects.
+   Applies only while a light Telegram theme is bound. */
 html[data-tg-theme='light'] .card-hero,
 html[data-tg-theme='light'] .glass-card,
 html[data-tg-theme='light'] .card-compact {
   background: #ffffff;
-  background-image: none;
   border: 1px solid rgb(var(--azf-outline));
-  box-shadow:
-    0 1px 2px rgb(23 29 31 / 0.08),
-    0 14px 32px -18px rgb(23 29 31 / 0.38);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 html[data-tg-theme='light'] .glass-blur {

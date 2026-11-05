@@ -859,7 +859,7 @@ export default function Nutrition() {
               type="button"
               onClick={() => updateMeal.mutate(editingLog)}
               disabled={updateMeal.isPending || editRows.length === 0}
-              className="cta-gradient w-full h-14 rounded-xl text-on-primary font-bold active:scale-[0.98] transition-transform disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              className="cta-gradient w-full h-14 rounded-xl text-on-primary font-bold active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
               {updateMeal.isPending ? 'Saving…' : 'Save changes'}
             </button>

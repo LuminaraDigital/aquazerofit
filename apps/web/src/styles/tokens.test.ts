@@ -118,10 +118,12 @@ describe('design tokens', () => {
  * Mini App and the Android app stop looking like one product.
  */
 describe('Corner Card surfaces', () => {
+  /** The body of the first rule whose selector line is exactly `selector {`. */
   const rule = (selector: string) => {
-    const start = stylesheet.indexOf(`
-  ${selector} {`);
-    return start < 0 ? '' : stylesheet.slice(start, stylesheet.indexOf('}', start));
+    const head = stylesheet.split('\n').findIndex((line) => line.trim() === `${selector} {`);
+    if (head < 0) return '';
+    const rest = stylesheet.split('\n').slice(head + 1);
+    return rest.slice(0, rest.findIndex((line) => line.trim() === '}')).join('\n');
   };
 
   it('uses the same two radii as Android', () => {
@@ -137,4 +139,16 @@ describe('Corner Card surfaces', () => {
       expect(body).not.toMatch(/backdrop-filter|gradient\(|box-shadow/);
     },
   );
+
+  it('keeps the light Telegram cards flat too', () => {
+    const body = rule("html[data-tg-theme='light'] .card-compact");
+    expect(body).toMatch(/background:/);
+    expect(body).not.toMatch(/box-shadow|backdrop-filter/);
+  });
+
+  it('gives a disabled primary its own ink, not a dimmed accent', () => {
+    const body = rule('.cta-gradient:disabled');
+    expect(body).toMatch(/background:\s*rgb\(var\(--azf-surface-container-high\)\)/);
+    expect(body).toMatch(/color:\s*rgb\(var\(--azf-on-surface-variant\)\)/);
+  });
 });

@@ -85,8 +85,6 @@ function WelcomeInner() {
 
   return (
     <div className="min-h-screen flex flex-col bg-surface text-on-surface overflow-hidden">
-      {/* Background atmosphere - WebGL aurora + hatch + vignette */}
-
       <main
         className="relative z-10 flex-1 flex flex-col max-w-md w-full mx-auto px-container-margin pb-8"
         style={{ paddingTop: 'calc(2.5rem + var(--azf-header-safe-top, 0px))' }}

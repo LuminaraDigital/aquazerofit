@@ -50,8 +50,13 @@ data class NotificationSettingsUiState(
      */
     val consents: ConsentEntity? = null,
     val savingConsent: Boolean = false,
+    /** The consent fetch failed and nothing is cached: the master switch has no value to show. */
+    val consentsFailed: Boolean = false,
     val permission: NotificationPermissionState = NotificationPermissionState.DENIED,
 ) {
+    /** Loading until the prefs and the consent row have both arrived, unless the fetch failed. */
+    val showSkeleton: Boolean get() = (loading || consents == null) && !consentsFailed
+
     /** The account-level `reminders` consent bit — the master switch. */
     val remindersConsented: Boolean get() = consents?.reminders == true
 
@@ -111,11 +116,22 @@ class NotificationSettingsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             accountRepository.consents().collect { consents ->
-                _uiState.value = _uiState.value.copy(consents = consents)
+                _uiState.value = _uiState.value.copy(consents = consents, consentsFailed = false)
             }
         }
-        viewModelScope.launch { accountRepository.refreshConsents() }
+        loadConsents()
         refreshPermission()
+    }
+
+    /** Fetch the consent row; a failure with nothing cached surfaces as an error state. */
+    fun loadConsents() {
+        _uiState.value = _uiState.value.copy(consentsFailed = false)
+        viewModelScope.launch {
+            val result = accountRepository.refreshConsents()
+            if (result is ApiResult.Failure) {
+                _uiState.value = _uiState.value.copy(consentsFailed = true)
+            }
+        }
     }
 
     /**

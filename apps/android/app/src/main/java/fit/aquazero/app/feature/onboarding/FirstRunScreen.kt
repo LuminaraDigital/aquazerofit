@@ -81,8 +81,13 @@ private fun FirstRunContent(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(AzfSpacing.ContainerMargin),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(
+                start = AzfSpacing.ContainerMargin,
+                end = AzfSpacing.ContainerMargin,
+                top = 8.dp,
+                bottom = AzfSpacing.SectionGap,
+            ),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
             item {
                 Column(modifier = Modifier.revealOnEnter(0)) {
@@ -90,10 +95,10 @@ private fun FirstRunContent(
                         text = firstName
                             ?.let { stringResource(R.string.firstrun_greeting_named, it) }
                             ?: stringResource(R.string.firstrun_greeting),
-                        style = MaterialTheme.typography.headlineLarge,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = stringResource(R.string.firstrun_body),
                         style = MaterialTheme.typography.bodyMedium,
@@ -143,7 +148,7 @@ private fun FirstRunContent(
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.firstrun_disclaimer).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),

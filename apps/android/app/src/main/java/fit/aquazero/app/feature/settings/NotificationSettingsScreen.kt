@@ -16,9 +16,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Info
@@ -47,6 +49,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -58,10 +62,15 @@ import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfChip
 import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfSectionHeading
+import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfSwitchRow
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.ErrorState
+import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.SecondaryButton
+import fit.aquazero.app.core.designsystem.Skeleton
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.designsystem.currentLocale
 import fit.aquazero.app.core.ui.LocaleFormatters
@@ -143,9 +152,34 @@ fun NotificationSettingsScreen(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(AzfSpacing.ContainerMargin),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(
+                start = AzfSpacing.ContainerMargin,
+                end = AzfSpacing.ContainerMargin,
+                top = 8.dp,
+                bottom = AzfSpacing.SectionGap,
+            ),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
+            if (state.consentsFailed && state.consents == null) {
+                item {
+                    ErrorState(
+                        title = stringResource(R.string.reminders_load_failed_title),
+                        message = stringResource(R.string.reminders_load_failed_body),
+                        retryLabel = stringResource(R.string.action_retry),
+                        onRetry = viewModel::loadConsents,
+                    )
+                }
+                return@LazyColumn
+            }
+            if (state.showSkeleton) {
+                items(count = 4) {
+                    Skeleton(
+                        modifier = Modifier.fillMaxWidth().height(96.dp),
+                        shape = AzfShapes.Card,
+                    )
+                }
+                return@LazyColumn
+            }
             item {
                 NoteCard(
                     text = stringResource(R.string.reminders_intro),
@@ -212,18 +246,20 @@ fun NotificationSettingsScreen(
                     onCheckedChange = viewModel::setWaterEnabled,
                     enabled = state.granularEnabled,
                 ) {
-                    Text(
-                        text = stringResource(R.string.reminders_frequency_label),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    AzfSectionHeading(stringResource(R.string.reminders_frequency_label))
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         WaterFrequency.entries.forEach { frequency ->
+                            // Short label on the chip so it never wraps; the full
+                            // phrase is what TalkBack reads.
+                            val full = stringResource(frequencyLabel(frequency))
                             AzfChip(
-                                text = stringResource(frequencyLabel(frequency)),
+                                text = stringResource(frequencyShortLabel(frequency)),
                                 selected = state.prefs.waterFrequency == frequency,
                                 onClick = { viewModel.setWaterFrequency(frequency) },
+                                modifier = Modifier
+                                    .heightIn(min = AzfSpacing.TouchTarget)
+                                    .semantics(mergeDescendants = true) { contentDescription = full },
                             )
                         }
                     }
@@ -234,7 +270,7 @@ fun NotificationSettingsScreen(
                             formatHour(ReminderPrefs.WATER_WINDOW_START_HOUR),
                             formatHour(ReminderPrefs.WATER_WINDOW_END_HOUR),
                         ),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -267,11 +303,7 @@ fun NotificationSettingsScreen(
                     onCheckedChange = viewModel::setWeighInEnabled,
                     enabled = state.granularEnabled,
                 ) {
-                    Text(
-                        text = stringResource(R.string.reminders_day_label),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    AzfSectionHeading(stringResource(R.string.reminders_day_label))
                     Spacer(modifier = Modifier.height(8.dp))
                     androidx.compose.foundation.layout.FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -283,6 +315,7 @@ fun NotificationSettingsScreen(
                                 text = day.getDisplayName(TextStyle.SHORT, locale),
                                 selected = state.prefs.weighInDay == day,
                                 onClick = { viewModel.setWeighInDay(day) },
+                                modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
                             )
                         }
                     }
@@ -331,21 +364,21 @@ private fun NoteCard(text: String, secondary: String? = null) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = null,
-                tint = AzfColors.PrimaryFixedDim,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.size(12.dp))
             Column {
                 Text(
                     text = text,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (secondary != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = secondary,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -359,10 +392,10 @@ private fun PermissionCard(blocked: Boolean, onAction: () -> Unit) {
     AzfCard(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.reminders_permission_title).uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = AzfColors.SecondaryFixedDim,
+            style = StatLabel,
+            color = LocalAzfExtended.current.warning,
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(
                 if (blocked) {
@@ -371,7 +404,7 @@ private fun PermissionCard(blocked: Boolean, onAction: () -> Unit) {
                     R.string.reminders_permission_body
                 },
             ),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(16.dp))
@@ -426,15 +459,12 @@ private fun TimeRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        AzfSectionHeading(label)
         AzfChip(
             text = formatted,
             selected = enabled,
             onClick = { if (enabled) onClick() },
+            modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
         )
     }
 }
@@ -472,6 +502,12 @@ private fun TimePickerDialog(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+private fun frequencyShortLabel(frequency: WaterFrequency): Int = when (frequency) {
+    WaterFrequency.EVERY_1H -> R.string.reminders_every_1h_short
+    WaterFrequency.EVERY_2H -> R.string.reminders_every_2h_short
+    WaterFrequency.EVERY_4H -> R.string.reminders_every_4h_short
+}
 
 private fun frequencyLabel(frequency: WaterFrequency): Int = when (frequency) {
     WaterFrequency.EVERY_1H -> R.string.reminders_every_1h

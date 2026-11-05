@@ -4,7 +4,6 @@ import androidx.activity.compose.LocalActivity
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Lock
@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -46,14 +47,17 @@ import fit.aquazero.app.core.data.PremiumOffer
 import fit.aquazero.app.core.data.PremiumOffers
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfChip
 import fit.aquazero.app.core.designsystem.AzfColors
+import fit.aquazero.app.core.designsystem.AzfHeroSurface
 import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.Scoreboard
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
@@ -110,10 +114,10 @@ fun PlanEntitlementsScreen(
                     contentPadding = PaddingValues(
                         start = AzfSpacing.ContainerMargin,
                         end = AzfSpacing.ContainerMargin,
-                        top = AzfSpacing.ContainerMargin,
-                        bottom = 40.dp,
+                        top = 8.dp,
+                        bottom = AzfSpacing.SectionGap,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapMedium),
+                    verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
                 ) {
                     item { Skeleton(modifier = Modifier.fillMaxWidth().height(160.dp)) }
                     item { Skeleton(modifier = Modifier.fillMaxWidth().height(80.dp)) }
@@ -123,7 +127,7 @@ fun PlanEntitlementsScreen(
 
             state.failed -> {
                 ErrorState(
-                    title = stringResource(R.string.plan_title),
+                    title = stringResource(R.string.plan_error_title),
                     message = stringResource(R.string.plan_error),
                     retryLabel = stringResource(R.string.memory_retry),
                     onRetry = viewModel::refresh,
@@ -142,10 +146,10 @@ fun PlanEntitlementsScreen(
                     contentPadding = PaddingValues(
                         start = AzfSpacing.ContainerMargin,
                         end = AzfSpacing.ContainerMargin,
-                        top = AzfSpacing.ContainerMargin,
-                        bottom = 40.dp,
+                        top = 8.dp,
+                        bottom = AzfSpacing.SectionGap,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapMedium),
+                    verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
                 ) {
                     item {
                         PositionCard(
@@ -163,6 +167,7 @@ fun PlanEntitlementsScreen(
                                     R.string.plan_difference_heading
                                 },
                             ),
+                            modifier = Modifier.padding(top = 20.dp),
                         )
                     }
 
@@ -187,11 +192,16 @@ fun PlanEntitlementsScreen(
                     }
 
                     if (state.costRows.isNotEmpty()) {
-                        item { AzfSectionHeading(stringResource(R.string.plan_costs_heading)) }
+                        item {
+                            AzfSectionHeading(
+                                stringResource(R.string.plan_costs_heading),
+                                modifier = Modifier.padding(top = 20.dp),
+                            )
+                        }
                         item {
                             AzfCard(modifier = Modifier.fillMaxWidth()) {
-                                state.costRows.forEach { (task, cost) ->
-                                    CostRow(task = task, cost = cost)
+                                state.costRows.forEachIndexed { index, (task, cost) ->
+                                    CostRow(task = task, cost = cost, last = index == state.costRows.lastIndex)
                                 }
                             }
                         }
@@ -222,7 +232,7 @@ fun PlanEntitlementsScreen(
                                             R.string.plan_premium_note
                                         },
                                     ),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 if (playActive) {
@@ -244,47 +254,24 @@ fun PlanEntitlementsScreen(
 @Composable
 private fun PositionCard(entitlements: EntitlementsDto, fraction: Float) {
     val premium = entitlements.tier == UserTier.PREMIUM
-    AzfCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.plan_current).uppercase(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            AzfChip(
-                text = stringResource(
-                    if (premium) R.string.plan_tier_premium else R.string.plan_tier_free,
-                ),
-                selected = premium,
-                onClick = {},
-            )
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = entitlements.creditsRemaining.toString(),
-                style = MaterialTheme.typography.headlineLarge,
-                color = AzfColors.PrimaryFixedDim,
-            )
-            Spacer(modifier = Modifier.size(8.dp))
-            Text(
-                text = stringResource(
-                    if (entitlements.creditsRemaining == 1) {
-                        R.string.plan_credit_available_one
-                    } else {
-                        R.string.plan_credits_available
-                    },
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
+    AzfHeroSurface(modifier = Modifier.fillMaxWidth()) {
+        AzfStatRow(
+            label = stringResource(R.string.plan_current),
+            value = stringResource(if (premium) R.string.plan_tier_premium else R.string.plan_tier_free),
+        )
+        AzfStatRow(
+            label = stringResource(
+                if (entitlements.creditsRemaining == 1) {
+                    R.string.plan_credit_available_one
+                } else {
+                    R.string.plan_credits_available
+                },
+            ),
+            value = entitlements.creditsRemaining.toString(),
+            valueStyle = Scoreboard,
+            divider = false,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -300,9 +287,24 @@ private fun PositionCard(entitlements: EntitlementsDto, fraction: Float) {
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
+        AzfStatRow(
+            label = stringResource(R.string.plan_daily_credits_label),
+            value = entitlements.dailyCredits.toString(),
+            valueStyle = DataSmall,
+            divider = entitlements.maxBankedCredits > 0,
+        )
+        if (entitlements.maxBankedCredits > 0) {
+            AzfStatRow(
+                label = stringResource(R.string.plan_bank_limit_label),
+                value = entitlements.maxBankedCredits.toString(),
+                valueStyle = DataSmall,
+                divider = false,
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = creditsExplainer(entitlements),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -336,7 +338,7 @@ private fun LaneCard(lane: String, premium: Boolean) {
         ) {
             Text(
                 text = laneTitle(lane),
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
@@ -361,7 +363,7 @@ private fun LaneCard(lane: String, premium: Boolean) {
                             R.string.plan_lane_locked
                         },
                     ),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = if (premium) {
                         AzfColors.SecondaryFixedDim
                     } else {
@@ -373,36 +375,21 @@ private fun LaneCard(lane: String, premium: Boolean) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = laneBody(lane),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-private fun CostRow(task: String, cost: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            text = taskLabel(task),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = if (cost == 1) {
-                stringResource(R.string.plan_cost_value_one)
-            } else {
-                stringResource(R.string.plan_cost_value, cost)
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+private fun CostRow(task: String, cost: Int, last: Boolean) {
+    AzfStatRow(
+        label = taskLabel(task),
+        value = cost.toString(),
+        unit = stringResource(if (cost == 1) R.string.plan_cost_unit_one else R.string.plan_cost_unit),
+        valueStyle = DataSmall,
+        divider = !last,
+    )
 }
 
 /**
@@ -424,15 +411,11 @@ private fun UpgradeCard(
             Icon(
                 imageVector = Icons.Outlined.WorkspacePremium,
                 contentDescription = null,
-                tint = AzfColors.SecondaryFixedDim,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.size(8.dp))
-            Text(
-                text = stringResource(R.string.plan_upgrade_heading).uppercase(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            AzfSectionHeading(stringResource(R.string.plan_upgrade_heading))
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
@@ -441,13 +424,13 @@ private fun UpgradeCard(
             } else {
                 stringResource(R.string.plan_upgrade_body_capped)
             },
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.plan_upgrade_coaches),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(16.dp))
@@ -456,12 +439,12 @@ private fun UpgradeCard(
             offerLoading -> Skeleton(modifier = Modifier.fillMaxWidth().height(140.dp))
             !playVerifyAvailable -> Text(
                 text = stringResource(R.string.plan_upgrade_server_unavailable),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             offers == null || (offers.annual == null && offers.monthly == null) -> Text(
                 text = stringResource(R.string.plan_upgrade_unavailable),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             else -> {
@@ -537,7 +520,7 @@ private fun UpgradeCard(
 
                 Text(
                     text = termsText,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -590,7 +573,7 @@ private fun PlanOptionCard(
                 shape = AzfShapes.Card,
             )
             .background(containerColor, AzfShapes.Card)
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Row(
@@ -614,7 +597,7 @@ private fun PlanOptionCard(
                         ) {
                             Text(
                                 text = badgeText,
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = AzfColors.SecondaryFixedDim,
                             )
                         }
@@ -623,15 +606,15 @@ private fun PlanOptionCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = priceText,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (subBadgeText != null) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "• $subBadgeText",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AzfColors.PrimaryFixedDim,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

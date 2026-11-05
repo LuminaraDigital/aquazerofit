@@ -577,6 +577,7 @@ export default function WorkoutLibrary() {
             retry={() => void todayQuery.refetch()}
           />
         ) : !today ? (
+          // With no plan the weekly strip above already offers to generate one.
           plan ? (
             <GlassCard className="p-5 text-center">
               <span className="material-symbols-outlined text-4xl text-secondary" aria-hidden="true">
@@ -587,16 +588,7 @@ export default function WorkoutLibrary() {
                 Recovery is part of the plan. See you tomorrow.
               </p>
             </GlassCard>
-          ) : (
-            <EmptyState
-              icon="fitness_center"
-              title={emptyPlan.title}
-              body={emptyPlan.body}
-              action={
-                <PrimaryButton onClick={() => setGenerateOpen(true)}>{emptyPlan.action}</PrimaryButton>
-              }
-            />
-          )
+          ) : null
         ) : (
           <GlassCard className="relative overflow-hidden p-6">
             <div

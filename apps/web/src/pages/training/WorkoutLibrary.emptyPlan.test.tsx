@@ -38,5 +38,7 @@ describe('workouts with no plan', () => {
     expect(await screen.findByText('No training plan yet')).toBeTruthy();
     expect(screen.getAllByText('No training plan yet')).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: /generate my plan/i })).toHaveLength(1);
+    // No empty "Today's workout" region left for a screen reader to land on.
+    expect(screen.queryByRole('region', { name: "Today's workout" })).toBeNull();
   });
 });

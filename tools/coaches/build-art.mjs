@@ -91,6 +91,10 @@ const VARIANTS = {
 };
 
 const PORTRAIT_HEIGHT = 900;
+const PORTRAIT_WIDTH = 600;
+/** Space above the head and under the feet in the upright renders. */
+const HEAD_GAP = 26;
+const FLOOR_GAP = 72;
 const AVATAR_SIZE = 256;
 
 /**
@@ -268,10 +272,18 @@ async function buildCoach(id, files) {
     .toBuffer({ resolveWithObject: true });
   const { width, height } = trimmed.info;
 
-  await sharp(trimmed.data)
-    .resize({ height: PORTRAIT_HEIGHT, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: 82, alphaQuality: 90 })
-    .toFile(path.join(outDir, 'portrait.webp'));
+  // A wide stance fitted to full height would fill the select tile edge to
+  // edge and dwarf every upright figure, so it is fitted inside the same 2:3
+  // frame instead, with the headroom and floor gap the upright renders carry.
+  // Upright figures are unchanged.
+  const wide = width / height > PORTRAIT_WIDTH / PORTRAIT_HEIGHT;
+  const clear = { r: 0, g: 0, b: 0, alpha: 0 };
+  const portrait = wide
+    ? sharp(trimmed.data)
+        .resize({ width: PORTRAIT_WIDTH, height: PORTRAIT_HEIGHT - HEAD_GAP - FLOOR_GAP, fit: 'contain', position: 'bottom', background: clear })
+        .extend({ top: HEAD_GAP, bottom: FLOOR_GAP, background: clear })
+    : sharp(trimmed.data).resize({ height: PORTRAIT_HEIGHT, fit: 'inside', withoutEnlargement: true });
+  await portrait.webp({ quality: 82, alphaQuality: 90 }).toFile(path.join(outDir, 'portrait.webp'));
 
   // Square head crop. Every value is clamped into the image: a squarer source
   // or an aggressive override must produce a worse crop, never a sharp error

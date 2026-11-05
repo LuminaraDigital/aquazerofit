@@ -206,7 +206,7 @@ export function CircularMacroRing({
             <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">
               kcal left
             </span>
-            <span className="text-[10px] text-outline mt-1 font-mono">Hover ring for details</span>
+            <span className="text-[10px] text-outline mt-1 font-mono">Tap a ring for details</span>
           </div>
         )}
       </div>

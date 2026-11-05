@@ -63,6 +63,9 @@ describe('Landing', () => {
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading.textContent).toMatch(/aquazerofit/i);
     expect(heading.textContent).toMatch(/your day, measured/i);
+    // The brand line and the headline are separate words to a screen reader,
+    // not "coachingYour day".
+    expect(heading.textContent).toMatch(/coaching Your day/);
   });
 
   it('makes Telegram the primary action', () => {

@@ -63,7 +63,7 @@ function Hero() {
                 <span>
                   <span className="font-semibold text-on-surface">AquaZeroFit</span> · food,
                   training, coaching
-                </span>
+                </span>{' '}
               </span>
               {/* Two explicit lines, each unbreakable: the fonts load async,
                   and a wider fallback would otherwise wrap this to three lines

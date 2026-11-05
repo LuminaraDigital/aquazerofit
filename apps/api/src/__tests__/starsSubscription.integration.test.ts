@@ -340,15 +340,19 @@ describe('subscription webhook', () => {
       externalId: playId,
       premiumUntil: new Date(Date.now() + 30 * 86_400_000).toISOString(),
     });
-    const res = await postUpdate({
-      pre_checkout_query: {
-        id: 'pcq-after-play',
-        currency: 'XTR',
-        total_amount: 417,
-        invoice_payload: 'premium.after-play',
-      },
-    });
-    revokePremium(userId, 'play', `clear-${playId}`, 'test cleanup');
+    let res;
+    try {
+      res = await postUpdate({
+        pre_checkout_query: {
+          id: 'pcq-after-play',
+          currency: 'XTR',
+          total_amount: 417,
+          invoice_payload: 'premium.after-play',
+        },
+      });
+    } finally {
+      revokePremium(userId, 'play', `clear-${playId}`, 'test cleanup');
+    }
     expect(res.status).toBe(200);
     const answered = fetchCalls.find((call) => call.url.endsWith('/answerPreCheckoutQuery'));
     expect(answered?.body.ok).toBe(false);
@@ -372,6 +376,61 @@ describe('subscription webhook', () => {
     expect(res.status).toBe(200);
     const answered = fetchCalls.find((call) => call.url.endsWith('/answerPreCheckoutQuery'));
     expect(answered?.body.ok).toBe(true);
+  });
+
+  it('accepts a renewal pre-checkout when the account is also premium through Play', async () => {
+    revokePremium(userId, 'admin', `wipe-${crypto.randomUUID()}`, 'isolate');
+    const payload = 'premium.renewal-with-play';
+    seedAnchor(payload, 417);
+    await postUpdate(paymentBody(payload, 'chg-renewal-with-play', inSeconds(30), 417, { is_first_recurring: true }));
+    const playId = `play-${crypto.randomUUID()}`;
+    grantPremium({
+      userId,
+      source: 'play',
+      externalId: playId,
+      premiumUntil: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+    });
+    fetchCalls.length = 0;
+    try {
+      const res = await postUpdate({
+        pre_checkout_query: { id: 'pcq-renewal-with-play', currency: 'XTR', total_amount: 417, invoice_payload: payload },
+      });
+      expect(res.status).toBe(200);
+      const answered = fetchCalls.find((call) => call.url.endsWith('/answerPreCheckoutQuery'));
+      expect(answered?.body.ok).toBe(true);
+    } finally {
+      revokePremium(userId, 'play', `clear-${playId}`, 'test cleanup');
+    }
+  });
+
+  it('logs an overlap, without the payload, when a first charge lands on an account already premium', async () => {
+    // Premium bought elsewhere between pre-checkout and payment: the Stars are
+    // already taken, so the grant stands and support is told to refund.
+    revokePremium(userId, 'admin', `wipe-${crypto.randomUUID()}`, 'isolate');
+    const payload = 'premium.overlap-do-not-log';
+    seedAnchor(payload, 417);
+    const playId = `play-${crypto.randomUUID()}`;
+    grantPremium({
+      userId,
+      source: 'play',
+      externalId: playId,
+      premiumUntil: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+    const spy = vi.spyOn(telemetry, 'logEvent');
+    try {
+      const exp = inSeconds(30);
+      await postUpdate(paymentBody(payload, 'chg-overlap', exp, 417, { is_first_recurring: true }));
+      expect(payments('chg-overlap')).toHaveLength(1);
+      expect(spy.mock.calls.filter(([name]) => name === 'stars_subscription_overlap')).toHaveLength(1);
+
+      spy.mockClear();
+      await postUpdate(paymentBody(payload, 'chg-overlap-renew', exp + 30 * 86_400, 417, { is_recurring: true }));
+      expect(spy.mock.calls.filter(([name]) => name === 'stars_subscription_overlap')).toHaveLength(0);
+      expect(spy.mock.calls.some((call) => JSON.stringify(call).includes(payload))).toBe(false);
+    } finally {
+      spy.mockRestore();
+      revokePremium(userId, 'play', `clear-${playId}`, 'test cleanup');
+    }
   });
 
   it('declines pre-checkout below the anchored price', async () => {

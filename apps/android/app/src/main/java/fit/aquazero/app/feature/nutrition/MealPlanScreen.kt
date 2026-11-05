@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
@@ -146,6 +147,7 @@ fun MealPlanScreen(
                     ErrorState(
                         title = stringResource(R.string.meal_plan_credits_title),
                         message = stringResource(R.string.meal_plan_slot_credits),
+                        icon = Icons.Outlined.HourglassEmpty,
                     )
                 }
             } else {
@@ -261,7 +263,7 @@ private fun SlotCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     // Out of credits: a retry cannot succeed, so none is offered.
-                    if (slot.failureMessageRes != R.string.meal_plan_slot_credits) {
+                    if (!slot.outOfCredits) {
                         SecondaryButton(
                             text = stringResource(R.string.meal_plan_slot_retry),
                             onClick = onRegenerate,

@@ -37,6 +37,9 @@ data class MealPlanSlot(
     val logging: Boolean = false,
     val feedback: SuggestionFeedback? = null,
 ) {
+    /** Failed for lack of AI credits, which a retry cannot fix. */
+    val outOfCredits: Boolean get() = failed && failureMessageRes == R.string.meal_plan_slot_credits
+
     /**
      * True when the suggestion came from the server's deterministic path
      * rather than a model. The honest answer when AI personalisation is off,
@@ -72,7 +75,7 @@ data class MealPlanUiState(
 
     /** Every slot has settled and failed for lack of AI credits: one notice, not four. */
     val creditsExhausted: Boolean
-        get() = slots.all { !it.loading && it.failed && it.failureMessageRes == R.string.meal_plan_slot_credits }
+        get() = slots.all { !it.loading && it.outOfCredits }
 
     val plannedKcal: Double get() = ready.sumOf { it.kcal }
 

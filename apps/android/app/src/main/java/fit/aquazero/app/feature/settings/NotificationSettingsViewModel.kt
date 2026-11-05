@@ -54,8 +54,11 @@ data class NotificationSettingsUiState(
     val consentsFailed: Boolean = false,
     val permission: NotificationPermissionState = NotificationPermissionState.DENIED,
 ) {
+    /** The fetch failed with nothing cached: show the error and its retry. */
+    val showError: Boolean get() = consentsFailed && consents == null
+
     /** Loading until the prefs and the consent row have both arrived, unless the fetch failed. */
-    val showSkeleton: Boolean get() = (loading || consents == null) && !consentsFailed
+    val showSkeleton: Boolean get() = (loading || consents == null) && !showError
 
     /** The account-level `reminders` consent bit — the master switch. */
     val remindersConsented: Boolean get() = consents?.reminders == true
@@ -116,7 +119,10 @@ class NotificationSettingsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             accountRepository.consents().collect { consents ->
-                _uiState.value = _uiState.value.copy(consents = consents, consentsFailed = false)
+                // Room emits null before any row exists; clearing the failure
+                // on that emission would put a failed fetch back on the
+                // skeleton for good. loadConsents() owns the reset.
+                _uiState.value = _uiState.value.copy(consents = consents)
             }
         }
         loadConsents()

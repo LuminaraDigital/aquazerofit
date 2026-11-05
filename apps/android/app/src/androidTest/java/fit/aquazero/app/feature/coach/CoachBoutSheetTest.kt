@@ -6,6 +6,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.platform.app.InstrumentationRegistry
+import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.ui.CoachRoster
 import org.junit.Assert.assertEquals
@@ -68,11 +70,14 @@ class CoachBoutSheetTest {
         assertEquals(listOf(first.persona.id), selected)
     }
 
+    /** Compliance copy: the bar shows every word of it, never an ellipsis. */
     @Test
-    fun disclaimerIsOneQuietLine() {
+    fun disclaimerShowsTheFullWording() {
+        val wording = InstrumentationRegistry.getInstrumentation().targetContext
+            .getString(R.string.coach_disclaimer)
         composeRule.setContent { AzfTheme { WellnessDisclaimerBar() } }
 
-        composeRule.onNode(hasText("General wellness support only", substring = true)).assertIsDisplayed()
+        composeRule.onNode(hasText(wording)).assertIsDisplayed()
     }
 }
 

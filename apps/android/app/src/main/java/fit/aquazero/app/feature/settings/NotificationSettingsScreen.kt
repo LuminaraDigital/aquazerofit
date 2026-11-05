@@ -160,7 +160,7 @@ fun NotificationSettingsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
-            if (state.consentsFailed && state.consents == null) {
+            if (state.showError) {
                 item {
                     ErrorState(
                         title = stringResource(R.string.reminders_load_failed_title),

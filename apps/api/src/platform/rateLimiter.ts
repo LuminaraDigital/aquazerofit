@@ -1,7 +1,8 @@
 /**
  * In-memory sliding-window rate limiter (AQF-07 §4 step 2: per user AND per IP).
  * Generous default lane (300/min). Model routes sit on a 20/min lane, except
- * meal photographs (5/min) and coach chat (10/min). Unauthenticated telemetry
+ * the meal-photo upload (5/min) and the two chat routes that call a model
+ * (10/min); the rest of /chat and /meal-photos is ordinary traffic. Unauthenticated telemetry
  * and invite peeks are 30/min. Auth guessing uses the configured per-IP
  * minute cap, and Telegram signups have their own per-IP and per-subnet caps.
  * Emits 429 RATE_LIMITED with Retry-After. Credit exhaustion is separate:
@@ -79,8 +80,8 @@ const AI_PATHS = [
  * Web and Android poll the job once a second while it runs; counted here, the
  * fifth poll answered 429 and the analysis screen failed mid-analysis.
  */
-function isPhotoUpload(req: Request): boolean {
-  return req.method === 'POST' && /\/meal-photos$/.test(req.path);
+function isPhotoUpload(method: string, path: string): boolean {
+  return method === 'POST' && path.endsWith('/meal-photos');
 }
 
 /**
@@ -89,8 +90,17 @@ function isPhotoUpload(req: Request): boolean {
  * opening the coach screen reads, and counting it against ten turns a minute
  * made the screen itself answer 429.
  */
-function isChatModelCall(req: Request): boolean {
-  return req.method === 'POST' && /\/chat\/(sessions\/[^/]+\/messages|meal-drafts)$/.test(req.path);
+function isChatModelCall(method: string, path: string): boolean {
+  return method === 'POST' && /\/chat\/(sessions\/[^/]+\/messages|meal-drafts)$/.test(path);
+}
+
+/**
+ * Express routes ignore case and a trailing slash, so `/Meal-Photos/` reaches
+ * the upload handler. Lanes are chosen from the same normalised path, or that
+ * spelling would spend model calls on the 300/min default lane.
+ */
+function lanePath(path: string): string {
+  return path.toLowerCase().replace(/\/+$/, '');
 }
 
 function isStrictPath(path: string): boolean {
@@ -142,11 +152,12 @@ export function rateLimiter(req: Request, res: Response, next: NextFunction): vo
     return;
   }
   const now = Date.now();
-  const auth = isAuthPath(req.path);
-  const anon = !auth && isAnonymousWritePath(req.path);
-  const photo = !auth && !anon && isPhotoUpload(req);
-  const chat = !auth && !anon && !photo && isChatModelCall(req);
-  const strict = !auth && !anon && !photo && !chat && isStrictPath(req.path);
+  const path = lanePath(req.path);
+  const auth = isAuthPath(path);
+  const anon = !auth && isAnonymousWritePath(path);
+  const photo = !auth && !anon && isPhotoUpload(req.method, path);
+  const chat = !auth && !anon && !photo && isChatModelCall(req.method, path);
+  const strict = !auth && !anon && !photo && !chat && isStrictPath(path);
   const lane = auth ? 'auth' : anon ? 'anon' : photo ? 'photo' : chat ? 'chat' : strict ? 'strict' : 'default';
   const limit = auth
     ? config.authRateLimitPerMinute

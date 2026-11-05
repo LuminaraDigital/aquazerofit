@@ -8,6 +8,7 @@
 import { Link } from 'react-router-dom';
 import { SOURCE_CODE_URL, WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
 import { getAttribution } from '../../lib/attribution';
+import { ANDROID_PLAY_STORE_URL, isAndroidMobileBrowser } from '../../lib/challenges';
 import { trackGrowth } from '../../lib/growth';
 import { telegramAppUrl } from '../../lib/telegramLink';
 import { useScrollProgress } from './motion';
@@ -119,6 +120,62 @@ export function TelegramCta({
       </span>
       {children ?? 'Open in Telegram'}
     </a>
+  );
+}
+
+/**
+ * The Google Play listing, shown as Google's own "Get it on Google Play" badge.
+ * Google's brand rules require the official artwork unaltered; the file in
+ * public/ is that badge with only its transparent margin trimmed, so it sits on
+ * the same 52px line as the other calls to action.
+ */
+export function PlayStoreBadge({ placement }: { placement: string }) {
+  return (
+    <a
+      href={ANDROID_PLAY_STORE_URL}
+      onClick={() => void trackGrowth('play_store_cta_clicked', { placement })}
+      rel="noreferrer noopener"
+      className="inline-flex shrink-0 rounded-[9px] transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+    >
+      <img
+        src="/google-play-badge.png"
+        alt="Get it on Google Play"
+        width={564}
+        height={168}
+        decoding="async"
+        className="h-[52px] w-auto"
+      />
+    </a>
+  );
+}
+
+/**
+ * The hero and closing calls to action on the landing page. Telegram leads for
+ * everyone except visitors already on an Android phone, for whom the native
+ * app is the shorter path, so the Play badge moves in front and Telegram steps
+ * down to the outlined style. `note` sits under the buttons it explains.
+ */
+export function AppCtas({
+  placement,
+  centered = false,
+  note,
+}: {
+  placement: string;
+  centered?: boolean;
+  note?: React.ReactNode;
+}) {
+  const android = isAndroidMobileBrowser();
+  const badge = <PlayStoreBadge placement={placement} />;
+  return (
+    <div className={`flex flex-col gap-4 ${centered ? 'items-center' : 'items-start'}`}>
+      {android && badge}
+      <div className={`flex w-full flex-col gap-3 sm:flex-row ${centered ? 'sm:justify-center' : ''}`}>
+        <TelegramCta placement={placement} variant={android ? 'ghost' : 'primary'} />
+        <WebFallbackLink placement={placement} />
+      </div>
+      {note}
+      {!android && badge}
+    </div>
   );
 }
 

@@ -226,6 +226,9 @@ export const GROWTH_EVENT_NAMES = [
   'telegram_cta_clicked',
   'web_fallback_clicked',
   'telegram_launch',
+  /* Clicks on the Google Play badge. Play Console counts installs, but only
+     this says which placement on the site sent them. */
+  'play_store_cta_clicked',
   /* Retention funnel. Once-per-browser client gates keep these sparse; the
      server still accepts repeats so a cleared cache cannot permanently hide
      a completed step. */

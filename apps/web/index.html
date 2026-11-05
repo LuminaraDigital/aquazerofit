@@ -46,18 +46,20 @@
     <meta name="apple-itunes-app" content="app-id=686449807, app-argument=https://t.me/aquazerofitbot/app" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Non-blocking: a Mini App must paint before Google Fonts answers. -->
+    <!-- Non-blocking: a Mini App must paint before Google Fonts answers. The
+         entry module switches these to screen media (lib/asyncFonts.ts); an
+         inline onload would be blocked by the CSP. -->
     <link
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap"
       rel="stylesheet"
       media="print"
-      onload="this.media='all'"
+      data-async-font
     />
     <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
       rel="stylesheet"
       media="print"
-      onload="this.media='all'"
+      data-async-font
     />
     <noscript>
       <style>#azf-boot { display: none !important; }</style>

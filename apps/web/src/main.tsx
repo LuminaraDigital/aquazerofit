@@ -9,7 +9,10 @@ import { initTelegramAnalytics } from './lib/telegramAnalytics';
 import { decodePayload } from './lib/telegramLink';
 import { adoptAttribution, captureAttributionFromUrl, getAttribution } from './lib/attribution';
 import { trackGrowth } from './lib/growth';
+import { enableAsyncFonts } from './lib/asyncFonts';
 import './styles/index.css';
+
+enableAsyncFonts();
 
 const queryClient = new QueryClient({
   defaultOptions: {

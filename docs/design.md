@@ -49,7 +49,7 @@ ruled stat row. On the website the same numerals carry the first frame.
 |---|---|---|
 | `AquaAura` radial glow behind first folds | a decorative glow that depicts nothing | flat `background` |
 | 135° aqua→mint gradient on primary buttons | gradient CTAs are a generic tell and weaken the accent | solid `primaryFixedDim` fill with `onPrimaryFixed` ink, 10.1:1 |
-| Gradient fill and gradient edge on `AzfHeroSurface` | a second glow treatment competing with the button | `surfaceContainer` with a 2dp accent rule on the leading edge of the label |
+| Gradient fill and gradient edge on `AzfHeroSurface` | a second glow treatment competing with the button | `surfaceContainer` with a 1dp aqua hairline at 40% |
 | Rotating gradient border on `GlowFrame` | a "border beam": motion that says nothing | static 1.5dp accent outline while active |
 | Gradient user chat bubble | the gradient made the user's words louder than the coach's | `surfaceContainerHighest` bubble with `onSurface` text |
 | Six radii (8, 12, 16, 20, 24, 28, 30) | no two screens nested corners the same way | two radii plus pill (below) |
@@ -112,8 +112,9 @@ labels and numerals. DM Sans for everything people read.
 | `bodySmall` | DM Sans | 13 / 18 | 0 | captions, attributions |
 | `labelLarge` | DM Sans Medium | 14 / 20 | +1% | chips, tabs |
 
-Nothing people read goes below 13sp. Every changing or aligned digit uses
-tabular figures.
+Reading text stays at 13sp or above; labels and the dock's tab names go down
+to 12sp (`labelSmall`, `labelMedium`), never lower. Every changing or aligned
+digit uses tabular figures.
 
 ### Space
 
@@ -137,8 +138,8 @@ Two radii and a pill, nested concentrically: an inner tile inset 8dp inside a
 
 No shadows on surfaces. A card is a tonal step (`surfaceContainerLow` on the
 ground) with a 1dp `outlineVariant` hairline at 60% alpha. The lead card on a
-screen is `surfaceContainer` with no hairline and a 2dp aqua rule before its
-label. There is one lead card per screen at most.
+screen is `surfaceContainer` with a 1dp aqua hairline at 40% alpha. There is
+one lead card per screen at most.
 
 ### Motion
 
@@ -150,7 +151,7 @@ system animations are off.
 |---|---|---|
 | `RevealDurationMs` | 360ms, `cubic-bezier(0.16, 1, 0.3, 1)` | first appearance of a screen's sections |
 | `RevealRise` | 8dp, with opacity from 0 | orientation, not travel |
-| `RevealStaggerMs` | 40ms, capped at 6 items | one leader, followers close behind |
+| `RevealStaggerMs` | 40ms, capped at 6 items (`RevealStaggerCap`) | one leader, followers close behind |
 | `PressScale` | 0.97 on a spring | confirms contact |
 | `ConfirmDurationMs` | 220ms | a tick, a tab lighting up |
 | `ScreenEnterMs` / `ScreenExitMs` | 280 / 190ms | screen changes; the exit is about 30% faster |

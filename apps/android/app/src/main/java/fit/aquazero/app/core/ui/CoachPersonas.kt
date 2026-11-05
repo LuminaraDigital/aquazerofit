@@ -85,7 +85,7 @@ object CoachRoster {
         ),
         CoachPersona(
             id = "anderson",
-            name = "Anderson Couture",
+            name = "Anderson Pike",
             ringName = "The Giant",
             taglineRes = R.string.coach_anderson_tagline,
             disciplineRes = R.string.coach_anderson_discipline,
@@ -129,7 +129,7 @@ object CoachRoster {
         ),
         CoachPersona(
             id = "jacare",
-            name = "Jacaré Aldo",
+            name = "Tiago Arruda",
             ringName = "The Prince",
             taglineRes = R.string.coach_jacare_tagline,
             disciplineRes = R.string.coach_jacare_discipline,
@@ -140,8 +140,8 @@ object CoachRoster {
         ),
         CoachPersona(
             id = "danial",
-            name = "Danial Nickal",
-            ringName = "The Wolf",
+            name = "Danial Kessler",
+            ringName = "The Metronome",
             taglineRes = R.string.coach_danial_tagline,
             disciplineRes = R.string.coach_danial_discipline,
             domainRes = R.string.coach_danial_domain,
@@ -151,7 +151,7 @@ object CoachRoster {
         ),
         CoachPersona(
             id = "kazushi",
-            name = "Kazushi Horiuchi",
+            name = "Shūhei Horiuchi",
             ringName = "The Hunter",
             taglineRes = R.string.coach_kazushi_tagline,
             disciplineRes = R.string.coach_kazushi_discipline,
@@ -173,8 +173,8 @@ object CoachRoster {
         ),
         CoachPersona(
             id = "mataemon",
-            name = "Mataemon Aoki",
-            ringName = "Tobikan",
+            name = "Mataemon Kuroda",
+            ringName = "The Locksmith",
             taglineRes = R.string.coach_mataemon_tagline,
             disciplineRes = R.string.coach_mataemon_discipline,
             domainRes = R.string.coach_mataemon_domain,
@@ -206,7 +206,7 @@ object CoachRoster {
         ),
         CoachPersona(
             id = "uthman",
-            name = "Uthman Nurmakhmedov",
+            name = "Uthman Sadykov",
             ringName = "The Crusher",
             taglineRes = R.string.coach_uthman_tagline,
             disciplineRes = R.string.coach_uthman_discipline,
@@ -228,7 +228,7 @@ object CoachRoster {
         ),
         CoachPersona(
             id = "george",
-            name = "George Saint",
+            name = "Étienne Delorme",
             ringName = "The Architect",
             taglineRes = R.string.coach_george_tagline,
             disciplineRes = R.string.coach_george_discipline,
@@ -305,8 +305,8 @@ object CoachRoster {
         ),
         CoachPersona(
             id = "ryoto",
-            name = "Ryōto Katou",
-            ringName = "The Dragon",
+            name = "Ryūsei Katou",
+            ringName = "Iron Shin",
             taglineRes = R.string.coach_ryoto_tagline,
             disciplineRes = R.string.coach_ryoto_discipline,
             domainRes = R.string.coach_ryoto_domain,
@@ -327,7 +327,7 @@ object CoachRoster {
         ),
         CoachPersona(
             id = "terry",
-            name = "Terry Crawford",
+            name = "Terry Bauer",
             ringName = "The Outlaw",
             taglineRes = R.string.coach_terry_tagline,
             disciplineRes = R.string.coach_terry_discipline,
@@ -338,8 +338,8 @@ object CoachRoster {
         ),
         CoachPersona(
             id = "usman",
-            name = "Usman Sergei Magomedov",
-            ringName = "The Eagle",
+            name = "Murad Alibekov",
+            ringName = "The Avalanche",
             taglineRes = R.string.coach_usman_tagline,
             disciplineRes = R.string.coach_usman_discipline,
             domainRes = R.string.coach_usman_domain,

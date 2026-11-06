@@ -31,6 +31,8 @@ playBilling = "9.1.0"
 splashscreen = "1.2.0"
 browser = "1.9.0"
 firebaseBom = "34.18.0"
+credentials = "1.5.0"
+googleId = "1.1.1"
 googleServices = "4.5.0"
 firebaseCrashlytics = "3.0.8"
 healthConnect = "1.1.0"
@@ -121,6 +123,13 @@ play-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.r
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
+# "Continue with Google": Credential Manager picks the account, googleid parses
+# the ID token, Firebase Auth turns it into the ID token the API verifies.
+androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
+androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
+googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleId" }
+kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
 
 # Health Connect — passive steps/heart-rate/sleep in, weight out.
 androidx-health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }

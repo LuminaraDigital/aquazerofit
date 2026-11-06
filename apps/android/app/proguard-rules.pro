@@ -76,3 +76,13 @@
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
 }
+
+# ----- Credential Manager ("Continue with Google") -----
+# CredentialManager finds its Play services provider by class NAME at runtime,
+# so R8 sees no reference and strips it; release builds then fail every
+# getCredential() with "no provider dependencies found". Rule from the
+# androidx.credentials integration guide.
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** {
+  *;
+}

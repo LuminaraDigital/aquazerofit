@@ -39,6 +39,7 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.common.MealTrust
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfChip
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.ConfidenceBandChip
@@ -146,14 +147,10 @@ fun MealDraftCard(
     }
 
     AzfCard(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.draft_title).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = LocalAzfExtended.current.primaryFixedDim,
-        )
+        AzfSectionHeading(text = stringResource(R.string.draft_title))
         Text(
             text = stringResource(R.string.draft_source, draft.sourceText),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -170,18 +167,18 @@ fun MealDraftCard(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(16.dp))
 
         if (showFatCaution) {
             FatCautionBanner()
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             Text(
                 text = stringResource(R.string.trust_add_cooking_fat),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             CookingFatPresetsRow(
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier.padding(top = 8.dp),
                 onPresetClick = { preset ->
                     fatAdditives = fatAdditives + CookingFatLine(
                         key = "fat-${preset.id}-${System.currentTimeMillis()}",
@@ -211,7 +208,7 @@ fun MealDraftCard(
                 },
                 onGramsChange = { grams -> update(item.id) { it.copy(grams = grams) } },
                 onLogManually = onLogManually,
-                modifier = Modifier.padding(bottom = 10.dp),
+                modifier = Modifier.padding(bottom = 12.dp),
             )
         }
 
@@ -228,7 +225,7 @@ fun MealDraftCard(
                     fatAdditives = fatAdditives.filter { it.key != line.key }
                     acknowledged = false
                 },
-                modifier = Modifier.padding(bottom = 10.dp),
+                modifier = Modifier.padding(bottom = 12.dp),
             )
         }
 
@@ -236,7 +233,7 @@ fun MealDraftCard(
             draft.notes.forEach { note ->
                 Text(
                     text = note,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp),
                 )
@@ -258,7 +255,7 @@ fun MealDraftCard(
             Text(
                 text = stringResource(R.string.draft_pick_food_first),
                 style = MaterialTheme.typography.labelMedium,
-                color = LocalAzfExtended.current.secondaryFixedDim,
+                color = LocalAzfExtended.current.warning,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
@@ -266,7 +263,7 @@ fun MealDraftCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = stringResource(R.string.draft_total),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(8.dp))
@@ -282,7 +279,7 @@ fun MealDraftCard(
         if (fatAdditives.isNotEmpty()) {
             Text(
                 text = stringResource(R.string.trust_fat_total_hint, totalKcal),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -322,16 +319,12 @@ private fun DraftItemRow(
             modifier = modifier
                 .fillMaxWidth()
                 .clip(AzfShapes.Inner)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .border(
-                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-                    AzfShapes.Inner,
-                )
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(12.dp),
         ) {
             Text(
                 text = stringResource(R.string.draft_unmatched, item.phrase),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (onLogManually != null) {
@@ -340,7 +333,7 @@ private fun DraftItemRow(
                     style = MaterialTheme.typography.labelLarge,
                     color = LocalAzfExtended.current.primaryFixedDim,
                     modifier = Modifier
-                        .padding(top = 6.dp)
+                        .padding(top = 8.dp)
                         .clickable(role = Role.Button, onClick = onLogManually)
                         // A bare text link: without this the target is one
                         // line of labelLarge, roughly 20dp.
@@ -358,11 +351,7 @@ private fun DraftItemRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(AzfShapes.Inner)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-                AzfShapes.Inner,
-            )
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -394,12 +383,12 @@ private fun DraftItemRow(
         if (match != null) {
             if (item.status == ChatMealItemStatus.RESOLVED) {
                 Row(
-                    modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+                    modifier = Modifier.padding(top = 8.dp, start = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = match.name,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
@@ -410,7 +399,7 @@ private fun DraftItemRow(
             } else if (match.score > 0) {
                 ConfidenceBandChip(
                     score = match.score,
-                    modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+                    modifier = Modifier.padding(top = 8.dp, start = 4.dp),
                 )
             }
             val grams = MealDraftModel.gramsOf(item, choice) ?: match.grams.toInt()
@@ -433,12 +422,12 @@ private fun DraftItemRow(
                         MealDraftModel.projectKcal(match, grams),
                     ),
                     style = DataSmall,
-                    color = LocalAzfExtended.current.primaryFixedDim,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             Text(
                 text = portionCaption(match),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, start = 4.dp),
             )
@@ -478,8 +467,8 @@ private fun FoodPicker(
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.draft_choose_food),
-            style = MaterialTheme.typography.labelSmall,
-            color = LocalAzfExtended.current.secondaryFixedDim,
+            style = MaterialTheme.typography.labelMedium,
+            color = LocalAzfExtended.current.warning,
         )
         Box {
             Text(
@@ -496,7 +485,7 @@ private fun FoodPicker(
                     .clip(AzfShapes.Inner)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable(role = Role.DropdownList) { open = true }
-                    .padding(horizontal = 12.dp, vertical = 14.dp),
+                    .padding(horizontal = 12.dp, vertical = 16.dp),
             )
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 item.matches.forEach { candidate ->
@@ -527,11 +516,7 @@ private fun CookingFatRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(AzfShapes.Inner)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-                AzfShapes.Inner,
-            )
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -566,7 +551,7 @@ private fun CookingFatRow(
             Text(
                 text = stringResource(R.string.draft_kcal, projectPresetKcal(line.preset, line.grams)),
                 style = DataSmall,
-                color = LocalAzfExtended.current.primaryFixedDim,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -602,7 +587,7 @@ private fun AllergenAcknowledgement(
             .joinToString("; ")
         Text(
             text = stringResource(R.string.draft_allergen_body, summary),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -617,7 +602,7 @@ private fun AllergenAcknowledgement(
             )
             Text(
                 text = stringResource(R.string.draft_allergen_ack),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
         }

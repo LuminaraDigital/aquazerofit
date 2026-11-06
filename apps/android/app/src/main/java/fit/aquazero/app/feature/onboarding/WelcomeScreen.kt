@@ -75,7 +75,7 @@ fun WelcomeScreen(
             Text(
                 text = stringResource(R.string.app_name).uppercase(),
                 style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
@@ -107,7 +107,7 @@ fun WelcomeScreen(
                 }
                 Text(
                     text = stringResource(titleRes).uppercase(),
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.displayLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                 )
@@ -155,8 +155,8 @@ fun WelcomeScreen(
             )
             Text(
                 text = stringResource(R.string.welcome_disclaimer).uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()

@@ -3,14 +3,15 @@ package fit.aquazero.app.core.gamification
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.model.ExperienceStatusDto
 import fit.aquazero.app.core.ui.CoachRoster
 
@@ -91,7 +92,8 @@ fun CelebrationLayer(
                 onShare = onShareAchievement?.let { share -> { share(current) } },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .statusBarsPadding()
+                    .padding(horizontal = AzfSpacing.ContainerMargin, vertical = AzfSpacing.Gutter),
             )
         }
     }

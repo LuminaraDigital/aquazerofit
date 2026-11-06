@@ -5,25 +5,14 @@ import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
-import androidx.compose.material.icons.outlined.Favorite
-import androidx.compose.material.icons.outlined.LocalFireDepartment
-import androidx.compose.material.icons.outlined.MonitorHeart
-import androidx.compose.material.icons.outlined.NightsStay
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -31,9 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -47,9 +34,12 @@ import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
+import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.currentLocale
 import fit.aquazero.app.core.health.HealthConnectAvailability
 import fit.aquazero.app.core.health.HealthDaySnapshot
@@ -79,7 +69,7 @@ fun HealthConnectScreen(
             HealthConnectCard(
                 modifier = Modifier.padding(
                     horizontal = AzfSpacing.ContainerMargin,
-                    vertical = AzfSpacing.ElementGapMedium,
+                    vertical = AzfSpacing.ElementGapSmall,
                 ),
             )
         }
@@ -139,14 +129,8 @@ fun HealthConnectCard(
 
     AzfCard(modifier = modifier, tier = AzfCardTier.Standard) {
         Text(
-            text = stringResource(R.string.health_card_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
-        Text(
             text = stringResource(R.string.health_card_body),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
@@ -167,8 +151,8 @@ fun HealthConnectCard(
             Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
             Text(
                 text = stringResource(messageRes),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -205,7 +189,7 @@ private fun UnavailableSection(
     Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
     Text(
         text = stringResource(body),
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
@@ -217,7 +201,7 @@ private fun UnavailableSection(
 private fun DisconnectedSection(busy: Boolean, onConnect: () -> Unit) {
     Text(
         text = stringResource(R.string.health_privacy_note),
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
@@ -233,7 +217,7 @@ private fun DisconnectedSection(busy: Boolean, onConnect: () -> Unit) {
 private fun LapsedSection(onManage: () -> Unit) {
     Text(
         text = stringResource(R.string.health_permissions_partial),
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
@@ -252,82 +236,52 @@ private fun ConnectedSection(
     if (snapshot.isEmpty) {
         Text(
             text = stringResource(R.string.health_empty),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     } else {
-        FigureRow(Icons.AutoMirrored.Outlined.DirectionsWalk, R.string.health_steps_label, snapshot.stepsText())
-        FigureRow(Icons.Outlined.Favorite, R.string.health_heart_rate_label, snapshot.averageBpmText())
-        FigureRow(Icons.Outlined.MonitorHeart, R.string.health_resting_label, snapshot.restingBpmText())
-        FigureRow(Icons.Outlined.NightsStay, R.string.health_sleep_label, snapshot.sleepText())
-        FigureRow(
-            Icons.Outlined.LocalFireDepartment,
-            R.string.health_energy_label,
-            snapshot.energyText(),
-        )
+        FigureRow(R.string.health_steps_label, snapshot.stepsText())
+        FigureRow(R.string.health_heart_rate_label, snapshot.averageBpmText())
+        FigureRow(R.string.health_resting_label, snapshot.restingBpmText())
+        FigureRow(R.string.health_sleep_label, snapshot.sleepText())
+        FigureRow(R.string.health_energy_label, snapshot.energyText(), divider = false)
         Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
         Text(
             text = stringResource(R.string.health_energy_note),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
     Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
     Text(
         text = stringResource(R.string.health_disconnect_note),
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
     SecondaryButton(text = stringResource(R.string.health_manage_action), onClick = onManage)
     Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
-    SecondaryButton(text = stringResource(R.string.health_disconnect_action), onClick = onDisconnect)
+    SecondaryButton(
+        text = stringResource(R.string.health_disconnect_action),
+        onClick = onDisconnect,
+        destructive = true,
+    )
 }
 
-/** One labelled figure. */
+/** One ruled line of today's tape. */
 @Composable
-private fun FigureRow(icon: ImageVector, @StringRes labelRes: Int, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(AzfSpacing.TouchTarget),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.size(12.dp))
-            Text(
-                text = stringResource(labelRes),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
+private fun FigureRow(@StringRes labelRes: Int, value: String, divider: Boolean = true) {
+    AzfStatRow(
+        label = stringResource(labelRes),
+        value = value,
+        valueStyle = DataSmall,
+        divider = divider,
+    )
 }
 
 @Composable
 private fun LoadingRow() {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(AzfSpacing.TouchTarget),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(20.dp),
-            color = MaterialTheme.colorScheme.primary,
-            strokeWidth = 2.dp,
-        )
-    }
+    Skeleton(modifier = Modifier.fillMaxWidth().height(AzfSpacing.TouchTarget))
 }
 
 // ----- formatting -----

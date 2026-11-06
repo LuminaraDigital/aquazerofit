@@ -39,10 +39,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -68,7 +64,6 @@ enum class AzfTab(val labelRes: Int, val icon: ImageVector, val activeIcon: Imag
 
 private const val INACTIVE_ICON_SCALE = 1f
 private const val ACTIVE_ICON_SCALE = 1.12f
-private const val QUICK_LOG_GLOW_ALPHA = 0.35f
 
 /**
  * Floating dock: two tabs, the quick-log button, two tabs. Logging is what
@@ -92,9 +87,9 @@ fun AzfBottomNav(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(68.dp)
-                .clip(AzfShapes.Dock)
+                .clip(AzfShapes.Card)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), AzfShapes.Dock),
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), AzfShapes.Card),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DockTab(AzfTab.Home, selected, onSelect)
@@ -154,7 +149,7 @@ private fun RowScope.DockTab(tab: AzfTab, selected: AzfTab, onSelect: (AzfTab) -
         )
         Text(
             text = stringResource(tab.labelRes),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = tint,
             maxLines = 1,
         )
@@ -170,18 +165,8 @@ private fun QuickLogButton(onClick: () -> Unit) {
         modifier = Modifier
             .size(56.dp)
             .pressScale(interaction)
-            .drawBehind {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(extended.primaryFixedDim.copy(alpha = QUICK_LOG_GLOW_ALPHA), Color.Transparent),
-                        center = Offset(size.width / 2f, size.height / 2f),
-                        radius = size.width * 0.8f,
-                    ),
-                    radius = size.width * 0.8f,
-                )
-            }
             .clip(CircleShape)
-            .background(extended.ctaGradient)
+            .background(extended.primaryFixedDim)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -196,7 +181,7 @@ private fun QuickLogButton(onClick: () -> Unit) {
         Icon(
             imageVector = Icons.Outlined.Add,
             contentDescription = stringResource(R.string.quick_log_open_cd),
-            tint = AzfColors.OnPrimary,
+            tint = AzfColors.OnPrimaryFixed,
             modifier = Modifier.size(28.dp),
         )
     }

@@ -9,18 +9,24 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -541,6 +548,19 @@ private fun MainShell(
             }
         }
 
+        // Edge-to-edge screens scroll under the status bar; without a ground
+        // there the clock and icons sat on top of whatever card scrolled up.
+        // The camera paints its own dark scrim over the live preview.
+        if (currentKey !is CaptureMealKey) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .windowInsetsTopHeight(WindowInsets.statusBars)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = CHROME_GROUND_ALPHA)),
+            )
+        }
+
         // Settings is a Play compliance surface. Account deletion, consents and
         // the AGPL source link all live behind it, so it must be reachable from
         // anywhere in the app, not only from one tab. The action sits in the
@@ -555,7 +575,15 @@ private fun MainShell(
                     .statusBarsPadding()
                     .padding(horizontal = 8.dp, vertical = 8.dp),
             ) {
-                IconButton(onClick = { backStack.add(SettingsKey) }) {
+                // The headers scroll away under this button, so it carries its
+                // own ground: without it the gear sat on top of whatever card
+                // had scrolled up beneath it.
+                IconButton(
+                    onClick = { backStack.add(SettingsKey) },
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = CHROME_GROUND_ALPHA)),
+                ) {
                     Icon(
                         imageVector = Icons.Outlined.Settings,
                         contentDescription = stringResource(R.string.shell_open_settings),
@@ -604,6 +632,7 @@ private fun screenBack(reducedMotion: Boolean): ContentTransform {
 
 private const val SCREEN_SHIFT_DIVISOR = 12
 private const val SCREEN_ENTER_SCALE = 0.98f
+private const val CHROME_GROUND_ALPHA = 0.9f
 
 /**
  * Entry decorators for every [NavDisplay] in the app.

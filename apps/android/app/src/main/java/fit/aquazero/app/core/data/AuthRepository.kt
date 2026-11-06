@@ -39,6 +39,10 @@ class AuthRepository @Inject constructor(
     suspend fun login(email: String, password: String): ApiResult<PublicUserDto> =
         sessionManager.login(email, password)
 
+    /** Finish "Continue with Google" with the token from [fit.aquazero.app.core.auth.GoogleSignInClient]. */
+    suspend fun loginWithFirebase(firebaseIdToken: String): ApiResult<PublicUserDto> =
+        sessionManager.loginWithFirebase(firebaseIdToken)
+
     /**
      * Does this client have to solve a challenge before a bot-gated write?
      *

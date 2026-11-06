@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -54,6 +55,7 @@ import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.MemoryFactCategory
 import fit.aquazero.app.core.model.MemoryFactDto
@@ -115,25 +117,17 @@ fun MemoryScreen(
             contentPadding = PaddingValues(
                 start = AzfSpacing.ContainerMargin,
                 end = AzfSpacing.ContainerMargin,
-                top = AzfSpacing.ContainerMargin,
-                bottom = 40.dp,
+                top = 8.dp,
+                bottom = AzfSpacing.SectionGap,
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
             item(contentType = "intro") {
-                Column {
-                    Text(
-                        text = stringResource(R.string.memory_heading),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = stringResource(R.string.memory_intro),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.memory_intro),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             if (state.loading) {
@@ -150,7 +144,7 @@ fun MemoryScreen(
             if (state.loadFailed) {
                 item(contentType = "error") {
                     ErrorState(
-                        title = stringResource(R.string.memory_title),
+                        title = stringResource(R.string.memory_error_title),
                         message = stringResource(R.string.memory_error),
                         retryLabel = stringResource(R.string.memory_retry),
                         onRetry = viewModel::load,
@@ -162,12 +156,8 @@ fun MemoryScreen(
             if (state.summary.isNotEmpty()) {
                 item(contentType = "summary") {
                     AzfCard(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = stringResource(R.string.memory_summary_heading).uppercase(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = AzfColors.SecondaryFixedDim,
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        AzfSectionHeading(stringResource(R.string.memory_summary_heading))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = state.summary,
                             style = MaterialTheme.typography.bodyMedium,
@@ -196,9 +186,8 @@ fun MemoryScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = stringResource(R.string.memory_suggested_body),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 4.dp),
                         )
                     }
                 }
@@ -235,7 +224,10 @@ fun MemoryScreen(
 
             if (state.rejected.isNotEmpty()) {
                 item(contentType = "rejected-toggle") {
-                    TextButton(onClick = viewModel::toggleRejected) {
+                    TextButton(
+                        onClick = viewModel::toggleRejected,
+                        modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
+                    ) {
                         Text(
                             text = stringResource(
                                 R.string.memory_rejected_heading,
@@ -271,7 +263,7 @@ fun MemoryScreen(
                 AzfCard(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = stringResource(R.string.memory_forget_body),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.height(16.dp))
@@ -279,6 +271,7 @@ fun MemoryScreen(
                         text = stringResource(R.string.memory_forget_cta),
                         onClick = viewModel::showForgetDialog,
                         enabled = state.canForget,
+                        destructive = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -295,7 +288,7 @@ fun MemoryScreen(
                 TextButton(onClick = viewModel::forgetEverything, enabled = !state.busy) {
                     Text(
                         text = stringResource(R.string.memory_forget_confirm),
-                        color = AzfColors.Coral,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             },
@@ -323,7 +316,7 @@ private fun ConsentOffState(onReviewConsents: () -> Unit, modifier: Modifier = M
         Icon(
             imageVector = Icons.Outlined.Spa,
             contentDescription = null,
-            tint = AzfColors.SecondaryFixedDim,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(56.dp),
         )
         Spacer(modifier = Modifier.height(16.dp))
@@ -437,7 +430,7 @@ private fun ConfirmedFactCard(
             IconTextButton(
                 icon = Icons.Outlined.Delete,
                 label = stringResource(R.string.memory_delete),
-                tint = AzfColors.Coral,
+                tint = MaterialTheme.colorScheme.error,
                 enabled = !busy,
                 onClick = onDelete,
             )
@@ -473,7 +466,7 @@ private fun RejectedFactCard(
             IconTextButton(
                 icon = Icons.Outlined.Delete,
                 label = stringResource(R.string.memory_delete),
-                tint = AzfColors.Coral,
+                tint = MaterialTheme.colorScheme.error,
                 enabled = !busy,
                 onClick = onDelete,
             )
@@ -486,13 +479,13 @@ private fun FactMeta(fact: MemoryFactDto) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = stringResource(categoryLabel(fact.category)).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = AzfColors.SecondaryFixedDim,
+            style = StatLabel,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.size(8.dp))
         Text(
             text = stringResource(sourceLabel(fact.source.kind)),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -506,14 +499,18 @@ private fun IconTextButton(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    TextButton(onClick = onClick, enabled = enabled) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = tint,
             modifier = Modifier.size(18.dp),
         )
-        Spacer(modifier = Modifier.size(6.dp))
+        Spacer(modifier = Modifier.size(8.dp))
         Text(text = label, color = tint, style = MaterialTheme.typography.labelLarge)
     }
 }
@@ -521,11 +518,7 @@ private fun IconTextButton(
 @Composable
 private fun AddFactCard(state: MemoryUiState, viewModel: MemoryViewModel) {
     AzfCard(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.memory_add_heading).uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = AzfColors.SecondaryFixedDim,
-        )
+        AzfSectionHeading(stringResource(R.string.memory_add_heading))
         Spacer(modifier = Modifier.height(12.dp))
         AzfTextField(
             value = state.draftText,
@@ -534,11 +527,7 @@ private fun AddFactCard(state: MemoryUiState, viewModel: MemoryViewModel) {
             singleLine = false,
         )
         Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = stringResource(R.string.memory_category_label),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        AzfSectionHeading(stringResource(R.string.memory_category_label))
         Spacer(modifier = Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -549,13 +538,14 @@ private fun AddFactCard(state: MemoryUiState, viewModel: MemoryViewModel) {
                     text = stringResource(categoryLabel(category)),
                     selected = state.draftCategory == category,
                     onClick = { viewModel.onDraftCategoryChange(category) },
+                    modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
                 )
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(categoryHint(state.draftCategory)),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(16.dp))

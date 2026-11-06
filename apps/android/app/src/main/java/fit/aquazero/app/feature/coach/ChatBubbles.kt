@@ -56,19 +56,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
-import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.model.ChatToolCallDto
 import fit.aquazero.app.core.ui.CoachAvatar
 import fit.aquazero.app.core.ui.CoachPersona
 import fit.aquazero.app.core.ui.CoachRoster
 
-/** Bubble corner radii: the tail corner is tight, the rest are card-round. */
-private val UserBubbleShape = RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp)
-private val AssistantBubbleShape = RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp)
+/** Bubble corner radii: card-round, with a control-tight tail corner. */
+private val UserBubbleShape = RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
+private val AssistantBubbleShape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp)
 
 /**
  * Compiled once, not once per recomposition.
@@ -80,7 +80,11 @@ private val AssistantBubbleShape = RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp)
  */
 private val CAMEL_BOUNDARY = Regex("([a-z])([A-Z])")
 
-/** The user's own turn: gradient fill, right-aligned, no affordances. */
+/**
+ * The user's own turn: a raised neutral surface, right-aligned, no
+ * affordances. Neutral on purpose: aqua marks the next thing to do, and the
+ * coach's reply is what the user came to read.
+ */
 @Composable
 fun UserBubble(
     content: String,
@@ -95,19 +99,19 @@ fun UserBubble(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
                 .clip(UserBubbleShape)
-                .background(LocalAzfExtended.current.ctaGradient)
-                .padding(14.dp),
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .padding(16.dp),
         ) {
             Text(
                 text = content,
-                style = MaterialTheme.typography.bodyMedium,
-                color = AzfColors.OnPrimary,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
         if (timestamp != null) {
             Text(
                 text = timestamp,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, end = 8.dp),
             )
@@ -175,7 +179,7 @@ fun AssistantBubble(
                 }
             }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
         Box(modifier = Modifier.fillMaxWidth(0.92f)) {
             val bubble = Modifier
                 .fillMaxWidth()
@@ -202,21 +206,14 @@ fun AssistantBubble(
             } else {
                 Column(
                     modifier = bubble
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                        .border(
-                            BorderStroke(
-                                1.dp,
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                            ),
-                            AssistantBubbleShape,
-                        )
-                        .padding(14.dp),
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(16.dp),
                 ) {
-                    MiniMarkdownText(text = content)
+                    MiniMarkdownText(text = content, style = MaterialTheme.typography.bodyLarge)
                     if (toolCalls.isNotEmpty()) {
                         ToolCards(
                             toolCalls = toolCalls,
-                            modifier = Modifier.padding(top = 10.dp),
+                            modifier = Modifier.padding(top = 12.dp),
                         )
                     }
                     if (actions.isNotEmpty() && onActionClick != null) {
@@ -249,7 +246,7 @@ fun AssistantBubble(
             if (reported) {
                 Text(
                     text = stringResource(R.string.coach_reported_badge),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = LocalAzfExtended.current.coral,
                     modifier = Modifier.padding(end = 8.dp),
                 )
@@ -257,7 +254,7 @@ fun AssistantBubble(
             if (timestamp != null) {
                 Text(
                     text = timestamp,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -295,14 +292,14 @@ fun ActionChipGroup(
                 // ~32dp while the tap area is Material's minimum; putting the
                 // minimum inside would have inflated the visible pill instead.
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(AzfShapes.Inner)
                     .clickable(enabled = !executed, role = Role.Button) {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         executedActionIds = executedActionIds + action.id
                         onActionClick(action)
                     }
                     .minimumInteractiveComponentSize()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(AzfShapes.Inner)
                     .background(bg)
                     .border(
                         BorderStroke(
@@ -313,7 +310,7 @@ fun ActionChipGroup(
                                 MaterialTheme.colorScheme.outlineVariant
                             },
                         ),
-                        RoundedCornerShape(12.dp),
+                        AzfShapes.Inner,
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -332,7 +329,7 @@ fun ActionChipGroup(
                     },
                     modifier = Modifier.size(16.dp),
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = if (executed) stringResource(R.string.coach_action_logged) else action.label,
                     style = MaterialTheme.typography.labelMedium,
@@ -368,7 +365,7 @@ fun SafetyFrame(
         modifier = modifier
             .background(calm.copy(alpha = 0.10f))
             .border(BorderStroke(1.dp, calm.copy(alpha = 0.4f)), AssistantBubbleShape)
-            .padding(14.dp)
+            .padding(16.dp)
             .semantics { contentDescription = description },
         verticalAlignment = Alignment.Top,
     ) {
@@ -380,8 +377,12 @@ fun SafetyFrame(
                 .size(20.dp)
                 .padding(end = 2.dp),
         )
-        Spacer(Modifier.width(10.dp))
-        MiniMarkdownText(text = content, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.width(12.dp))
+        MiniMarkdownText(
+            text = content,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -453,18 +454,18 @@ fun ToolCards(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(AzfShapes.Inner)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                     .padding(12.dp),
             ) {
                 Text(
                     text = toolLabel(call.tool).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = LocalAzfExtended.current.primaryFixedDim,
+                    style = StatLabel,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = call.resultSummary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
@@ -495,34 +496,29 @@ internal fun humaniseTool(tool: String): String {
     return words.replaceFirstChar { it.uppercase() }
 }
 
-/** The persistent wellness disclaimer. Never dismissible, never collapsed. */
+/**
+ * The persistent wellness disclaimer. Never dismissible, never collapsed, but
+ * a quiet single line: an icon and a caption, no card around it.
+ */
 @Composable
 fun WellnessDisclaimerBar(modifier: Modifier = Modifier) {
-    val description = stringResource(R.string.coach_disclaimer_cd)
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(AzfShapes.Inner)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-                AzfShapes.Inner,
-            )
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-            .semantics { contentDescription = description },
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Outlined.Info,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.tertiaryContainer,
-            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
         )
         Text(
             text = stringResource(R.string.coach_disclaimer),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 10.dp),
+            // Wraps rather than truncates: this is compliance copy, so every
+            // word of it has to stay readable.
+            modifier = Modifier.padding(start = 8.dp),
         )
     }
 }

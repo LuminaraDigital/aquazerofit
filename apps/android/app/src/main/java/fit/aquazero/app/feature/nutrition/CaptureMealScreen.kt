@@ -33,17 +33,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FlashlightOff
 import androidx.compose.material.icons.outlined.FlashlightOn
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Replay
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -84,6 +82,7 @@ import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfChip
 import fit.aquazero.app.core.designsystem.AzfShapes
+import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
@@ -346,11 +345,12 @@ private fun CaptureHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.45f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .background(OverlayHeaderScrim)
+            .statusBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RoundIconButton(
+        OverlayControl(
             icon = Icons.Outlined.Close,
             contentDescription = stringResource(R.string.capture_close_cd),
             onClick = onBack,
@@ -362,16 +362,16 @@ private fun CaptureHeader(
             Text(
                 text = stringResource(R.string.capture_title),
                 style = MaterialTheme.typography.titleLarge,
-                color = LocalAzfExtended.current.primaryFixedDim,
+                color = OverlayInk,
             )
             Text(
                 text = stringResource(R.string.capture_subtitle),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.labelMedium,
+                color = OverlayInkMuted,
             )
         }
         if (hasTorch) {
-            RoundIconButton(
+            OverlayControl(
                 icon = if (torchOn) Icons.Outlined.FlashlightOn else Icons.Outlined.FlashlightOff,
                 contentDescription = stringResource(
                     if (torchOn) R.string.capture_torch_off_cd else R.string.capture_torch_on_cd,
@@ -379,7 +379,7 @@ private fun CaptureHeader(
                 onClick = onToggleTorch,
             )
         } else {
-            Spacer(modifier = Modifier.size(40.dp))
+            Spacer(modifier = Modifier.size(AzfSpacing.TouchTarget))
         }
     }
 }
@@ -387,46 +387,26 @@ private fun CaptureHeader(
 @Composable
 private fun CaptureGuidance(state: CaptureMealUiState) {
     when {
-        state.uploading -> Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
+        // The spinner lives inside the Analyse button; this is just the status.
+        state.uploading || state.preparing -> Text(
+            text = stringResource(
+                if (state.uploading) R.string.capture_uploading else R.string.capture_preparing,
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = OverlayInk,
             modifier = Modifier
                 .clip(AzfShapes.Inner)
-                .background(Color.Black.copy(alpha = 0.55f))
-                .padding(24.dp)
+                .background(OverlayPillScrim)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
                 .semantics { liveRegion = LiveRegionMode.Polite },
-        ) {
-            CircularProgressIndicator(color = LocalAzfExtended.current.primaryFixedDim)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.capture_uploading),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
-            )
-        }
-
-        state.preparing -> Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .clip(AzfShapes.Inner)
-                .background(Color.Black.copy(alpha = 0.55f))
-                .padding(24.dp)
-                .semantics { liveRegion = LiveRegionMode.Polite },
-        ) {
-            CircularProgressIndicator(color = LocalAzfExtended.current.primaryFixedDim)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.capture_preparing),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
-            )
-        }
+        )
 
         else -> Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .padding(horizontal = 24.dp)
                 .clip(AzfShapes.Inner)
-                .background(Color.Black.copy(alpha = 0.4f))
+                .background(OverlayPillScrim)
                 .padding(horizontal = 20.dp, vertical = 12.dp),
         ) {
             Text(
@@ -438,14 +418,14 @@ private fun CaptureGuidance(state: CaptureMealUiState) {
                     },
                 ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
+                color = OverlayInk,
                 textAlign = TextAlign.Center,
             )
             if (state.staged == null) {
                 Text(
                     text = stringResource(R.string.capture_hint_lighting),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = OverlayInkMuted,
                     textAlign = TextAlign.Center,
                 )
             }
@@ -494,7 +474,7 @@ private fun CaptureControls(
             .fillMaxWidth()
             .background(
                 Brush.verticalGradient(
-                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f), Color.Black),
+                    listOf(Color.Transparent, OverlayFooterScrim, Color.Black),
                 ),
             )
             .navigationBarsPadding()
@@ -504,7 +484,7 @@ private fun CaptureControls(
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 20.dp),
+            modifier = Modifier.padding(bottom = 16.dp),
         ) {
             NutritionFormat.MEAL_TYPES.forEach { mealType ->
                 AzfChip(
@@ -520,7 +500,7 @@ private fun CaptureControls(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SquareIconButton(
+            OverlayControl(
                 icon = Icons.Outlined.PhotoLibrary,
                 contentDescription = stringResource(R.string.capture_gallery_cd),
                 enabled = !state.uploading,
@@ -535,7 +515,7 @@ private fun CaptureControls(
                 onClick = onShutter,
             )
 
-            SquareIconButton(
+            OverlayControl(
                 icon = Icons.Outlined.Replay,
                 contentDescription = stringResource(R.string.capture_retake_cd),
                 enabled = state.staged != null && !state.uploading,
@@ -549,7 +529,7 @@ private fun CaptureControls(
                 onClick = onAnalyze,
                 enabled = state.canAnalyze,
                 loading = state.uploading,
-                modifier = Modifier.padding(top = 20.dp),
+                modifier = Modifier.padding(top = 16.dp),
             )
         }
     }
@@ -607,7 +587,7 @@ internal fun CameraRationale(
 @Composable
 internal fun ViewfinderBrackets(modifier: Modifier = Modifier) {
     val accent = LocalAzfExtended.current.primaryFixedDim
-    Box(modifier = modifier.padding(horizontal = 32.dp, vertical = 120.dp)) {
+    Box(modifier = modifier.padding(start = 32.dp, end = 32.dp, top = 120.dp, bottom = 280.dp)) {
         Bracket(accent, Alignment.TopStart)
         Bracket(accent, Alignment.TopEnd)
         Bracket(accent, Alignment.BottomStart)
@@ -640,51 +620,23 @@ private fun BoxScope.Bracket(
     }
 }
 
+/** The shared 48dp circle, dressed for use over the camera image. */
 @Composable
-private fun RoundIconButton(
+private fun OverlayControl(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.12f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        IconButton(onClick = onClick) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = Color.White,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SquareIconButton(
-    icon: ImageVector,
-    contentDescription: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .size(56.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color.White.copy(alpha = if (enabled) 0.14f else 0.05f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        IconButton(onClick = onClick, enabled = enabled) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = Color.White.copy(alpha = if (enabled) 1f else 0.4f),
-            )
-        }
-    }
+    CircleIconControl(
+        icon = icon,
+        contentDescription = contentDescription,
+        onClick = onClick,
+        enabled = enabled,
+        tint = OverlayInk,
+        container = OverlayControlFill,
+        ring = Color.Transparent,
+    )
 }
 
 @Composable
@@ -694,7 +646,7 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .size(80.dp)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = if (enabled) 1f else 0.35f)),
+            .background(OverlayInk.copy(alpha = if (enabled) 1f else 0.35f)),
         contentAlignment = Alignment.Center,
     ) {
         IconButton(
@@ -706,12 +658,22 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(68.dp)
                     .clip(CircleShape)
-                    .border(3.dp, Color.Black.copy(alpha = 0.6f), CircleShape)
+                    .border(3.dp, OverlayShutterRing, CircleShape)
                     .semantics { contentDescription = label },
             )
         }
     }
 }
+
+// White-on-camera colours. The image behind is unknowable, so these are fixed
+// rather than themed: ink that is always light over scrims that are always dark.
+private val OverlayInk = Color.White
+private val OverlayInkMuted = Color.White.copy(alpha = 0.7f)
+private val OverlayControlFill = Color.White.copy(alpha = 0.14f)
+private val OverlayHeaderScrim = Color.Black.copy(alpha = 0.45f)
+private val OverlayPillScrim = Color.Black.copy(alpha = 0.55f)
+private val OverlayFooterScrim = Color.Black.copy(alpha = 0.85f)
+private val OverlayShutterRing = Color.Black.copy(alpha = 0.6f)
 
 // ---------------------------------------------------------------------------
 // Platform helpers

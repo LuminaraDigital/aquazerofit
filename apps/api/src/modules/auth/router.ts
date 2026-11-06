@@ -24,8 +24,9 @@ import {
   register,
   requestPasswordReset,
   telegramAuth,
+  tokensFor,
 } from './service';
-import { firebaseSession } from './firebaseUsers';
+import { ensureUserFromFirebase, firebaseSession, type FirebaseIdentity } from './firebaseUsers';
 import { verifyFirebaseIdToken, isFirebaseAdminConfigured } from '../../platform/firebaseAdmin';
 import {
   clearRefreshCookie,
@@ -121,6 +122,31 @@ authRouter.post('/telegram', (req, res) => {
   sendAuth(req, res, telegramAuth(initData, clientIpForRateLimit(req)));
 });
 
+/** Verify the `Authorization: Bearer <Firebase ID token>` header or throw. */
+async function firebaseIdentityFrom(req: { headers: { authorization?: string } }): Promise<FirebaseIdentity> {
+  if (!isFirebaseAdminConfigured()) {
+    throw new AppError('AUTH_INVALID', 'Firebase Auth is not configured on this server');
+  }
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    throw new AppError('AUTH_REQUIRED', 'Firebase ID token required');
+  }
+  const identity = await verifyFirebaseIdToken(header.slice(7)).catch((err: unknown) => {
+    // A token the verifier rejects (expired, revoked, forged, disabled user)
+    // is the caller's problem: 401. Anything else, such as a broken server
+    // credential ('app/...' or 'auth/internal-error'), stays a logged 500.
+    const code = (err as { code?: unknown }).code;
+    if (typeof code === 'string' && code.startsWith('auth/') && code !== 'auth/internal-error') {
+      return null;
+    }
+    throw err;
+  });
+  if (!identity) {
+    throw new AppError('AUTH_INVALID', 'Firebase ID token required');
+  }
+  return identity;
+}
+
 /**
  * Web Firebase Auth session bootstrap. Client signs in with the Firebase SDK,
  * then POSTs here with Authorization: Bearer <ID_TOKEN>. Hydrates / links the
@@ -131,21 +157,22 @@ authRouter.post('/telegram', (req, res) => {
 authRouter.post(
   '/firebase/session',
   asyncHandler(async (req, res) => {
-    if (!isFirebaseAdminConfigured()) {
-      throw new AppError(
-        'AUTH_INVALID',
-        'Firebase Auth is not configured on this server',
-      );
-    }
-    const header = req.headers.authorization;
-    if (!header?.startsWith('Bearer ')) {
-      throw new AppError('AUTH_REQUIRED', 'Firebase ID token required');
-    }
-    const identity = await verifyFirebaseIdToken(header.slice(7));
-    if (!identity) {
-      throw new AppError('AUTH_INVALID', 'Firebase ID token required');
-    }
-    res.json(firebaseSession(identity, req.ip));
+    res.json(firebaseSession(await firebaseIdentityFrom(req), req.ip));
+  }),
+);
+
+/**
+ * Native Firebase sign-in (Android "Continue with Google"). Same identity
+ * rules as /firebase/session (ensureUserFromFirebase), but answers with the
+ * access + refresh pair password login returns, so the native client keeps one
+ * session model: rotated refresh tokens, family revocation, purge on account
+ * switch. The Firebase ID token is spent here and never stored by the client.
+ */
+authRouter.post(
+  '/firebase/token',
+  asyncHandler(async (req, res) => {
+    const user = ensureUserFromFirebase(await firebaseIdentityFrom(req), req.ip);
+    sendAuth(req, res, tokensFor(user));
   }),
 );
 

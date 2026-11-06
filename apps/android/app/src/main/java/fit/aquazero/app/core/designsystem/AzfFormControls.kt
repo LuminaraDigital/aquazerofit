@@ -31,6 +31,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
@@ -350,14 +352,17 @@ fun AzfNavigationRow(
     }
 }
 
-/** A small uppercase section heading, used across the settings stack. */
+/**
+ * The section label every screen uses above a group of content: condensed
+ * capitals tracked +8% ([StatLabel]), announced as a heading.
+ */
 @Composable
 fun AzfSectionHeading(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.titleSmall,
+        style = StatLabel,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(start = 4.dp),
+        modifier = modifier.semantics { heading() },
     )
 }
 

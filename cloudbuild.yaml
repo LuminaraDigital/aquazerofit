@@ -2,8 +2,17 @@
 # service.
 #
 # Operator command, from the repo root, after the IAM and Artifact Registry
-# steps in docs/CLOUDFLARE_CUTOVER.md:
-#   gcloud builds submit --project=aquazerofit --config=cloudbuild.yaml
+# steps in docs/CLOUDFLARE_CUTOVER.md. The region matches the Cloud Run
+# service. COMMIT_SHA is empty on a manual submit unless it is passed:
+#   gcloud builds submit --project=aquazerofit --region=australia-southeast1 \
+#     --config=cloudbuild.yaml --substitutions=COMMIT_SHA=$(git rev-parse HEAD)
+#
+# The Cloud Build service account needs permission to deploy aquazerofit-api.
+# This project is still missing run.services.get on that account
+# (docs/launch-checklist.md), and the deploy also needs
+# roles/iam.serviceAccountUser on the runtime account azf-api.
+# This updates the API only: the public frontend ships with the Worker
+# (docs/OPERATIONS.md, "Deploying to production").
 #
 # This config does not map aquazerofit.com and does not change Cloudflare DNS.
 # The image tag is the commit SHA, not :latest.

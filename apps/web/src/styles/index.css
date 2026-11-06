@@ -214,6 +214,18 @@ html.tg-active .min-h-screen {
     background: rgb(var(--azf-primary-fixed-dim));
   }
 
+  /* The one label style for the signed-in app: a section label above a
+     group, a stat-row label, a figure's caption. Always neutral; aqua is for
+     actions and selection only. Android `statLabel`. */
+  .stat-label {
+    @apply font-heading text-[14px] font-semibold uppercase leading-4 tracking-[0.08em] text-on-surface-variant;
+  }
+
+  /* Android `scoreboard`: the one figure per screen. */
+  .scoreboard {
+    @apply font-heading text-[56px] font-semibold leading-none tabular-nums text-on-surface;
+  }
+
   .heading-display {
     @apply font-heading font-semibold uppercase tracking-[0.04em];
   }

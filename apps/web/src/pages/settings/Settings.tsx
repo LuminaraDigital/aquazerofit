@@ -299,7 +299,7 @@ export default function Settings() {
               info
             </span>
             <div className="space-y-1">
-              <h3 className="text-sm font-bold text-secondary uppercase tracking-wider">
+              <h3 className="stat-label">
                 Wellness Disclaimer
               </h3>
               <p className="text-xs text-on-surface-variant leading-relaxed">
@@ -311,7 +311,7 @@ export default function Settings() {
 
         {/* Wellness profile - the only section that needs the profile */}
         <section>
-          <h3 className="font-heading font-semibold uppercase tracking-wide text-xl text-primary mb-3 px-2">
+          <h3 className="stat-label mb-3 px-2">
             Wellness Profile
           </h3>
           {profile ? (
@@ -334,7 +334,7 @@ export default function Settings() {
 
         {/* Preferences */}
         <section>
-          <h3 className="font-heading font-semibold uppercase tracking-wide text-xl text-primary mb-3 px-2">
+          <h3 className="stat-label mb-3 px-2">
             Preferences
           </h3>
           <div className="glass-card overflow-hidden">
@@ -396,7 +396,7 @@ export default function Settings() {
         >
           <h3
             id="privacy-consents-heading"
-            className="font-heading font-semibold uppercase tracking-wide text-xl text-primary mb-3 px-2"
+            className="stat-label mb-3 px-2"
           >
             Privacy & Consents
           </h3>
@@ -521,7 +521,7 @@ export default function Settings() {
 
         {/* Danger zone */}
         <section>
-          <h3 className="font-heading font-semibold uppercase tracking-wide text-xl text-coral mb-3 px-2">
+          <h3 className="stat-label mb-3 px-2">
             Danger Zone
           </h3>
           <div className="glass-card border-coral/40 p-card-padding space-y-3">

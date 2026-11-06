@@ -223,7 +223,7 @@ export default function Challenges() {
                 <GlassCard key={c.id} className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                      <p className="stat-label">
                         {KIND_LABELS[c.kind]} · {c.status}
                       </p>
                       <p className="mt-1 font-mono text-lg text-on-surface">{c.code}</p>

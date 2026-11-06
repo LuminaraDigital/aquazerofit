@@ -152,7 +152,7 @@ export default function MealPlan() {
         {/* Daily totals vs targets */}
         <section className="mb-6" aria-label="Planned totals">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="font-heading font-semibold uppercase tracking-[0.02em] text-xl text-primary">
+            <h2 className="stat-label">
               Today's Selection
             </h2>
             <span className="text-sm text-secondary font-medium tabular-nums">

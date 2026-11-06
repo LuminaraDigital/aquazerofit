@@ -563,7 +563,7 @@ export default function WorkoutDetail() {
 
           {phase === 'work' ? (
             <GlassCard className="p-6 text-center">
-              <p className="text-xs font-bold uppercase tracking-widest text-primary">
+              <p className="stat-label">
                 Current exercise
               </p>
               <h2 className="heading-display mt-2 font-heading text-3xl text-on-surface">
@@ -686,7 +686,7 @@ export default function WorkoutDetail() {
             </GlassCard>
           ) : (
             <GlassCard className="p-6 text-center">
-              <p className="text-xs font-bold uppercase tracking-widest text-secondary">Rest</p>
+              <p className="stat-label">Rest</p>
               <div className="mt-4 flex justify-center">
                 <RingProgress
                   value={restTotal - restLeft}

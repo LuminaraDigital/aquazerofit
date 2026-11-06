@@ -179,7 +179,7 @@ function ToolCards({ toolCalls }: { toolCalls: ChatToolCall[] }) {
     <div className="mt-2 space-y-2">
       {toolCalls.map((tc, i) => (
         <GlassCard key={`${tc.tool}-${i}`} className="p-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary">
+          <p className="stat-label">
             {TOOL_LABELS[tc.tool] ?? humaniseTool(tc.tool)}
           </p>
           <p className="mt-1 text-sm text-on-surface-variant">{tc.resultSummary}</p>

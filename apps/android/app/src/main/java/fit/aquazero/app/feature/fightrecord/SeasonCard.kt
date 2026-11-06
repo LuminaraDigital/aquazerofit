@@ -101,7 +101,7 @@ internal fun SeasonCardContent(
                 )
                 Text(
                     text = stringResource(R.string.fight_record_season_subtitle, season.name, seasonDatesText(season)),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -130,7 +130,7 @@ internal fun SeasonCardContent(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = daysLeftText(current.daysLeft),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )

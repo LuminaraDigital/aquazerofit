@@ -53,7 +53,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -73,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.audio.SpeechInputState
 import fit.aquazero.app.core.database.ChatMessageEntity
+import fit.aquazero.app.core.designsystem.ActiveFrame
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
@@ -81,7 +81,6 @@ import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.GlowFrame
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
@@ -407,7 +406,7 @@ private fun LoadingConversation() {
         modifier = Modifier
             .fillMaxSize()
             .padding(AzfSpacing.ContainerMargin),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Skeleton(modifier = Modifier.fillMaxWidth(0.75f).height(78.dp), shape = AzfShapes.Card)
         Skeleton(modifier = Modifier.fillMaxWidth(0.6f).height(52.dp), shape = AzfShapes.Card)
@@ -444,7 +443,7 @@ private fun Conversation(
             horizontal = AzfSpacing.ContainerMargin,
             vertical = 12.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         reverseLayout = true,
     ) {
         state.draft?.let { draft ->
@@ -464,10 +463,10 @@ private fun Conversation(
             item(key = "proposing") {
                 Column {
                     CoachByline(state.persona)
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(8.dp))
                     Text(
                         text = stringResource(R.string.draft_reading),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -556,7 +555,7 @@ private fun DraftBlock(
 ) {
     Column {
         CoachByline(persona)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
         MealDraftCard(
             draft = draft,
             pending = pending,
@@ -580,7 +579,7 @@ private fun TurnFailureFrame(
 ) {
     Column {
         CoachByline(persona)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
         SafetyFrame(
             content = stringResource(coachTurnFailureMessageRes(failure)),
             modifier = Modifier.fillMaxWidth(0.92f),
@@ -633,16 +632,15 @@ private fun EmptyConversation(state: CoachUiState, onPrompt: (String) -> Unit) {
                 R.string.coach_greeting_body,
                 stringResource(state.persona.taglineRes),
             ),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = 8.dp),
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(24.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             prompts.forEach { prompt ->
-                val (icon, tint) = coachActionStyle(prompt)
-                CoachActionRow(text = prompt, icon = icon, tint = tint, onClick = { onPrompt(prompt) })
+                CoachActionRow(text = prompt, icon = coachActionIcon(prompt), onClick = { onPrompt(prompt) })
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -662,49 +660,50 @@ private fun EmptyConversation(state: CoachUiState, onPrompt: (String) -> Unit) {
  * server, so position says nothing about topic; anything unrecognised gets the
  * neutral spark rather than a misleading picture.
  */
-@Composable
-private fun coachActionStyle(prompt: String): Pair<ImageVector, Color> {
-    val extended = LocalAzfExtended.current
+private fun coachActionIcon(prompt: String): ImageVector {
     val text = prompt.lowercase()
     return when {
-        listOf("eat", "meal", "dinner", "lunch", "breakfast").any(text::contains) ->
-            Icons.Outlined.Restaurant to extended.primaryFixedDim
-        listOf("workout", "train").any(text::contains) ->
-            Icons.Outlined.FitnessCenter to extended.secondaryFixedDim
-        "weight" in text -> Icons.Outlined.MonitorWeight to extended.coral
-        "tracking" in text -> Icons.Outlined.Insights to extended.warning
-        else -> Icons.Outlined.AutoAwesome to extended.primaryFixedDim
+        listOf("eat", "meal", "dinner", "lunch", "breakfast").any(text::contains) -> Icons.Outlined.Restaurant
+        listOf("workout", "train").any(text::contains) -> Icons.Outlined.FitnessCenter
+        "weight" in text -> Icons.Outlined.MonitorWeight
+        "tracking" in text -> Icons.Outlined.Insights
+        else -> Icons.Outlined.AutoAwesome
     }
 }
 
 /** One suggested prompt: a full-width thumb target rather than a small chip. */
 @Composable
-private fun CoachActionRow(text: String, icon: ImageVector, tint: Color, onClick: () -> Unit) {
+private fun CoachActionRow(text: String, icon: ImageVector, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 60.dp)
+            .heightIn(min = 56.dp)
             .pressScale(interaction)
             .clip(AzfShapes.Card)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(tint.copy(alpha = 0.16f)),
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
         }
         Spacer(Modifier.width(12.dp))
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }
@@ -737,7 +736,7 @@ private fun Composer(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
             .imePadding()
-            .padding(horizontal = AzfSpacing.ContainerMargin, vertical = 10.dp),
+            .padding(horizontal = AzfSpacing.ContainerMargin, vertical = 8.dp),
     ) {
         if (state.sessionId == null && !state.loading) {
             Text(
@@ -769,15 +768,15 @@ private fun Composer(
             }
         }
 
-        GlowFrame(
+        ActiveFrame(
             active = isListening || state.streaming || hasText,
-            shape = AzfShapes.Composer,
+            shape = AzfShapes.Card,
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(AzfShapes.Composer)
+                .clip(AzfShapes.Card)
                 .background(MaterialTheme.colorScheme.surfaceContainerLow),
         ) {
-            Column(modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp)) {
+            Column(modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
                 ComposerField(
                     value = value,
                     onValueChange = onValueChange,
@@ -835,7 +834,7 @@ private fun ComposerField(
         onValueChange = onValueChange,
         enabled = enabled,
         maxLines = COMPOSER_MAX_LINES,
-        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
         cursorBrush = SolidColor(LocalAzfExtended.current.primaryFixedDim),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
         modifier = Modifier
@@ -847,7 +846,7 @@ private fun ComposerField(
                 if (value.isEmpty()) {
                     Text(
                         text = placeholder,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -864,15 +863,11 @@ private fun SendButton(enabled: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
-            .size(44.dp)
+            .size(48.dp)
             .pressScale(interaction)
             .clip(CircleShape)
             .background(
-                if (enabled) {
-                    extended.ctaGradient
-                } else {
-                    SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh)
-                },
+                if (enabled) extended.primaryFixedDim else MaterialTheme.colorScheme.surfaceContainerHigh,
             )
             .clickable(
                 enabled = enabled,

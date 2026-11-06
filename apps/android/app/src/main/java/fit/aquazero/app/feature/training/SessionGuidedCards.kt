@@ -27,16 +27,17 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfHeroSurface
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
-import fit.aquazero.app.core.designsystem.DataLarge
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.RingProgress
+import fit.aquazero.app.core.designsystem.Scoreboard
 import fit.aquazero.app.core.designsystem.SecondaryButton
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.designsystem.pressScale
 import fit.aquazero.app.core.ui.CoachAvatar
 import fit.aquazero.app.core.ui.CoachRoster
@@ -73,7 +74,7 @@ internal fun SessionProgressHeader(state: WorkoutSessionUiState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(AzfSpacing.ElementGapSmall))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -96,7 +97,7 @@ internal fun SessionProgressHeader(state: WorkoutSessionUiState) {
                                 .fillMaxWidth(fill)
                                 .height(8.dp)
                                 .clip(AzfShapes.Pill)
-                                .background(extended.ctaGradient),
+                                .background(extended.primaryFixedDim),
                         )
                     }
                 }
@@ -117,12 +118,8 @@ internal fun WorkCard(
 ) {
     val setNumber = state.currentSetsDone + 1
     AzfHeroSurface {
-        Text(
-            text = stringResource(R.string.session_current_exercise).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = LocalAzfExtended.current.primaryFixedDim,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
+        AzfSectionHeading(text = stringResource(R.string.session_current_exercise))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = entry.name.uppercase(),
             style = MaterialTheme.typography.headlineLarge,
@@ -138,7 +135,7 @@ internal fun WorkCard(
                 text = notes,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
 
@@ -222,7 +219,7 @@ private fun TapTarget(
             .size(TAP_TARGET_SIZE.dp)
             .pressScale(interaction)
             .clip(AzfShapes.Pill)
-            .background(LocalAzfExtended.current.ctaGradient)
+            .background(LocalAzfExtended.current.primaryFixedDim)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -236,13 +233,18 @@ private fun TapTarget(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = stringResource(R.string.session_set_counter, setNumber, totalSets),
-                style = DataLarge.copy(fontSize = 40.sp, lineHeight = 44.sp),
+                text = stringResource(R.string.session_set_of_label, setNumber, totalSets).uppercase(),
+                style = StatLabel,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+            Text(
+                text = setNumber.toString(),
+                style = Scoreboard,
                 color = MaterialTheme.colorScheme.onPrimary,
             )
             Text(
                 text = stringResource(R.string.session_tap_when_done).uppercase(),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onPrimary,
             )
         }
@@ -290,13 +292,13 @@ internal fun RestCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = state.restLeftSeconds.toString(),
-                    style = DataLarge.copy(fontSize = 56.sp, lineHeight = 60.sp),
+                    style = Scoreboard,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = stringResource(R.string.session_rest).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = LocalAzfExtended.current.secondaryFixedDim,
+                    style = StatLabel,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

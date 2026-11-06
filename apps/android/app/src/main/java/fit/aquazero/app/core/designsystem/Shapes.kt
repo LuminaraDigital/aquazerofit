@@ -5,34 +5,25 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
 /**
- * "Liquid Geometric" shape language: 20dp cards, 16dp inner elements, full
- * pills for chips and buttons.
+ * Two radii and a pill (docs/design.md). Corners nest concentrically: a tile
+ * inset 8dp inside a [Card] takes [Inner].
  */
 object AzfShapes {
-    /** Card corner radius. */
-    val Card = RoundedCornerShape(20.dp)
+    /** Containers: cards, sheets, the bottom dock, the coach composer. */
+    val Card = RoundedCornerShape(16.dp)
 
-    /** Inner element radius (inputs, nested tiles). */
-    val Inner = RoundedCornerShape(16.dp)
+    /** Controls: buttons, inputs, inner tiles, thumbnails. */
+    val Inner = RoundedCornerShape(8.dp)
 
-    /** Fully rounded pill (chips, buttons, indicators). */
+    /** Fully rounded pill (chips, avatars, the log button, progress tracks). */
     val Pill = RoundedCornerShape(percent = 50)
-
-    /** The lit hero surface: larger than a card so it reads as the lead. */
-    val Hero = RoundedCornerShape(28.dp)
-
-    /** The coach composer. */
-    val Composer = RoundedCornerShape(24.dp)
-
-    /** The floating bottom dock. */
-    val Dock = RoundedCornerShape(30.dp)
 }
 
-/** Material shape scheme mapped onto the Deep Sea shape language. */
+/** Material shape scheme mapped onto the same two radii. */
 val AzfMaterialShapes: Shapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
+    extraSmall = AzfShapes.Inner,
+    small = AzfShapes.Inner,
     medium = AzfShapes.Inner,
     large = AzfShapes.Card,
-    extraLarge = RoundedCornerShape(28.dp),
+    extraLarge = AzfShapes.Card,
 )

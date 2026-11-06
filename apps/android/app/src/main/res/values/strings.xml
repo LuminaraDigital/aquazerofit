@@ -206,7 +206,6 @@
     <string name="session_current_exercise">Current exercise</string>
     <string name="session_target">Target: %1$s</string>
     <string name="session_tap_when_done">Tap when done</string>
-    <string name="session_set_counter">%1$d/%2$d</string>
     <string name="session_complete_set_cd">Complete set %1$d of %2$d of %3$s</string>
     <string name="session_skip_exercise">Skip exercise</string>
     <string name="session_rest">Rest</string>
@@ -448,8 +447,8 @@
     <string name="nutrition_prev_day">Previous day</string>
     <string name="nutrition_next_day">Next day</string>
     <string name="nutrition_open_calendar">Open the calendar</string>
-    <string name="nutrition_error_title">This day didn\'t load</string>
-    <string name="nutrition_error_message">Anything you log stays on this device until you\'re back online.</string>
+    <string name="nutrition_error_title">We couldn\'t load this day</string>
+    <string name="nutrition_error_message">Anything you log is kept on this device and syncs when it can.</string>
     <string name="nutrition_goal">Goal</string>
     <string name="nutrition_food">Food</string>
     <string name="nutrition_exercise">Exercise</string>
@@ -575,7 +574,7 @@
     <string name="analysis_scanning_title">Reading your plate…</string>
     <string name="analysis_scanning_body">Identifying the food and working out the macros. Nothing is logged yet.</string>
     <string name="analysis_load_error_title">This analysis didn\'t load</string>
-    <string name="analysis_load_error_body">Check your connection and try again - nothing has been logged.</string>
+    <string name="analysis_load_error_body">We couldn\'t load this analysis. Nothing has been logged.</string>
     <string name="analysis_failed_title">We couldn\'t read that photo</string>
     <string name="analysis_failed_body">Try again, or add the food by hand instead.</string>
     <string name="analysis_item_name">Item</string>
@@ -597,7 +596,6 @@
     <string name="coach_title">Coach %1$s</string>
     <!-- WELLNESS_DISCLAIMER, verbatim from packages/shared/src/constants.ts -->
     <string name="coach_disclaimer">AquaZeroFit provides general wellness and fitness support only. It does not provide medical diagnosis, treatment or professional healthcare advice.</string>
-    <string name="coach_disclaimer_cd">Wellness disclaimer</string>
     <string name="coach_conversation_cd">Conversation with your coach</string>
     <string name="coach_greeting_title">Hi, I\'m %1$s</string>
     <string name="coach_greeting_body">%1$s Ask me about your nutrition, training or progress.</string>
@@ -949,7 +947,6 @@
     <string name="setup_reveal_protein">Protein</string>
     <string name="setup_reveal_carbs">Carbs</string>
     <string name="setup_reveal_fat">Fat</string>
-    <string name="setup_reveal_grams">%1$dg</string>
     <string name="setup_reveal_water">Daily water target: %1$s</string>
     <string name="setup_reveal_clamped">We adjusted your calorie target to a safe minimum. Slower, sustainable progress protects your health - AquaZeroFit never recommends eating below this floor.</string>
     <string name="setup_reveal_clamped_reason">We adjusted your calorie target to a safe minimum (%1$s). Slower, sustainable progress protects your health - AquaZeroFit never recommends eating below this floor.</string>
@@ -1093,8 +1090,11 @@
     <string name="reminders_frequency_label">Frequency</string>
     <string name="reminders_day_label">Day</string>
     <string name="reminders_every_1h">Every hour</string>
+    <string name="reminders_every_1h_short">1 h</string>
     <string name="reminders_every_2h">Every 2 hours</string>
+    <string name="reminders_every_2h_short">2 h</string>
     <string name="reminders_every_4h">Every 4 hours</string>
+    <string name="reminders_every_4h_short">4 h</string>
     <string name="reminders_water_window">Between %1$s and %2$s</string>
     <string name="reminders_pick_time">Choose a time</string>
     <string name="reminders_enabled_toast">Reminders enabled.</string>
@@ -1118,7 +1118,7 @@
 
     <!-- Coach memory -->
     <string name="memory_title">Coach memory</string>
-    <string name="memory_heading">What your coach remembers</string>
+    <string name="memory_error_title">Memory unavailable</string>
     <string name="memory_intro">Memories help your coach personalise its guidance - and you are always in control: review, edit or delete anything here.</string>
     <string name="memory_consent_off_title">Memory is paused</string>
     <string name="memory_consent_off_body">Coach memory needs the AI personalisation consent, which is currently switched off. Nothing new is remembered while it is off - you decide if and when to turn it back on.</string>
@@ -1203,8 +1203,6 @@
     <string name="plan_lane_generic_body">This part of the coach runs on a model lane the free tier does not reach.</string>
     <string name="plan_difference_footnote">Your targets, your logging, your training plans, the coach chat and every number in your weekly summary work the same way on both plans.</string>
     <string name="plan_costs_heading">What each AI action costs</string>
-    <string name="plan_cost_value">%1$d credits</string>
-    <string name="plan_cost_value_one">1 credit</string>
     <string name="plan_task_chat_turn">Message to your coach</string>
     <string name="plan_task_meal_photo">Meal photo analysis</string>
     <string name="plan_task_meal_recommendation">Meal recommendation</string>
@@ -1341,7 +1339,6 @@
     <string name="challenges_code_too_short">Enter the full code from your invite.</string>
 
     <!-- Meal plan -->
-    <string name="meal_plan_heading">Meal plan</string>
     <string name="meal_plan_intro"></string>
     <string name="meal_plan_regenerate_all">Regenerate every meal</string>
     <string name="meal_plan_regenerate_one">Regenerate the %1$s suggestion</string>
@@ -1531,4 +1528,35 @@
     <string name="restriction_allowed_email_domain_title">Allowed sign-in email domain</string>
     <string name="restriction_allowed_email_domain_desc">Optional organisation email domain hint (for example example.com). Consents can never be granted via managed configuration.</string>
     <string name="signin_error_email_domain">Use an @%1$s email address required by your organisation.</string>
+    <!-- redesign: shared -->
+    <string name="action_close">Close</string>
+    <!-- redesign: training and progress -->
+    <string name="session_set_of_label">Set %1$d of %2$d</string>
+    <!-- redesign: coach -->
+    <string name="coach_status_free">Free</string>
+    <string name="coach_status_unlocked">Unlocked</string>
+    <string name="settings_account_heading">Account and data</string>
+    <string name="reminders_load_failed_title">Reminders unavailable</string>
+    <string name="reminders_load_failed_body">We could not load your reminder settings. Your choices are safe; try again.</string>
+    <string name="plan_error_title">Plan unavailable</string>
+    <string name="plan_daily_credits_label">Daily credits</string>
+    <string name="plan_bank_limit_label">Bank limit</string>
+    <string name="plan_cost_unit">credits</string>
+    <string name="plan_cost_unit_one">credit</string>
+    <!-- redesign: onboarding -->
+    <string name="setup_targets_error_title">Targets not loaded</string>
+    <string name="setup_targets_error_body">Your details are saved, but we could not fetch your daily targets. Try again, or continue and check again later.</string>
+    <!-- redesign: challenges -->
+    <string name="challenges_error_title">Huddles unavailable</string>
+    <!-- redesign: fight record -->
+    <string name="fight_record_error_title">Fight record unavailable</string>
+    <string name="fight_record_active_days_label">Active days</string>
+    <!-- redesign: nutrition -->
+    <string name="nutrition_over">Over goal</string>
+    <string name="nutrition_unit_kcal">kcal</string>
+    <string name="nutrition_unit_g">g</string>
+    <string name="nutrition_day_summary">%1$s eaten of %2$s goal</string>
+    <string name="nutrition_day_summary_burned">%1$s eaten of %2$s goal, %3$s from exercise</string>
+    <string name="meal_plan_credits_title">Out of AI credits</string>
+    <string name="recipe_per_serving_heading">Per serving</string>
 </resources>

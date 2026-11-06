@@ -22,7 +22,8 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Secondary action: transparent surface with a 1dp aqua border, same 56dp
- * touch target and press-scale as [PrimaryButton].
+ * touch target and press-scale as [PrimaryButton]. [destructive] swaps aqua
+ * for the error colour, for actions such as signing out or deleting data.
  */
 @Composable
 fun SecondaryButton(
@@ -30,17 +31,19 @@ fun SecondaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    destructive: Boolean = false,
 ) {
+    val tone = if (destructive) MaterialTheme.colorScheme.error else LocalAzfExtended.current.primaryFixedDim
     val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
             .pressScale(interaction)
-            .clip(AzfShapes.Pill)
+            .clip(AzfShapes.Inner)
             .border(
-                BorderStroke(1.dp, LocalAzfExtended.current.primaryFixedDim.copy(alpha = 0.7f)),
-                AzfShapes.Pill,
+                BorderStroke(1.dp, tone.copy(alpha = 0.7f)),
+                AzfShapes.Inner,
             )
             .alpha(if (enabled) 1f else 0.5f)
             .clickable(
@@ -55,7 +58,7 @@ fun SecondaryButton(
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
+            color = if (destructive) tone else MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
         )
     }

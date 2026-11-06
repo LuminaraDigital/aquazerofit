@@ -1,13 +1,8 @@
 package fit.aquazero.app.feature.nutrition
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,17 +12,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddCircleOutline
-import androidx.compose.material.icons.outlined.CenterFocusWeak
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,9 +40,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -56,23 +53,24 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.MealTrust
 import fit.aquazero.app.core.designsystem.AzfAppHeader
-import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfCardTier
+import fit.aquazero.app.core.designsystem.AzfHeroSurface
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.CookingFatPresetsRow
-import fit.aquazero.app.core.designsystem.DataLarge
+import fit.aquazero.app.core.designsystem.DataMedium
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.FatCautionBanner
 import fit.aquazero.app.core.designsystem.GramsStepper
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.Scoreboard
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
-import fit.aquazero.app.core.designsystem.rememberReducedMotion
 import fit.aquazero.app.core.model.FoodDto
 import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.ui.NutritionFormat
@@ -214,67 +212,29 @@ internal fun AnalysisContent(
 
 @Composable
 private fun ScanningState(modifier: Modifier = Modifier) {
-    val reducedMotion = rememberReducedMotion()
-    val accent = LocalAzfExtended.current.primaryFixedDim
-    val transition = rememberInfiniteTransition(label = "scanning")
-    // Deliberately NOT `by`: reading the animated value into a composition
-    // scope would invalidate this whole Column — the icon, both Text nodes and
-    // their `stringResource` lookups — at the animation's frame rate, for the
-    // entire analysis wait. Held as a State and read inside the
-    // `graphicsLayer` lambda below, the pulse only re-runs the draw phase.
-    val pulse = transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = PULSE_MILLIS, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "pulse",
-    )
-
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = AzfSpacing.ContainerMargin)
+            .padding(top = AzfSpacing.ElementGapSmall)
             .semantics { liveRegion = LiveRegionMode.Polite },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
     ) {
-        Box(
-            modifier = Modifier
-                .size(128.dp)
-                .graphicsLayer { alpha = if (reducedMotion) REDUCED_MOTION_ALPHA else pulse.value }
-                .clip(CircleShape)
-                .border(2.dp, accent.copy(alpha = 0.5f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.CenterFocusWeak,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(48.dp),
-            )
-        }
-        Text(
-            text = stringResource(R.string.analysis_scanning_title),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = 24.dp),
-        )
+        AzfSectionHeading(stringResource(R.string.analysis_scanning_title))
         Text(
             text = stringResource(R.string.analysis_scanning_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp),
         )
-        repeat(3) {
-            Skeleton(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(bottom = 12.dp),
-            )
+        // The shape of the result that is coming: the total, then the items.
+        Skeleton(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(SCANNING_TOTAL_HEIGHT),
+            shape = AzfShapes.Card,
+        )
+        repeat(SCANNING_ROWS) {
+            Skeleton(modifier = Modifier.fillMaxWidth().height(SCANNING_ROW_HEIGHT))
         }
     }
 }
@@ -296,7 +256,7 @@ private fun ReviewList(
         contentPadding = PaddingValues(
             start = AzfSpacing.ContainerMargin,
             end = AzfSpacing.ContainerMargin,
-            top = AzfSpacing.ElementGapMedium,
+            top = AzfSpacing.ElementGapSmall,
             bottom = AzfSpacing.SectionGap,
         ),
         verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
@@ -315,7 +275,7 @@ private fun ReviewList(
                     FatCautionBanner()
                     Text(
                         text = stringResource(R.string.trust_add_cooking_fat),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     CookingFatPresetsRow(onPresetClick = onAddCookingFat)
@@ -330,10 +290,8 @@ private fun ReviewList(
                     .padding(top = AzfSpacing.ElementGapMedium),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
+                AzfSectionHeading(
                     text = stringResource(R.string.analysis_breakdown),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(onClick = onAddItem, enabled = !state.confirmed) {
@@ -343,7 +301,7 @@ private fun ReviewList(
                         tint = LocalAzfExtended.current.primaryFixedDim,
                         modifier = Modifier.size(18.dp),
                     )
-                    Spacer(modifier = Modifier.size(6.dp))
+                    Spacer(modifier = Modifier.size(8.dp))
                     Text(
                         text = stringResource(R.string.analysis_add_item),
                         color = LocalAzfExtended.current.primaryFixedDim,
@@ -355,20 +313,20 @@ private fun ReviewList(
 
         if (state.items.isEmpty()) {
             item(key = "empty", contentType = "empty") {
-                AzfCard(tier = AzfCardTier.Compact) {
-                    Text(
-                        text = stringResource(R.string.analysis_no_items),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.analysis_no_items),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = AzfSpacing.ElementGapSmall),
+                )
             }
         }
 
-        items(state.items, key = { it.key }, contentType = { "review-item" }) { item ->
-            ReviewItemCard(
+        itemsIndexed(state.items, key = { _, item ->
+            item.key
+        }, contentType = { _, _ -> "review-item" }) { index, item ->
+            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ReviewItemRow(
                 item = item,
                 editable = !state.confirmed,
                 onRename = { onRename(item.key, it) },
@@ -413,10 +371,10 @@ private fun ReviewList(
                 )
                 Text(
                     text = stringResource(R.string.analysis_ai_disclaimer),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
                 )
                 PrimaryButton(
                     text = stringResource(
@@ -437,55 +395,46 @@ private fun ReviewList(
 
 @Composable
 private fun AnalysisSummaryCard(totals: ReviewTotals, mealType: MealType) {
-    AzfCard(tier = AzfCardTier.Hero) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.analysis_estimated_calories),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = stringResource(
-                        R.string.analysis_kcal_value,
-                        NutritionFormat.fmtInt(totals.kcal),
-                    ),
-                    style = DataLarge,
-                    color = LocalAzfExtended.current.primaryFixedDim,
-                )
-                Text(
-                    text = stringResource(NutritionFormat.mealLabelRes(mealType)),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                MacroLine(R.string.macro_protein, totals.proteinG)
-                MacroLine(R.string.macro_carbs, totals.carbsG)
-                MacroLine(R.string.macro_fat, totals.fatG)
-            }
+    AzfHeroSurface {
+        AzfSectionHeading(stringResource(R.string.analysis_estimated_calories))
+        Row(modifier = Modifier.padding(top = 8.dp), verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = NutritionFormat.fmtInt(totals.kcal),
+                style = Scoreboard,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = stringResource(R.string.nutrition_unit_kcal),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            )
         }
+        Text(
+            text = stringResource(NutritionFormat.mealLabelRes(mealType)),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp, bottom = AzfSpacing.ElementGapSmall),
+        )
+        TotalRow(R.string.macro_protein, totals.proteinG)
+        TotalRow(R.string.macro_carbs, totals.carbsG)
+        TotalRow(R.string.macro_fat, totals.fatG, divider = false)
     }
 }
 
 @Composable
-private fun MacroLine(labelRes: Int, grams: Double) {
-    Text(
-        text = stringResource(
-            R.string.analysis_macro_line,
-            stringResource(labelRes),
-            NutritionFormat.fmt1(grams),
-        ),
-        style = DataSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun TotalRow(labelRes: Int, grams: Double, divider: Boolean = true) {
+    AzfStatRow(
+        label = stringResource(labelRes),
+        value = NutritionFormat.fmt1(grams),
+        unit = stringResource(R.string.nutrition_unit_g),
+        divider = divider,
     )
 }
 
+/** One predicted food as a ruled row: name, portion, figures. No card of its own. */
 @Composable
-private fun ReviewItemCard(
+private fun ReviewItemRow(
     item: ReviewItem,
     editable: Boolean,
     onRename: (String) -> Unit,
@@ -493,7 +442,7 @@ private fun ReviewItemCard(
     onRemove: () -> Unit,
 ) {
     val computed = AnalysisReview.toMealLogItem(item)
-    AzfCard(tier = AzfCardTier.Standard) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = AzfSpacing.ElementGapSmall)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             AzfTextField(
                 value = item.name,
@@ -506,7 +455,7 @@ private fun ReviewItemCard(
                 Icon(
                     imageVector = Icons.Outlined.DeleteOutline,
                     contentDescription = stringResource(R.string.analysis_remove_item, item.name),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.error,
                 )
             }
         }
@@ -524,8 +473,8 @@ private fun ReviewItemCard(
                     R.string.analysis_kcal_value,
                     NutritionFormat.fmtInt(computed.kcal),
                 ),
-                style = DataSmall,
-                color = LocalAzfExtended.current.primaryFixedDim,
+                style = DataMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
 
@@ -546,21 +495,15 @@ private fun ReviewItemCard(
                 style = DataSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            item.confidence?.let { ConfidenceChip(confidence = it) }
+            item.confidence?.let { ConfidenceLabel(confidence = it) }
         }
     }
 }
 
-/** Per-item confidence: ≥75% green High, ≥50% aqua Medium, else coral Low. */
+/** Per-item confidence as plain text; only a low reading asks for attention. */
 @Composable
-private fun ConfidenceChip(confidence: Double) {
-    val extended = LocalAzfExtended.current
+private fun ConfidenceLabel(confidence: Double) {
     val tier = AnalysisReview.tierOf(confidence)
-    val accent = when (tier) {
-        ConfidenceTier.High -> extended.secondaryFixedDim
-        ConfidenceTier.Medium -> extended.primaryFixedDim
-        ConfidenceTier.Low -> extended.coral
-    }
     val tierLabel = stringResource(
         when (tier) {
             ConfidenceTier.High -> R.string.analysis_confidence_high
@@ -568,20 +511,14 @@ private fun ConfidenceChip(confidence: Double) {
             ConfidenceTier.Low -> R.string.analysis_confidence_low
         },
     )
-    val label = stringResource(
-        R.string.analysis_confidence_pct,
-        tierLabel,
-        AnalysisReview.percent(confidence),
-    )
     Text(
-        text = label,
-        style = MaterialTheme.typography.labelSmall,
-        color = accent,
-        modifier = Modifier
-            .clip(AzfShapes.Pill)
-            .background(accent.copy(alpha = 0.15f))
-            .border(1.dp, accent.copy(alpha = 0.6f), AzfShapes.Pill)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+        text = stringResource(R.string.analysis_confidence_pct, tierLabel, AnalysisReview.percent(confidence)),
+        style = MaterialTheme.typography.labelMedium,
+        color = if (tier == ConfidenceTier.Low) {
+            LocalAzfExtended.current.warning
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
     )
 }
 
@@ -593,7 +530,7 @@ private fun InlineNotice(text: String, tone: Color, assertive: Boolean = false) 
             .clip(AzfShapes.Inner)
             .border(1.dp, tone.copy(alpha = 0.5f), AzfShapes.Inner)
             .background(tone.copy(alpha = 0.08f))
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .semantics {
                 liveRegion = if (assertive) LiveRegionMode.Assertive else LiveRegionMode.Polite
             },
@@ -628,11 +565,19 @@ private fun AddItemSheet(
                 .padding(bottom = AzfSpacing.ContainerMargin),
             verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
         ) {
-            Text(
-                text = stringResource(R.string.analysis_add_sheet_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AzfSectionHeading(
+                    text = stringResource(R.string.analysis_add_sheet_title),
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.action_close),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             val selected = sheet.selected
             if (selected == null) {
@@ -646,34 +591,36 @@ private fun AddItemSheet(
                         Skeleton(modifier = Modifier.fillMaxWidth().height(48.dp))
                     }
                 }
-                sheet.results.take(MAX_RESULTS).forEach { food ->
-                    AzfCard(tier = AzfCardTier.Compact) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = food.name,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                Text(
-                                    text = stringResource(
-                                        R.string.analysis_per_100g,
-                                        NutritionFormat.fmtInt(food.per100g.kcal),
-                                    ),
-                                    style = DataSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            TextButton(onClick = { onSelectFood(food) }) {
-                                Text(
-                                    text = stringResource(R.string.analysis_add_sheet_pick),
-                                    color = LocalAzfExtended.current.primaryFixedDim,
-                                )
-                            }
+                sheet.results.take(MAX_RESULTS).forEachIndexed { index, food ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(role = Role.Button) { onSelectFood(food) }
+                            .heightIn(min = AzfSpacing.TouchTarget)
+                            .padding(vertical = AzfSpacing.ElementGapSmall),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = food.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = stringResource(
+                                    R.string.analysis_per_100g,
+                                    NutritionFormat.fmtInt(food.per100g.kcal),
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
+                        Icon(
+                            imageVector = Icons.Outlined.Add,
+                            contentDescription = stringResource(R.string.analysis_add_sheet_pick),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
             } else {
@@ -711,8 +658,9 @@ private fun AddItemSheet(
 }
 
 private const val MAX_RESULTS = 12
-private const val PULSE_MILLIS = 1200
-private const val REDUCED_MOTION_ALPHA = 0.7f
+private val SCANNING_TOTAL_HEIGHT = 224.dp
+private val SCANNING_ROW_HEIGHT = 56.dp
+private const val SCANNING_ROWS = 3
 
 // ---------------------------------------------------------------------------
 // Previews

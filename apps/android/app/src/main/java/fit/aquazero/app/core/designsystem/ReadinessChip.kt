@@ -86,7 +86,7 @@ fun ReadinessChip(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ReadinessSummary(copy = copy, headline = readiness.headline, modifier = Modifier.weight(1f))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = toggleLabel,
                         style = MaterialTheme.typography.labelMedium,

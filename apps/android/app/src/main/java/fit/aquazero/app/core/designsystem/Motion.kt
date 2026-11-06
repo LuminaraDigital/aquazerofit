@@ -45,14 +45,20 @@ object AzfMotion {
     /** Signature reveal easing — cubic-bezier(0.16, 1, 0.3, 1). */
     val RevealEasing: Easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
 
-    /** Reveal duration in milliseconds. */
-    const val RevealDurationMs: Int = 600
+    /**
+     * Reveal duration in milliseconds. Tabs are opened all day, so their
+     * entrance orients and gets out of the way.
+     */
+    const val RevealDurationMs: Int = 360
 
     /** Stagger between successive reveal indices, in milliseconds. */
-    const val RevealStaggerMs: Long = 80L
+    const val RevealStaggerMs: Long = 40L
+
+    /** Indices past this one reveal together: one leader, a short cascade. */
+    const val RevealStaggerCap: Int = 6
 
     /** Vertical rise distance of the reveal. */
-    val RevealRise = 16.dp
+    val RevealRise = 8.dp
 
     /** Press scale applied to interactive surfaces. */
     const val PressScale: Float = 0.97f
@@ -86,8 +92,9 @@ object AzfMotion {
 fun rememberReducedMotion(): Boolean = LocalAzfReducedMotion.current
 
 /**
- * Entrance reveal: fade in + 16dp rise over 600ms with the signature easing,
- * staggered by [index] * 80ms. No-ops entirely under reduced motion.
+ * Entrance reveal: fade in + 8dp rise over 360ms with the signature easing,
+ * staggered by [index] * 40ms up to [AzfMotion.RevealStaggerCap]. No-ops
+ * entirely under reduced motion.
  *
  * Implemented as a [Modifier.Node] rather than `Modifier.composed`. `composed`
  * produces a fresh, non-equal Modifier instance on every recomposition, so
@@ -131,7 +138,7 @@ private class RevealOnEnterElement(val index: Int) : ModifierNodeElement<RevealO
  * Drives the entrance reveal from one 0 → 1 progress value.
  *
  * One value is enough because both halves of the reveal share a spec: with
- * `tween(600, RevealEasing)`, `alpha` running 0 → 1 and `rise` running 1 → 0
+ * `tween(RevealDurationMs, RevealEasing)`, `alpha` running 0 → 1 and `rise` running 1 → 0
  * are the same curve mirrored, so `rise == 1 - alpha` at every frame.
  * MotionModifierTest pins that. `progress` is read inside the layer block,
  * which Compose observes separately from composition — the animation costs a
@@ -177,7 +184,7 @@ private class RevealOnEnterNode(var index: Int) :
     }
 
     private fun startReveal() {
-        val staggerMs = index * AzfMotion.RevealStaggerMs
+        val staggerMs = index.coerceAtMost(AzfMotion.RevealStaggerCap) * AzfMotion.RevealStaggerMs
         coroutineScope.launch {
             delay(staggerMs)
             animate(

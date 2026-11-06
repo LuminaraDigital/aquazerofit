@@ -34,7 +34,11 @@ fun PrimaryButton(
     val interaction = remember { MutableInteractionSource() }
     // Disabled sits two steps above any card or sheet, so it still reads as a
     // button that is not ready yet rather than vanishing into a sheet.
-    val fill = if (enabled) LocalAzfExtended.current.primaryFixedDim else MaterialTheme.colorScheme.surfaceContainerHighest
+    val fill = if (enabled) {
+        LocalAzfExtended.current.primaryFixedDim
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHighest
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()

@@ -98,11 +98,11 @@ import fit.aquazero.app.feature.settings.SettingsScreen
 import fit.aquazero.app.feature.settings.health.HealthConnectScreen
 import fit.aquazero.app.feature.training.WorkoutLibraryScreen
 import fit.aquazero.app.feature.training.WorkoutSessionScreen
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** Root-level session holder: restores the session once at process start. */
 @HiltViewModel

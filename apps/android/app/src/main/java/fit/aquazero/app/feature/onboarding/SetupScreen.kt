@@ -453,7 +453,6 @@ private fun TargetsReveal(
                 )
             }
         }
-        }
 
         item {
             AzfCard(modifier = Modifier.fillMaxWidth()) {

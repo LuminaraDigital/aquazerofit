@@ -21,6 +21,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Before
 import org.junit.Rule
@@ -67,7 +68,7 @@ class DesignSystemScreenshotTest {
             }
         }
         compose.mainClock.advanceTimeBy(SETTLE_MS)
-        compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
+        compose.onRoot().captureRoboImage("src/test/screenshots/$name.png", roborazziOptions = TOLERANT)
     }
 
     // -- headers -------------------------------------------------------------
@@ -230,5 +231,14 @@ class DesignSystemScreenshotTest {
 
     private companion object {
         const val SETTLE_MS = 1_000L
+
+        /**
+         * Goldens are recorded on Windows and verified on the Linux CI runner,
+         * where text anti-aliasing differs by a few edge pixels. 1% of pixels
+         * absorbs that; a colour, radius or layout change moves far more.
+         */
+        val TOLERANT = RoborazziOptions(
+            compareOptions = RoborazziOptions.CompareOptions(changeThreshold = 0.01f),
+        )
     }
 }

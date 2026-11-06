@@ -37,7 +37,7 @@ export function LevelBar({
           <span className="font-heading font-semibold text-on-surface tabular-nums">
             Level {level}
           </span>
-          <span className="text-xs uppercase tracking-wider text-primary/90 truncate">
+          <span className="stat-label truncate">
             {rank.name}
           </span>
         </div>

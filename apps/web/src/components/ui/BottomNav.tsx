@@ -50,9 +50,7 @@ export function BottomNav() {
                 )}
                 <span
                   aria-hidden="true"
-                  className={`material-symbols-outlined relative z-10 text-[24px] transition-all ${
-                    isActive ? 'drop-shadow-[0_0_8px_rgba(138,235,255,0.6)]' : ''
-                  }`}
+                  className="material-symbols-outlined relative z-10 text-[24px] transition-all"
                   style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
                 >
                   {item.icon}

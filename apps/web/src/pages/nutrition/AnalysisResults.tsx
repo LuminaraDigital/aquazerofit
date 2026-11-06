@@ -415,7 +415,7 @@ export default function AnalysisResults() {
                   hasUnresolved ||
                   job.status === 'confirmed'
                 }
-                className="cta-gradient w-full py-4 rounded-xl font-heading font-semibold uppercase tracking-[0.02em] text-xl text-on-primary shadow-lg shadow-secondary/20 flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                className="cta-gradient w-full py-4 rounded-xl font-heading font-semibold uppercase tracking-[0.02em] text-xl text-on-primary shadow-lg shadow-secondary/20 flex items-center justify-center gap-2 active:scale-95 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <span>
                   {job.status === 'confirmed'

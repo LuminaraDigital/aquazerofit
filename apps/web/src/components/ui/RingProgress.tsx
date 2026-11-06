@@ -76,7 +76,6 @@ export function RingProgress({
           transform={`rotate(-90 ${center} ${center})`}
           style={{
             transition: 'stroke-dashoffset 800ms cubic-bezier(0.4, 0, 0.2, 1)',
-            filter: `drop-shadow(0 0 6px ${color}40)`,
           }}
         />
       </svg>

@@ -405,7 +405,7 @@ export default function Progress() {
                 {summary.achievements.map(({ definition, earnedAt }) => (
                   <li key={definition.id} className="flex flex-col items-center gap-2 text-center">
                     {earnedAt ? (
-                      <div className="cta-gradient rounded-full p-[2px] shadow-[0_0_15px_rgba(138,235,255,0.4)]">
+                      <div className="cta-gradient rounded-full p-[2px]">
                         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-surface-container-high">
                           <span
                             className="material-symbols-outlined text-4xl text-primary"

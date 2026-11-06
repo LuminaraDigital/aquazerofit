@@ -278,7 +278,7 @@ export default function CaptureMeal() {
               type="button"
               onClick={() => cameraInputRef.current?.click()}
               aria-label="Take a photo"
-              className="w-20 h-20 rounded-full bg-white flex items-center justify-center transition-all shadow-[0_0_20px_rgba(138,235,255,0.4)] active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              className="w-20 h-20 rounded-full bg-white flex items-center justify-center transition-all active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
               <div className="w-[72px] h-[72px] rounded-full border-2 border-background" aria-hidden="true" />
             </button>

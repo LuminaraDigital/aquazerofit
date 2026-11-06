@@ -98,11 +98,7 @@ export function AkinStage({
     <div className={`akin-stage relative select-none ${className}`}>
       <button
         type="button"
-        className={`akin-stage-frame relative ${frame} overflow-hidden rounded-2xl bg-black/50 outline-none ring-primary/0 transition-[box-shadow,transform] duration-300 focus-visible:ring-2 ${
-          hover
-            ? 'shadow-[0_0_36px_rgba(47,217,244,0.45)]'
-            : 'shadow-[0_0_24px_rgba(47,217,244,0.28)]'
-        }`}
+        className={`akin-stage-frame relative ${frame} overflow-hidden rounded-2xl bg-black/50 outline-none ring-primary/0 transition-[box-shadow,transform] duration-300 focus-visible:ring-2`}
         aria-label={`${AQUA_CHARACTER.name}, ${meta.label}. Click to change pose.`}
         onClick={() => {
           pauseBriefly();

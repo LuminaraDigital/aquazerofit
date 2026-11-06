@@ -751,7 +751,7 @@ export default function Nutrition() {
                           <div
                             className={`w-full rounded-t-lg ${
                               isSelected
-                                ? 'cta-gradient shadow-[0_0_15px_rgba(47,217,244,0.4)]'
+                                ? 'cta-gradient'
                                 : p.value > 0
                                   ? 'bg-primary/20'
                                   : 'bg-surface-container-highest'

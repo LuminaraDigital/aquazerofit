@@ -671,7 +671,7 @@ export default function WorkoutDetail() {
 
               <button
                 onClick={completeSet}
-                className="mx-auto mt-6 flex h-40 w-40 flex-col items-center justify-center rounded-full cta-gradient text-on-primary shadow-[0_8px_24px_rgba(34,211,238,0.3)] transition-transform active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                className="mx-auto mt-6 flex h-40 w-40 flex-col items-center justify-center rounded-full cta-gradient text-on-primary transition-transform active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 aria-label={`Complete set ${(setsDone[exerciseIdx] ?? 0) + 1} of ${current.setsPlanned}`}
               >
                 <span className="text-4xl font-bold tabular-nums">

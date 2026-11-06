@@ -162,7 +162,7 @@ function AssistantByline({ coach }: { coach: CoachCardData | undefined }) {
       ) : (
         <div
           aria-hidden="true"
-          className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-primary/40 bg-primary/20 shadow-[0_0_10px_rgba(138,235,255,0.35)]"
+          className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-primary/40 bg-primary/20"
         >
           <AquaMascot size="sm" decorative className="scale-110" />
         </div>
@@ -758,7 +758,7 @@ export default function Coach() {
             e.preventDefault();
             void send(input);
           }}
-          className="glass-card flex items-center gap-2 rounded-card p-2 focus-within:border-primary focus-within:shadow-[0_0_15px_rgba(138,235,255,0.2)]"
+          className="glass-card flex items-center gap-2 rounded-card p-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary"
         >
           <label htmlFor="coach-input" className="sr-only">
             Message {coachName}

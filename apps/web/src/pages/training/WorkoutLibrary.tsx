@@ -542,7 +542,7 @@ export default function WorkoutLibrary() {
                       doneToday
                         ? 'bg-secondary-container text-on-secondary'
                         : isToday
-                          ? 'border-2 border-primary text-primary shadow-[0_0_15px_rgba(138,235,255,0.3)]'
+                          ? 'border-2 border-primary text-primary'
                           : day.isRest
                             ? 'bg-surface-container text-outline'
                             : 'bg-surface-container text-on-surface-variant'

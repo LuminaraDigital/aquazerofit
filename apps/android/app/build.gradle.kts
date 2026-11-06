@@ -10,6 +10,7 @@ plugins {
   alias(libs.plugins.room3)
   alias(libs.plugins.detekt)
   alias(libs.plugins.ktlint)
+  alias(libs.plugins.roborazzi)
   alias(libs.plugins.google.services)
   alias(libs.plugins.firebase.crashlytics)
 }
@@ -111,6 +112,12 @@ android {
         ?: System.getenv("AZF_KEY_PASSWORD")
         ?: ""
     }
+  }
+
+  testOptions {
+    // Robolectric needs merged resources and manifest: the screenshot tests
+    // render res/font (Barlow Condensed, DM Sans) and the app's strings.
+    unitTests.isIncludeAndroidResources = true
   }
 
   buildTypes {
@@ -327,6 +334,13 @@ dependencies {
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
 
+  // Design-system screenshot tests (src/test/.../designsystem/ScreenshotTest).
+  testImplementation(libs.robolectric)
+  testImplementation(libs.roborazzi)
+  testImplementation(libs.roborazzi.compose)
+  testImplementation(libs.androidx.compose.ui.test.junit4)
+  testImplementation(libs.androidx.test.ext.junit)
+
   // Instrumented tests
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
@@ -342,3 +356,8 @@ dependencies {
   androidTestImplementation(libs.androidx.test.espresso.core)
   androidTestImplementation(libs.androidx.test.uiautomator)
 }
+
+// Golden PNGs for the design-system screenshot tests live in
+// app/src/test/screenshots. `./gradlew test` verifies them
+// (roborazzi.test.verify in gradle.properties); re-record after an intended
+// visual change with `./gradlew test -Proborazzi.test.record=true -Proborazzi.test.verify=false`.

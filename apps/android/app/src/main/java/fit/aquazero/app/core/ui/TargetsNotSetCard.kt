@@ -21,7 +21,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.PrimaryButton
 
@@ -51,7 +50,7 @@ fun TargetsNotSetCard(
             Icon(
                 imageVector = Icons.Outlined.Calculate,
                 contentDescription = null,
-                tint = AzfColors.PrimaryFixedDim,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp),
             )
             Spacer(modifier = Modifier.size(12.dp))

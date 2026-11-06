@@ -4,8 +4,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Spacing rhythm from DESIGN.md: 20dp container margin and card padding,
- * 16dp gutter, 32dp between major sections.
+ * A 4dp grid (docs/design.md): 20dp container margin, 16dp card padding,
+ * 12dp between cards, 32dp between sections.
  */
 object AzfSpacing {
     /** Side margin of the primary content container. */
@@ -15,10 +15,10 @@ object AzfSpacing {
     val ContainerPadding: Dp = 20.dp
 
     /** Gap between cards within a section. */
-    val Gutter: Dp = 16.dp
+    val Gutter: Dp = 12.dp
 
     /** Padding inside cards. */
-    val CardPadding: Dp = 20.dp
+    val CardPadding: Dp = 16.dp
 
     /** Vertical gap between major sections. */
     val SectionGap: Dp = 32.dp

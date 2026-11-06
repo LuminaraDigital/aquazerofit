@@ -42,7 +42,7 @@ fun LevelBar(
         animationSpec = if (reducedMotion) tween(0) else tween(800, easing = AzfMotion.RevealEasing),
         label = "levelFill",
     )
-    val fill = LocalAzfExtended.current.ctaGradient
+    val fill = LocalAzfExtended.current.primaryFixedDim
     Column(modifier = modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
@@ -73,15 +73,13 @@ fun LevelBar(
                 .height(10.dp)
                 .clip(AzfShapes.Pill)
                 .background(LocalAzfExtended.current.ringTrack)
-                // Drawn, not scaled — see MacroBar. Sizing the round rect also
-                // keeps the CTA gradient spanning exactly the filled part, the
-                // way the old inner Box did; `scaleX` would have stretched the
-                // ramp instead of re-fitting it.
+                // Drawn, not scaled — see MacroBar: the animation repaints
+                // without recomposing or relaying out.
                 .drawWithCache {
                     val cap = CornerRadius(size.height / 2f)
                     onDrawBehind {
                         drawRoundRect(
-                            brush = fill,
+                            color = fill,
                             size = Size(size.width * animated.value, size.height),
                             cornerRadius = cap,
                         )

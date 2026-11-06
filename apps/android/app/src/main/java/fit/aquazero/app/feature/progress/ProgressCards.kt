@@ -28,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -39,16 +38,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.DataLarge
+import fit.aquazero.app.core.designsystem.DataMedium
 import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.model.AchievementStatusDto
 import fit.aquazero.app.core.model.ConsistencyStatusDto
 import fit.aquazero.app.core.model.ProgressInsightDto
@@ -62,37 +63,29 @@ fun MetricCard(
     modifier: Modifier = Modifier,
     unit: String? = null,
     icon: ImageVector? = null,
-    accent: Color = Color.Unspecified,
 ) {
-    val tint = if (accent == Color.Unspecified) {
-        LocalAzfExtended.current.primaryFixedDim
-    } else {
-        accent
-    }
     AzfCard(tier = AzfCardTier.Compact, modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = tint,
-                    modifier = Modifier
-                        .size(16.dp)
-                        .padding(end = 2.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
                 )
             }
             Text(
                 text = label.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
+                style = StatLabel,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = if (icon != null) 6.dp else 0.dp),
+                modifier = Modifier.padding(start = if (icon != null) 8.dp else 0.dp),
             )
         }
         Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 4.dp)) {
             Text(
                 text = value,
-                style = DataLarge.copy(fontSize = 26.sp, lineHeight = 28.sp),
-                color = tint,
+                style = DataLarge,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             if (unit != null) {
                 Text(
@@ -130,14 +123,10 @@ fun ConsistencyCard(
             verticalAlignment = Alignment.Top,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.consistency_title).uppercase(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                AzfSectionHeading(text = stringResource(R.string.consistency_title))
                 Text(
                     text = stringResource(R.string.consistency_window, consistency.windowDays),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -149,7 +138,7 @@ fun ConsistencyCard(
                     .clip(AzfShapes.Pill)
                     .background(accent.copy(alpha = 0.12f))
                     .border(BorderStroke(1.dp, accent.copy(alpha = 0.4f)), AzfShapes.Pill)
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
             )
         }
 
@@ -160,8 +149,8 @@ fun ConsistencyCard(
             ) {
                 Text(
                     text = consistency.activeDays.toString(),
-                    style = DataLarge.copy(fontSize = 36.sp, lineHeight = 38.sp),
-                    color = accent,
+                    style = DataLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = stringResource(
@@ -170,7 +159,7 @@ fun ConsistencyCard(
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp, bottom = 3.dp),
+                    modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
                 )
             }
         } else {
@@ -185,7 +174,7 @@ fun ConsistencyCard(
         // Proportion only — the meter never marks an individual day as missed.
         Box(
             modifier = Modifier
-                .padding(top = 12.dp)
+                .padding(top = AzfSpacing.Gutter)
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(AzfShapes.Pill)
@@ -204,13 +193,13 @@ fun ConsistencyCard(
             text = stringResource(ConsistencyCopy.body(consistency)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = AzfSpacing.Gutter),
         )
 
         if (runDays != null || bestDays != null) {
             Row(
                 modifier = Modifier.padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(AzfSpacing.ContainerMargin),
             ) {
                 if (runDays != null) {
                     Text(
@@ -258,11 +247,7 @@ fun WeeklyInsightCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom,
         ) {
-            Text(
-                text = stringResource(R.string.progress_insight_title).uppercase(),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            AzfSectionHeading(text = stringResource(R.string.progress_insight_title))
             Text(
                 text = stringResource(R.string.progress_insight_period, insight.periodDays),
                 style = DataSmall,
@@ -273,14 +258,12 @@ fun WeeklyInsightCard(
             text = insight.narrative,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = AzfSpacing.Gutter),
         )
 
         if (insight.changes.isNotEmpty()) {
-            Text(
-                text = stringResource(R.string.progress_insight_changes).uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            AzfSectionHeading(
+                text = stringResource(R.string.progress_insight_changes),
                 modifier = Modifier.padding(top = AzfSpacing.ElementGapMedium),
             )
             insight.changes.forEach { change ->
@@ -319,7 +302,7 @@ fun WeeklyInsightCard(
                         text = change.label,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 10.dp),
+                        modifier = Modifier.padding(start = 12.dp),
                     )
                 }
             }
@@ -332,9 +315,9 @@ fun WeeklyInsightCard(
             )
             Text(
                 text = stringResource(noteRes),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 10.dp),
+                modifier = Modifier.padding(top = AzfSpacing.Gutter),
             )
         }
     }
@@ -369,7 +352,7 @@ fun AchievementTile(
                 .clip(CircleShape)
                 .then(
                     if (earned) {
-                        Modifier.background(LocalAzfExtended.current.ctaGradient)
+                        Modifier.background(LocalAzfExtended.current.primaryFixedDim)
                     } else {
                         Modifier
                             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
@@ -395,7 +378,7 @@ fun AchievementTile(
         }
         Text(
             text = status.definition.name,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = if (earned) {
                 MaterialTheme.colorScheme.onSurface
             } else {
@@ -404,12 +387,12 @@ fun AchievementTile(
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = 8.dp),
         )
         if (earned && earnedDateLabel != null) {
             Text(
                 text = earnedDateLabel,
-                style = DataSmall.copy(fontSize = 10.sp, lineHeight = 12.sp),
+                style = DataSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -437,7 +420,7 @@ fun AdaptiveMetabolicCard(
     val expenditureKcal = NutritionFormat.fmtInt(result.estimatedTdeeKcal)
     val targetKcal = NutritionFormat.fmtInt(result.recommendedTargetKcal)
 
-    AzfCard(tier = AzfCardTier.Hero, modifier = modifier.fillMaxWidth()) {
+    AzfCard(modifier = modifier.fillMaxWidth()) {
         Row(
             // Title and badge are one fact — "Adaptive metabolism, high
             // confidence" — not two stops on the swipe path.
@@ -447,29 +430,25 @@ fun AdaptiveMetabolicCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = stringResource(R.string.progress_adaptive_title).uppercase(),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            AzfSectionHeading(text = stringResource(R.string.progress_adaptive_title))
             Box(
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(confidenceBadgeColor.copy(alpha = 0.15f))
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 Text(
                     text = stringResource(
                         R.string.progress_adaptive_confidence,
                         confidenceWord,
                     ).uppercase(),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    style = MaterialTheme.typography.labelMedium,
                     color = confidenceBadgeColor,
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(AzfSpacing.Gutter))
 
         val statsCd = stringResource(
             R.string.progress_adaptive_stats_cd,
@@ -485,34 +464,26 @@ fun AdaptiveMetabolicCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.progress_adaptive_expenditure).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                AzfSectionHeading(text = stringResource(R.string.progress_adaptive_expenditure))
                 Text(
                     text = stringResource(R.string.progress_adaptive_kcal, expenditureKcal),
-                    style = DataLarge.copy(fontSize = 24.sp),
-                    color = extended.primaryFixedDim,
+                    style = DataMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.progress_adaptive_target).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                AzfSectionHeading(text = stringResource(R.string.progress_adaptive_target))
                 Text(
                     text = stringResource(R.string.progress_adaptive_kcal, targetKcal),
-                    style = DataLarge.copy(fontSize = 24.sp),
-                    color = extended.secondaryFixedDim,
+                    style = DataMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(AzfSpacing.Gutter))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(modifier = Modifier.height(AzfSpacing.Gutter))
 
         Text(
             text = result.reasoning,

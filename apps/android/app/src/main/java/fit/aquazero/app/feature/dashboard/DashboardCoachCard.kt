@@ -32,6 +32,7 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.common.CoachNudgeKind
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfChip
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.LevelBar
@@ -119,11 +120,7 @@ private fun DashboardCoachCardContent(
                     .weight(1f)
                     .padding(start = AzfSpacing.ElementGapMedium),
             ) {
-                Text(
-                    text = stringResource(R.string.dashboard_coach_heading),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = LocalAzfExtended.current.secondaryFixedDim,
-                )
+                AzfSectionHeading(text = stringResource(R.string.dashboard_coach_heading))
                 Text(
                     text = persona.name,
                     style = MaterialTheme.typography.titleMedium,

@@ -32,6 +32,8 @@ data class LogWeightUiState(
     val errorRes: Int? = null,
     val saving: Boolean = false,
     val recent: List<WeightLogEntity> = emptyList(),
+    /** False until the first Room emission, so an empty list is not shown while loading. */
+    val historyLoaded: Boolean = true,
 ) {
     /** The entry parsed into canonical kilograms, or null when unusable. */
     val parsedKg: Double?
@@ -174,7 +176,7 @@ class LogWeightViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(LogWeightUiState())
+    private val _uiState = MutableStateFlow(LogWeightUiState(historyLoaded = false))
     val uiState: StateFlow<LogWeightUiState> = _uiState.asStateFlow()
 
     private val _events = Channel<LogWeightEvent>(Channel.BUFFERED)
@@ -186,6 +188,7 @@ class LogWeightViewModel @Inject constructor(
                 val cutoff = LocalDates.shift(LocalDates.today(), -RECENT_DAYS.toLong())
                 _uiState.value = _uiState.value.copy(
                     recent = logs.filter { it.localDate >= cutoff },
+                    historyLoaded = true,
                 )
             }
         }

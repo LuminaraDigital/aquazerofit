@@ -42,7 +42,7 @@ internal fun DailyEnergyLoopCard(
                     NutritionFormat.fmtInt(abs(delta)),
                 ),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             targets.adaptiveReasoning?.takeIf { it.isNotBlank() }?.let { reasoning ->
                 Spacer(Modifier.height(4.dp))

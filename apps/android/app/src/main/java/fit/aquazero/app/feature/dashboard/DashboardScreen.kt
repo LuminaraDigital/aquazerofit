@@ -28,7 +28,6 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
-import fit.aquazero.app.core.designsystem.AquaAura
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.ErrorState
@@ -137,7 +136,6 @@ fun DashboardContent(
 ) {
     val reflectPrompt = stringResource(R.string.home_ask_coach_day)
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        AquaAura()
         Column(
             modifier = Modifier
                 .fillMaxSize()

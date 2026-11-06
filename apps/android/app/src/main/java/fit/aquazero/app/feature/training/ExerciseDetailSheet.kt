@@ -20,9 +20,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -45,6 +47,7 @@ import fit.aquazero.app.core.database.ExerciseMediaEntity
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfCardTier
 import fit.aquazero.app.core.designsystem.AzfColors
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
@@ -75,6 +78,7 @@ fun ExerciseDetailSheet(
     ) {
         ExerciseDetailBody(
             detail = detail,
+            onClose = onDismiss,
             modifier = Modifier
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
@@ -89,6 +93,7 @@ fun ExerciseDetailSheet(
 fun ExerciseDetailBody(
     detail: ExerciseDetail,
     modifier: Modifier = Modifier,
+    onClose: (() -> Unit)? = null,
 ) {
     val exercise = detail.exercise
     val images = ExerciseAttribution.images(detail.media)
@@ -97,11 +102,22 @@ fun ExerciseDetailBody(
     val fallbackEquipment = exercise.equipment.firstOrNull() ?: Equipment.NONE
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = exercise.name.uppercase(),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = exercise.name.uppercase(),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            if (onClose != null) {
+                IconButton(onClick = onClose) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.action_close),
+                    )
+                }
+            }
+        }
 
         when {
             images.isEmpty() -> ExercisePlaceholder(
@@ -149,13 +165,13 @@ fun ExerciseDetailBody(
                     imageVector = Icons.Outlined.AutoAwesome,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(16.dp),
                 )
                 Text(
                     text = stringResource(R.string.attribution_ai_media),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 6.dp),
+                    modifier = Modifier.padding(start = 8.dp),
                 )
             }
         }
@@ -170,7 +186,7 @@ fun ExerciseDetailBody(
         }
 
         if (exercise.primaryMuscles.isNotEmpty() || exercise.secondaryMuscles.isNotEmpty()) {
-            SectionLabel(
+            AzfSectionHeading(
                 text = stringResource(R.string.training_muscles),
                 modifier = Modifier.padding(top = AzfSpacing.ElementGapMedium),
             )
@@ -181,7 +197,7 @@ fun ExerciseDetailBody(
         }
 
         if (exercise.equipment.isNotEmpty()) {
-            SectionLabel(
+            AzfSectionHeading(
                 text = stringResource(R.string.training_equipment),
                 modifier = Modifier.padding(top = AzfSpacing.ElementGapMedium),
             )
@@ -223,7 +239,7 @@ fun ExerciseDetailBody(
         AttributionBlock(
             exercise = exercise,
             credits = credits,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = AzfSpacing.Gutter),
         )
     }
 }
@@ -257,7 +273,7 @@ fun AttributionBlock(
             }
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 2.dp),
             )
@@ -281,7 +297,7 @@ fun AttributionBlock(
                         exercise.licence,
                     )
                 },
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -302,7 +318,7 @@ private fun ExerciseMediaImage(
         model = ExerciseAttribution.mediaUrl(media.url),
         contentDescription = description,
         contentScale = ContentScale.Crop,
-        modifier = modifier.clip(AzfShapes.Card),
+        modifier = modifier.clip(AzfShapes.Inner),
         loading = { ExercisePlaceholder(equipment = equipment, modifier = Modifier.fillMaxWidth()) },
         error = { ExercisePlaceholder(equipment = equipment, modifier = Modifier.fillMaxWidth()) },
     )
@@ -319,7 +335,7 @@ fun ExercisePlaceholder(
 ) {
     Box(
         modifier = modifier
-            .clip(AzfShapes.Card)
+            .clip(AzfShapes.Inner)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
@@ -331,16 +347,6 @@ fun ExercisePlaceholder(
             modifier = Modifier.size(32.dp),
         )
     }
-}
-
-@Composable
-private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier,
-    )
 }
 
 @Composable
@@ -374,7 +380,7 @@ private fun MuscleTag(text: String, primary: Boolean) {
                 ),
                 AzfShapes.Pill,
             )
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
     )
 }
 
@@ -385,7 +391,7 @@ private fun EquipmentTag(equipment: Equipment) {
         modifier = Modifier
             .clip(AzfShapes.Pill)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
     ) {
         Icon(
             imageVector = equipmentIcon(equipment),
@@ -397,7 +403,7 @@ private fun EquipmentTag(equipment: Equipment) {
             text = stringResource(equipmentLabelRes(equipment)),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 6.dp),
+            modifier = Modifier.padding(start = 8.dp),
         )
     }
 }

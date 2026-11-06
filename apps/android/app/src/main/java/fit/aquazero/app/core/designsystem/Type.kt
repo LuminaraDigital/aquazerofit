@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
 import fit.aquazero.app.R
 
 /**
- * Deep Sea type system.
+ * Corner Card type system (docs/design.md).
  *
  * Headings: Barlow Condensed SemiBold (uppercase is applied at call sites),
  * tracking +0.02–0.04em per DESIGN.md. Body & data: DM Sans (bundled as a
@@ -78,7 +78,41 @@ val DataSmall: TextStyle = TextStyle(
     fontFeatureSettings = TabularNumbers,
 )
 
-/** Material typography mapped onto the DESIGN.md scale. */
+/**
+ * The signature numeral (docs/design.md): the one figure that answers a
+ * screen's question, in Barlow Condensed with tabular figures so a live value
+ * never jitters.
+ */
+val Scoreboard: TextStyle = TextStyle(
+    fontFamily = BarlowCondensed,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 56.sp,
+    lineHeight = 56.sp,
+    fontFeatureSettings = TabularNumbers,
+)
+
+/** 24sp/700 DM Sans with tabular figures: a figure inside a card or row. */
+val DataMedium: TextStyle = TextStyle(
+    fontFamily = DmSans,
+    fontWeight = FontWeight.Bold,
+    fontSize = 24.sp,
+    lineHeight = 28.sp,
+    fontFeatureSettings = TabularNumbers,
+)
+
+/**
+ * The tale-of-the-tape label: condensed capitals tracked +8% over a section
+ * or a stat. Callers uppercase the text.
+ */
+val StatLabel: TextStyle = TextStyle(
+    fontFamily = BarlowCondensed,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 14.sp,
+    lineHeight = 16.sp,
+    letterSpacing = 0.08.em,
+)
+
+/** Material typography mapped onto the docs/design.md scale. */
 val AzfTypography: Typography = Typography(
     displayLarge = TextStyle(
         fontFamily = BarlowCondensed,
@@ -163,8 +197,8 @@ val AzfTypography: Typography = Typography(
     labelSmall = TextStyle(
         fontFamily = DmSans,
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
         letterSpacing = 0.02.em,
     ),
 )

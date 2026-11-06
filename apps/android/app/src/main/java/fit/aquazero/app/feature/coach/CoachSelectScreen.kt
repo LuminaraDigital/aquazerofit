@@ -1,24 +1,21 @@
 package fit.aquazero.app.feature.coach
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
@@ -37,21 +34,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
+import fit.aquazero.app.core.designsystem.ActiveFrame
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.ErrorState
-import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.Skeleton
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.designsystem.pressScale
 import fit.aquazero.app.core.gamification.XpPanel
@@ -62,7 +60,7 @@ import fit.aquazero.app.core.ui.CoachRoster
 import fit.aquazero.app.core.ui.rememberToastSink
 
 /**
- * Character select: nine fighters, one door.
+ * Character select: the bout sheet, nine fighters, one door.
  *
  * Locked coaches are drawn, dimmed, with the requirement under them. There is
  * no price, no "unlock now", and no second currency anywhere on this screen —
@@ -137,41 +135,43 @@ fun CoachSelectContent(
             return@Scaffold
         }
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+        LazyColumn(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(AzfSpacing.ContainerMargin),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(
+                start = AzfSpacing.ContainerMargin,
+                end = AzfSpacing.ContainerMargin,
+                top = 8.dp,
+                bottom = AzfSpacing.SectionGap,
+            ),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
-            item(span = { GridItemSpan(2) }) {
+            item {
                 Column {
                     Text(
                         text = stringResource(R.string.coach_select_sub),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(16.dp))
                     AzfCard(modifier = Modifier.fillMaxWidth()) {
                         if (state.experience == null) {
                             Skeleton(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(58.dp),
+                                    .height(56.dp),
                             )
                         } else {
                             XpPanel(experience = state.experience)
                         }
                         Text(
                             text = stringResource(R.string.coach_select_xp_note),
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 10.dp),
+                            modifier = Modifier.padding(top = 12.dp),
                         )
                     }
-                    Spacer(Modifier.height(6.dp))
                 }
             }
 
@@ -180,34 +180,39 @@ fun CoachSelectContent(
                     Skeleton(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(250.dp),
+                            .height(88.dp),
                         shape = AzfShapes.Card,
                     )
                 }
             }
 
             items(items = state.cards, key = { it.persona.id }) { card ->
-                CoachTile(
+                CoachBout(
                     card = card,
                     switching = state.switchingCoachId == card.persona.id,
                     onSelect = { onSelect(card) },
                 )
             }
 
-            item(span = { GridItemSpan(2) }) {
+            item {
                 Text(
                     text = stringResource(R.string.coach_select_footer),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 24.dp),
+                    modifier = Modifier.padding(top = 12.dp),
                 )
             }
         }
     }
 }
 
+/**
+ * One line of the bout sheet: avatar, ring name, then "real name - status" as
+ * a stat label. A locked coach is dimmed *and* carries a lock and its unlock
+ * level in words, so the state never rests on colour or opacity alone.
+ */
 @Composable
-private fun CoachTile(
+private fun CoachBout(
     card: CoachCard,
     switching: Boolean,
     onSelect: () -> Unit,
@@ -216,129 +221,103 @@ private fun CoachTile(
     val persona = card.persona
     val interaction = remember { MutableInteractionSource() }
     val requirement = stringResource(R.string.coach_unlock_label, card.requiredLevel)
+    val status = when {
+        !card.unlocked -> requirement
+        persona.isFree -> stringResource(R.string.coach_status_free)
+        else -> stringResource(R.string.coach_status_unlocked)
+    }
     val description = if (card.unlocked) {
         stringResource(R.string.coach_unlocked_cd, persona.name)
     } else {
         stringResource(R.string.coach_locked_cd, persona.name, requirement)
     }
 
-    Column(
+    ActiveFrame(
+        active = card.active,
+        shape = AzfShapes.Card,
         modifier = modifier
             .fillMaxWidth()
             .pressScale(interaction)
             .clip(AzfShapes.Card)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(
-                BorderStroke(
-                    1.dp,
-                    if (card.active) {
-                        persona.colour
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                    },
-                ),
-                AzfShapes.Card,
-            )
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onSelect,
-            )
-            .semantics { contentDescription = description },
+            .background(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 88.dp)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onSelect,
+                )
+                .semantics(mergeDescendants = true) { contentDescription = description }
+                .padding(AzfSpacing.CardPadding),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The full-body art is the roster's character, so each bout shows
+            // it as a tall tile, the way a fight card shows its fighters.
             CoachPortrait(
                 persona = persona,
-                shape = AzfShapes.Card,
                 dimmed = !card.unlocked,
+                modifier = Modifier.size(width = 80.dp, height = 108.dp),
+            )
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(158.dp),
-            )
-            if (card.active) {
+                    .weight(1f)
+                    .padding(horizontal = AzfSpacing.Gutter),
+            ) {
                 Text(
-                    text = stringResource(R.string.coach_select_active).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .clip(AzfShapes.Pill)
-                        .background(persona.colour)
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    text = persona.ringName.uppercase(),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = if (card.unlocked) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            }
-            if (!card.unlocked) {
-                Icon(
-                    imageVector = Icons.Outlined.Lock,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .size(18.dp),
-                )
-            }
-        }
-
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = persona.name,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "${persona.ringName} · ${stringResource(persona.voiceWordRes)}".uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = persona.colour,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-            Text(
-                text = stringResource(persona.domainRes),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-
-            if (card.unlocked && card.bondXp > 0) {
                 Text(
-                    text = stringResource(
-                        R.string.coach_bond,
-                        card.bondLevel,
-                        card.bondXp.toString(),
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
+                    text = "${persona.name} · $status".uppercase(),
+                    style = StatLabel,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                Text(
+                    text = stringResource(persona.domainRes),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                if (card.unlocked && card.bondXp > 0) {
+                    Text(
+                        text = stringResource(R.string.coach_bond, card.bondLevel, card.bondXp.toString()),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
             }
-
-            Spacer(Modifier.height(10.dp))
-
             if (card.unlocked) {
-                PrimaryButton(
+                Text(
                     text = when {
                         switching -> stringResource(R.string.coach_select_switching)
                         card.active -> stringResource(R.string.coach_select_open)
                         else -> stringResource(R.string.coach_select_choose)
                     },
-                    onClick = onSelect,
-                    enabled = !switching,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = LocalAzfExtended.current.primaryFixedDim,
                 )
             } else {
-                // The requirement, and nothing else. No price, no shortcut.
-                Text(
-                    text = requirement,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
+                Icon(
+                    imageVector = Icons.Outlined.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }

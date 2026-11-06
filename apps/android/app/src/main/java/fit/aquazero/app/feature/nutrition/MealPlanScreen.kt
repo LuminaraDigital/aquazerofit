@@ -9,11 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
@@ -27,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -37,12 +38,15 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.data.SuggestionFeedback
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfColors
+import fit.aquazero.app.core.designsystem.AzfHeroSurface
 import fit.aquazero.app.core.designsystem.AzfNavigationRow
 import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.DataSmall
+import fit.aquazero.app.core.designsystem.ErrorState
+import fit.aquazero.app.core.designsystem.Scoreboard
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.designsystem.ToastKind
@@ -95,13 +99,14 @@ fun MealPlanScreen(
                             contentDescription = stringResource(
                                 R.string.meal_plan_regenerate_all,
                             ),
-                            tint = AzfColors.SecondaryFixedDim,
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                     }
                 },
             )
         },
     ) { innerPadding ->
+        val intro = stringResource(R.string.meal_plan_intro)
         LazyColumn(
             modifier = Modifier
                 .padding(innerPadding)
@@ -109,27 +114,19 @@ fun MealPlanScreen(
             contentPadding = PaddingValues(
                 start = AzfSpacing.ContainerMargin,
                 end = AzfSpacing.ContainerMargin,
-                top = AzfSpacing.ContainerMargin,
-                bottom = 40.dp,
+                top = AzfSpacing.ElementGapSmall,
+                bottom = AzfSpacing.SectionGap,
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
-            item {
-                Column {
+            // The header already says "Meal plan"; only a real explainer earns a line.
+            if (intro.isNotBlank()) {
+                item {
                     Text(
-                        text = stringResource(R.string.meal_plan_heading),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        text = intro,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    val intro = stringResource(R.string.meal_plan_intro)
-                    if (intro.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = intro,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
 
@@ -137,25 +134,21 @@ fun MealPlanScreen(
 
             if (state.offline && state.readyCount == 0) {
                 item {
-                    AzfCard(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = stringResource(R.string.meal_plan_offline_title).uppercase(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = AzfColors.SecondaryFixedDim,
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = stringResource(R.string.meal_plan_offline_body),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        SecondaryButton(
-                            text = stringResource(R.string.meal_plan_slot_retry),
-                            onClick = viewModel::regenerateAll,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                    ErrorState(
+                        title = stringResource(R.string.meal_plan_offline_title),
+                        message = stringResource(R.string.meal_plan_offline_body),
+                        retryLabel = stringResource(R.string.meal_plan_slot_retry),
+                        onRetry = viewModel::regenerateAll,
+                    )
+                }
+            } else if (state.creditsExhausted) {
+                // One notice, not a failed card per meal: a retry cannot succeed.
+                item {
+                    ErrorState(
+                        title = stringResource(R.string.meal_plan_credits_title),
+                        message = stringResource(R.string.meal_plan_slot_credits),
+                        icon = Icons.Outlined.HourglassEmpty,
+                    )
                 }
             } else {
                 items(state.slots, key = { it.mealType.name }) { slot ->
@@ -172,18 +165,16 @@ fun MealPlanScreen(
             item {
                 Text(
                     text = stringResource(R.string.meal_plan_recipes_body),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp),
                 )
             }
             if (state.recipes.isEmpty()) {
                 item {
                     Text(
                         text = stringResource(R.string.meal_plan_recipes_empty),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
                     )
                 }
             } else {
@@ -202,66 +193,42 @@ fun MealPlanScreen(
     }
 }
 
+/** The lead card: what the plan adds up to against today's target. */
 @Composable
 private fun PlannedTotals(state: MealPlanUiState) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        TotalCard(
-            label = stringResource(R.string.meal_plan_planned_kcal),
-            value = NutritionFormat.fmtInt(state.plannedKcal),
-            secondary = state.kcalTarget?.let {
-                stringResource(R.string.meal_plan_of_target, NutritionFormat.fmtInt(it))
-            },
-            color = AzfColors.PrimaryFixedDim,
-            modifier = Modifier.weight(1f),
-        )
-        TotalCard(
+    AzfHeroSurface {
+        AzfSectionHeading(stringResource(R.string.meal_plan_planned_kcal))
+        Row(modifier = Modifier.padding(top = 8.dp), verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = NutritionFormat.fmtInt(state.plannedKcal),
+                style = Scoreboard,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = state.kcalTarget?.let {
+                    stringResource(R.string.meal_plan_of_target, NutritionFormat.fmtInt(it))
+                } ?: stringResource(R.string.nutrition_unit_kcal),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(AzfSpacing.ElementGapSmall))
+        AzfStatRow(
             label = stringResource(R.string.meal_plan_planned_protein),
-            value = stringResource(
-                R.string.recipe_grams,
-                state.plannedProteinG.roundToInt(),
-            ),
-            secondary = state.proteinTarget?.let {
+            value = stringResource(R.string.recipe_grams, state.plannedProteinG.roundToInt()),
+            unit = state.proteinTarget?.let {
                 stringResource(
                     R.string.meal_plan_of_target,
                     stringResource(R.string.recipe_grams, it.roundToInt()),
                 )
             },
-            color = AzfColors.SecondaryFixedDim,
-            modifier = Modifier.weight(1f),
+            divider = false,
         )
     }
 }
 
-@Composable
-private fun TotalCard(
-    label: String,
-    value: String,
-    secondary: String?,
-    color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
-) {
-    AzfCard(modifier = modifier) {
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.headlineMedium,
-            color = color,
-        )
-        if (secondary != null) {
-            Text(
-                text = secondary,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
+/** One meal: heading with its single regenerate control, then one card. */
 @Composable
 private fun SlotCard(
     slot: MealPlanSlot,
@@ -270,64 +237,48 @@ private fun SlotCard(
     onFeedback: (SuggestionFeedback) -> Unit,
 ) {
     val mealLabel = stringResource(NutritionFormat.mealLabelRes(slot.mealType))
-    AzfCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = NutritionFormat.mealIcon(slot.mealType),
-                    contentDescription = null,
-                    tint = AzfColors.PrimaryFixedDim,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = mealLabel.uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = AzfColors.PrimaryFixedDim,
-                )
-            }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            AzfSectionHeading(text = mealLabel, modifier = Modifier.weight(1f))
             IconButton(onClick = onRegenerate) {
                 Icon(
                     imageVector = Icons.Outlined.Refresh,
-                    contentDescription = stringResource(
-                        R.string.meal_plan_regenerate_one,
-                        mealLabel,
-                    ),
+                    contentDescription = stringResource(R.string.meal_plan_regenerate_one, mealLabel),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        AzfCard(modifier = Modifier.fillMaxWidth()) {
+            when {
+                slot.loading -> {
+                    Skeleton(modifier = Modifier.fillMaxWidth().height(24.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Skeleton(modifier = Modifier.fillMaxWidth().height(48.dp))
+                }
 
-        when {
-            slot.loading -> {
-                Skeleton(modifier = Modifier.fillMaxWidth().height(24.dp))
-                Spacer(modifier = Modifier.height(8.dp))
-                Skeleton(modifier = Modifier.fillMaxWidth().height(48.dp))
-            }
-            slot.failed || slot.recommendation == null -> {
-                Text(
-                    text = stringResource(slot.failureMessageRes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                slot.failed || slot.recommendation == null -> {
+                    Text(
+                        text = stringResource(slot.failureMessageRes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // Out of credits: a retry cannot succeed, so none is offered.
+                    if (!slot.outOfCredits) {
+                        SecondaryButton(
+                            text = stringResource(R.string.meal_plan_slot_retry),
+                            onClick = onRegenerate,
+                            modifier = Modifier.padding(top = AzfSpacing.ElementGapMedium),
+                        )
+                    }
+                }
+
+                else -> SuggestionBody(
+                    slot = slot,
+                    recommendation = slot.recommendation,
+                    onLog = onLog,
+                    onFeedback = onFeedback,
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                SecondaryButton(
-                    text = stringResource(R.string.meal_plan_slot_retry),
-                    onClick = onRegenerate,
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
-            else -> SuggestionBody(
-                slot = slot,
-                recommendation = slot.recommendation,
-                onLog = onLog,
-                onFeedback = onFeedback,
-            )
         }
     }
 }
@@ -339,20 +290,20 @@ private fun SuggestionBody(
     onLog: () -> Unit,
     onFeedback: (SuggestionFeedback) -> Unit,
 ) {
-    Text(
-        text = recommendation.name,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
-    Spacer(modifier = Modifier.height(4.dp))
-    Text(
-        text = stringResource(
-            R.string.meal_plan_kcal,
-            NutritionFormat.fmtInt(recommendation.kcal),
-        ),
-        style = MaterialTheme.typography.titleSmall,
-        color = AzfColors.SecondaryFixedDim,
-    )
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        Text(
+            text = recommendation.name,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(R.string.meal_plan_kcal, NutritionFormat.fmtInt(recommendation.kcal)),
+            style = DataSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 12.dp, top = 4.dp),
+        )
+    }
     Text(
         text = stringResource(
             R.string.meal_plan_macros,
@@ -360,61 +311,69 @@ private fun SuggestionBody(
             recommendation.carbsG.roundToInt(),
             recommendation.fatG.roundToInt(),
         ),
-        style = MaterialTheme.typography.labelSmall,
+        style = DataSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp),
     )
     if (recommendation.rationale.isNotBlank()) {
-        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = recommendation.rationale,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
         )
     }
     if (slot.deterministic) {
-        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.meal_plan_deterministic_note),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
         )
     }
-    Spacer(modifier = Modifier.height(16.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        PrimaryButton(
+    Row(
+        modifier = Modifier.padding(top = AzfSpacing.ElementGapMedium),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
+    ) {
+        SecondaryButton(
             text = stringResource(
                 if (slot.logged) R.string.meal_plan_logged else R.string.meal_plan_log_cta,
             ),
             onClick = onLog,
             enabled = !slot.logged && !slot.logging,
-            loading = slot.logging,
             modifier = Modifier.weight(1f),
         )
-        Spacer(modifier = Modifier.size(8.dp))
-        IconButton(onClick = { onFeedback(SuggestionFeedback.UP) }) {
-            Icon(
-                imageVector = Icons.Outlined.ThumbUp,
-                contentDescription = stringResource(R.string.meal_plan_feedback_up),
-                tint = if (slot.feedback == SuggestionFeedback.UP) {
-                    AzfColors.SecondaryFixedDim
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
-        IconButton(onClick = { onFeedback(SuggestionFeedback.DOWN) }) {
-            Icon(
-                imageVector = Icons.Outlined.ThumbDown,
-                contentDescription = stringResource(R.string.meal_plan_feedback_down),
-                // Coral, never red: a "not for me" is a preference, not a fault.
-                tint = if (slot.feedback == SuggestionFeedback.DOWN) {
-                    AzfColors.Coral
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
+        FeedbackControl(
+            icon = Icons.Outlined.ThumbUp,
+            contentDescription = stringResource(R.string.meal_plan_feedback_up),
+            selected = slot.feedback == SuggestionFeedback.UP,
+            onClick = { onFeedback(SuggestionFeedback.UP) },
+        )
+        FeedbackControl(
+            icon = Icons.Outlined.ThumbDown,
+            contentDescription = stringResource(R.string.meal_plan_feedback_down),
+            selected = slot.feedback == SuggestionFeedback.DOWN,
+            onClick = { onFeedback(SuggestionFeedback.DOWN) },
+        )
     }
+}
+
+/** A chosen rating is a selection, so it takes the action colour. */
+@Composable
+private fun FeedbackControl(
+    icon: ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    CircleIconControl(
+        icon = icon,
+        contentDescription = contentDescription,
+        onClick = onClick,
+        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        ring = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+    )
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF0E1416, heightDp = 700)
@@ -423,7 +382,7 @@ private fun MealPlanPreview() {
     AzfTheme {
         Column(
             modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
             SlotCard(
                 slot = MealPlanSlot(

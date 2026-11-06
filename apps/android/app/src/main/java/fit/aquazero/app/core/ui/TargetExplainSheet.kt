@@ -1,21 +1,31 @@
 package fit.aquazero.app.core.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import fit.aquazero.app.R
-import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
+import fit.aquazero.app.core.designsystem.DataLarge
 import fit.aquazero.app.core.model.DerivedTargetsDto
 
 /**
@@ -35,70 +45,58 @@ fun TargetExplainSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(horizontal = AzfSpacing.ContainerMargin)
+                .padding(bottom = AzfSpacing.SectionGap),
         ) {
-            Text(
-                text = stringResource(R.string.target_explain_title),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(12.dp))
-            ExplainRow(
-                label = stringResource(R.string.target_explain_bmr),
-                value = "${targets.bmr} kcal",
-            )
-            ExplainRow(
-                label = stringResource(R.string.target_explain_tdee),
-                value = "${targets.tdee} kcal",
-            )
-            ExplainRow(
-                label = stringResource(R.string.target_explain_goal),
-                value = "${targets.kcalTarget} kcal",
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.target_explain_title).uppercase(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+                IconButton(onClick = onDismiss, modifier = Modifier.size(AzfSpacing.TouchTarget)) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.action_close),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
+            val kcal = "kcal"
+            AzfStatRow(label = stringResource(R.string.target_explain_bmr), value = "${targets.bmr}", unit = kcal)
+            AzfStatRow(label = stringResource(R.string.target_explain_tdee), value = "${targets.tdee}", unit = kcal)
             if (targets.adaptiveEnabled == true && targets.adaptationKcal != null) {
-                ExplainRow(
+                AzfStatRow(
                     label = stringResource(R.string.target_explain_adaptive),
-                    value = "${targets.adaptationKcal} kcal",
+                    value = "${targets.adaptationKcal}",
+                    unit = kcal,
                 )
             }
+            AzfStatRow(
+                label = stringResource(R.string.target_explain_goal),
+                value = "${targets.kcalTarget}",
+                unit = kcal,
+                valueStyle = DataLarge,
+                divider = false,
+            )
             targets.adaptiveReasoning?.takeIf { it.isNotBlank() }?.let { reasoning ->
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
                 Text(
                     text = reasoning,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (targets.clamped && targets.clampReason != null) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(AzfSpacing.ElementGapSmall))
                 Text(
                     text = targets.clampReason,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(Modifier.height(16.dp))
-            PrimaryButton(
-                text = stringResource(R.string.target_explain_close),
-                onClick = onDismiss,
-            )
         }
-    }
-}
-
-@Composable
-private fun ExplainRow(label: String, value: String) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
     }
 }

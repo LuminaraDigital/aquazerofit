@@ -129,7 +129,7 @@ body {
    ink utilities (text-on-primary and friends), or a disabled button keeps
    dark ink on a dark fill. */
 .cta-gradient:disabled {
-  background: rgb(var(--azf-surface-container-high));
+  background: rgb(var(--azf-surface-container-highest));
   color: rgb(var(--azf-on-surface-variant));
   opacity: 1;
 }

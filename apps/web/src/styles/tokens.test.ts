@@ -148,7 +148,7 @@ describe('Corner Card surfaces', () => {
 
   it('gives a disabled primary its own ink, not a dimmed accent', () => {
     const body = rule('.cta-gradient:disabled');
-    expect(body).toMatch(/background:\s*rgb\(var\(--azf-surface-container-high\)\)/);
+    expect(body).toMatch(/background:\s*rgb\(var\(--azf-surface-container-highest\)\)/);
     expect(body).toMatch(/color:\s*rgb\(var\(--azf-on-surface-variant\)\)/);
   });
 });

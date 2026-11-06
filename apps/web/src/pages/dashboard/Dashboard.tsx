@@ -5,7 +5,6 @@ import type { DailyNutrition, ProgressSummary, TrendPoint } from '@aquazerofit/s
 import { api } from '@/lib/api';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { RingProgress } from '@/components/ui/RingProgress';
 import { Skeleton, DashboardSkeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { CoachCard } from '@/components/coach/CoachCard';
@@ -16,7 +15,7 @@ import { ReadinessChip } from '@/components/progress/ReadinessChip';
 import { WeeklyInsightCard } from '@/components/progress/WeeklyInsightCard';
 import { todayWorkoutQuery, queryKeys, useProgressInsight, useReadiness } from '@/lib/queries';
 import { useTelegramMainAction } from '@/lib/useTelegramChrome';
-import { MacroBar } from './MacroBar';
+import { CalorieLead } from './CalorieLead';
 import { WaterCard } from './WaterCard';
 import { SuggestMealCard } from './SuggestMealCard';
 import {
@@ -137,7 +136,7 @@ export default function Dashboard() {
             {daily && daily.kcalConsumed === 0 && (
               <section className="mb-5 reveal reveal-2" aria-label="Get started">
                 <GlassCard className="p-card-padding border border-primary/30">
-                  <p className="text-xs font-bold uppercase tracking-wider text-primary mb-1">
+                  <p className="stat-label mb-1">
                     Next step
                   </p>
                   <h2 className="font-heading font-semibold text-xl text-on-surface mb-1">
@@ -166,98 +165,14 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* Calorie ring hero - the visual anchor */}
+            {/* Lead card: the scoreboard figure answers "how much is left today". */}
             <section className="mb-5 reveal reveal-2" aria-label="Daily calories">
-              <GlassCard tier="hero" className="p-card-padding flex flex-col items-center relative overflow-hidden float-gentle">
-                <div className="w-full flex justify-between items-start mb-5">
-                  <div>
-                    <h2 className="font-heading font-semibold uppercase tracking-[0.04em] text-lg text-on-surface-variant">
-                      Nutrition
-                    </h2>
-                    <p className="text-xs text-on-surface-variant/60 mt-0.5">Daily goal</p>
-                  </div>
-                  {daily && (
-                    <div className="flex flex-col items-end">
-                      <span className="text-xs font-medium text-on-surface-variant/60 uppercase tracking-wider">
-                        Consumed
-                      </span>
-                      <span className="tabular-nums font-body font-bold text-lg text-on-surface">
-                        {fmtInt(daily.kcalConsumed)}
-                      </span>
-                    </div>
-                  )}
-                </div>
+              <GlassCard tier="hero" className="p-card-padding">
                 {daily ? (
-                  <>
-                    <div className="mb-6">
-                      <RingProgress
-                        value={daily.kcalConsumed}
-                        target={daily.kcalTarget}
-                        size={180}
-                        strokeWidth={7}
-                        tone="aqua"
-                      >
-                        <div className="flex flex-col items-center">
-                          <span className="font-heading font-semibold text-[44px] text-primary tabular-nums leading-none">
-                            {fmtInt(Math.max(0, daily.kcalRemaining))}
-                          </span>
-                          <span className="text-xs text-on-surface-variant mt-1.5 uppercase tracking-wider">kcal left</span>
-                        </div>
-                      </RingProgress>
-                    </div>
-                    <div
-                      className="w-full grid grid-cols-4 text-center tabular-nums mb-6"
-                      aria-label={`Goal ${fmtInt(daily.kcalTarget)} minus food ${fmtInt(daily.kcalConsumed)} plus exercise ${fmtInt(daily.kcalBurned)} equals ${fmtInt(daily.kcalRemaining)} remaining`}
-                    >
-                      <div>
-                        <p className="text-base font-bold text-on-surface">{fmtInt(daily.kcalTarget)}</p>
-                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">Goal</p>
-                      </div>
-                      <div>
-                        <p className="text-base font-bold text-on-surface">
-                          − {fmtInt(daily.kcalConsumed)}
-                        </p>
-                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">Food</p>
-                      </div>
-                      <div>
-                        <p className="text-base font-bold text-on-surface">
-                          + {fmtInt(daily.kcalBurned)}
-                        </p>
-                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">
-                          Exercise
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-base font-bold text-primary">{fmtInt(daily.kcalRemaining)}</p>
-                        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">
-                          Remaining
-                        </p>
-                      </div>
-                    </div>
-                    <div className="w-full grid grid-cols-3 gap-3">
-                      <MacroBar
-                        label="Protein"
-                        tone="green"
-                        consumed={daily.proteinG.consumed}
-                        target={daily.proteinG.target}
-                      />
-                      <MacroBar
-                        label="Carbs"
-                        tone="aqua"
-                        consumed={daily.carbsG.consumed}
-                        target={daily.carbsG.target}
-                      />
-                      <MacroBar
-                        label="Fat"
-                        tone="coral"
-                        consumed={daily.fatG.consumed}
-                        target={daily.fatG.target}
-                      />
-                    </div>
-                  </>
+                  <CalorieLead daily={daily} variant="today" />
                 ) : (
-                  <div className="flex flex-col items-center gap-4 w-full">
-                    <Skeleton className="h-44 w-44 rounded-full" />
+                  <div className="flex flex-col gap-4 w-full">
+                    <Skeleton className="h-16 w-40" />
                     <Skeleton className="h-6 w-full" />
                   </div>
                 )}

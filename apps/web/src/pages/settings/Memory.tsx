@@ -373,7 +373,7 @@ export default function Memory() {
       <main className="pt-6 px-container-margin space-y-section-gap pb-6">
         {/* Trust framing */}
         <section className="space-y-1 px-2">
-          <h2 className="font-heading font-semibold uppercase tracking-wide text-xl text-primary">
+          <h2 className="stat-label">
             What your coach remembers
           </h2>
           <p className="text-sm text-on-surface-variant leading-relaxed">
@@ -421,7 +421,7 @@ export default function Memory() {
             {/* Suggested — needs review */}
             {suggested.length > 0 && (
               <section>
-                <h3 className="font-heading font-semibold uppercase tracking-wide text-base text-secondary mb-2 px-2">
+                <h3 className="stat-label mb-2 px-2">
                   Needs your review ({suggested.length})
                 </h3>
                 <p className="text-xs text-on-surface-variant mb-3 px-2">

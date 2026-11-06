@@ -311,7 +311,6 @@ memory: ['memory']
 
 | Component | File | Technique |
 |-----------|------|-----------|
-| **AppBackground** (app shell) | `AppBackground.tsx` | Full-screen triangle, banded aurora rays, 3-layer (canvas + hatch + vignette) |
 | **HeroOrb** (landing hero) | `HeroOrb.tsx` | Raymarched metaball (3 spheres + smooth-min), pointer parallax (orbits camera), pixel budget cap (900k px @ DPR≤1.75) |
 
 **Guards** (both): prefers-reduced-motion → no init; no WebGL context → CSS fallback; off-screen → rAF stops (IntersectionObserver); backgrounded tab → browser pauses rAF; context loss → clean cancel.
@@ -623,7 +622,7 @@ apps/web/src/
 ├── main.tsx                    # React root
 ├── App.tsx                     # Routes (lazy), Suspense
 ├── components/
-│   ├── layout/                 # AppLayout, RequireAuth, AppBackground, ToastProvider
+│   ├── layout/                 # AppLayout, RequireAuth, ToastProvider
 │   ├── ui/                     # Buttons, RingProgress, Skeleton, Toast, PageSpinner
 │   ├── brand/                  # AkinStage (mascot)
 │   └── share/                  # ShareMoment (OG card)

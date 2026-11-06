@@ -14,7 +14,6 @@ import {
   publishTelegramViewport,
   resetTelegramChromeForTests,
   retainClosingConfirmation,
-  shouldUseStaticTelegramBackground,
   supportsTelegramMainButton,
   syncTelegramBackButton,
   syncTelegramChromeColors,
@@ -301,45 +300,6 @@ describe('main button', () => {
   it('is unavailable below 6.1', () => {
     install({ version: '6.0', withVersion: false });
     expect(supportsTelegramMainButton()).toBe(false);
-  });
-});
-
-describe('static background gate', () => {
-  const inside = { inTelegram: true as const };
-
-  it('stays off outside Telegram even on a low-end device', () => {
-    expect(
-      shouldUseStaticTelegramBackground({
-        inTelegram: false,
-        platform: 'android',
-        deviceMemory: 2,
-        hardwareConcurrency: 2,
-        prefersReducedMotion: true,
-      }),
-    ).toBe(false);
-  });
-
-  it.each([
-    ['android', { platform: 'android' }],
-    ['android_x', { platform: 'android_x' }],
-    ['deviceMemory 4', { deviceMemory: 4, platform: 'ios' }],
-    ['hardwareConcurrency 4', { hardwareConcurrency: 4, platform: 'ios' }],
-    ['reduced motion', { prefersReducedMotion: true, platform: 'ios' }],
-    ['light scheme', { colorScheme: 'light' as const, platform: 'ios', deviceMemory: 8, hardwareConcurrency: 8 }],
-  ])('uses a static background inside Telegram: %s', (_label, extra) => {
-    expect(shouldUseStaticTelegramBackground({ ...inside, ...extra })).toBe(true);
-  });
-
-  it('keeps WebGL on a high-end dark iOS client', () => {
-    expect(
-      shouldUseStaticTelegramBackground({
-        ...inside,
-        platform: 'ios',
-        colorScheme: 'dark',
-        deviceMemory: 8,
-        hardwareConcurrency: 8,
-      }),
-    ).toBe(false);
   });
 });
 

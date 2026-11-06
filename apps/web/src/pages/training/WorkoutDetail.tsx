@@ -563,7 +563,7 @@ export default function WorkoutDetail() {
 
           {phase === 'work' ? (
             <GlassCard className="p-6 text-center">
-              <p className="text-xs font-bold uppercase tracking-widest text-primary">
+              <p className="stat-label">
                 Current exercise
               </p>
               <h2 className="heading-display mt-2 font-heading text-3xl text-on-surface">
@@ -671,7 +671,7 @@ export default function WorkoutDetail() {
 
               <button
                 onClick={completeSet}
-                className="mx-auto mt-6 flex h-40 w-40 flex-col items-center justify-center rounded-full cta-gradient text-on-primary shadow-[0_8px_24px_rgba(34,211,238,0.3)] transition-transform active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                className="mx-auto mt-6 flex h-40 w-40 flex-col items-center justify-center rounded-full cta-gradient text-on-primary transition-transform active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 aria-label={`Complete set ${(setsDone[exerciseIdx] ?? 0) + 1} of ${current.setsPlanned}`}
               >
                 <span className="text-4xl font-bold tabular-nums">
@@ -686,7 +686,7 @@ export default function WorkoutDetail() {
             </GlassCard>
           ) : (
             <GlassCard className="p-6 text-center">
-              <p className="text-xs font-bold uppercase tracking-widest text-secondary">Rest</p>
+              <p className="stat-label">Rest</p>
               <div className="mt-4 flex justify-center">
                 <RingProgress
                   value={restTotal - restLeft}

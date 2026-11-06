@@ -109,7 +109,7 @@ export default function NotificationSettings() {
         </div>
 
         <section className="mb-6">
-          <h2 className="font-heading font-semibold uppercase tracking-wider text-xl text-primary mb-2">
+          <h2 className="stat-label mb-2">
             Preferences
           </h2>
         </section>

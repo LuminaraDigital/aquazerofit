@@ -30,7 +30,7 @@ export function SecondaryButton({
       type={type}
       disabled={isDisabled}
       aria-busy={loading || undefined}
-      className={`${widthClass} min-h-[52px] rounded-2xl border border-primary/60 bg-transparent font-heading font-semibold uppercase tracking-[0.04em] text-sm text-primary transition-all hover:bg-primary/8 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 px-6 ${className}`}
+      className={`${widthClass} min-h-[52px] rounded-xl border border-primary/60 bg-transparent font-heading font-semibold uppercase tracking-[0.04em] text-sm text-primary transition-all hover:bg-primary/8 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 px-6 ${className}`}
       {...rest}
     >
       {loading && (

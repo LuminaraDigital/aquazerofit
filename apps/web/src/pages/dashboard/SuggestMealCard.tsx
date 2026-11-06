@@ -70,7 +70,7 @@ export function SuggestMealCard({ date }: { date: string }) {
       </div>
 
       {rec && (
-        <div className="mb-4 rounded-xl bg-surface-container-low border border-outline-variant p-4">
+        <div className="mb-4 rounded-card bg-surface-container-low border border-outline-variant p-4">
           <div className="flex justify-between items-start gap-3 mb-1">
             <p className="font-bold text-on-surface">{rec.name}</p>
             <span className="text-primary font-bold text-sm tabular-nums whitespace-nowrap">
@@ -101,7 +101,7 @@ export function SuggestMealCard({ date }: { date: string }) {
             type="button"
             onClick={() => addToLog.mutate(rec.id)}
             disabled={addToLog.isPending || logged}
-            className="flex-1 py-3 rounded-xl cta-gradient text-on-primary font-bold transition-all active:scale-95 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            className="flex-1 py-3 rounded-xl cta-gradient text-on-primary font-bold transition-all active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
           >
             {logged ? 'Logged ✓' : addToLog.isPending ? 'Logging…' : 'Add to log'}
           </button>

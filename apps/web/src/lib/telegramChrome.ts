@@ -247,33 +247,6 @@ export function syncTelegramMainButton(action: MainButtonAction | null, ownerId?
   call(() => button.show());
 }
 
-export interface DeviceSignals {
-  inTelegram: boolean;
-  platform?: string;
-  colorScheme?: 'light' | 'dark';
-  deviceMemory?: number;
-  hardwareConcurrency?: number;
-  prefersReducedMotion?: boolean;
-}
-
-/**
- * Static CSS background instead of the WebGL aurora.
- * Only inside Telegram: Android, a light scheme (the shader is a dark ocean),
- * deviceMemory <= 4, hardwareConcurrency <= 4, or reduced motion.
- * Outside Telegram this is always false. Reduced motion there already skips
- * the shader and leaves the existing canvas stack alone.
- */
-export function shouldUseStaticTelegramBackground(signals: DeviceSignals): boolean {
-  if (!signals.inTelegram) return false;
-  if (signals.prefersReducedMotion) return true;
-  if (signals.colorScheme === 'light') return true;
-  const platform = (signals.platform ?? '').toLowerCase();
-  if (platform === 'android' || platform.startsWith('android')) return true;
-  if (typeof signals.deviceMemory === 'number' && signals.deviceMemory <= 4) return true;
-  if (typeof signals.hardwareConcurrency === 'number' && signals.hardwareConcurrency <= 4) return true;
-  return false;
-}
-
 /** Drop module state so unit tests do not leak subscriptions across cases. */
 export function resetTelegramChromeForTests(): void {
   chromeDetach?.();

@@ -190,7 +190,7 @@ export function MealDraftCard({
 
   return (
     <GlassCard className="p-4">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Ready to log</p>
+      <p className="stat-label">Ready to log</p>
       <p className="mt-1 text-sm text-on-surface-variant">
         From “{draft.sourceText}”. Nothing is saved until you tap <strong>Log meal</strong>.
       </p>

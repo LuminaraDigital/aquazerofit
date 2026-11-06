@@ -23,7 +23,7 @@ export function PrimaryButton({
       type={type}
       disabled={isDisabled}
       aria-busy={loading || undefined}
-      className={`cta-gradient azf-cta-text w-full min-h-[52px] rounded-2xl font-heading font-semibold uppercase tracking-[0.04em] text-sm transition-all active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 px-6 ${className}`}
+      className={`cta-gradient azf-cta-text w-full min-h-[56px] rounded-xl font-heading font-semibold uppercase tracking-[0.04em] text-sm transition-transform duration-100 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 px-6 ${className}`}
       {...rest}
     >
       {loading && (

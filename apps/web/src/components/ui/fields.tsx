@@ -151,7 +151,7 @@ export function OptionCardGroup<T extends string>({
               aria-label={opt.body ? `${opt.title}. ${opt.body}` : opt.title}
               onClick={() => onChange(opt.value)}
               className={`glass-card flex items-center gap-4 p-4 text-left transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary active:scale-[0.98] ${
-                active ? 'border-primary shadow-[0_0_15px_rgba(138,235,255,0.15)]' : ''
+                active ? 'border-primary' : ''
               }`}
             >
               {opt.icon && (

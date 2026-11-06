@@ -57,7 +57,7 @@ export function ReadinessChip({
         <span className="material-symbols-outlined text-[18px] text-primary">{mode.icon}</span>
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[11px] font-bold uppercase tracking-widest text-primary">
+        <span className="stat-label block">
           {mode.label} week
         </span>
         <span className="block text-sm leading-snug text-on-surface">{readiness.headline}</span>

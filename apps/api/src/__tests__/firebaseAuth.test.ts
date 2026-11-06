@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'azf-firebase-auth-'));
 process.env.AZF_DATA_DIR = dataDir;
@@ -103,6 +103,105 @@ describe('Firebase ID token auth', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(me.status).toBe(200);
     expect(me.body.user.email).toBe('legacy.jwt@example.com');
+  });
+});
+
+describe('POST /auth/firebase/token (native Google sign-in)', () => {
+  // Earlier tests leave a persistent mockResolvedValue behind; start clean and
+  // leave nothing queued for the suites after this one.
+  beforeEach(() => verifyFirebaseIdToken.mockReset());
+  afterEach(() => verifyFirebaseIdToken.mockReset());
+
+  it('swaps a verified Firebase ID token for a session that opens /me and refreshes', async () => {
+    verifyFirebaseIdToken.mockResolvedValueOnce({
+      uid: 'fb-native-1',
+      email: 'native.google@example.com',
+      emailVerified: true,
+      name: 'Native Google',
+    });
+    const res = await request(app)
+      .post(`${base}/auth/firebase/token`)
+      .set('Authorization', 'Bearer native-firebase-id-token')
+      .send({});
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({
+      email: 'native.google@example.com',
+      displayName: 'Native Google',
+      hasPassword: false,
+    });
+
+    // The returned access token is the legacy JWT, not the Firebase token.
+    verifyFirebaseIdToken.mockRejectedValueOnce(new Error('not a firebase token'));
+    const me = await request(app)
+      .get(`${base}/me`)
+      .set('Authorization', `Bearer ${res.body.accessToken}`);
+    expect(me.status).toBe(200);
+    expect(me.body.user.id).toBe(res.body.user.id);
+
+    const refreshed = await request(app)
+      .post(`${base}/auth/refresh`)
+      .send({ refreshToken: res.body.refreshToken });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body.user.id).toBe(res.body.user.id);
+  });
+
+  it('signs the same Google identity back into the same account', async () => {
+    const identity = {
+      uid: 'fb-native-1',
+      email: 'native.google@example.com',
+      emailVerified: true,
+      name: 'Native Google',
+    };
+    verifyFirebaseIdToken.mockResolvedValueOnce(identity);
+    const first = await request(app).post(`${base}/auth/firebase/token`).set('Authorization', 'Bearer a');
+    verifyFirebaseIdToken.mockResolvedValueOnce(identity);
+    const second = await request(app).post(`${base}/auth/firebase/token`).set('Authorization', 'Bearer b');
+    expect(second.status).toBe(200);
+    expect(second.body.user.id).toBe(first.body.user.id);
+  });
+
+  it('answers 401, not 500, for an expired, revoked or forged Firebase token', async () => {
+    for (const code of ['auth/id-token-expired', 'auth/id-token-revoked', 'auth/argument-error']) {
+      verifyFirebaseIdToken.mockRejectedValueOnce(Object.assign(new Error('bad token'), { code }));
+      const res = await request(app).post(`${base}/auth/firebase/token`).set('Authorization', 'Bearer x');
+      expect(res.status, code).toBe(401);
+      expect(res.body.code).toBe('AUTH_INVALID');
+    }
+  });
+
+  it('still reports a broken server credential as a server error', async () => {
+    verifyFirebaseIdToken.mockRejectedValueOnce(
+      Object.assign(new Error('invalid_grant'), { code: 'app/invalid-credential' }),
+    );
+    const res = await request(app).post(`${base}/auth/firebase/token`).set('Authorization', 'Bearer x');
+    expect(res.status).toBe(500);
+  });
+
+  it('refuses a request with no Firebase ID token', async () => {
+    const res = await request(app).post(`${base}/auth/firebase/token`).send({});
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('AUTH_REQUIRED');
+    expect(res.body.accessToken).toBeUndefined();
+  });
+
+  it('issues no session for an unverified email that matches an existing account', async () => {
+    const reg = await request(app)
+      .post(`${base}/auth/register`)
+      .send({ email: 'native.victim@example.com', password: 'CorrectHorse9Battery' });
+    expect(reg.status).toBe(201);
+
+    verifyFirebaseIdToken.mockResolvedValueOnce({
+      uid: 'fb-native-attacker',
+      email: 'native.victim@example.com',
+      emailVerified: false,
+    });
+    const res = await request(app)
+      .post(`${base}/auth/firebase/token`)
+      .set('Authorization', 'Bearer unverified-native-token');
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('AUTH_EMAIL_UNVERIFIED');
+    expect(res.body.accessToken).toBeUndefined();
+    expect(res.body.refreshToken).toBeUndefined();
   });
 });
 

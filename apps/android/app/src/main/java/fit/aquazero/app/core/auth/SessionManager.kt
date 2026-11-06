@@ -86,6 +86,10 @@ class SessionManager @Inject constructor(
     suspend fun login(email: String, password: String): ApiResult<PublicUserDto> =
         installSession { authApi.login(LoginRequest(email = email, password = password)) }
 
+    /** Google sign-in: exchange a Firebase ID token for an API session. */
+    suspend fun loginWithFirebase(firebaseIdToken: String): ApiResult<PublicUserDto> =
+        installSession { authApi.firebaseToken("Bearer $firebaseIdToken") }
+
     /**
      * Registration; the server signs the new account straight in.
      *

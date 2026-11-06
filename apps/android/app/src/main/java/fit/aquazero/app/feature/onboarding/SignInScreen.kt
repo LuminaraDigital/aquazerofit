@@ -1,5 +1,6 @@
 package fit.aquazero.app.feature.onboarding
 
+import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +32,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fit.aquazero.app.BuildConfig
 import fit.aquazero.app.R
+import fit.aquazero.app.core.auth.GoogleSignInClient
+import fit.aquazero.app.core.auth.GoogleSignInResult
 import fit.aquazero.app.core.data.AuthRepository
 import fit.aquazero.app.core.designsystem.AssetImage
 import fit.aquazero.app.core.designsystem.AzfAppHeader
@@ -66,6 +69,8 @@ data class SignInMessages(
     val challengeFailed: String,
     val challengeCancelled: String,
     val domainRestricted: (String) -> String = { "Use an @$it email address required by your organisation." },
+    val googleFailed: String = "Google sign-in did not finish. Try again, or use email.",
+    val googleNoAccount: String = "Add a Google account to this device in Settings, then try again.",
 )
 
 /**
@@ -133,6 +138,7 @@ class SignInViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val crashReporter: CrashReporter,
     private val deviceSecurityController: DeviceSecurityController,
+    private val googleSignInClient: GoogleSignInClient,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SignInUiState())
@@ -212,6 +218,38 @@ class SignInViewModel @Inject constructor(
         _state.update { it.copy(loading = true, submitError = null, resetSent = false) }
         viewModelScope.launch {
             runStep(passwordResetStepFor(authRepository.captchaRequirement(), messages), messages)
+        }
+    }
+
+    /**
+     * "Continue with Google": account picker, then the API exchange. One tap
+     * signs in an existing account or creates one, so it is the same in both
+     * modes. Not bot-gated: a Google account is itself the proof the captcha
+     * stands in for on the email form.
+     */
+    fun signInWithGoogle(activityContext: Context, messages: SignInMessages) {
+        if (_state.value.loading) return
+        _state.update { it.copy(loading = true, submitError = null) }
+        viewModelScope.launch {
+            val result = googleSignInClient.signIn(activityContext)
+            if (result is GoogleSignInResult.Failed) {
+                crashReporter.log("google sign-in failed: ${result.reason}")
+            }
+            val security = deviceSecurityController.state.value
+            when (
+                val step = googleSignInStepFor(
+                    result = result,
+                    isEmailAllowed = security::isEmailAllowed,
+                    allowedDomain = security.restrictions.allowedEmailDomain,
+                    messages = messages,
+                )
+            ) {
+                is GoogleSignInStep.Exchange ->
+                    finish(authRepository.loginWithFirebase(step.firebaseIdToken), messages)
+                is GoogleSignInStep.Stop -> _state.update {
+                    it.copy(loading = false, submitError = step.message)
+                }
+            }
         }
     }
 
@@ -338,7 +376,10 @@ fun SignInScreen(
         domainRestricted = { domain ->
             resources.getString(R.string.signin_error_email_domain, domain)
         },
+        googleFailed = stringResource(R.string.signin_google_failed),
+        googleNoAccount = stringResource(R.string.signin_google_no_account),
     )
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     state.challengeAction?.let { action ->
         TurnstileChallenge(
@@ -386,6 +427,19 @@ fun SignInScreen(
                     .padding(vertical = 16.dp)
                     .size(56.dp)
                     .revealOnEnter(0),
+            )
+            GoogleSignInButton(
+                onClick = { viewModel.signInWithGoogle(context, messages) },
+                enabled = !state.loading,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .revealOnEnter(0),
+            )
+            Text(
+                text = stringResource(R.string.signin_or),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 16.dp),
             )
             AzfTextField(
                 value = state.email,

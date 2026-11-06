@@ -50,37 +50,37 @@ const SCREENS = [
     id: 'dashboard',
     title: 'Today at a glance',
     caption: 'Calories remaining, macro split and hydration, all computed from your own figures.',
-    alt: 'Dashboard: 1,135 kcal left on a progress ring, protein, carbs and fat against target, and hydration logged in 250 ml steps.',
+    alt: 'Today: 2,382 kcal left as the lead figure, protein, carbs and fat against target as ruled rows, and the day’s checklist of meals, workout and water.',
   },
   {
     id: 'nutrition',
     title: 'Per-meal logging',
     caption: 'A searchable food corpus, barcode scanning and day navigation, meal by meal.',
-    alt: 'Nutrition day view: a calorie ring, macro targets and each meal of the day listed with its entries.',
+    alt: 'Nutrition day view: 2,382 kcal remaining of a 2,580 goal, macros against target, quick actions to scan a meal or barcode, and each meal of the day.',
   },
   {
     id: 'coach',
     title: 'A coach that knows your day',
     caption: 'Grounded in what you have logged, with the wellness boundary always on screen.',
-    alt: "Aqua Coach: a reply quoting today's logged calories, protein, carbs, fat and water, above the persistent wellness disclaimer.",
+    alt: 'Coach chat with Akin: advice on easing into a recovery jog, under the persistent wellness disclaimer.',
   },
   {
-    id: 'meal-plan',
-    title: 'Plans matched to your targets',
-    caption: 'Generated against your calorie and macro targets, with allergens excluded first.',
-    alt: 'An AI meal plan laid out against the day’s calorie and macro targets.',
+    id: 'recipe',
+    title: 'Recipes you can log as cooked',
+    caption: 'Per-serving calories and macros, allergens called out, and the full method cached for offline reading.',
+    alt: 'Recipe: avocado and egg sourdough toast at 440 kcal per serving with protein, carbs and fat, an allergen note, a servings stepper and the ingredient list.',
   },
   {
     id: 'workouts',
     title: 'Training that fits your kit',
     caption: 'An openly licensed exercise corpus, filtered to the equipment you actually own.',
-    alt: 'Workout library: the training week, a rest-day card, and the exercise library filtered by type, muscle and equipment.',
+    alt: 'Workouts: today’s full-body strength session with its exercises and a start button, the training week, and the exercise library.',
   },
   {
     id: 'progress',
     title: 'Progress over 7, 30 and 90 days',
     caption: 'Weight journey and calorie trend, so a single heavy day reads as a single day.',
-    alt: 'Progress view: current weight, change since start, a weight journey chart against goal, and a calorie trend bar chart.',
+    alt: 'Progress: current weight 80.0 kg as the lead figure, change since start, and the 28-day consistency window.',
   },
 ];
 
@@ -113,8 +113,8 @@ export function Gallery() {
               Real screens from the running app.
             </h2>
             <p className={LEAD}>
-              Captured signed in as the seeded demo account. Every number on them came out of the
-              same code you would be using.
+              Captured from the Android app, signed in to a test account. Every number on them came
+              out of the same code you would be using.
             </p>
           </Reveal>
 

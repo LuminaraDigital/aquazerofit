@@ -3,8 +3,9 @@ import { fetchPriorityHigh } from '@/lib/fetchPriority';
 /**
  * Device frame for the real screen captures.
  *
- * The screen is a real capture of the running application (docs/screenshots,
- * re-encoded to WebP in public/screenshots) rather than markup imitating it.
+ * The screen is a real capture of the running application, re-encoded to WebP
+ * in public/screenshots, rather than markup imitating it. Most are Android
+ * captures with the OS status bar cropped off.
  * A hand-built replica drifts from the product the moment either changes —
  * ours already had, within an hour of being written — and a landing page whose
  * "screenshots" are drawings is exactly the tell we are trying to avoid.
@@ -27,12 +28,10 @@ export function DeviceFrame({
 }) {
   return (
     <div
-      className={`relative rounded-[42px] border border-white/10 bg-[#0b1113] p-2.5 shadow-[0_60px_120px_-40px_rgba(0,0,0,0.95),0_0_80px_-40px_rgba(47,217,244,0.5)] ${className}`}
+      // A plain bezel: the screen is the subject, so no glow or sheen competes
+      // with it (docs/design.md).
+      className={`relative rounded-[42px] border border-outline-variant/60 bg-surface-container-lowest p-2.5 ${className}`}
     >
-      <div
-        className="pointer-events-none absolute inset-0 rounded-[42px] bg-gradient-to-br from-white/12 via-transparent to-transparent"
-        aria-hidden="true"
-      />
       <div className="relative overflow-hidden rounded-[34px] bg-surface-container-lowest">
         <img
           src={`/screenshots/${id}.webp`}
@@ -48,8 +47,8 @@ export function DeviceFrame({
           decoding="async"
           className="block h-auto w-full"
         />
-        {/* No drawn notch: these are browser captures with no OS status bar, so
-            a fake one would land on top of the app's own header. */}
+        {/* No drawn notch: the captures carry no status bar, so a fake one
+            would land on top of the app's own header. */}
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import fit.aquazero.app.core.model.RefreshRequest
 import fit.aquazero.app.core.model.RegisterRequest
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 
 /** Auth routes: registration, login, rotation, logout, password reset. */
@@ -28,6 +29,14 @@ interface AuthApi {
 
     @POST("auth/login")
     suspend fun login(@Body body: LoginRequest): AuthResponseDto
+
+    /**
+     * Swap a Firebase ID token ("Continue with Google") for the same token
+     * pair [login] returns. [bearer] is `Bearer <Firebase ID token>`; it is
+     * spent here and never stored.
+     */
+    @POST("auth/firebase/token")
+    suspend fun firebaseToken(@Header("Authorization") bearer: String): AuthResponseDto
 
     /** Body transport; returns a fresh token pair (CAS rotation server-side). */
     @POST("auth/refresh")

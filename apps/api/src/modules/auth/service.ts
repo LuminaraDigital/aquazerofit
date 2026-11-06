@@ -84,7 +84,8 @@ export function findUserByEmail(email: string): User | undefined {
   );
 }
 
-function tokensFor(user: User, channel?: SessionChannel): AuthResponse {
+/** Mint the access + refresh pair every sign-in path returns. */
+export function tokensFor(user: User, channel?: SessionChannel): AuthResponse {
   const { token } = issueRefresh(user.id, undefined, channel);
   return {
     accessToken: signAccess(user, channel),

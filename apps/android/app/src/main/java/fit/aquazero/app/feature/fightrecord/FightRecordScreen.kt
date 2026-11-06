@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,12 +41,16 @@ import fit.aquazero.app.BuildConfig
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfCardTier
+import fit.aquazero.app.core.designsystem.AzfHeroSurface
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.ErrorState
+import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.Scoreboard
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.model.BeltAwardDto
 import fit.aquazero.app.core.model.BeltRungDto
@@ -124,8 +129,8 @@ internal fun FightRecordContent(
             contentPadding = PaddingValues(
                 start = AzfSpacing.ContainerMargin,
                 end = AzfSpacing.ContainerMargin,
-                top = AzfSpacing.ElementGapMedium,
-                bottom = 40.dp,
+                top = 8.dp,
+                bottom = AzfSpacing.SectionGap,
             ),
             verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
@@ -138,7 +143,7 @@ internal fun FightRecordContent(
                 }
                 FightRecordUiState.Failed -> item {
                     ErrorState(
-                        title = stringResource(R.string.fight_record_title),
+                        title = stringResource(R.string.fight_record_error_title),
                         message = stringResource(R.string.fight_record_error),
                         retryLabel = stringResource(R.string.action_retry),
                         onRetry = onRetry,
@@ -168,7 +173,7 @@ private fun CurrentSeason(record: FightRecordStatusDto, onShare: (BeltTier, Int)
     val current = record.current
     val season = current.season
     val held = current.tier
-    AzfCard(modifier = Modifier.fillMaxWidth(), tier = AzfCardTier.Hero) {
+    AzfHeroSurface(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.fight_record_season_named, season.number, season.name).uppercase(),
             style = MaterialTheme.typography.headlineSmall,
@@ -177,7 +182,7 @@ private fun CurrentSeason(record: FightRecordStatusDto, onShare: (BeltTier, Int)
         )
         Text(
             text = seasonDatesText(season),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
@@ -190,17 +195,14 @@ private fun CurrentSeason(record: FightRecordStatusDto, onShare: (BeltTier, Int)
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Text(
-                    text = pluralStringResource(
-                        R.plurals.fight_record_active_days,
-                        current.activeDays,
-                        current.activeDays,
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
+        AzfStatRow(
+            label = stringResource(R.string.fight_record_active_days_label),
+            value = current.activeDays.toString(),
+            valueStyle = Scoreboard,
+            divider = false,
+        )
 
         Spacer(Modifier.height(AzfSpacing.ElementGapMedium))
         Text(
@@ -210,7 +212,7 @@ private fun CurrentSeason(record: FightRecordStatusDto, onShare: (BeltTier, Int)
         )
         Text(
             text = daysLeftText(current.daysLeft),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
@@ -235,13 +237,14 @@ private fun Ladder(record: FightRecordStatusDto) {
     val held = stringResource(R.string.fight_record_rung_held)
     val ahead = stringResource(R.string.fight_record_rung_ahead)
     AzfCard(modifier = Modifier.fillMaxWidth()) {
-        SectionHeading(stringResource(R.string.fight_record_ladder_heading))
+        AzfSectionHeading(stringResource(R.string.fight_record_ladder_heading))
         record.ladder.forEach { rung ->
             val isHeld = isRungHeld(rung.tier, record.current.tier)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = AzfSpacing.TouchTarget)
                     .padding(top = AzfSpacing.ElementGapSmall)
                     .semantics(mergeDescendants = true) { stateDescription = if (isHeld) held else ahead },
             ) {
@@ -256,7 +259,7 @@ private fun Ladder(record: FightRecordStatusDto) {
                 )
                 Text(
                     text = pluralStringResource(R.plurals.fight_record_rung_days, rung.activeDays, rung.activeDays),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 // A fixed slot, so the threshold column lines up held or not.
@@ -270,7 +273,7 @@ private fun Ladder(record: FightRecordStatusDto) {
                         Icon(
                             imageVector = Icons.Outlined.CheckCircle,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = LocalAzfExtended.current.secondaryFixedDim,
                         )
                     }
                 }
@@ -283,7 +286,7 @@ private fun Ladder(record: FightRecordStatusDto) {
 @Composable
 private fun Shelf(record: FightRecordStatusDto) {
     AzfCard(modifier = Modifier.fillMaxWidth()) {
-        SectionHeading(stringResource(R.string.fight_record_shelf_heading))
+        AzfSectionHeading(stringResource(R.string.fight_record_shelf_heading))
         if (record.belts.isEmpty()) {
             record.ladder.firstOrNull()?.let { first ->
                 Text(
@@ -311,23 +314,13 @@ private fun Shelf(record: FightRecordStatusDto) {
                     )
                     Text(
                         text = stringResource(R.string.fight_record_season_named, belt.seasonNumber, belt.seasonName),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
     }
-}
-
-@Composable
-private fun SectionHeading(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.semantics { heading() },
-    )
 }
 
 /**

@@ -351,7 +351,7 @@ export default function RecipeDetail() {
                 type="button"
                 onClick={() => logMeal.mutate(recipe)}
                 disabled={logMeal.isPending}
-                className="cta-gradient w-full h-14 rounded-xl flex items-center justify-center gap-2 text-on-primary font-bold shadow-lg shadow-secondary/20 active:scale-95 transition-transform disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                className="cta-gradient w-full h-14 rounded-xl flex items-center justify-center gap-2 text-on-primary font-bold shadow-lg shadow-secondary/20 active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <span
                   className="material-symbols-outlined"

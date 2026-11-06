@@ -88,7 +88,7 @@ export function WaterCard({ date, consumedMl, targetMl }: WaterCardProps) {
             aria-hidden="true"
             className={
               i < filled
-                ? 'text-primary drop-shadow-[0_0_4px_rgba(138,235,255,0.6)] transition-all duration-300'
+                ? 'text-primary transition-all duration-300'
                 : 'text-outline-variant transition-all duration-300'
             }
           >

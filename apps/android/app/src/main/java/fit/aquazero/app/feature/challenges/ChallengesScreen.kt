@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -62,12 +63,15 @@ import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.DataMedium
+import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.EmptyState
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.MacroBar
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.BuddyChallengeDto
 import fit.aquazero.app.core.model.BuddyChallengeKind
@@ -135,35 +139,30 @@ fun ChallengesScreen(
             contentPadding = PaddingValues(
                 start = AzfSpacing.ContainerMargin,
                 end = AzfSpacing.ContainerMargin,
-                top = AzfSpacing.ContainerMargin,
-                bottom = 40.dp,
+                top = 8.dp,
+                bottom = AzfSpacing.SectionGap,
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
             item {
-                AzfCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.Top) {
-                        Icon(
-                            imageVector = Icons.Outlined.Group,
-                            contentDescription = null,
-                            tint = AzfColors.PrimaryFixedDim,
-                            modifier = Modifier.size(24.dp),
-                        )
-                        Spacer(modifier = Modifier.size(12.dp))
-                        Text(
-                            text = stringResource(R.string.challenges_intro),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                Text(
+                    text = stringResource(R.string.challenges_intro),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             item { CreateCard(state = state, viewModel = viewModel) }
 
             item { JoinCard(state = state, viewModel = viewModel) }
 
-            item { AzfSectionHeading(stringResource(R.string.challenges_yours_heading)) }
+            item {
+                // 12dp list gap + 20dp = the 32dp section gap.
+                AzfSectionHeading(
+                    stringResource(R.string.challenges_yours_heading),
+                    modifier = Modifier.padding(top = 20.dp),
+                )
+            }
 
             when {
                 state.loading -> item {
@@ -174,7 +173,7 @@ fun ChallengesScreen(
                 }
                 state.loadFailed -> item {
                     ErrorState(
-                        title = stringResource(R.string.challenges_title),
+                        title = stringResource(R.string.challenges_error_title),
                         message = stringResource(R.string.challenges_error),
                         retryLabel = stringResource(R.string.challenges_retry),
                         onRetry = viewModel::load,
@@ -202,11 +201,7 @@ fun ChallengesScreen(
 @Composable
 private fun CreateCard(state: ChallengesUiState, viewModel: ChallengesViewModel) {
     AzfCard(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.challenges_create_heading).uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = AzfColors.SecondaryFixedDim,
-        )
+        AzfSectionHeading(stringResource(R.string.challenges_create_heading))
         Spacer(modifier = Modifier.height(12.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -217,6 +212,7 @@ private fun CreateCard(state: ChallengesUiState, viewModel: ChallengesViewModel)
                     text = stringResource(kindLabel(kind)),
                     selected = state.kind == kind,
                     onClick = { viewModel.setKind(kind) },
+                    modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
                 )
             }
         }
@@ -236,7 +232,7 @@ private fun CreateCard(state: ChallengesUiState, viewModel: ChallengesViewModel)
                 R.string.challenges_create_note,
                 ChallengesRepository.MAX_MEMBERS,
             ),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -245,11 +241,7 @@ private fun CreateCard(state: ChallengesUiState, viewModel: ChallengesViewModel)
 @Composable
 private fun JoinCard(state: ChallengesUiState, viewModel: ChallengesViewModel) {
     AzfCard(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.challenges_join_heading).uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = AzfColors.SecondaryFixedDim,
-        )
+        AzfSectionHeading(stringResource(R.string.challenges_join_heading))
         Spacer(modifier = Modifier.height(12.dp))
         AzfTextField(
             value = state.joinCode,
@@ -285,21 +277,19 @@ private fun ChallengeCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(kindLabel(challenge.kind)).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AzfColors.PrimaryFixedDim,
+                    style = StatLabel,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = challenge.code,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = FontFamily.Monospace,
-                    ),
+                    style = DataMedium.copy(fontFamily = FontFamily.Monospace),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             Text(
                 text = stringResource(statusLabel(challenge.status)),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -310,7 +300,7 @@ private fun ChallengeCard(
                 challenge.targetDays,
                 challenge.endsAt,
             ),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(4.dp))
@@ -320,7 +310,7 @@ private fun ChallengeCard(
                 challenge.members.size,
                 ChallengesRepository.MAX_MEMBERS,
             ),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -338,22 +328,22 @@ private fun ChallengeCard(
         }
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onCopy) {
+            TextButton(onClick = onCopy, modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget)) {
                 Icon(
                     imageVector = Icons.Outlined.ContentCopy,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                 )
-                Spacer(modifier = Modifier.size(6.dp))
+                Spacer(modifier = Modifier.size(8.dp))
                 Text(text = stringResource(R.string.challenges_copy_code))
             }
-            TextButton(onClick = onShare) {
+            TextButton(onClick = onShare, modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget)) {
                 Icon(
                     imageVector = Icons.Outlined.Share,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                 )
-                Spacer(modifier = Modifier.size(6.dp))
+                Spacer(modifier = Modifier.size(8.dp))
                 Text(text = stringResource(R.string.challenges_share_code))
             }
         }
@@ -368,9 +358,9 @@ private fun Podium(leaders: List<BuddyChallengeMemberDto>) {
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.Bottom,
     ) {
-        PodiumSeat(leaders[1], rank = 2, avatarSize = 60.dp, medal = AzfColors.OnSurfaceVariant)
+        PodiumSeat(leaders[1], rank = 2, avatarSize = 60.dp, medal = MaterialTheme.colorScheme.onSurfaceVariant)
         PodiumSeat(leaders[0], rank = 1, avatarSize = 76.dp, medal = AzfColors.Warning)
-        PodiumSeat(leaders[2], rank = 3, avatarSize = 60.dp, medal = AzfColors.Coral)
+        PodiumSeat(leaders[2], rank = 3, avatarSize = 60.dp, medal = MaterialTheme.colorScheme.outline)
     }
 }
 
@@ -408,23 +398,23 @@ private fun PodiumSeat(member: BuddyChallengeMemberDto, rank: Int, avatarSize: D
             ) {
                 Text(
                     text = rank.toString(),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = AzfColors.Surface,
                 )
             }
         }
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = member.displayName,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = stringResource(R.string.challenges_days_short, member.progressDays),
-            style = MaterialTheme.typography.labelMedium,
-            color = AzfColors.PrimaryFixedDim,
+            style = DataSmall,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -433,7 +423,7 @@ private const val PODIUM_SIZE = 3
 
 @Composable
 private fun MemberRow(member: BuddyChallengeMemberDto, targetDays: Int) {
-    Column(modifier = Modifier.padding(bottom = 10.dp)) {
+    Column(modifier = Modifier.padding(bottom = 12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -449,11 +439,11 @@ private fun MemberRow(member: BuddyChallengeMemberDto, targetDays: Int) {
                     member.progressDays,
                     targetDays,
                 ),
-                style = MaterialTheme.typography.bodySmall,
-                color = AzfColors.PrimaryFixedDim,
+                style = DataSmall,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         MacroBar(
             label = member.displayName,
             consumed = member.progressDays.toDouble(),

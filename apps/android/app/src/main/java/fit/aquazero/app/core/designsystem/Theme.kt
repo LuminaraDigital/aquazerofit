@@ -9,14 +9,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 /**
  * Deep Sea is dark-only by design: the single [darkColorScheme] below is the
- * whole theme. Values are ported verbatim from DESIGN.md via [AzfColors].
+ * whole theme. Values come from [AzfColors]; docs/design.md explains them.
  */
 private val DeepSeaColorScheme = darkColorScheme(
     primary = AzfColors.Primary,
@@ -57,18 +55,18 @@ private val DeepSeaColorScheme = darkColorScheme(
 )
 
 /**
- * Brand tokens that have no Material role: the CTA gradient, ring track,
- * coral (the only color for weight gain) and the fixed-dim accents.
+ * Brand tokens that have no Material role: ring track, coral (the only color
+ * for weight gain) and the fixed-dim accents. There is deliberately no
+ * gradient here: the accent is a flat fill (docs/design.md, "What this
+ * retires").
  */
 @Immutable
 data class AzfExtendedColors(
-    /** 135° aqua→sea-green gradient for primary CTAs and completed goals. */
-    val ctaGradient: Brush,
     /** Track color behind progress rings and bars. */
     val ringTrack: Color,
     /** Coral accent (weight gain, physiological markers). Never red. */
     val coral: Color,
-    /** Vibrant aqua accent (`primary-fixed-dim`). */
+    /** Vibrant aqua accent (`primary-fixed-dim`): the filled-button colour. */
     val primaryFixedDim: Color,
     /** Vibrant sea-green accent (`secondary-fixed-dim`). */
     val secondaryFixedDim: Color,
@@ -78,13 +76,8 @@ data class AzfExtendedColors(
     val info: Color,
 )
 
-/** Default extended tokens; the gradient runs top-left → bottom-right (135°). */
+/** Default extended tokens. */
 val AzfExtended: AzfExtendedColors = AzfExtendedColors(
-    ctaGradient = Brush.linearGradient(
-        colors = listOf(AzfColors.PrimaryFixedDim, AzfColors.SecondaryFixedDim),
-        start = Offset.Zero,
-        end = Offset.Infinite,
-    ),
     ringTrack = AzfColors.RingTrack,
     coral = AzfColors.Coral,
     primaryFixedDim = AzfColors.PrimaryFixedDim,

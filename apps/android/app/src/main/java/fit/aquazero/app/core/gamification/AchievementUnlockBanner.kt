@@ -48,7 +48,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fit.aquazero.app.R
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfShapes
+import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.rememberReducedMotion
@@ -117,11 +119,8 @@ fun AchievementUnlockBanner(
                 .fillMaxWidth()
                 .clip(AzfShapes.Card)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .border(
-                    BorderStroke(1.dp, LocalAzfExtended.current.secondaryFixedDim.copy(alpha = 0.5f)),
-                    AzfShapes.Card,
-                )
-                .padding(14.dp)
+                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), AzfShapes.Card)
+                .padding(AzfSpacing.CardPadding)
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
                     contentDescription = announcement
@@ -137,20 +136,16 @@ fun AchievementUnlockBanner(
                     .weight(1f)
                     .padding(horizontal = 12.dp),
             ) {
-                Text(
-                    text = label.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = LocalAzfExtended.current.secondaryFixedDim,
-                )
+                AzfSectionHeading(text = label)
                 Text(
                     text = celebration.reaction,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             CoachAvatar(persona = persona, size = 32.dp, contentDescription = null)
             if (onShare != null) {
-                IconButton(onClick = onShare) {
+                IconButton(onClick = onShare, modifier = Modifier.size(AzfSpacing.TouchTarget)) {
                     Icon(
                         imageVector = Icons.Outlined.IosShare,
                         contentDescription = stringResource(R.string.achievement_share_cd),
@@ -158,7 +153,7 @@ fun AchievementUnlockBanner(
                     )
                 }
             }
-            IconButton(onClick = onDismiss) {
+            IconButton(onClick = onDismiss, modifier = Modifier.size(AzfSpacing.TouchTarget)) {
                 Icon(
                     imageVector = Icons.Outlined.Close,
                     contentDescription = stringResource(R.string.achievement_dismiss_cd),

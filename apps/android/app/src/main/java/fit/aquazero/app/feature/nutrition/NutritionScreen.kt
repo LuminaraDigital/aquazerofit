@@ -26,7 +26,6 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.common.LocalDailyNutrition
-import fit.aquazero.app.core.designsystem.AquaAura
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTheme
@@ -151,7 +150,6 @@ fun NutritionContent(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        AquaAura()
         Column(modifier = Modifier.fillMaxSize()) {
             AzfAppHeader(title = stringResource(R.string.screen_nutrition))
             Column(
@@ -162,7 +160,7 @@ fun NutritionContent(
                         PaddingValues(
                             start = AzfSpacing.ContainerMargin,
                             end = AzfSpacing.ContainerMargin,
-                            bottom = AzfSpacing.Gutter,
+                            bottom = AzfSpacing.SectionGap,
                         ),
                     ),
             ) {
@@ -188,9 +186,9 @@ fun NutritionContent(
                     }
 
                     state.nutrition == null -> {
-                        CardSkeleton(height = 240.dp, modifier = Modifier.revealOnEnter(1))
+                        CardSkeleton(height = 232.dp, modifier = Modifier.revealOnEnter(1))
                         Spacer(Modifier.height(AzfSpacing.Gutter))
-                        CardSkeleton(height = 96.dp, modifier = Modifier.revealOnEnter(2))
+                        CardSkeleton(height = 120.dp, modifier = Modifier.revealOnEnter(2))
                         Spacer(Modifier.height(AzfSpacing.Gutter))
                         CardSkeleton(height = 180.dp, modifier = Modifier.revealOnEnter(3))
                     }
@@ -293,7 +291,7 @@ private fun MealTimeline(
 ) {
     Column(
         modifier = Modifier.revealOnEnter(3),
-        verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapSmall),
+        verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapMedium),
     ) {
         NutritionFormat.MEAL_TYPES.forEach { mealType ->
             MealSection(

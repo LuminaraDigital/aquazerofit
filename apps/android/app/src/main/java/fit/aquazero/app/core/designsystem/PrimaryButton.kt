@@ -14,15 +14,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 /**
- * Primary CTA: the aqua→sea-green 135° gradient with press-scale feedback
- * (0.97) and a 56dp minimum height per DESIGN.md.
+ * Primary CTA: a flat aqua fill with dark ink (10.1:1), press-scale feedback
+ * (0.97) and a 56dp minimum height. One per view (docs/design.md).
  */
 @Composable
 fun PrimaryButton(
@@ -33,14 +32,20 @@ fun PrimaryButton(
     loading: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
+    // Disabled sits two steps above any card or sheet, so it still reads as a
+    // button that is not ready yet rather than vanishing into a sheet.
+    val fill = if (enabled) {
+        LocalAzfExtended.current.primaryFixedDim
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHighest
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
             .pressScale(interaction)
-            .clip(AzfShapes.Pill)
-            .background(LocalAzfExtended.current.ctaGradient)
-            .alpha(if (enabled) 1f else 0.5f)
+            .clip(AzfShapes.Inner)
+            .background(fill)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -53,14 +58,16 @@ fun PrimaryButton(
         if (loading) {
             CircularProgressIndicator(
                 modifier = Modifier.padding(8.dp),
-                color = AzfColors.OnPrimary,
+                color = AzfColors.OnPrimaryFixed,
                 strokeWidth = 2.dp,
             )
         } else {
             Text(
                 text = text,
                 style = MaterialTheme.typography.titleMedium,
-                color = AzfColors.OnPrimary,
+                // Disabled is a different surface, not a dimmed accent, so
+                // "not yet" never reads as "press me".
+                color = if (enabled) AzfColors.OnPrimaryFixed else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
             )
         }

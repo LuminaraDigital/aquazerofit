@@ -75,8 +75,8 @@ const STEPS: StepSpec[] = [
       'Runs a deterministic allergen filter after generation, tuned to reject anything it cannot prove safe rather than risk a miss.',
       'Leaves the arithmetic where it belongs: the totals you see are computed, not narrated.',
     ],
-    screenshot: 'meal-plan',
-    alt: 'A generated meal plan laid out against the day’s calorie and macro targets.',
+    screenshot: 'recipe',
+    alt: 'A recipe from the plan: per-serving calories and macros, an allergen note and a servings stepper.',
   },
   {
     id: 'train',

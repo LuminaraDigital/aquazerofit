@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -56,20 +57,22 @@ import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
 import fit.aquazero.app.core.designsystem.AzfChip
-import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfNavigationRow
 import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSegmentOption
 import fit.aquazero.app.core.designsystem.AzfSegmented
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
 import fit.aquazero.app.core.designsystem.AzfSwitchRow
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.PrimaryButton
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
+import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.designsystem.ToastKind
 import fit.aquazero.app.core.model.Allergen
 import fit.aquazero.app.core.model.DietaryPreference
@@ -152,16 +155,16 @@ fun SettingsScreen(
             contentPadding = PaddingValues(
                 start = AzfSpacing.ContainerMargin,
                 end = AzfSpacing.ContainerMargin,
-                top = AzfSpacing.ContainerMargin,
-                bottom = 40.dp,
+                top = 8.dp,
+                bottom = AzfSpacing.SectionGap,
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter),
         ) {
             item(contentType = "identity") { IdentityCard(state, viewModel) }
 
             item(contentType = "disclaimer") { DisclaimerCard() }
 
-            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_profile_heading)) }
+            item(contentType = "heading") { SectionLabel(stringResource(R.string.settings_profile_heading)) }
             item(contentType = "profile") {
                 when {
                     state.profile != null -> ProfileSummaryCard(
@@ -181,7 +184,7 @@ fun SettingsScreen(
 
             if (state.profile != null) {
                 item(contentType = "heading") {
-                    AzfSectionHeading(stringResource(R.string.settings_preferences_heading))
+                    SectionLabel(stringResource(R.string.settings_preferences_heading))
                 }
                 item(contentType = "preferences") { PreferenceCards(state, viewModel) }
             }
@@ -218,10 +221,10 @@ fun SettingsScreen(
                 )
             }
 
-            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_privacy_heading)) }
+            item(contentType = "heading") { SectionLabel(stringResource(R.string.settings_privacy_heading)) }
             item(contentType = "consent") { ConsentCard(state, viewModel) }
 
-            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_security_heading)) }
+            item(contentType = "heading") { SectionLabel(stringResource(R.string.settings_security_heading)) }
             item(contentType = "device-security") {
                 DeviceSecurityCard(
                     security = state.deviceSecurity,
@@ -230,6 +233,7 @@ fun SettingsScreen(
                 )
             }
 
+            item(contentType = "heading") { SectionLabel(stringResource(R.string.settings_account_heading)) }
             item(contentType = "nav-row") {
                 AzfNavigationRow(
                     title = stringResource(R.string.settings_memory_title),
@@ -265,9 +269,9 @@ fun SettingsScreen(
                 )
             }
 
-            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_legal_heading)) }
+            item(contentType = "heading") { SectionLabel(stringResource(R.string.settings_legal_heading)) }
             item(contentType = "legal") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter)) {
                     AzfNavigationRow(
                         title = stringResource(R.string.settings_privacy_policy),
                         body = stringResource(R.string.settings_link_opens_browser),
@@ -310,7 +314,7 @@ fun SettingsScreen(
                 }
             }
 
-            item(contentType = "heading") { AzfSectionHeading(stringResource(R.string.settings_danger_heading)) }
+            item(contentType = "heading") { SectionLabel(stringResource(R.string.settings_danger_heading)) }
             item(contentType = "deletion") {
                 DeletionCard(
                     state = state,
@@ -330,6 +334,7 @@ fun SettingsScreen(
                     ),
                     onClick = { viewModel.signOut() },
                     enabled = !state.signingOut,
+                    destructive = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -341,7 +346,7 @@ fun SettingsScreen(
                         BuildConfig.VERSION_NAME,
                         BuildConfig.VERSION_CODE,
                     ),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
@@ -384,7 +389,7 @@ private fun IdentityCard(state: SettingsUiState, viewModel: SettingsViewModel) {
             Icon(
                 imageVector = Icons.Outlined.AccountCircle,
                 contentDescription = stringResource(R.string.settings_avatar_cd),
-                tint = AzfColors.PrimaryFixedDim,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(48.dp),
             )
             Spacer(modifier = Modifier.size(16.dp))
@@ -400,7 +405,7 @@ private fun IdentityCard(state: SettingsUiState, viewModel: SettingsViewModel) {
                     text = state.memberSince.takeIf { it.isNotBlank() }
                         ?.let { stringResource(R.string.settings_member_since, formatMonthYear(it)) }
                         ?: state.email,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -448,20 +453,16 @@ private fun DisclaimerCard() {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = null,
-                tint = AzfColors.PrimaryFixedDim,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.size(12.dp))
             Column {
-                Text(
-                    text = stringResource(R.string.settings_disclaimer_heading).uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = AzfColors.SecondaryFixedDim,
-                )
+                AzfSectionHeading(stringResource(R.string.settings_disclaimer_heading))
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = stringResource(R.string.settings_disclaimer_body),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -487,6 +488,7 @@ private fun ProfileSummaryCard(profile: WellnessProfileDto?, onEdit: () -> Unit)
         SummaryRow(
             stringResource(R.string.settings_profile_activity),
             stringResource(activityLabel(profile.activityLevel)),
+            divider = false,
         )
         Spacer(modifier = Modifier.height(12.dp))
         SecondaryButton(
@@ -498,30 +500,20 @@ private fun ProfileSummaryCard(profile: WellnessProfileDto?, onEdit: () -> Unit)
 }
 
 @Composable
-private fun SummaryRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
+private fun SummaryRow(label: String, value: String, divider: Boolean = true) {
+    AzfStatRow(label = label, value = value, valueStyle = DataSmall, divider = divider)
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    // 12dp list gap + 20dp = the 32dp section gap.
+    AzfSectionHeading(text, modifier = Modifier.padding(top = 20.dp))
 }
 
 @Composable
 private fun PreferenceCards(state: SettingsUiState, viewModel: SettingsViewModel) {
     val profile = state.profile ?: return
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(AzfSpacing.Gutter)) {
         AzfCard(modifier = Modifier.fillMaxWidth()) {
             AzfSegmented(
                 label = stringResource(R.string.settings_units),
@@ -540,15 +532,11 @@ private fun PreferenceCards(state: SettingsUiState, viewModel: SettingsViewModel
             )
         }
         AzfCard(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = stringResource(R.string.settings_nutrition_emphasis_heading),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            AzfSectionHeading(stringResource(R.string.settings_nutrition_emphasis_heading))
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = stringResource(R.string.settings_nutrition_emphasis_body),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -571,11 +559,7 @@ private fun PreferenceCards(state: SettingsUiState, viewModel: SettingsViewModel
             )
         }
         AzfCard(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = stringResource(R.string.settings_dietary_heading),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            AzfSectionHeading(stringResource(R.string.settings_dietary_heading))
             Spacer(modifier = Modifier.height(8.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -588,20 +572,17 @@ private fun PreferenceCards(state: SettingsUiState, viewModel: SettingsViewModel
                         onClick = {
                             if (state.profileEditable) viewModel.toggleDietaryPreference(preference)
                         },
+                        modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
                     )
                 }
             }
         }
         AzfCard(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = stringResource(R.string.settings_allergies_heading),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            AzfSectionHeading(stringResource(R.string.settings_allergies_heading))
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = stringResource(R.string.settings_allergies_body),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -614,6 +595,7 @@ private fun PreferenceCards(state: SettingsUiState, viewModel: SettingsViewModel
                         text = stringResource(allergenLabel(allergen)),
                         selected = allergen in profile.allergies,
                         onClick = { if (state.profileEditable) viewModel.toggleAllergy(allergen) },
+                        modifier = Modifier.heightIn(min = AzfSpacing.TouchTarget),
                     )
                 }
             }
@@ -628,7 +610,7 @@ private fun ConsentCard(state: SettingsUiState, viewModel: SettingsViewModel) {
         if (consents == null) {
             Text(
                 text = stringResource(R.string.settings_consents_loading),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             return@AzfCard
@@ -686,20 +668,20 @@ private fun DeletionCard(
         if (state.deletionRequestedAt == null) {
             Text(
                 text = stringResource(R.string.settings_delete_body, grace),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.settings_delete_export_first),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (state.playSubscriptionActive) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(R.string.settings_delete_play_warning),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -707,6 +689,7 @@ private fun DeletionCard(
             SecondaryButton(
                 text = stringResource(R.string.settings_delete_cta),
                 onClick = { viewModel.showDialog(SettingsDialog.RequestDeletion) },
+                destructive = true,
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
@@ -714,33 +697,34 @@ private fun DeletionCard(
                 Icon(
                     imageVector = Icons.Outlined.DeleteForever,
                     contentDescription = null,
-                    tint = AzfColors.Coral,
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(modifier = Modifier.size(8.dp))
                 Text(
                     text = stringResource(R.string.settings_delete_pending_heading).uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = AzfColors.Coral,
+                    style = StatLabel,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.settings_delete_pending_body, grace),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(16.dp))
             SecondaryButton(
                 text = stringResource(R.string.settings_delete_now_cta),
                 onClick = { viewModel.showDialog(SettingsDialog.PurgeNow) },
+                destructive = true,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.settings_delete_web_note),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(4.dp))

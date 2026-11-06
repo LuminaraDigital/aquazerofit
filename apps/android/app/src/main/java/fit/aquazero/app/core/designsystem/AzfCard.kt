@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 enum class AzfCardTier { Hero, Standard, Compact }
 
 /**
- * The Deep Sea card: tonal surface, 1dp outline border, 20dp radius.
+ * The standard card: tonal surface, 1dp hairline, 16dp radius ([AzfShapes.Card]).
  * Elevation is tonal layering, never a heavy shadow.
  */
 @Composable

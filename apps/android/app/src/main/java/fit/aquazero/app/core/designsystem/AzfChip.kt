@@ -12,17 +12,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 /**
  * Pill chip: low-opacity accent fill with full-strength accent text when
- * selected (DESIGN.md chip recipe), outline-only when idle. Emits a haptic
+ * selected, outline-only when idle. 48dp tall so the whole chip is the touch
+ * target, one line, and TalkBack hears whether it is selected. Emits a haptic
  * tick on selection.
  */
 @Composable
@@ -37,7 +41,7 @@ fun AzfChip(
     val accent = LocalAzfExtended.current.primaryFixedDim
     Row(
         modifier = modifier
-            .heightIn(min = 32.dp)
+            .heightIn(min = 48.dp)
             .pressScale(interaction)
             .clip(AzfShapes.Pill)
             .background(if (selected) accent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerLow)
@@ -56,12 +60,15 @@ fun AzfChip(
                 haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                 onClick()
             }
-            .padding(horizontal = 14.dp, vertical = 6.dp),
+            .semantics { this.selected = selected }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
             color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
         )
     }
 }

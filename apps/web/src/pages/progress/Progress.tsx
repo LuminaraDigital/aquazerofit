@@ -190,16 +190,16 @@ export default function Progress() {
           <section aria-label="Weight progress">
             <div className="grid grid-cols-2 gap-4">
               <GlassCard className="p-5">
-                <span className="text-sm text-on-surface-variant">Current Weight</span>
-                <div className="mt-2 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-primary tabular-nums">
+                <span className="stat-label">Current weight</span>
+                <div className="mt-2 flex items-baseline gap-1.5">
+                  <span className="scoreboard">
                     {summary.currentWeightKg?.toFixed(1) ?? '-'}
                   </span>
-                  <span className="text-sm text-on-surface-variant">kg</span>
+                  <span className="text-base text-on-surface-variant">kg</span>
                 </div>
               </GlassCard>
               <GlassCard className="p-5">
-                <span className="text-sm text-on-surface-variant">Since start</span>
+                <span className="stat-label">Since start</span>
                 {/* Direction is reported, not judged: a gain is not rendered as
                     a failure and a loss is not rendered as a reward. Same ink
                     either way - the sign carries the information. */}
@@ -405,7 +405,7 @@ export default function Progress() {
                 {summary.achievements.map(({ definition, earnedAt }) => (
                   <li key={definition.id} className="flex flex-col items-center gap-2 text-center">
                     {earnedAt ? (
-                      <div className="cta-gradient rounded-full p-[2px] shadow-[0_0_15px_rgba(138,235,255,0.4)]">
+                      <div className="cta-gradient rounded-full p-[2px]">
                         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-surface-container-high">
                           <span
                             className="material-symbols-outlined text-4xl text-primary"

@@ -72,13 +72,15 @@ export default {
         coral: 'rgb(var(--azf-coral) / <alpha-value>)',
       },
       fontFamily: {
-        heading: ['"Barlow Condensed"', 'sans-serif'],
+        heading: ['"Barlow Condensed"', '"Barlow Condensed Fallback"', 'sans-serif'],
         body: ['"DM Sans"', 'sans-serif'],
       },
+      // Two radii, matching Android's AzfShapes (docs/design.md): 16px for
+      // containers, 8px for controls and inner tiles.
       borderRadius: {
-        card: '20px',
-        xl: '16px',
-        '2xl': '20px',
+        card: '16px',
+        xl: '8px',
+        '2xl': '16px',
       },
       spacing: {
         'container-margin': '1.25rem',

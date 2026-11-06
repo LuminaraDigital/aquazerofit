@@ -177,7 +177,7 @@ export default function LogWeight() {
           />
           <div
             aria-hidden="true"
-            className="mx-auto h-1 w-16 rounded-full bg-secondary shadow-[0_0_15px_rgba(69,223,164,0.5)]"
+            className="mx-auto h-1 w-16 rounded-full bg-secondary"
           />
         </div>
 

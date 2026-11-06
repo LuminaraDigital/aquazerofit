@@ -40,17 +40,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfConsentRow
+import fit.aquazero.app.core.designsystem.AzfHeroSurface
 import fit.aquazero.app.core.designsystem.AzfOptionCard
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSegmentOption
 import fit.aquazero.app.core.designsystem.AzfSegmented
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.ErrorState
+import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
-import fit.aquazero.app.core.designsystem.RingProgress
+import fit.aquazero.app.core.designsystem.Scoreboard
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
 import fit.aquazero.app.core.model.ActivityLevel
@@ -90,6 +94,8 @@ fun SetupScreen(
         state.loading -> SetupLoading(modifier)
         state.phase == SetupPhase.REVEAL -> TargetsReveal(
             targets = state.targets,
+            retrying = state.saving,
+            onRetry = viewModel::retryTargets,
             onContinue = viewModel::finish,
             modifier = modifier,
         )
@@ -146,17 +152,22 @@ private fun SetupForm(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(AzfSpacing.ContainerMargin),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            contentPadding = PaddingValues(
+                start = AzfSpacing.ContainerMargin,
+                end = AzfSpacing.ContainerMargin,
+                top = 8.dp,
+                bottom = AzfSpacing.SectionGap,
+            ),
+            verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapMedium),
         ) {
             item {
                 Column {
                     Text(
                         text = stringResource(R.string.setup_heading),
-                        style = MaterialTheme.typography.headlineLarge,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = stringResource(R.string.setup_intro),
                         style = MaterialTheme.typography.bodyMedium,
@@ -243,12 +254,7 @@ private fun SetupForm(
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = stringResource(R.string.setup_goal_label),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
+                    AzfSectionHeading(stringResource(R.string.setup_goal_label))
                     AzfOptionCard(
                         title = stringResource(R.string.setup_goal_lose),
                         body = stringResource(R.string.setup_goal_lose_body),
@@ -323,14 +329,14 @@ private fun SetupForm(
                         Icon(
                             imageVector = Icons.Outlined.Info,
                             contentDescription = null,
-                            tint = AzfColors.TertiaryContainer,
+                            tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
                             text = stringResource(state.errorRes),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AzfColors.TertiaryContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
                         )
                     }
                 }
@@ -362,31 +368,51 @@ private fun SetupForm(
 @Composable
 private fun TargetsReveal(
     targets: DerivedTargetsDto?,
+    retrying: Boolean,
+    onRetry: () -> Unit,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (targets == null) {
-        SetupLoading(modifier)
+        // The profile saved; only the numbers failed to come back. Say so, and
+        // offer the retry rather than a skeleton that never resolves.
+        if (retrying) {
+            SetupLoading(modifier)
+        } else {
+            Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+                ErrorState(
+                    title = stringResource(R.string.setup_targets_error_title),
+                    message = stringResource(R.string.setup_targets_error_body),
+                    retryLabel = stringResource(R.string.action_retry),
+                    onRetry = onRetry,
+                )
+                SecondaryButton(
+                    text = stringResource(R.string.setup_reveal_continue),
+                    onClick = onContinue,
+                    modifier = Modifier.padding(horizontal = AzfSpacing.ContainerMargin),
+                )
+            }
+        }
         return
     }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(AzfSpacing.ContainerMargin),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(AzfSpacing.ElementGapMedium),
     ) {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     imageVector = Icons.Outlined.Verified,
                     contentDescription = null,
-                    tint = AzfColors.SecondaryFixedDim,
+                    tint = LocalAzfExtended.current.secondaryFixedDim,
                     modifier = Modifier.size(48.dp),
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = stringResource(R.string.setup_reveal_heading),
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                 )
@@ -400,47 +426,30 @@ private fun TargetsReveal(
             }
         }
 
+        // The same tale-of-the-tape card as Today and Nutrition, so the first
+        // numbers someone sees look like every number after them.
         item {
-            RingProgress(
-                progress = 1f,
-                size = 180.dp,
-                strokeWidth = 10.dp,
-                center = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = NutritionFormat.fmtInt(targets.kcalTarget),
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = stringResource(R.string.setup_reveal_kcal_sublabel),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-            )
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                MacroRing(
-                    grams = targets.proteinG,
+            AzfHeroSurface {
+                AzfStatRow(
+                    label = stringResource(R.string.setup_reveal_kcal_sublabel),
+                    value = NutritionFormat.fmtInt(targets.kcalTarget),
+                    valueStyle = Scoreboard,
+                )
+                AzfStatRow(
                     label = stringResource(R.string.setup_reveal_protein),
-                    color = AzfColors.SecondaryFixedDim,
+                    value = targets.proteinG.roundToInt().toString(),
+                    unit = stringResource(R.string.nutrition_unit_g),
                 )
-                MacroRing(
-                    grams = targets.carbsG,
+                AzfStatRow(
                     label = stringResource(R.string.setup_reveal_carbs),
-                    color = AzfColors.PrimaryFixedDim,
+                    value = targets.carbsG.roundToInt().toString(),
+                    unit = stringResource(R.string.nutrition_unit_g),
                 )
-                MacroRing(
-                    grams = targets.fatG,
+                AzfStatRow(
                     label = stringResource(R.string.setup_reveal_fat),
-                    color = AzfColors.Coral,
+                    value = targets.fatG.roundToInt().toString(),
+                    unit = stringResource(R.string.nutrition_unit_g),
+                    divider = false,
                 )
             }
         }
@@ -451,7 +460,7 @@ private fun TargetsReveal(
                     Icon(
                         imageVector = Icons.Outlined.WaterDrop,
                         contentDescription = null,
-                        tint = AzfColors.PrimaryFixedDim,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.size(12.dp))
                     Text(
@@ -473,14 +482,14 @@ private fun TargetsReveal(
                         Icon(
                             imageVector = Icons.Outlined.Info,
                             contentDescription = null,
-                            tint = AzfColors.SecondaryFixedDim,
+                            tint = LocalAzfExtended.current.warning,
                         )
                         Spacer(modifier = Modifier.size(12.dp))
                         Text(
                             text = targets.clampReason?.let {
                                 stringResource(R.string.setup_reveal_clamped_reason, it)
                             } ?: stringResource(R.string.setup_reveal_clamped),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -491,7 +500,7 @@ private fun TargetsReveal(
         item {
             Text(
                 text = stringResource(R.string.setup_deferred_note),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
@@ -504,35 +513,6 @@ private fun TargetsReveal(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-    }
-}
-
-@Composable
-private fun MacroRing(
-    grams: Double,
-    label: String,
-    color: androidx.compose.ui.graphics.Color,
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        RingProgress(
-            progress = 1f,
-            size = 88.dp,
-            strokeWidth = 6.dp,
-            color = color,
-            center = {
-                Text(
-                    text = stringResource(R.string.setup_reveal_grams, grams.roundToInt()),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            },
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -595,7 +575,7 @@ private fun SetupFormPreviewBody() {
     Column(modifier = Modifier.padding(AzfSpacing.ContainerMargin)) {
         Text(
             text = stringResource(R.string.setup_heading),
-            style = MaterialTheme.typography.headlineLarge,
+            style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -628,6 +608,8 @@ private fun TargetsRevealPreview() {
                 computedAt = "2026-08-27T00:00:00.000Z",
                 formulaVersion = "v1",
             ),
+            retrying = false,
+            onRetry = {},
             onContinue = {},
         )
     }

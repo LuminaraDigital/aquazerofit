@@ -6,19 +6,17 @@ import { api } from '@/lib/api';
 import { trackFirstValueMeal } from '@/lib/retention';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { RingProgress } from '@/components/ui/RingProgress';
 import { Skeleton, NutritionSkeleton } from '@/components/ui/Skeleton';
 import { useFocusTrap } from '@/lib/useFocusTrap';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/Toast';
-import { MacroBar } from '../dashboard/MacroBar';
+import { CalorieLead } from '../dashboard/CalorieLead';
 import { WaterCard } from '../dashboard/WaterCard';
 import { BarcodeSheet } from './BarcodeSheet';
 import { FoodSearchSheet } from './FoodSearchSheet';
 import { GramsStepper } from './GramsStepper';
 import { rescaleItem } from './nutritionMath';
-import { CircularMacroRing } from '@/components/ui/CircularMacroRing';
 import { AquaCalendarPicker, type DayStatus } from '@/components/ui/AquaCalendarPicker';
 import { AquaStatusline } from '@/components/ui/AquaStatusline';
 import { queryKeys } from '@/lib/queries';
@@ -58,7 +56,6 @@ export default function Nutrition() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [showStatusline, setShowStatusline] = useState(false);
   const [microOpen, setMicroOpen] = useState(false);
-  const [macroRingMode, setMacroRingMode] = useState<'concentric' | 'single'>('concentric');
   const [editingLog, setEditingLog] = useState<MealLog | null>(null);
   const editPanelRef = useRef<HTMLDivElement>(null);
   const closeEdit = useCallback(() => setEditingLog(null), []);
@@ -333,109 +330,10 @@ export default function Nutrition() {
           <NutritionSkeleton />
         ) : (
           <>
-            {/* Calories remaining card with formula row */}
+            {/* Lead card: remaining kcal as the scoreboard figure, macros as ruled rows */}
             <section className="mb-4" aria-label="Calories remaining">
-              <GlassCard className="p-card-padding">
-                <div className="flex flex-col items-center">
-                  <div className="w-full flex items-center justify-between mb-4">
-                    <h2 className="font-heading font-semibold uppercase tracking-[0.02em] text-2xl text-on-surface">
-                      Calories Remaining
-                    </h2>
-                    <button
-                      type="button"
-                      onClick={() => setMacroRingMode((m) => (m === 'concentric' ? 'single' : 'concentric'))}
-                      aria-label="Toggle macro ring view mode"
-                      className="px-2.5 py-1 rounded-full text-xs font-bold border border-outline-variant/50 bg-surface-container-high text-primary hover:bg-surface-container-highest transition-colors flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">donut_large</span>
-                      <span>{macroRingMode === 'concentric' ? 'Concentric' : 'Single'}</span>
-                    </button>
-                  </div>
-
-                  <div className="mb-5 w-full flex justify-center">
-                    {macroRingMode === 'concentric' ? (
-                      <CircularMacroRing
-                        calories={{ consumed: daily.kcalConsumed, target: daily.kcalTarget }}
-                        protein={daily.proteinG}
-                        carbs={daily.carbsG}
-                        fat={daily.fatG}
-                        water={daily.waterMl}
-                        size={250}
-                      />
-                    ) : (
-                      <RingProgress
-                        value={daily.kcalConsumed}
-                        target={daily.kcalTarget}
-                        size={160}
-                        strokeWidth={8}
-                        tone="aqua"
-                      >
-                        <div className="flex flex-col items-center">
-                          <span className="text-3xl font-bold text-primary tabular-nums">
-                            {fmtInt(Math.max(0, daily.kcalRemaining))}
-                          </span>
-                          <span className="text-sm text-on-surface-variant">kcal left</span>
-                        </div>
-                      </RingProgress>
-                    )}
-                  </div>
-                  <div
-                    className="w-full grid grid-cols-4 text-center tabular-nums"
-                    aria-label={`Goal ${fmtInt(daily.kcalTarget)} minus food ${fmtInt(daily.kcalConsumed)} plus exercise ${fmtInt(daily.kcalBurned)} equals ${fmtInt(daily.kcalRemaining)} remaining`}
-                  >
-                    <div>
-                      <p className="text-base font-bold text-on-surface">{fmtInt(daily.kcalTarget)}</p>
-                      <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">Goal</p>
-                    </div>
-                    <div>
-                      <p className="text-base font-bold text-on-surface">
-                        − {fmtInt(daily.kcalConsumed)}
-                      </p>
-                      <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">Food</p>
-                    </div>
-                    <div>
-                      <p className="text-base font-bold text-on-surface">
-                        + {fmtInt(daily.kcalBurned)}
-                      </p>
-                      <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">
-                        Exercise
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-base font-bold text-primary">{fmtInt(daily.kcalRemaining)}</p>
-                      <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">
-                        Remaining
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </GlassCard>
-            </section>
-
-            {/* Macro bars */}
-            <section className="mb-4" aria-label="Macros">
-              <GlassCard className="p-card-padding space-y-4">
-                <MacroBar
-                  variant="full"
-                  label="Protein"
-                  tone="green"
-                  consumed={daily.proteinG.consumed}
-                  target={daily.proteinG.target}
-                />
-                <MacroBar
-                  variant="full"
-                  label="Carbs"
-                  tone="aqua"
-                  consumed={daily.carbsG.consumed}
-                  target={daily.carbsG.target}
-                />
-                <MacroBar
-                  variant="full"
-                  label="Fats"
-                  tone="coral"
-                  consumed={daily.fatG.consumed}
-                  target={daily.fatG.target}
-                />
+              <GlassCard tier="hero" className="p-card-padding">
+                <CalorieLead daily={daily} variant="day" />
               </GlassCard>
             </section>
 
@@ -751,7 +649,7 @@ export default function Nutrition() {
                           <div
                             className={`w-full rounded-t-lg ${
                               isSelected
-                                ? 'cta-gradient shadow-[0_0_15px_rgba(47,217,244,0.4)]'
+                                ? 'cta-gradient'
                                 : p.value > 0
                                   ? 'bg-primary/20'
                                   : 'bg-surface-container-highest'
@@ -859,7 +757,7 @@ export default function Nutrition() {
               type="button"
               onClick={() => updateMeal.mutate(editingLog)}
               disabled={updateMeal.isPending || editRows.length === 0}
-              className="cta-gradient w-full h-14 rounded-xl text-on-primary font-bold active:scale-[0.98] transition-transform disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              className="cta-gradient w-full h-14 rounded-xl text-on-primary font-bold active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
               {updateMeal.isPending ? 'Saving…' : 'Save changes'}
             </button>

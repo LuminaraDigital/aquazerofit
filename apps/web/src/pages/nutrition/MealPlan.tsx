@@ -152,7 +152,7 @@ export default function MealPlan() {
         {/* Daily totals vs targets */}
         <section className="mb-6" aria-label="Planned totals">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="font-heading font-semibold uppercase tracking-[0.02em] text-xl text-primary">
+            <h2 className="stat-label">
               Today's Selection
             </h2>
             <span className="text-sm text-secondary font-medium tabular-nums">
@@ -276,7 +276,7 @@ export default function MealPlan() {
                       type="button"
                       onClick={() => logRec.mutate(rec.id)}
                       disabled={slot.logged || logRec.isPending}
-                      className="flex-1 h-12 rounded-xl cta-gradient text-on-primary font-bold active:scale-[0.98] transition-transform disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                      className="flex-1 h-12 rounded-xl cta-gradient text-on-primary font-bold active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                     >
                       {slot.logged ? 'Logged ✓' : 'Log this'}
                     </button>

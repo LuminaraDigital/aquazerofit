@@ -86,7 +86,7 @@ export function AccountAccessSection({ user }: { user: PublicUser }) {
     <section aria-labelledby="account-access-heading">
       <h3
         id="account-access-heading"
-        className="font-heading font-semibold uppercase tracking-wide text-xl text-primary mb-3 px-2"
+        className="stat-label mb-3 px-2"
       >
         Account Access
       </h3>

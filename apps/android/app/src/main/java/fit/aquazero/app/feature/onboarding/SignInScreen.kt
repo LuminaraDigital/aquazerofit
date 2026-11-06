@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,6 +38,7 @@ import fit.aquazero.app.core.auth.GoogleSignInResult
 import fit.aquazero.app.core.data.AuthRepository
 import fit.aquazero.app.core.designsystem.AssetImage
 import fit.aquazero.app.core.designsystem.AzfAppHeader
+import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSpacing
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.BrandAssets
@@ -475,7 +477,7 @@ fun SignInScreen(
             state.submitError?.let { error ->
                 Text(
                     text = error,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = 12.dp),
                 )
@@ -497,11 +499,12 @@ fun SignInScreen(
                     enabled = !state.loading,
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
+                        .heightIn(min = AzfSpacing.TouchTarget)
                         .padding(top = 4.dp),
                 ) {
                     Text(
                         text = stringResource(R.string.signin_forgot_password),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -510,7 +513,8 @@ fun SignInScreen(
                 onClick = viewModel::toggleMode,
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .padding(top = 8.dp, bottom = 24.dp),
+                    .heightIn(min = AzfSpacing.TouchTarget)
+                    .padding(top = 8.dp, bottom = AzfSpacing.SectionGap),
             ) {
                 Text(
                     text = stringResource(
@@ -530,11 +534,7 @@ fun SignInScreen(
 @Composable
 private fun PasswordChecklist(state: SignInUiState, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
-        Text(
-            text = stringResource(R.string.signin_password_rules).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        AzfSectionHeading(stringResource(R.string.signin_password_rules))
         ChecklistRow(met = state.passwordLongEnough, label = stringResource(R.string.signin_error_password_length))
         ChecklistRow(met = state.passwordHasLowercase, label = stringResource(R.string.signin_error_password_lowercase))
         ChecklistRow(met = state.passwordHasUppercase, label = stringResource(R.string.signin_error_password_uppercase))
@@ -545,7 +545,7 @@ private fun PasswordChecklist(state: SignInUiState, modifier: Modifier = Modifie
 @Composable
 private fun ChecklistRow(met: Boolean, label: String) {
     Row(
-        modifier = Modifier.padding(top = 6.dp),
+        modifier = Modifier.padding(top = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -559,7 +559,7 @@ private fun ChecklistRow(met: Boolean, label: String) {
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 8.dp),
         )

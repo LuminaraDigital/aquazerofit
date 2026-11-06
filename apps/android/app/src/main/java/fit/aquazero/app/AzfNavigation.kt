@@ -550,13 +550,16 @@ private fun MainShell(
 
         // Edge-to-edge screens scroll under the status bar; without a ground
         // there the clock and icons sat on top of whatever card scrolled up.
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .windowInsetsTopHeight(WindowInsets.statusBars)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = CHROME_GROUND_ALPHA)),
-        )
+        // The camera paints its own dark scrim over the live preview.
+        if (currentKey !is CaptureMealKey) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .windowInsetsTopHeight(WindowInsets.statusBars)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = CHROME_GROUND_ALPHA)),
+            )
+        }
 
         // Settings is a Play compliance surface. Account deletion, consents and
         // the AGPL source link all live behind it, so it must be reachable from

@@ -215,14 +215,8 @@ private fun WorkoutLibraryContent(
 
                         state.plan != null -> RestDayCard(modifier = Modifier.revealOnEnter(2))
 
-                        state.plan == null && state.planError == null && !state.loadingPlan -> EmptyState(
-                            title = stringResource(R.string.training_plan_empty_title),
-                            message = stringResource(R.string.training_plan_empty_body),
-                            icon = Icons.Outlined.FitnessCenter,
-                            actionLabel = stringResource(R.string.training_generate_plan),
-                            onAction = onOpenGenerate,
-                        )
-
+                        // No plan: the week strip below carries the one empty
+                        // state, so it shows even while today's fetch is pending.
                         else -> Spacer(modifier = Modifier.height(0.dp))
                     }
                 }
@@ -260,8 +254,13 @@ private fun WorkoutLibraryContent(
                             onRetry = onRetry,
                         )
 
-                        // No plan: the Today slot above already shows the empty state.
-                        else -> Unit
+                        else -> EmptyState(
+                            title = stringResource(R.string.training_plan_empty_title),
+                            message = stringResource(R.string.training_plan_empty_body),
+                            icon = Icons.Outlined.FitnessCenter,
+                            actionLabel = stringResource(R.string.training_generate_plan),
+                            onAction = onOpenGenerate,
+                        )
                     }
                 }
 

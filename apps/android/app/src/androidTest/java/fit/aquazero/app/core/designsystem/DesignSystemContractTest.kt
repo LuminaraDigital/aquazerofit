@@ -10,7 +10,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
+import androidx.compose.ui.test.assertTouchWidthIsEqualTo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -42,9 +43,11 @@ class DesignSystemContractTest {
         }
 
         composeRule.onNodeWithText("NUTRITION").assert(isHeading)
+        // Material draws the icon button at 40dp and extends its touch area to
+        // 48dp beyond the drawn bounds, so assert the touch bounds.
         composeRule.onNodeWithContentDescription("Back")
-            .assertWidthIsAtLeast(48.dp)
-            .assertHeightIsAtLeast(48.dp)
+            .assertTouchWidthIsEqualTo(48.dp)
+            .assertTouchHeightIsEqualTo(48.dp)
     }
 
     @Test

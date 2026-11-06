@@ -112,7 +112,7 @@ previously listed as unreleased and that this tag already contains.
 
 ## [1.0.0] - 2026-08-03
 
-First public release, prepared for the capstone submission (NIT3004).
+First public release.
 
 ### Added
 

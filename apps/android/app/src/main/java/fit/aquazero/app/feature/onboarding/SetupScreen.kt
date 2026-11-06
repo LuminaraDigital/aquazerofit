@@ -40,25 +40,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fit.aquazero.app.R
 import fit.aquazero.app.core.designsystem.AzfAppHeader
 import fit.aquazero.app.core.designsystem.AzfCard
-import fit.aquazero.app.core.designsystem.AzfColors
 import fit.aquazero.app.core.designsystem.AzfConsentRow
+import fit.aquazero.app.core.designsystem.AzfHeroSurface
 import fit.aquazero.app.core.designsystem.AzfOptionCard
 import fit.aquazero.app.core.designsystem.AzfSectionHeading
 import fit.aquazero.app.core.designsystem.AzfSegmentOption
 import fit.aquazero.app.core.designsystem.AzfSegmented
 import fit.aquazero.app.core.designsystem.AzfShapes
 import fit.aquazero.app.core.designsystem.AzfSpacing
+import fit.aquazero.app.core.designsystem.AzfStatRow
 import fit.aquazero.app.core.designsystem.AzfTextField
 import fit.aquazero.app.core.designsystem.AzfTheme
-import fit.aquazero.app.core.designsystem.DataSmall
 import fit.aquazero.app.core.designsystem.ErrorState
 import fit.aquazero.app.core.designsystem.LocalAzfExtended
 import fit.aquazero.app.core.designsystem.PrimaryButton
-import fit.aquazero.app.core.designsystem.RingProgress
 import fit.aquazero.app.core.designsystem.Scoreboard
 import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.designsystem.Skeleton
-import fit.aquazero.app.core.designsystem.StatLabel
 import fit.aquazero.app.core.model.ActivityLevel
 import fit.aquazero.app.core.model.DerivedTargetsDto
 import fit.aquazero.app.core.model.Goal
@@ -428,49 +426,33 @@ private fun TargetsReveal(
             }
         }
 
+        // The same tale-of-the-tape card as Today and Nutrition, so the first
+        // numbers someone sees look like every number after them.
         item {
-            RingProgress(
-                progress = 1f,
-                size = 180.dp,
-                strokeWidth = 10.dp,
-                center = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = NutritionFormat.fmtInt(targets.kcalTarget),
-                            style = Scoreboard,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = stringResource(R.string.setup_reveal_kcal_sublabel),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-            )
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                MacroRing(
-                    grams = targets.proteinG,
+            AzfHeroSurface {
+                AzfStatRow(
+                    label = stringResource(R.string.setup_reveal_kcal_sublabel),
+                    value = NutritionFormat.fmtInt(targets.kcalTarget),
+                    valueStyle = Scoreboard,
+                )
+                AzfStatRow(
                     label = stringResource(R.string.setup_reveal_protein),
-                    color = AzfColors.SecondaryFixedDim,
+                    value = targets.proteinG.roundToInt().toString(),
+                    unit = stringResource(R.string.nutrition_unit_g),
                 )
-                MacroRing(
-                    grams = targets.carbsG,
+                AzfStatRow(
                     label = stringResource(R.string.setup_reveal_carbs),
-                    color = AzfColors.PrimaryFixedDim,
+                    value = targets.carbsG.roundToInt().toString(),
+                    unit = stringResource(R.string.nutrition_unit_g),
                 )
-                MacroRing(
-                    grams = targets.fatG,
+                AzfStatRow(
                     label = stringResource(R.string.setup_reveal_fat),
-                    color = AzfColors.Coral,
+                    value = targets.fatG.roundToInt().toString(),
+                    unit = stringResource(R.string.nutrition_unit_g),
+                    divider = false,
                 )
             }
+        }
         }
 
         item {
@@ -532,35 +514,6 @@ private fun TargetsReveal(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-    }
-}
-
-@Composable
-private fun MacroRing(
-    grams: Double,
-    label: String,
-    color: androidx.compose.ui.graphics.Color,
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        RingProgress(
-            progress = 1f,
-            size = 88.dp,
-            strokeWidth = 6.dp,
-            color = color,
-            center = {
-                Text(
-                    text = stringResource(R.string.setup_reveal_grams, grams.roundToInt()),
-                    style = DataSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            },
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = label.uppercase(),
-            style = StatLabel,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

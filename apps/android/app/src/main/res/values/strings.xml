@@ -943,7 +943,6 @@
     <string name="setup_reveal_protein">Protein</string>
     <string name="setup_reveal_carbs">Carbs</string>
     <string name="setup_reveal_fat">Fat</string>
-    <string name="setup_reveal_grams">%1$dg</string>
     <string name="setup_reveal_water">Daily water target: %1$s</string>
     <string name="setup_reveal_clamped">We adjusted your calorie target to a safe minimum. Slower, sustainable progress protects your health - AquaZeroFit never recommends eating below this floor.</string>
     <string name="setup_reveal_clamped_reason">We adjusted your calorie target to a safe minimum (%1$s). Slower, sustainable progress protects your health - AquaZeroFit never recommends eating below this floor.</string>

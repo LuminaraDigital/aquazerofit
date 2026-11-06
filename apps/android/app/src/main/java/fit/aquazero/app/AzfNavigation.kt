@@ -13,11 +13,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
@@ -95,11 +98,11 @@ import fit.aquazero.app.feature.settings.SettingsScreen
 import fit.aquazero.app.feature.settings.health.HealthConnectScreen
 import fit.aquazero.app.feature.training.WorkoutLibraryScreen
 import fit.aquazero.app.feature.training.WorkoutSessionScreen
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /** Root-level session holder: restores the session once at process start. */
 @HiltViewModel
@@ -545,6 +548,16 @@ private fun MainShell(
             }
         }
 
+        // Edge-to-edge screens scroll under the status bar; without a ground
+        // there the clock and icons sat on top of whatever card scrolled up.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = CHROME_GROUND_ALPHA)),
+        )
+
         // Settings is a Play compliance surface. Account deletion, consents and
         // the AGPL source link all live behind it, so it must be reachable from
         // anywhere in the app, not only from one tab. The action sits in the
@@ -566,7 +579,7 @@ private fun MainShell(
                     onClick = { backStack.add(SettingsKey) },
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = SETTINGS_GROUND_ALPHA)),
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = CHROME_GROUND_ALPHA)),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Settings,
@@ -616,7 +629,7 @@ private fun screenBack(reducedMotion: Boolean): ContentTransform {
 
 private const val SCREEN_SHIFT_DIVISOR = 12
 private const val SCREEN_ENTER_SCALE = 0.98f
-private const val SETTINGS_GROUND_ALPHA = 0.9f
+private const val CHROME_GROUND_ALPHA = 0.9f
 
 /**
  * Entry decorators for every [NavDisplay] in the app.

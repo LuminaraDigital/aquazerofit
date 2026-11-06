@@ -28,7 +28,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -56,7 +55,7 @@ import fit.aquazero.app.core.designsystem.pressScale
 import fit.aquazero.app.core.gamification.XpPanel
 import fit.aquazero.app.core.model.CoachRankDto
 import fit.aquazero.app.core.model.ExperienceStatusDto
-import fit.aquazero.app.core.ui.CoachAvatar
+import fit.aquazero.app.core.ui.CoachPortrait
 import fit.aquazero.app.core.ui.CoachRoster
 import fit.aquazero.app.core.ui.rememberToastSink
 
@@ -232,7 +231,6 @@ private fun CoachBout(
     } else {
         stringResource(R.string.coach_locked_cd, persona.name, requirement)
     }
-    val dim = if (card.unlocked) 1f else 0.5f
 
     ActiveFrame(
         active = card.active,
@@ -257,10 +255,12 @@ private fun CoachBout(
                 .padding(AzfSpacing.CardPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CoachAvatar(
+            // The full-body art is the roster's character, so each bout shows
+            // it as a tall tile, the way a fight card shows its fighters.
+            CoachPortrait(
                 persona = persona,
-                size = 56.dp,
-                modifier = Modifier.alpha(dim),
+                dimmed = !card.unlocked,
+                modifier = Modifier.size(width = 80.dp, height = 108.dp),
             )
             Column(
                 modifier = Modifier

@@ -329,6 +329,13 @@ dependencies {
   implementation(platform(libs.firebase.bom))
   implementation(libs.firebase.analytics)
   implementation(libs.firebase.crashlytics)
+  implementation(libs.firebase.auth)
+
+  // Sign in with Google (see core/auth/GoogleSignInClient.kt)
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services.auth)
+  implementation(libs.googleid)
+  implementation(libs.kotlinx.coroutines.play.services)
 
   // Local tests
   testImplementation(libs.junit)

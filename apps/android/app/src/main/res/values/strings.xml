@@ -44,6 +44,10 @@
     <string name="signin_error_generic">Sign-in failed. Check your details and try again.</string>
     <string name="signin_error_offline">You appear to be offline. Try again when connected.</string>
     <string name="signin_password_rules">Password requirements</string>
+    <string name="signin_google">Continue with Google</string>
+    <string name="signin_or">or use email</string>
+    <string name="signin_google_failed">Google sign-in did not finish. Try again, or use email.</string>
+    <string name="signin_google_no_account">Add a Google account to this device in Settings, then try again.</string>
 
     <!--
       Screen titles.

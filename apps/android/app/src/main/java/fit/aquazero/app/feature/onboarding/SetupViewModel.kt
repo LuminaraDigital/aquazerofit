@@ -50,10 +50,12 @@ data class SetupUiState(
     val weight: String = "",
     val goal: Goal? = null,
     val activityLevel: ActivityLevel? = null,
+    // Every purpose starts off: only a box the person ticks is consent, and
+    // these match the API's DEFAULT_CONSENTS (SetupUiStateTest).
     val consentWellness: Boolean = false,
-    val consentAi: Boolean = true,
-    val consentAnalytics: Boolean = true,
-    val consentReminders: Boolean = true,
+    val consentAi: Boolean = false,
+    val consentAnalytics: Boolean = false,
+    val consentReminders: Boolean = false,
     val errorRes: Int? = null,
     val saving: Boolean = false,
     val targets: DerivedTargetsDto? = null,

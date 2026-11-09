@@ -266,7 +266,11 @@ interface DocumentRow {
 
 export class PostgresStore extends MemoryBackedStore {
   private readonly exec: QueryExecutor;
-  private readonly pool: Pool | null;
+  /**
+   * Public so platform/sql can run the Fight Camp `engage` schema over this
+   * same pool rather than opening a second one against the connection cap.
+   */
+  readonly pool: Pool | null;
   private hydrated = false;
 
   /**

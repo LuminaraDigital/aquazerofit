@@ -14,11 +14,13 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   budgetExhausted,
+  attachAiBudgetStore,
   budgetSnapshot,
   recordSpend,
   recordSuppressed,
   resetAiBudget,
 } from '../platform/aiBudget';
+import { getStore } from '../platform/store';
 import { complete, resetProviderCircuits } from '../modules/ai/gateway';
 
 const BUDGET_ENV = 'AZF_DAILY_TOKEN_BUDGET';
@@ -87,6 +89,21 @@ describe('daily token budget accounting', () => {
     expect(budgetExhausted()).toBe(false);
     recordSpend('groq', 1);
     expect(budgetExhausted()).toBe(true);
+  });
+
+  /*
+   * Held only in memory, a restart handed out a fresh day: a deploy or a crash
+   * loop could spend the whole ceiling again each time the process came back.
+   */
+  it('keeps the day spent across a restart', () => {
+    process.env[BUDGET_ENV] = '1000';
+    attachAiBudgetStore(getStore());
+    resetAiBudget(); // the test data dir is shared, so clear any stored day first
+    recordSpend('groq', 1000);
+    recordSuppressed();
+    attachAiBudgetStore(getStore()); // what boot does after a restart
+    expect(budgetExhausted()).toBe(true);
+    expect(budgetSnapshot()).toMatchObject({ tokensSpent: 1000, providerCalls: 1, suppressedCalls: 1 });
   });
 
   /*

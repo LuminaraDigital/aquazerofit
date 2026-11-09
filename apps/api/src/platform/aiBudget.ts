@@ -24,10 +24,16 @@
  * not an exact meter — set it with headroom rather than at the exact number
  * you can afford.
  *
+ * PERSISTENCE: the day's counter is written to the document store after every
+ * change and read back the first time it is needed after boot. Held only in
+ * memory, every restart handed out a fresh budget - a deploy, a crash, or a
+ * crash loop could each spend the whole day's ceiling again.
+ *
  * SCOPE: one process. `assertSingleInstance()` refuses to boot a second
- * serving process, so today that is the whole deployment. If that guard is
- * ever lifted this must move to a shared store, because two processes each
- * holding half a budget is two budgets.
+ * serving process, so today that is the whole deployment. The stored copy is
+ * a restart record, not a shared counter: two live processes would each
+ * overwrite the other's total, so lifting that guard still needs an atomic
+ * increment in the database.
  */
 import { config } from './config';
 
@@ -41,11 +47,55 @@ interface DaySpend {
   suppressed: number;
 }
 
+interface StoredDaySpend extends DaySpend {
+  id: string;
+  type: 'aiBudgetDay';
+}
+
 function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-let day: DaySpend = { date: todayUtc(), tokens: 0, calls: 0, suppressed: 0 };
+function docId(date: string): string {
+  return `aiBudget:${date}`;
+}
+
+/**
+ * The slice of the document store this module uses. Injected at boot rather
+ * than imported: the store imports the seed and through it most of the app,
+ * and this module sits under telemetry, which nearly everything imports.
+ */
+export interface BudgetStore {
+  byId<T extends { id: string }>(name: 'ai', id: string): T | undefined;
+  upsert<T extends { id: string }>(name: 'ai', doc: T): T;
+}
+
+let backing: BudgetStore | null = null;
+
+/** null until the first read after boot (or after a reset) has consulted the store. */
+let day: DaySpend | null = null;
+
+/** Called once the store is ready. Drops the in-memory day so it is re-read from the store. */
+export function attachAiBudgetStore(store: BudgetStore): void {
+  backing = store;
+  day = null;
+}
+
+/** The stored total for `date`, or a fresh day when none was written. */
+function load(date: string): DaySpend {
+  const saved = backing?.byId<StoredDaySpend>('ai', docId(date));
+  if (!saved) return { date, tokens: 0, calls: 0, suppressed: 0 };
+  return { date, tokens: saved.tokens, calls: saved.calls, suppressed: saved.suppressed };
+}
+
+/** Write the counter through. A failed write must never fail the model call it records. */
+function persist(state: DaySpend): void {
+  try {
+    backing?.upsert<StoredDaySpend>('ai', { id: docId(state.date), type: 'aiBudgetDay', ...state });
+  } catch {
+    // The in-memory counter still holds the ceiling until the next restart.
+  }
+}
 
 /**
  * Roll the counter when the UTC day changes.
@@ -57,9 +107,7 @@ let day: DaySpend = { date: todayUtc(), tokens: 0, calls: 0, suppressed: 0 };
  */
 function current(): DaySpend {
   const today = todayUtc();
-  if (day.date !== today) {
-    day = { date: today, tokens: 0, calls: 0, suppressed: 0 };
-  }
+  if (day?.date !== today) day = load(today);
   return day;
 }
 
@@ -90,11 +138,14 @@ export function recordSpend(provider: string, tokens: number | undefined): void 
   const state = current();
   state.tokens += spent;
   state.calls += 1;
+  persist(state);
 }
 
 /** Record that a call was served from the offline engine to protect the budget. */
 export function recordSuppressed(): void {
-  current().suppressed += 1;
+  const state = current();
+  state.suppressed += 1;
+  persist(state);
 }
 
 /** Operator snapshot for GET /metrics. */
@@ -118,7 +169,8 @@ export function budgetSnapshot(): {
   };
 }
 
-/** Test/ops hook. */
+/** Test/ops hook: zero today's counter, in memory and in the store. */
 export function resetAiBudget(): void {
   day = { date: todayUtc(), tokens: 0, calls: 0, suppressed: 0 };
+  persist(day);
 }

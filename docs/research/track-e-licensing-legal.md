@@ -58,4 +58,4 @@
 - **wger.de runtime dependence**: no ToS found — silent policy change, shutdown, or IP blocking is possible; mitigation = import-and-cache, not runtime proxying.
 - **Scenario 1 "intimacy" creep**: if AquaZeroFit's UX becomes a thin shell over wger (its value = wger's functionality), a court could see one combined program. Keep AquaZeroFit's independent features dominant; document the arm's-length design.
 - **AI prompt outputs (P-01..P-09)** prompted with wger exercise text: CC-BY-SA attribution should survive into generated plan content referencing those exercises — flag for the safety/attribution pipeline.
-- AQF-12 is marked "Draft for supervisor review" (v2.0, July 2026) — the wger verdict should be ratified before commercial release, as the register itself requires.
+- AQF-12 (v2.0, July 2026) is issued with the wger verdict still recorded as a draft; AQF-12A proposes its ratification and awaits owner sign-off. Ratify it before commercial release, as the register itself requires.

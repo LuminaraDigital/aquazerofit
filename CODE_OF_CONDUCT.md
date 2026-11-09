@@ -60,14 +60,16 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at
-[luminaradigitalagency@gmail.com](mailto:luminaradigitalagency@gmail.com).
-All complaints will be reviewed and investigated promptly and fairly.
+[info@luminara.digital](mailto:info@luminara.digital) with the subject line
+"Conduct report". All complaints will be reviewed and investigated promptly and
+fairly.
 
 All community leaders are obligated to respect the privacy and security of the
 reporter of any incident.
 
-Note that this address is for conduct reports only. Security vulnerabilities
-follow a separate private process described in [SECURITY.md](SECURITY.md).
+Note that this is the general Luminara Digital contact address, so use the
+subject line above to route a conduct report. Security vulnerabilities follow a
+separate private process described in [SECURITY.md](SECURITY.md).
 
 ## Enforcement Guidelines
 

@@ -4,7 +4,7 @@
  * fact to any client that fetches the file.
  */
 import { describe, expect, it } from 'vitest';
-import { LLMS_SUMMARY, PLAY_STORE_LISTING_URL, llmsSectionPaths, renderLlmsTxt } from './llms';
+import { LLMS_SUMMARY, PLAY_STORE_LISTING_URL, llmsLineForPath, llmsSectionPaths, renderLlmsTxt } from './llms';
 import { MARKETING_ROUTES, SITE_DEFAULTS, canonicalUrl, resolveSiteConfig } from './site';
 
 const cfg = resolveSiteConfig({});
@@ -80,5 +80,9 @@ describe('renderLlmsTxt', () => {
     expect(text).not.toContain('/sign-in');
     expect(text).not.toContain('/nutrition');
     expect(text).not.toContain('/settings');
+  });
+
+  it('rejects a path that is not a marketing route', () => {
+    expect(() => llmsLineForPath('/sign-in', cfg)).toThrow(/not a marketing route/);
   });
 });

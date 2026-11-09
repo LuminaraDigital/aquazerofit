@@ -62,7 +62,8 @@ function routeFor(path: string): MarketingRoute {
   return route;
 }
 
-function linkLine(path: string, cfg: SiteConfig): string {
+/** One markdown link line. Throws when `path` is not a marketing route. */
+export function llmsLineForPath(path: string, cfg: SiteConfig): string {
   const route = routeFor(path);
   const url = canonicalUrl(cfg.siteOrigin, route.path);
   return `- [${llmsLinkLabel(route)}](${url}): ${route.description}`;
@@ -71,7 +72,7 @@ function linkLine(path: string, cfg: SiteConfig): string {
 /** llmstxt.org document: H1, one blockquote, then H2 link lists. */
 export function renderLlmsTxt(cfg: SiteConfig): string {
   const sections = LLMS_SECTIONS.map((section) =>
-    [`## ${section.heading}`, '', ...section.paths.map((path) => linkLine(path, cfg))].join('\n'),
+    [`## ${section.heading}`, '', ...section.paths.map((path) => llmsLineForPath(path, cfg))].join('\n'),
   );
   return [`# AquaZeroFit`, '', `> ${LLMS_SUMMARY}`, '', sections.join('\n\n'), ''].join('\n');
 }

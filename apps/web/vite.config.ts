@@ -1,13 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
+import { llmsDevPlugin, llmsPlugin } from './vite-plugins/llms';
 import { seoDevPlugin, seoPlugin } from './vite-plugins/seo';
 
 export default defineConfig({
   // SUPPORT_EMAIL is the one public mailbox. It is not a secret. The VITE_
   // prefix still covers the existing build-time settings.
   envPrefix: ['VITE_', 'SUPPORT_EMAIL'],
-  plugins: [react(), seoPlugin(), seoDevPlugin()],
+  plugins: [react(), seoPlugin(), seoDevPlugin(), llmsPlugin(), llmsDevPlugin()],
   resolve: {
     alias: {
       '@aquazerofit/shared': fileURLToPath(

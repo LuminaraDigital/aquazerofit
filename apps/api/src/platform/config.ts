@@ -312,6 +312,18 @@ export const config = {
   },
 
   /**
+   * Firebase API key for the Identity Toolkit REST calls the Admin SDK cannot
+   * make: checking an email + password, and sending Firebase's reset email.
+   * Not a secret (Firebase API keys identify the project, they grant nothing).
+   * Set, email/password accounts live in Firebase Auth so one account works
+   * on web and Android. Unset, the API keeps its own bcrypt credentials, which
+   * is what dev, the test suite and the keyless offline demo need.
+   */
+  get firebaseApiKey(): string {
+    return process.env.FIREBASE_API_KEY?.trim() ?? '';
+  },
+
+  /**
    * Turnstile site key. Public by design - it is handed to any caller of
    * GET /auth/captcha.
    *

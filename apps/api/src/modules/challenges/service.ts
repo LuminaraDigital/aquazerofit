@@ -16,7 +16,14 @@ import {
 } from '@aquazerofit/shared';
 import { AppError } from '../../platform/errors';
 import { addDays, processLocalToday } from '../../platform/dates';
-import { getStore, newId } from '../../platform/store';
+import {
+  LOGS_BY_CHALLENGE_CODE,
+  LOGS_BY_USER_TYPE_DATE,
+  PLANS_BY_USER_TYPE_DATE,
+  getStore,
+  indexKey,
+  newId,
+} from '../../platform/store';
 import { mealLogsForDate } from '../logs/service';
 import { containsProfanity } from '@aquazerofit/shared';
 
@@ -60,7 +67,12 @@ function issueCode(): string {
 function findByCode(code: string): BuddyChallenge | undefined {
   const normalised = code.trim().toUpperCase();
   return getStore()
-    .where<BuddyChallenge>('logs', (d) => d.type === 'buddyChallenge' && d.code === normalised)
+    .whereIndexed<BuddyChallenge>(
+      'logs',
+      LOGS_BY_CHALLENGE_CODE,
+      indexKey(normalised),
+      (d) => d.type === 'buddyChallenge' && d.code === normalised,
+    )
     .at(0);
 }
 
@@ -69,8 +81,10 @@ function dayQualifies(userId: string, localDate: string, kind: BuddyChallengeKin
     if (mealLogsForDate(userId, localDate).length > 0) return true;
   }
   if (kind === 'workouts' || kind === 'logging_streak') {
-    const workouts = getStore().where<WorkoutSession>(
+    const workouts = getStore().whereIndexed<WorkoutSession>(
       'plans',
+      PLANS_BY_USER_TYPE_DATE,
+      indexKey(userId, 'workoutSession', localDate),
       (d) =>
         d.type === 'workoutSession' &&
         d.userId === userId &&
@@ -81,8 +95,10 @@ function dayQualifies(userId: string, localDate: string, kind: BuddyChallengeKin
   }
   if (kind === 'logging_streak') {
     // Water or weight also counts as "showing up" for streak challenges.
-    const water = getStore().where(
+    const water = getStore().whereIndexed(
       'logs',
+      LOGS_BY_USER_TYPE_DATE,
+      indexKey(userId, 'waterLog', localDate),
       (d) =>
         (d as { type?: string; userId?: string; localDate?: string }).type === 'waterLog' &&
         (d as { userId?: string }).userId === userId &&

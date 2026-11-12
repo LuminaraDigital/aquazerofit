@@ -12,7 +12,7 @@ import { AppError } from '../platform/errors';
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'azf-tg-caps-'));
 process.env.AZF_DATA_DIR = dataDir;
 
-const { telegramAuth, resetTelegramNewAccountLimits } = await import('../modules/auth/service');
+const { telegramAuth, resetNewAccountLimits } = await import('../modules/auth/service');
 const { signTelegramInitData } = await import('../modules/auth/telegram');
 const { config } = await import('../platform/config');
 const { getStore } = await import('../platform/store');
@@ -48,7 +48,7 @@ function codeOf(fn: () => void): string | null {
 }
 
 beforeEach(() => {
-  resetTelegramNewAccountLimits();
+  resetNewAccountLimits();
   for (const key of LIMIT_KEYS) delete process.env[key];
 });
 
@@ -57,7 +57,7 @@ afterEach(() => {
     if (ORIGINAL[key] === undefined) delete process.env[key];
     else process.env[key] = ORIGINAL[key];
   }
-  resetTelegramNewAccountLimits();
+  resetNewAccountLimits();
 });
 
 afterAll(async () => {
@@ -125,7 +125,7 @@ describe('telegram new-account enforcement', () => {
     for (let i = 0; i < 6; i += 1) {
       expect(codeOf(() => telegramAuth(initDataFor(730000 + i), `198.51.${i}.10`))).toBeNull();
     }
-    resetTelegramNewAccountLimits();
+    resetNewAccountLimits();
     process.env.TELEGRAM_SIGNUP_GLOBAL_DAILY = '2';
     expect(codeOf(() => telegramAuth(initDataFor(740001), '198.51.10.10'))).toBeNull();
     expect(codeOf(() => telegramAuth(initDataFor(740002), '198.51.11.10'))).toBeNull();

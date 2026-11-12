@@ -39,7 +39,7 @@ const { effectiveTier, entitlementHistory, grantPremium } = await import(
 );
 const { resetStripePriceCache } = await import('../modules/billing/stripe');
 const { signTelegramInitData } = await import('../modules/auth/telegram');
-const { resetTelegramNewAccountLimits } = await import('../modules/auth/service');
+const { resetNewAccountLimits } = await import('../modules/auth/service');
 
 const app = createApp();
 const base = '/api/v1';
@@ -672,7 +672,7 @@ describe('POST /billing/stripe/checkout', () => {
   });
 
   it('refuses checkout for a Telegram session, including after refresh', async () => {
-    resetTelegramNewAccountLimits();
+    resetNewAccountLimits();
     const initData = signTelegramInitData({
       auth_date: String(Math.floor(Date.now() / 1000)),
       query_id: 'AA-stripe-tg',

@@ -42,6 +42,15 @@ export function notFoundHandler(_req: Request, res: Response): void {
   res.status(404).json({ code: 'NOT_FOUND', message: 'Resource not found' } satisfies ApiErrorBody);
 }
 
+/** The 4xx a body-parser or multer rejection should answer with, else null. */
+function clientErrorStatus(err: unknown): number | null {
+  if (typeof err !== 'object' || err === null) return null;
+  const e = err as { name?: unknown; code?: unknown; status?: unknown; expose?: unknown };
+  if (e.name === 'MulterError') return e.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+  if (e.expose === true && typeof e.status === 'number' && e.status >= 400 && e.status < 500) return e.status;
+  return null;
+}
+
 export function errorHandler(
   err: unknown,
   _req: Request,
@@ -63,6 +72,18 @@ export function errorHandler(
       code: 'VALIDATION_FAILED',
       message: 'Request validation failed',
       details: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+    } satisfies ApiErrorBody);
+    return;
+  }
+  // The caller's mistake, not ours: body-parser marks its rejections (broken
+  // JSON, oversized or unsupported bodies) with `expose` and a 4xx status, and
+  // multer throws a MulterError. Left to the branch below they were 500s and
+  // error-log lines that anyone could produce by sending `{`.
+  const clientStatus = clientErrorStatus(err);
+  if (clientStatus !== null) {
+    res.status(clientStatus).json({
+      code: 'VALIDATION_FAILED',
+      message: clientStatus === 413 ? 'Request body is too large' : 'Request body could not be read',
     } satisfies ApiErrorBody);
     return;
   }

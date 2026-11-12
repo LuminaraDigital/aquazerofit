@@ -157,7 +157,7 @@ async function firebaseIdentityFrom(req: { headers: { authorization?: string } }
 authRouter.post(
   '/firebase/session',
   asyncHandler(async (req, res) => {
-    res.json(firebaseSession(await firebaseIdentityFrom(req), req.ip));
+    res.json(firebaseSession(await firebaseIdentityFrom(req), clientIpForRateLimit(req)));
   }),
 );
 
@@ -171,7 +171,7 @@ authRouter.post(
 authRouter.post(
   '/firebase/token',
   asyncHandler(async (req, res) => {
-    const user = ensureUserFromFirebase(await firebaseIdentityFrom(req), req.ip);
+    const user = ensureUserFromFirebase(await firebaseIdentityFrom(req), clientIpForRateLimit(req));
     sendAuth(req, res, tokensFor(user));
   }),
 );

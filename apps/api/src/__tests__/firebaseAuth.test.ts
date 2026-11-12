@@ -26,7 +26,7 @@ const { createApp } = await import('../app');
 const { getStore } = await import('../platform/store');
 const { ensureUserFromFirebase } = await import('../modules/auth/firebaseUsers');
 const { signTelegramInitData } = await import('../modules/auth/telegram');
-const { resetTelegramNewAccountLimits } = await import('../modules/auth/service');
+const { resetNewAccountLimits } = await import('../modules/auth/service');
 const { credentialsId } = await import('../modules/me/service');
 const app = createApp();
 const base = '/api/v1';
@@ -488,7 +488,7 @@ describe('Firebase email linking requires a verified email', () => {
   });
 
   it('does not link a verified Google sign-in onto an email a Telegram account claimed', async () => {
-    resetTelegramNewAccountLimits();
+    resetNewAccountLimits();
     const initData = signTelegramInitData({
       auth_date: String(Math.floor(Date.now() / 1000)),
       query_id: 'AA-takeover',
@@ -635,7 +635,7 @@ describe('a Firebase account whose email is unproved', () => {
     expect(creds.status).toBe(403);
     expect(creds.body.code).toBe('AUTH_EMAIL_UNVERIFIED');
 
-    resetTelegramNewAccountLimits();
+    resetNewAccountLimits();
     verifyFirebaseIdToken.mockResolvedValueOnce(unverified);
     const link = await request(app)
       .post(`${base}/me/link-telegram`)
@@ -660,7 +660,7 @@ describe('a Firebase account whose email is unproved', () => {
       passwordHash: await bcrypt.hash('EarlyBird9Password', 4),
     });
 
-    resetTelegramNewAccountLimits();
+    resetNewAccountLimits();
     const tg = await request(app).post(`${base}/auth/telegram`).send({ initData: tgInitData(770102) });
     expect(tg.status).toBe(200);
     expect(tg.body.user.id).toBe(userId);

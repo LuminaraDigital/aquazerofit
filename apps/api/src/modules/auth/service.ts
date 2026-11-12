@@ -138,19 +138,35 @@ function recordLoginFailure(emailKey: string, now: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Telegram auto-provision caps (distinct from the /auth rate lane).
-// Only NEW account creation is counted; returning users signing in again are
+// Auto-provision caps for accounts nobody vetted (distinct from the /auth rate
+// lane): Telegram initData, and Firebase identities, whose email/password
+// sign-up needs only the public web key (no captcha, no App Check). Only NEW
+// account creation is counted; returning users signing in again are
 // unaffected. Limits live in config (per IP per minute, per subnet per day,
-// and an optional process-local daily ceiling that defaults to off).
-// Stale buckets are pruned lazily on each check.
+// and an optional process-local daily ceiling that defaults to off), and each
+// kind keeps its own counters. Stale buckets are pruned lazily on each check.
 // ---------------------------------------------------------------------------
 
-const TG_NEW_ACCOUNT_WINDOW_MS = 60_000;
+const NEW_ACCOUNT_WINDOW_MS = 60_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const telegramNewAccountsByIp = new Map<string, number[]>();
-const telegramNewAccountsGlobal: number[] = [];
-const telegramNewAccountsBySubnet = new Map<string, number[]>();
+export type NewAccountKind = 'telegram' | 'firebase';
+
+interface NewAccountBuckets {
+  byIp: Map<string, number[]>;
+  global: number[];
+  bySubnet: Map<string, number[]>;
+}
+
+const newAccounts: Record<NewAccountKind, NewAccountBuckets> = {
+  telegram: { byIp: new Map(), global: [], bySubnet: new Map() },
+  firebase: { byIp: new Map(), global: [], bySubnet: new Map() },
+};
+
+const NEW_ACCOUNT_LABEL: Record<NewAccountKind, string> = {
+  telegram: 'new Telegram accounts',
+  firebase: 'new accounts',
+};
 
 /** IPv4 /24, or the IPv6 /64 the client already keys on. */
 function subnetKey(clientKey: string): string {
@@ -158,80 +174,74 @@ function subnetKey(clientKey: string): string {
   return parts.length === 4 ? `${parts.slice(0, 3).join('.')}.0/24` : clientKey;
 }
 
-function pruneTelegramNewAccounts(now: number): void {
+function pruneNewAccounts(buckets: NewAccountBuckets, now: number): void {
   const idle = 10 * 60_000;
   const dayStart = now - DAY_MS;
-  
-  // Prune per-IP (short window)
-  for (const [key, stamps] of telegramNewAccountsByIp) {
+  for (const [key, stamps] of buckets.byIp) {
     const newest = stamps[stamps.length - 1] ?? 0;
-    if (now - newest > idle) telegramNewAccountsByIp.delete(key);
+    if (now - newest > idle) buckets.byIp.delete(key);
   }
-  
-  // Prune global daily
-  while (telegramNewAccountsGlobal.length > 0 && telegramNewAccountsGlobal[0] < dayStart) {
-    telegramNewAccountsGlobal.shift();
-  }
-  
-  // Prune per-subnet daily
-  for (const [key, stamps] of telegramNewAccountsBySubnet) {
+  while (buckets.global.length > 0 && buckets.global[0]! < dayStart) buckets.global.shift();
+  for (const [key, stamps] of buckets.bySubnet) {
     const valid = stamps.filter((t) => t > dayStart);
-    if (valid.length === 0) {
-      telegramNewAccountsBySubnet.delete(key);
-    } else {
-      telegramNewAccountsBySubnet.set(key, valid);
-    }
+    if (valid.length === 0) buckets.bySubnet.delete(key);
+    else buckets.bySubnet.set(key, valid);
   }
 }
 
-function assertTelegramNewAccountAllowed(ip: string | undefined, now: number): void {
-  pruneTelegramNewAccounts(now);
+/** Count one new account of this kind from this address, or throw RATE_LIMITED. */
+export function assertNewAccountAllowed(kind: NewAccountKind, ip: string | undefined, now: number): void {
+  const buckets = newAccounts[kind];
+  const label = NEW_ACCOUNT_LABEL[kind];
+  pruneNewAccounts(buckets, now);
   const key = clientNetworkKey(ip?.trim() || 'unknown');
   const perIpLimit = config.telegramSignupPerIpPerMinute;
   const subnetLimit = config.telegramSignupSubnetDaily;
   const globalLimit = config.telegramSignupGlobalDaily;
-  const windowStart = now - TG_NEW_ACCOUNT_WINDOW_MS;
-  const stamps = (telegramNewAccountsByIp.get(key) ?? []).filter((t) => t > windowStart);
+  const windowStart = now - NEW_ACCOUNT_WINDOW_MS;
+  const stamps = (buckets.byIp.get(key) ?? []).filter((t) => t > windowStart);
   if (stamps.length >= perIpLimit) {
     const oldest = stamps[0] ?? now;
-    const retryAfterSeconds = Math.max(1, Math.ceil((oldest + TG_NEW_ACCOUNT_WINDOW_MS - now) / 1000));
-    throw new AppError('RATE_LIMITED', 'Too many new Telegram accounts from this network. Please try again later.', {
+    const retryAfterSeconds = Math.max(1, Math.ceil((oldest + NEW_ACCOUNT_WINDOW_MS - now) / 1000));
+    throw new AppError('RATE_LIMITED', `Too many ${label} from this network. Please try again later.`, {
       retryAfterSeconds,
     });
   }
 
   // Process-local daily ceiling. 0 disables it (the launch default).
-  if (globalLimit > 0 && telegramNewAccountsGlobal.length >= globalLimit) {
-    const oldest = telegramNewAccountsGlobal[0] ?? now;
+  if (globalLimit > 0 && buckets.global.length >= globalLimit) {
+    const oldest = buckets.global[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + DAY_MS - now) / 1000));
-    throw new AppError('RATE_LIMITED', 'Global daily limit for new Telegram accounts reached. Please try again tomorrow.', {
+    throw new AppError('RATE_LIMITED', `Global daily limit for ${label} reached. Please try again tomorrow.`, {
       retryAfterSeconds,
     });
   }
 
   // Per-subnet daily cap.
   const subnet = subnetKey(key);
-  const subnetStamps = telegramNewAccountsBySubnet.get(subnet) ?? [];
+  const subnetStamps = buckets.bySubnet.get(subnet) ?? [];
   if (subnetStamps.length >= subnetLimit) {
     const oldest = subnetStamps[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + DAY_MS - now) / 1000));
-    throw new AppError('RATE_LIMITED', 'Too many new Telegram accounts from this network region. Please try again tomorrow.', {
+    throw new AppError('RATE_LIMITED', `Too many ${label} from this network region. Please try again tomorrow.`, {
       retryAfterSeconds,
     });
   }
-  
+
   stamps.push(now);
-  telegramNewAccountsByIp.set(key, stamps);
-  telegramNewAccountsGlobal.push(now);
+  buckets.byIp.set(key, stamps);
+  buckets.global.push(now);
   subnetStamps.push(now);
-  telegramNewAccountsBySubnet.set(subnet, subnetStamps);
+  buckets.bySubnet.set(subnet, subnetStamps);
 }
 
 /** Test hook. */
-export function resetTelegramNewAccountLimits(): void {
-  telegramNewAccountsByIp.clear();
-  telegramNewAccountsGlobal.length = 0;
-  telegramNewAccountsBySubnet.clear();
+export function resetNewAccountLimits(): void {
+  for (const buckets of Object.values(newAccounts)) {
+    buckets.byIp.clear();
+    buckets.global.length = 0;
+    buckets.bySubnet.clear();
+  }
 }
 
 /** Test hook. */
@@ -332,7 +342,7 @@ export function telegramAuth(initData: string, ip?: string): AuthResponse {
   const store = getStore();
   let user = store.findOne<User>('users', (d) => isUserDoc(d) && d.tgId === tgUser.id);
   if (!user) {
-    assertTelegramNewAccountAllowed(ip, Date.now());
+    assertNewAccountAllowed('telegram', ip, Date.now());
     const now = new Date().toISOString();
     user = {
       id: newId('usr'),

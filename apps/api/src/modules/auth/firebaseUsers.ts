@@ -49,7 +49,7 @@ import { config } from '../../platform/config';
 import { isUnownedEmailDomain } from '../../platform/mailer';
 import { getStore, newId } from '../../platform/store';
 import { credentialsId, toPublicUser } from '../me/service';
-import { auditAuthEvent, findUserByEmail, hashIdentifier } from './service';
+import { assertNewAccountAllowed, auditAuthEvent, findUserByEmail, hashIdentifier } from './service';
 
 export interface FirebaseIdentity {
   uid: string;
@@ -167,6 +167,9 @@ export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string):
     }
   }
 
+  // Nobody vetted this identity: Firebase sign-up has no captcha. Count it
+  // against the same new-account caps as Telegram before writing anything.
+  assertNewAccountAllowed('firebase', ip, Date.now());
   const now = new Date().toISOString();
   const syntheticEmail = email || `fb-${identity.uid}@firebase.aquazero.fit`;
   const user: User = {

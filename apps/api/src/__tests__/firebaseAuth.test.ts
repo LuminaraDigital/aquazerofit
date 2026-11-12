@@ -487,7 +487,7 @@ describe('Firebase email linking requires a verified email', () => {
     }
   });
 
-  it('does not link a verified Google sign-in onto an email a Telegram account claimed', async () => {
+  it("keeps an email a Telegram account claimed off it, so the owner's Google sign-in gets their own account", async () => {
     resetTelegramNewAccountLimits();
     const initData = signTelegramInitData({
       auth_date: String(Math.floor(Date.now() / 1000)),
@@ -498,13 +498,14 @@ describe('Firebase email linking requires a verified email', () => {
     expect(tg.status).toBe(200);
     const attackerId = tg.body.user.id as string;
 
+    // The claim waits on the victim's mailbox; the address never reaches the
+    // squatter's account (emailClaim.integration.test.ts covers the flow).
     const set = await request(app)
       .post(`${base}/me/credentials`)
       .set('Authorization', `Bearer ${tg.body.accessToken}`)
       .send({ email: 'Victim.Takeover@example.com', password: 'CorrectHorse9Battery' });
-    expect(set.status).toBe(200);
-    expect(set.body.user.email).toBe('victim.takeover@example.com');
-    expect(set.body.user.emailVerified).toBe(false);
+    expect(set.status).toBe(202);
+    expect(set.body.pendingEmail).toBe('victim.takeover@example.com');
 
     verifyFirebaseIdToken.mockResolvedValueOnce({
       uid: 'fb-victim-google',
@@ -516,47 +517,17 @@ describe('Firebase email linking requires a verified email', () => {
       .post(`${base}/auth/firebase/session`)
       .set('Authorization', 'Bearer victim-google-token')
       .send({});
-    expect(session.status).toBe(403);
-    expect(session.body.code).toBe('AUTH_EMAIL_UNVERIFIED');
-    expect(session.body.message).toBe('This email is not verified on the existing account');
+    expect(session.status).toBe(200);
+    expect(session.body.user.id).not.toBe(attackerId);
+    expect(session.body.user.email).toBe('victim.takeover@example.com');
 
-    const stored = getStore().byId<{
-      id: string;
-      email: string;
-      emailVerified: boolean;
-      firebaseUid?: string;
-      tgId?: number;
-      role: string;
-    }>('users', attackerId);
-    expect(stored?.firebaseUid).toBeUndefined();
-    expect(stored?.emailVerified).toBe(false);
-    expect(stored?.email).toBe('victim.takeover@example.com');
-    expect(stored?.tgId).toBe(770001);
-    expect(stored?.role).toBe('user');
-
-    const linked = getStore().where<{ id: string; firebaseUid?: string }>('users', (d) => {
-      return d.firebaseUid === 'fb-victim-google';
-    });
-    expect(linked).toHaveLength(0);
-
-    const rejected = getStore().where<{ id: string; userId?: string; action?: string; detail?: { reason?: string } }>(
-      'audit',
-      (d) => d.userId === attackerId && d.action === 'firebase.link.rejected',
+    const stored = getStore().byId<{ id: string; email: string; firebaseUid?: string; tgId?: number }>(
+      'users',
+      attackerId,
     );
-    expect(rejected.some((event) => event.detail?.reason === 'account_email_unverified')).toBe(true);
-    expect(JSON.stringify(rejected)).not.toContain('victim.takeover@example.com');
-    expect(JSON.stringify(rejected)).not.toContain('fb-victim-google');
-
-    verifyFirebaseIdToken.mockResolvedValueOnce({
-      uid: 'fb-victim-google',
-      email: 'victim.takeover@example.com',
-      emailVerified: true,
-      name: 'Victim',
-    });
-    const me = await request(app).get(`${base}/me`).set('Authorization', 'Bearer victim-google-token');
-    expect(me.status).toBe(403);
-    expect(me.body.code).toBe('AUTH_EMAIL_UNVERIFIED');
-    expect(getStore().byId<{ id: string; firebaseUid?: string }>('users', attackerId)?.firebaseUid).toBeUndefined();
+    expect(stored?.firebaseUid).toBeUndefined();
+    expect(stored?.email).not.toBe('victim.takeover@example.com');
+    expect(stored?.tgId).toBe(770001);
   });
 
   it('refuses to link when the stored email is unverified, even if the token is verified', () => {

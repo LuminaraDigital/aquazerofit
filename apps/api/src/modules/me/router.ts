@@ -126,8 +126,9 @@ meRouter.post(
   '/credentials',
   asyncHandler(async (req, res) => {
     const input = setCredentialsSchema.parse(req.body);
-    const user = await setCredentials(userIdOf(req), input, req.ip);
-    res.json({ user });
+    const result = await setCredentials(userIdOf(req), input, req.ip);
+    // 202 while the address waits on its confirmation link.
+    res.status(result.pendingEmail ? 202 : 200).json(result);
   }),
 );
 

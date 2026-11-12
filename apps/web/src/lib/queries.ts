@@ -158,7 +158,9 @@ export function useUpdateMe() {
 
 /**
  * POST /me/credentials  -  first-time email + password for a Telegram-provisioned
- * account, so it can sign in on the web. The server rejects the call once a
+ * account, so it can sign in on the web. A new address answers 202 with
+ * `pendingEmail`: nothing attaches until the link mailed there is opened
+ * (/confirm-email). The server rejects the call once a
  * password exists (change goes through the reset flow), so the Settings surface
  * gates on `user.hasPassword === false`.
  */
@@ -166,7 +168,7 @@ export function useSetCredentials() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { email: string; password: string }) =>
-      api<{ user: PublicUser }>('/me/credentials', { method: 'POST', body: input }),
+      api<{ user: PublicUser; pendingEmail?: string }>('/me/credentials', { method: 'POST', body: input }),
     onSuccess: (res) => {
       const user = unwrap<PublicUser>(res, 'user');
       if (user) {

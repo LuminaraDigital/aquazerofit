@@ -4,6 +4,7 @@
  */
 import { Router } from 'express';
 import {
+  emailConfirmSchema,
   loginSchema,
   passwordResetConfirmSchema,
   passwordResetRequestSchema,
@@ -17,6 +18,7 @@ import { clientIpForRateLimit } from '../../platform/clientIp';
 import { assertHuman, captchaConfig } from '../../platform/botProtection';
 import { asyncHandler } from '../../platform/errors';
 import {
+  confirmEmailClaim,
   confirmPasswordReset,
   login,
   logout,
@@ -194,6 +196,14 @@ authRouter.post(
     });
   }),
 );
+
+// The link in the confirmation mail from POST /me/credentials. Unauthenticated:
+// the mail may be opened on another device. The token is the proof.
+authRouter.post('/email-confirm', (req, res) => {
+  const { token } = emailConfirmSchema.parse(req.body);
+  confirmEmailClaim(token, clientIpForRateLimit(req));
+  res.json({ message: 'Email confirmed. Sign in with your email and password.' });
+});
 
 authRouter.post(
   '/password-reset/confirm',

@@ -7,6 +7,7 @@ import type { AuthResponse, User } from '@aquazerofit/shared';
 import { clientNetworkKey } from '../../platform/clientIp';
 import { AppError } from '../../platform/errors';
 import { config } from '../../platform/config';
+import { isUnownedEmailDomain } from '../../platform/mailer';
 import { getStore, newId } from '../../platform/store';
 import {
   issueRefresh,
@@ -20,7 +21,7 @@ import {
 } from '../../platform/auth';
 import { assertFirebaseEmailProved, credentialsId, toPublicUser, type CredentialsDoc } from '../me/service';
 import { validateTelegramInitData, type TelegramUser } from './telegram';
-import { sendPasswordResetEmail } from './emails';
+import { sendEmailConfirmationEmail, sendPasswordResetEmail } from './emails';
 import bcrypt from 'bcryptjs';
 import { containsProfanity } from '@aquazerofit/shared';
 
@@ -445,17 +446,48 @@ export async function confirmPasswordReset(token: string, newPassword: string, i
 }
 
 /**
+ * A pending email + password for an account that has no password yet,
+ * waiting on the link mailed to that address. Stored in `users`, so the
+ * data export (which skips that container) never ships the hash, and account
+ * deletion (which purges it by userId) removes it.
+ */
+export interface EmailClaimDoc {
+  id: string;
+  type: 'emailClaim';
+  userId: string;
+  email: string;
+  passwordHash: string;
+  /** sha256 hex of the token; the raw value is mailed once and never stored. */
+  tokenHash: string;
+  expiresAt: string;
+  usedAt: string | null;
+  createdAt: string;
+}
+
+const EMAIL_CLAIM_TTL_MS = 24 * 60 * 60_000;
+/** Confirmation mails one account may send per hour: a cap on mailing a stranger. */
+const EMAIL_CLAIMS_PER_HOUR = 3;
+
+function claimsFor(userId: string): EmailClaimDoc[] {
+  return getStore().where<EmailClaimDoc>(
+    'users',
+    (d) => (d as { type?: string }).type === 'emailClaim' && (d as { userId?: string }).userId === userId,
+  );
+}
+
+/**
  * First-time credentials for a Telegram-provisioned account (AQF-09 §2.3):
  * replace the synthetic tg-…@ placeholder email with one the user owns and
  * create the credentials record that `login` requires. One-shot by design -
- * an account that already has a password changes it via the reset flow, which
- * proves control of the mailbox; this endpoint only proves a valid session.
+ * an account that already has a password changes it via the reset flow.
+ * This endpoint proves only a valid session, so a new address becomes an
+ * EmailClaimDoc and attaches in confirmEmailClaim once its mailbox answers.
  */
 export async function setCredentials(
   userId: string,
   input: { email: string; password: string },
   ip?: string,
-): Promise<AuthResponse['user']> {
+): Promise<{ user: AuthResponse['user']; pendingEmail?: string; devToken?: string }> {
   const store = getStore();
   const user = store.byId<User>('users', userId);
   if (!user || !isUserDoc(user)) throw new AppError('NOT_FOUND', 'Account not found');
@@ -469,35 +501,92 @@ export async function setCredentials(
   }
 
   const email = input.email.trim().toLowerCase();
+  if (isUnownedEmailDomain(email)) {
+    throw new AppError('VALIDATION_FAILED', 'Use an email address you can receive mail at.');
+  }
   const existing = findUserByEmail(email);
   if (existing && existing.id !== userId) {
     throw new AppError('CONFLICT', 'An account already exists for this email address');
   }
+  const passwordHash = await bcryptHashAsync(input.password, BCRYPT_ROUNDS);
 
-  const emailChanged = email !== user.email.trim().toLowerCase();
-  const updated: User = {
-    ...user,
-    email,
-    // A new address is unproved. This codebase has a password-reset token,
-    // not an email-verification token, and the reset flow must not be reused
-    // to flip this flag (it changes the password and revokes every session).
-    // Leave a changed address unverified in every environment, including dev,
-    // so a later verified Firebase sign-in cannot attach to this account.
-    // Password login does not read the flag and still works. An unchanged
-    // address keeps whatever proof it already had.
-    //
-    // What is left: a mailbox-proof flow that sets emailVerified only after
-    // the address is confirmed, and a way to release an unverified claim.
-    // Until then, register returns CONFLICT while this row holds the address.
-    emailVerified: emailChanged ? false : user.emailVerified,
-  };
-  store.upsert('users', updated);
+  // The account already holds this address, proved: nothing to confirm.
+  if (email === user.email.trim().toLowerCase() && user.emailVerified === true) {
+    store.upsert('users', { id: credentialsId(userId), type: 'credentials', userId, passwordHash } satisfies CredentialsDoc);
+    auditAuthEvent(userId, 'credentials.set', { emailHash: hashIdentifier(email) }, ip);
+    return { user: toPublicUser(user) };
+  }
+
+  // Anything else waits on the mailbox. Writing the address straight onto the
+  // account let a Telegram session claim someone else's: register then said
+  // CONFLICT to the owner, and their password reset put them in an account the
+  // claimant still reached through Telegram. Until the link is opened the
+  // address belongs to nobody here.
+  const now = Date.now();
+  const previous = claimsFor(userId);
+  const recent = previous.filter((c) => now - Date.parse(c.createdAt) < 60 * 60_000);
+  if (recent.length >= EMAIL_CLAIMS_PER_HOUR) {
+    throw new AppError('RATE_LIMITED', 'Too many confirmation emails. Please try again later.', {
+      retryAfterSeconds: 3600,
+    });
+  }
+  // One live claim per account: a new one retires the rest.
+  for (const old of previous) {
+    if (old.usedAt === null) store.upsert('users', { ...old, usedAt: new Date(now).toISOString() });
+  }
+  const token = crypto.randomUUID();
   store.upsert('users', {
-    id: credentialsId(userId),
-    type: 'credentials',
+    id: newId('ecl'),
+    type: 'emailClaim',
     userId,
-    passwordHash: await bcryptHashAsync(input.password, BCRYPT_ROUNDS),
+    email,
+    passwordHash,
+    tokenHash: sha256Hex(token),
+    expiresAt: new Date(now + EMAIL_CLAIM_TTL_MS).toISOString(),
+    usedAt: null,
+    createdAt: new Date(now).toISOString(),
+  } satisfies EmailClaimDoc);
+  auditAuthEvent(userId, 'credentials.claimed', { emailHash: hashIdentifier(email) }, ip);
+  // Not awaited, as for the reset mail: a provider outage must not fail the call.
+  void sendEmailConfirmationEmail(email, token).catch((err: unknown) => {
+    console.error(
+      `[mail] email confirmation delivery failed for ${hashIdentifier(email)}:`,
+      err instanceof Error ? err.message : err,
+    );
+  });
+  const exposeToken = process.env.NODE_ENV === 'development' && config.exposeDevTokens;
+  return { user: toPublicUser(user), pendingEmail: email, ...(exposeToken ? { devToken: token } : {}) };
+}
+
+/**
+ * Open a confirmation link: the claimed email and password attach to the
+ * account, and because the link reached that mailbox the address is marked
+ * verified. Refused if the link is unknown, used or expired, or if the
+ * address has since been taken (register stayed open to its owner).
+ */
+export function confirmEmailClaim(token: string, ip?: string): void {
+  const store = getStore();
+  const tokenHash = sha256Hex(token);
+  const claim = store.findOne<EmailClaimDoc>(
+    'users',
+    (d) => (d as { type?: string }).type === 'emailClaim' && (d as { tokenHash?: string }).tokenHash === tokenHash,
+  );
+  if (!claim || claim.usedAt !== null || Date.parse(claim.expiresAt) < Date.now()) {
+    throw new AppError('VALIDATION_FAILED', 'This confirmation link is invalid or has expired.');
+  }
+  store.upsert('users', { ...claim, usedAt: new Date().toISOString() });
+  const user = store.byId<User>('users', claim.userId);
+  if (!user || !isUserDoc(user)) throw new AppError('NOT_FOUND', 'Account not found');
+  const holder = findUserByEmail(claim.email);
+  if ((holder && holder.id !== user.id) || store.byId<CredentialsDoc>('users', credentialsId(user.id))) {
+    throw new AppError('CONFLICT', 'This email is already in use. Sign in with it, or choose another.');
+  }
+  store.upsert('users', { ...user, email: claim.email, emailVerified: true } satisfies User);
+  store.upsert('users', {
+    id: credentialsId(user.id),
+    type: 'credentials',
+    userId: user.id,
+    passwordHash: claim.passwordHash,
   } satisfies CredentialsDoc);
-  auditAuthEvent(userId, 'credentials.set', { emailHash: hashIdentifier(email) }, ip);
-  return toPublicUser(updated);
+  auditAuthEvent(user.id, 'credentials.set', { emailHash: hashIdentifier(claim.email), confirmed: true }, ip);
 }

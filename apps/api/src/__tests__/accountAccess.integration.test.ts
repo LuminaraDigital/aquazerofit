@@ -87,26 +87,44 @@ describe('telegram-provisioned account → web credentials', () => {
     expect(res.body.code).toBe('VALIDATION_FAILED');
   });
 
-  it('sets email + password once, then that account signs in on the web', async () => {
+  it('sets email + password once the mailed link is opened, then that account signs in on the web', async () => {
     const { token, userId } = await telegramSignIn(910003);
 
-    const set = await request(app)
-      .post(`${base}/me/credentials`)
-      .set(auth(token))
-      .send({ email: 'Tess3@Example.com', password: 'CorrectHorse9Battery' });
-    expect(set.status).toBe(200);
-    expect(set.body.user.email).toBe('tess3@example.com'); // normalised
-    expect(set.body.user.hasPassword).toBe(true);
-    expect(set.body.user.telegramLinked).toBe(true);
-    // The address is unproved. Dev must not auto-verify it: that flag is what
-    // a later Firebase sign-in uses to decide whether it may link.
-    expect(set.body.user.emailVerified).toBe(false);
+    // The dev token echo stands in for the mail.
+    const savedEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    process.env.EXPOSE_DEV_TOKENS = 'true';
+    let set;
+    try {
+      set = await request(app)
+        .post(`${base}/me/credentials`)
+        .set(auth(token))
+        .send({ email: 'Tess3@Example.com', password: 'CorrectHorse9Battery' });
+    } finally {
+      process.env.NODE_ENV = savedEnv;
+      delete process.env.EXPOSE_DEV_TOKENS;
+    }
+    expect(set.status).toBe(202);
+    expect(set.body.pendingEmail).toBe('tess3@example.com'); // normalised
+    expect(set.body.user.hasPassword).toBe(false);
+
+    // Nothing signs in until the mailbox answers.
+    const early = await request(app)
+      .post(`${base}/auth/login`)
+      .send({ email: 'tess3@example.com', password: 'CorrectHorse9Battery' });
+    expect(early.status).toBe(401);
+
+    const confirmed = await request(app).post(`${base}/auth/email-confirm`).send({ token: set.body.devToken });
+    expect(confirmed.status).toBe(200);
 
     const login = await request(app)
       .post(`${base}/auth/login`)
       .send({ email: 'tess3@example.com', password: 'CorrectHorse9Battery' });
     expect(login.status).toBe(200);
     expect(login.body.user.id).toBe(userId); // same account, not a new one
+    // The opened link proved the mailbox.
+    expect(login.body.user.emailVerified).toBe(true);
+    expect(login.body.user.telegramLinked).toBe(true);
 
     // One-shot: a second call must bounce to the reset flow instead.
     const again = await request(app)

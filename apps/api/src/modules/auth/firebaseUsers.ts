@@ -67,7 +67,7 @@ function safeDisplayName(candidate: string): string {
   return containsProfanity(candidate) ? 'Aqua member' : candidate;
 }
 
-function findUserByFirebaseUid(uid: string): User | undefined {
+export function findUserByFirebaseUid(uid: string): User | undefined {
   return getStore().findOne<User>(
     'users',
     (d) => isUserDoc(d) && (d as User).firebaseUid === uid,

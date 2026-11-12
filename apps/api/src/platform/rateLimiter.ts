@@ -121,29 +121,50 @@ function isAnonymousWritePath(path: string): boolean {
   return path.includes('/analytics/events') || path.includes('/challenges/peek');
 }
 
-/** Best-effort subject extraction for limiter keying only. This is not authentication. */
+/**
+ * The user a request is counted against: only an access token this server
+ * signed names one. The limiter runs before requireAuth, so an unverified
+ * `sub` let anyone spend another user's budget, or mint a new bucket per
+ * request. A Firebase ID token (web) is not checked here, because that needs
+ * the async Admin verifier; those requests count against their address only,
+ * and the credit ledger still caps what any one account can spend.
+ */
 function subjectOf(req: Request, clientIp: string): string {
   const header = req.headers.authorization;
   if (header?.startsWith('Bearer ')) {
-    const decoded = jwt.decode(header.slice(7));
-    if (decoded && typeof decoded === 'object' && typeof decoded.sub === 'string') {
-      return `u:${decoded.sub}`;
+    try {
+      const payload = jwt.verify(header.slice(7), config.jwtAccessSecret, { algorithms: ['HS256'] });
+      if (typeof payload === 'object' && typeof payload.sub === 'string') return `u:${payload.sub}`;
+    } catch {
+      // Not ours, expired or forged: fall back to the address.
     }
   }
   return `ip:${clientIp}`;
 }
 
-function hit(key: string, limit: number, now: number): { allowed: boolean; retryAfterSec: number } {
-  const windowStart = now - WINDOW_MS;
-  const stamps = (buckets.get(key) ?? []).filter((t) => t > windowStart);
-  if (stamps.length >= limit) {
-    const oldest = stamps[0] ?? now;
-    buckets.set(key, stamps);
-    return { allowed: false, retryAfterSec: Math.max(1, Math.ceil((oldest + WINDOW_MS - now) / 1000)) };
+/**
+ * Hard ceiling on live buckets. Pruning only drops buckets idle for ten
+ * minutes, so a flood of distinct addresses could otherwise grow the map
+ * until the process runs out of memory. Past the ceiling the oldest bucket
+ * goes, which forgives one early caller rather than taking the API down.
+ */
+export const MAX_BUCKETS = 50_000;
+
+function liveStamps(key: string, now: number): number[] {
+  return (buckets.get(key) ?? []).filter((t) => t > now - WINDOW_MS);
+}
+
+function retryAfterSec(stamps: number[], now: number): number {
+  return Math.max(1, Math.ceil(((stamps[0] ?? now) + WINDOW_MS - now) / 1000));
+}
+
+function record(key: string, stamps: number[], now: number): void {
+  if (!buckets.has(key) && buckets.size >= MAX_BUCKETS) {
+    const oldest = buckets.keys().next().value;
+    if (oldest !== undefined) buckets.delete(oldest);
   }
   stamps.push(now);
   buckets.set(key, stamps);
-  return { allowed: true, retryAfterSec: 0 };
 }
 
 export function rateLimiter(req: Request, res: Response, next: NextFunction): void {
@@ -191,21 +212,30 @@ export function rateLimiter(req: Request, res: Response, next: NextFunction): vo
    * described behaviour the code did not have.
    */
   const keys = auth ? [ipKey] : [...new Set([`${lane}:${subjectOf(req, clientIp)}`, ipKey])];
-  const checks = keys.map((key) => hit(key, limit, now));
-  const blocked = checks.find((c) => !c.allowed);
+  // Check every key before recording any: a refused request is not charged
+  // to the buckets that would have let it through.
+  const windows = keys.map((key) => ({ key, stamps: liveStamps(key, now) }));
+  const blocked = windows.find((w) => w.stamps.length >= limit);
   if (blocked) {
-    res.setHeader('Retry-After', String(blocked.retryAfterSec));
+    const retryAfterSeconds = retryAfterSec(blocked.stamps, now);
+    res.setHeader('Retry-After', String(retryAfterSeconds));
     res.status(429).json({
       code: 'RATE_LIMITED',
       message: 'Rate limit reached. Please retry shortly.',
-      details: { retryAfterSeconds: blocked.retryAfterSec },
+      details: { retryAfterSeconds },
     } satisfies ApiErrorBody);
     return;
   }
+  for (const { key, stamps } of windows) record(key, stamps, now);
   next();
 }
 
 /** Test/ops hook. */
 export function resetRateLimiter(): void {
   buckets.clear();
+}
+
+/** Test hook: how many buckets are live. */
+export function rateLimiterBucketCount(): number {
+  return buckets.size;
 }

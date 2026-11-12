@@ -37,6 +37,17 @@ import { containsProfanity } from '@aquazerofit/shared';
  }
 
  /**
+  * A hash no password matches, at the same cost as real ones. login() compares
+  * against it when there is no account or no password, so an unknown address
+  * takes as long to refuse as a wrong password. Built once, on first use.
+  */
+ let dummyHash: Promise<string> | undefined;
+ function dummyPasswordHash(): Promise<string> {
+   dummyHash ??= bcrypt.hash(crypto.randomUUID(), BCRYPT_ROUNDS);
+   return dummyHash;
+ }
+
+ /**
   * Audit-safe identifier: truncated sha256 of the raw email/tgId. The raw value
   * never lands in the audit container; the hash is re-identifiable only by
   * someone who already holds the original value.
@@ -286,8 +297,13 @@ export async function login(input: { email: string; password: string }, ip?: str
 
   const user = findUserByEmail(input.email);
   const cred = user ? store.byId<CredentialsDoc>('users', credentialsId(user.id)) : undefined;
-  // Uniform failure path: never reveal whether the email exists.
-  if (!user || !cred || !(await bcryptCompareAsync(input.password, cred.passwordHash))) {
+  // Uniform failure path: never reveal whether the email exists, in the
+  // answer or in how long it takes. An unknown address still pays one compare.
+  const passwordMatches = await bcryptCompareAsync(
+    input.password,
+    cred?.passwordHash ?? (await dummyPasswordHash()),
+  );
+  if (!user || !cred || !passwordMatches) {
     recordLoginFailure(emailKey, now);
     auditAuthEvent(user?.id ?? 'unknown', 'login.failed', { emailHash: hashIdentifier(emailKey) }, ip);
     throw new AppError('AUTH_INVALID', 'Email or password is incorrect');

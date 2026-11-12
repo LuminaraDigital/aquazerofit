@@ -34,6 +34,7 @@ import type {
 import { api, ApiError, tokenStore } from './api';
 import { toAuthResponseStub, useFirebaseAuth } from './AuthProvider';
 import { asList, orNull, unwrap } from './envelopes';
+import { clearUserDrafts } from './userDrafts';
 
 export type TrendRange = '7d' | '30d' | '90d';
 
@@ -437,9 +438,17 @@ export function getStoredUser(): PublicUser | null {
   }
 }
 
-function storeUser(user: PublicUser | undefined): void {
+/**
+ * Remember the signed-in user. A different account from the one stored means
+ * an account switch that never went through logout (an expired session, a
+ * second person on the browser), so the last account's drafts go too.
+ */
+export function storeUser(user: PublicUser | undefined): void {
+  if (!user) return;
+  const previous = getStoredUser();
+  if (previous && previous.id !== user.id) clearUserDrafts();
   try {
-    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
   } catch {
     // storage full / unavailable  -  non-fatal
   }
@@ -545,6 +554,7 @@ export function useAuthActions() {
     } catch {
       // ignore
     }
+    clearUserDrafts();
     qc.clear();
   }
 

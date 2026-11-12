@@ -44,6 +44,11 @@ export interface MealLog {
   visionJobId?: string;
   loggedAt: string; // ISO UTC
   localDate: string; // YYYY-MM-DD in the user's timezone
+  /**
+   * Server clock at creation. loggedAt can come from the client, so XP asks
+   * this instead. Absent on rows saved before it existed.
+   */
+  recordedAt?: string;
 }
 
 export interface WaterLog {

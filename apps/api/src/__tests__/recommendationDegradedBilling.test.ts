@@ -150,3 +150,29 @@ it('releases the reservation in production when no provider is configured at all
     else process.env.GROQ_API_KEY = savedKey;
   }
 });
+
+/*
+ * With aiPersonalisation off the route never calls a model: it picks a
+ * generic recipe in code. That deterministic output is no more the paid
+ * thing than a degraded template is, so the hold is released, not committed,
+ * like every other lane that ends without a model answer.
+ */
+it('does not charge for the consent-off deterministic pick', async () => {
+  const off = await request(app).put(`${base}/me/consents`).set(auth()).send({
+    wellnessDataProcessing: true,
+    aiPersonalisation: false,
+    anonymisedAnalytics: false,
+    reminders: false,
+  });
+  expect(off.status).toBe(200);
+  await creditLedger.grantDailyIfNeeded(userId);
+  const before = await creditLedger.balance(userId);
+
+  const res = await request(app)
+    .post(`${base}/recommendations/meals`)
+    .set(auth())
+    .send({ mealType: 'breakfast', localDate: '2026-07-31' });
+  expect(res.status).toBe(201);
+  expect(res.body.recommendation.ai.model).toBe('consent-off-fallback');
+  expect(await creditLedger.balance(userId)).toBe(before);
+});

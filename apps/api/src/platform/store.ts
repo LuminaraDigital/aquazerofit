@@ -179,6 +179,27 @@ function userTypeKey(doc: StoredDoc): string | undefined {
 }
 
 /**
+ * Buddy challenges by invite code. The unauthenticated invite peek and the
+ * join both look a code up, and without this each one scanned every log of
+ * every user. Not unique: codes are random and issueCode retries on a clash,
+ * and a boot must not fail over a historical duplicate.
+ */
+export const LOGS_BY_CHALLENGE_CODE = 'logs.buddyChallenge.code';
+
+function challengeCodeKey(doc: StoredDoc): string | undefined {
+  const d = doc as { type?: unknown; code?: unknown };
+  if (d.type !== 'buddyChallenge' || typeof d.code !== 'string') return undefined;
+  return indexKey(d.code);
+}
+
+/**
+ * Workout sessions by user and day, the plans-container twin of
+ * LOGS_BY_USER_TYPE_DATE. Challenge progress asks "did this member train on
+ * this day" once per day of the challenge.
+ */
+export const PLANS_BY_USER_TYPE_DATE = 'plans.userId+type+localDate';
+
+/**
  * Stars purchases and Stars subscription charges, one row per Telegram charge
  * id. Unique. A charge id is one payment, so the two document types share the
  * key. Refunds are excluded: they name the same charge and must not collide
@@ -207,6 +228,8 @@ function starsChargeKey(doc: StoredDoc): string | undefined {
 export const SECONDARY_INDEXES: readonly SecondaryIndexSpec[] = [
   { name: LOGS_BY_USER_TYPE_DATE, container: 'logs', key: userTypeDateKey },
   { name: LOGS_BY_USER_TYPE, container: 'logs', key: userTypeKey },
+  { name: LOGS_BY_CHALLENGE_CODE, container: 'logs', key: challengeCodeKey },
+  { name: PLANS_BY_USER_TYPE_DATE, container: 'plans', key: userTypeDateKey },
   {
     name: LEDGER_BY_STARS_CHARGE,
     container: 'ledger',

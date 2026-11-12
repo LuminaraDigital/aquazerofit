@@ -11,7 +11,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Wipes user-scoped Room caches on logout and on different-user sign-in.
+ * Wipes user-scoped Room caches on logout and on different-user sign-in,
+ * and the per-user state outside Room through [UserScopedExtras].
  *
  * Catalog tables (foods corpus, exercises, recipes) survive account switch;
  * per-user overlays on catalog (coach unlock state, food recency) are cleared.
@@ -28,6 +29,7 @@ class LocalCachePurger @Inject constructor(
     private val chatDao: ChatDao,
     private val userOverlayDao: UserOverlayDao,
     private val syncScheduler: SyncScheduler,
+    private val extras: UserScopedExtras,
 ) {
 
     /** Cached account id, or null when the singleton user row is empty. */
@@ -41,6 +43,7 @@ class LocalCachePurger @Inject constructor(
 
     private suspend fun purgeUserScoped(includeOutbox: Boolean) {
         syncScheduler.cancelPendingSync()
+        extras.clear()
         logsDao.clearAllLogs()
         userDao.clearAllAccountRows()
         trainingDao.clearAllTraining()

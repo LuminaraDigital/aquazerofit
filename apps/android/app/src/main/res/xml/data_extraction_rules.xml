@@ -21,6 +21,10 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="datastore/azf_auth.preferences_pb" />
+        <!-- The Health Connect opt-in is a property of one handset (see
+             HealthConnectConsentStore); restoring it elsewhere claims a consent
+             nobody gave on that device. -->
+        <exclude domain="file" path="datastore/azf_health.preferences_pb" />
         <exclude domain="database" path="azf.db" />
         <exclude domain="database" path="azf.db-wal" />
         <exclude domain="database" path="azf.db-shm" />
@@ -28,6 +32,10 @@
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/azf_auth.preferences_pb" />
+        <!-- The Health Connect opt-in is a property of one handset (see
+             HealthConnectConsentStore); restoring it elsewhere claims a consent
+             nobody gave on that device. -->
+        <exclude domain="file" path="datastore/azf_health.preferences_pb" />
         <exclude domain="database" path="azf.db" />
         <exclude domain="database" path="azf.db-wal" />
         <exclude domain="database" path="azf.db-shm" />

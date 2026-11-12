@@ -125,10 +125,27 @@ const STORED_IMAGE_MAX_EDGE = 1600;
  */
 const DECODE_LIMITS = { limitInputPixels: 40_000_000 } as const;
 
+/**
+ * The formats MEAL_PHOTO_MIME advertises, as sharp names what it finds in the
+ * bytes. libvips decodes far more (SVG through librsvg, GIF, TIFF, PDF where
+ * built in), and each extra parser is attack surface on the request thread of
+ * the only API process, so anything else is refused before it is decoded.
+ */
+const DECODABLE_FORMATS = new Set(['jpeg', 'png', 'heif']);
+
 async function toStorableImages(
   buffer: Buffer,
   declaredMime?: string,
 ): Promise<{ jpeg: Buffer; webp?: Buffer }> {
+  // metadata() reads the header only; it does not decode the pixels.
+  const { format } = await sharp(buffer, DECODE_LIMITS)
+    .metadata()
+    .catch(() => ({ format: undefined }));
+  if (!format || !DECODABLE_FORMATS.has(format)) {
+    throw new AppError('VALIDATION_FAILED', 'That file is not a JPEG, PNG or HEIC photo.', {
+      allowed: MEAL_PHOTO_MIME,
+    });
+  }
   try {
     const jpeg = await sharp(buffer, DECODE_LIMITS)
       .rotate()

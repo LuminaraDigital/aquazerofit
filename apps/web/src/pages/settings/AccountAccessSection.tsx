@@ -34,6 +34,7 @@ export function AccountAccessSection({ user }: { user: PublicUser }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   const needsCredentials = user.hasPassword === false;
   const inTelegram = isTMA();
@@ -47,9 +48,14 @@ export function AccountAccessSection({ user }: { user: PublicUser }) {
     }
     setError(null);
     try {
-      await setCredentials.mutateAsync(check.data);
+      const res = await setCredentials.mutateAsync(check.data);
       haptic('success');
-      toast.success('Email & password set - you can now sign in on the web.');
+      if (res.pendingEmail) {
+        setPendingEmail(res.pendingEmail);
+        toast.success(`Check ${res.pendingEmail} for a link to finish.`);
+      } else {
+        toast.success('Email & password set - you can now sign in on the web.');
+      }
       setFormOpen(false);
       setPassword('');
     } catch (err) {
@@ -100,9 +106,11 @@ export function AccountAccessSection({ user }: { user: PublicUser }) {
             <div className="min-w-0 flex-1">
               <span className="block truncate text-base">Email sign-in</span>
               <span className="block truncate text-xs text-on-surface-variant">
-                {needsCredentials
-                  ? 'Not set - needed to sign in from any browser'
-                  : user.email}
+                {!needsCredentials
+                  ? user.email
+                  : pendingEmail
+                    ? `Waiting for you to open the link sent to ${pendingEmail}`
+                    : 'Not set - needed to sign in from any browser'}
               </span>
             </div>
             {needsCredentials && !formOpen && (

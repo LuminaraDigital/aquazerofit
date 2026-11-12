@@ -5,6 +5,10 @@
      excluded. -->
 <full-backup-content>
     <exclude domain="file" path="datastore/azf_auth.preferences_pb" />
+    <!-- The Health Connect opt-in is a property of one handset (see
+         HealthConnectConsentStore); restoring it elsewhere claims a consent
+         nobody gave on that device. -->
+    <exclude domain="file" path="datastore/azf_health.preferences_pb" />
     <!-- Wellness cache (meals, chat, profile, etc.) must not leave the device
          via cloud backup or device transfer; refresh tokens are already
          excluded above and are useless off-device without the Keystore key.

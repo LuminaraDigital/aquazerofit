@@ -234,4 +234,5 @@ private fun AzfDatabase.purger() = LocalCachePurger(
     chatDao = chatDao(),
     userOverlayDao = userOverlayDao(),
     syncScheduler = NoOpSyncScheduler(),
+    extras = {},
 )

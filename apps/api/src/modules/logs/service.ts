@@ -139,6 +139,7 @@ export function createMealLog(
     source,
     loggedAt: input.loggedAt ?? new Date().toISOString(),
     localDate: input.localDate,
+    recordedAt: new Date().toISOString(),
   };
   getStore().upsert('logs', log);
   return log;

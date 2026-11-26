@@ -1,7 +1,7 @@
 # AQF-12A — wger Integration Addendum
 
 **Addendum to:** AQF-12 Upstream Integration and Licensing Register (v2.0)
-**Date:** 2026-07-30 · **Status:** Ratification addendum — proposed for supervisor sign-off alongside AQF-12
+**Date:** 2026-07-30 · **Status:** Ratification addendum — proposed for owner sign-off alongside AQF-12
 **Scope:** Ratifies the wger verdict recorded as draft in AQF-12 and registers the obligations arising from the data-only adoption implemented per `wger-integration-plan.md`.
 
 ---
@@ -53,4 +53,4 @@ wger.de carries no published ToS, SLA, or commercial-use terms; silent policy ch
 - `content/ATTRIBUTION.md` — human-facing attribution record and placement spec.
 - `research/security-privacy-review.md` — security/privacy review of the new import and lookup surface.
 
-**Approval:** pending supervisor sign-off (same gate as AQF-12).
+**Approval:** pending owner sign-off (same gate as AQF-12).

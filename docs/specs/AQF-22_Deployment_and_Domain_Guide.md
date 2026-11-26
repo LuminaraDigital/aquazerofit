@@ -2,14 +2,13 @@
 logo: design/brand/AquaZeroFit(single_Logo).png
 brand: AquaZero
 tagline: AI Wellness Assistant
-unit: NIT3004 IT Capstone Project 2
 title: Deployment Guide
 subtitle: Deploying AquaZeroFit and connecting the production domain
 details:
   Document ID: AQF-22
   Project: AquaZeroFit, an AI-powered wellness platform (web and Telegram Mini App)
   Prepared by: Babatundji Williams-Fulwood, Technical Lead and Software Architect
-  Team: Babatundji Williams-Fulwood (s8138393), Eric La, Victor Hong
+  Team: Babatundji Williams-Fulwood, Eric La, Victor Hong
   Date: 31 July 2026
   Audience: First-time deployer, no prior platform experience assumed
   Document status: Issued

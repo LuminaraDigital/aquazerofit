@@ -583,7 +583,7 @@ npm run verify     # typecheck → test → eval (exact CI pipeline)
 | Area | Trade-off | Mitigation |
 |------|-----------|------------|
 | **Tokens in localStorage** | TMA makes cookie sessions impractical | Short TTL (15m), rotating refresh, family revocation, server stores only sha256 |
-| **bcryptjs cost 10** | Portability floor for capstone | Native binding + higher cost = first hardening step for prod |
+| **bcryptjs cost 10** | Portability floor for the initial release | Native binding + higher cost = first hardening step for prod |
 | **Client-declared MIME** | Meal photo uploads | Size cap, allowlist, UUID names, private, ownership-checked, TTL sweep |
 | **Single-instance Postgres** | Local working set hydration | Documented in AQF-04/22; scale-out requires read replicas |
 | **Offline mock engine** | Template output when providers fail | `degraded` flag forces caller branching; never silently served as genuine |
@@ -676,7 +676,7 @@ packages/shared/src/
 6. **Safety by architecture** — classifier in code, two-stage, output validation, eval gate
 7. **Accessibility & motion respect** — built-in, not bolted on
 
-### Areas for Evolution (Post-Capstone)
+### Areas for Evolution
 
 | Area | Recommendation |
 |------|----------------|

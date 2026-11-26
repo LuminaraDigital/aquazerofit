@@ -10,7 +10,7 @@
 
 - **P0 (Immediate):** Block production deployment until fixed
 - **P1 (Before Production):** Must fix before any public-facing deployment
-- **P2 (Before Scale):** Harden before user growth beyond capstone demo
+- **P2 (Before Scale):** Harden before user growth beyond the initial launch
 - **P3 (Defense in Depth):** Nice-to-have improvements
 
 ---

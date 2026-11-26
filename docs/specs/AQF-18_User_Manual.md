@@ -2,7 +2,6 @@
 logo: design/brand/AquaZeroFit(single_Logo).png
 brand: AquaZero
 tagline: AI Wellness Assistant
-unit: NIT3004 IT Capstone Project 2
 title: User Manual
 subtitle: Install it, sign in, and run every feature without asking anyone for help
 details:
@@ -10,12 +9,12 @@ details:
   Product: AquaZeroFit, an AI-powered wellness platform (web and Telegram Mini App)
   Version: 3.0 (rewritten against the shipping build, screenshots captured from the running app)
   Primary author: Eric La (Frontend)
-  Document owner: Babatundji Williams-Fulwood (s8138393), Technical Lead and Software Architect
+  Document owner: Babatundji Williams-Fulwood, Technical Lead and Software Architect
   Contributors: Victor Hong (Data and Quality)
-  Group: Group 15, Victoria University, Melbourne
+  Organisation: Luminara Digital
   Telegram bot: @AquaZeroFitBot
-  Audience: New users, markers, supervisors
-  Status: Issued for supervisor and lecturer review
+  Audience: New users and support staff
+  Status: Issued
   Related documents: AQF-11 Safety Privacy and Ethical Design, AQF-15 Runbook and Deployment Guide, AQF-24 Software Architecture and Contribution Report
 ---
 
@@ -50,7 +49,7 @@ You can run AquaZeroFit as a **Mini App inside Telegram**, or as a **website in 
 | How you sign in | Automatically, using your Telegram account | Email address and password |
 | Setup time | About thirty seconds | About two minutes |
 | Works on | Android, iPhone, Windows, macOS, Linux | Any device with a modern browser |
-| Best for | Everyday use on a phone | Larger screens, and marking |
+| Best for | Everyday use on a phone | Larger screens and longer sessions |
 
 ## 1.4 What you need before you start
 
@@ -134,7 +133,7 @@ If you use both surfaces, link them so that one account holds all of your histor
 
 ## 2.4 Running the project from source
 
-This section is for markers and supervisors who want to run the application on their own machine. Ordinary users can skip it.
+This section is for developers and technical reviewers who want to run the application on their own machine. Ordinary users can skip it.
 
 ### 2.4.1 Prerequisites
 

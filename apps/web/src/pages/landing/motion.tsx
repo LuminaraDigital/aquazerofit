@@ -1,21 +1,17 @@
 /**
- * Motion primitives for the landing page.
+ * Motion and 3D pointer primitives for the marketing surface.
  *
- * Everything here is one-shot and observer-driven: no scroll listeners, no
- * layout reads per frame. Pointer tilt writes CSS custom properties inside a
- * rAF so the compositor does the work (see the .lp-* rules in styles/index.css).
- *
- * Every effect degrades to "no motion, content still visible" when the user
- * prefers reduced motion — the CSS media query is the backstop, these hooks
- * simply stop doing the work.
+ * Everything here is observer-driven or rAF-batched directly onto DOM refs /
+ * CSS custom properties (`--lp-rx`, `--lp-ry`, `--lp-gx`, `--lp-gy`) with zero
+ * React re-renders per scroll or pointer frame.
  */
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -28,28 +24,20 @@ export function prefersReducedMotion(): boolean {
   );
 }
 
-/**
- * True once the element has scrolled into view, and true forever after —
- * entrance animations that replay on every scroll pass read as noise.
- */
-export function useInView<T extends Element>(rootMargin = '0px 0px -12% 0px') {
+/** One-shot viewport entrance observer with generous bottom margin (+80px). */
+function useInView<T extends Element>() {
   const ref = useRef<T>(null);
   const [inView, setInView] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') {
+    if (typeof IntersectionObserver === 'undefined' || prefersReducedMotion()) {
       setInView(true);
       return;
     }
-    /* Anything already on screen at mount is revealed without waiting for a
-       callback. Above-the-fold content must never depend on an observer
-       firing — a backgrounded tab, for one, delivers nothing until it is
-       looked at, and hidden-by-default content that never arrives is worse
-       than no animation at all. */
     const rect = el.getBoundingClientRect();
-    if (rect.top < window.innerHeight && rect.bottom > 0) {
+    if (rect.top < window.innerHeight + 80 && rect.bottom > -40) {
       setInView(true);
       return;
     }
@@ -62,13 +50,101 @@ export function useInView<T extends Element>(rootMargin = '0px 0px -12% 0px') {
           }
         }
       },
-      { rootMargin, threshold: 0.15 },
+      { rootMargin: '0px 0px 80px 0px', threshold: 0.01 },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [rootMargin]);
+  }, []);
 
   return { ref, inView };
+}
+
+function resetTilt(el: HTMLElement): void {
+  delete el.dataset.tilting;
+  el.style.setProperty('--lp-rx', '0deg');
+  el.style.setProperty('--lp-ry', '0deg');
+  el.style.setProperty('--lp-gx', '50%');
+  el.style.setProperty('--lp-gy', '22%');
+}
+
+/**
+ * Hardware-accelerated 3D pointer tilt driven strictly via CSS custom
+ * properties inside a single requestAnimationFrame (measuring layout inside
+ * the rAF rather than on raw 1000Hz pointer events).
+ */
+export function usePointerTilt<T extends HTMLElement>({
+  maxTilt = 7,
+  disabled = false,
+}: {
+  maxTilt?: number;
+  disabled?: boolean;
+} = {}) {
+  const ref = useRef<T>(null);
+  const rafRef = useRef<number>(0);
+  const latestRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    if (disabled && ref.current) {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
+      resetTilt(ref.current);
+    }
+  }, [disabled]);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  const onPointerMove = useCallback(
+    (event: ReactPointerEvent<T>) => {
+      if (disabled || event.pointerType === 'touch' || prefersReducedMotion()) return;
+      latestRef.current = { x: event.clientX, y: event.clientY };
+      if (rafRef.current) return;
+
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = 0;
+        const el = ref.current;
+        const pt = latestRef.current;
+        if (!el || !pt) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+
+        const px = Math.max(0, Math.min(1, (pt.x - rect.left) / rect.width));
+        const py = Math.max(0, Math.min(1, (pt.y - rect.top) / rect.height));
+        const rx = (0.5 - py) * maxTilt * 2;
+        const ry = (px - 0.5) * maxTilt * 2;
+
+        el.dataset.tilting = 'true';
+        el.style.setProperty('--lp-rx', `${rx.toFixed(2)}deg`);
+        el.style.setProperty('--lp-ry', `${ry.toFixed(2)}deg`);
+        el.style.setProperty('--lp-gx', `${(px * 100).toFixed(1)}%`);
+        el.style.setProperty('--lp-gy', `${(py * 100).toFixed(1)}%`);
+      });
+    },
+    [disabled, maxTilt],
+  );
+
+  const onPointerReset = useCallback(() => {
+    latestRef.current = null;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+    if (ref.current) resetTilt(ref.current);
+  }, []);
+
+  return {
+    ref,
+    handlers: {
+      onPointerMove,
+      onPointerLeave: onPointerReset,
+      onPointerCancel: onPointerReset,
+    },
+  };
 }
 
 /** Wraps children in a one-shot scroll reveal. `delay` staggers siblings. */
@@ -84,9 +160,6 @@ export function Reveal({
   as?: 'div' | 'section' | 'li' | 'article' | 'header';
 }) {
   const { ref, inView } = useInView<HTMLDivElement>();
-  /* Narrowed to 'div' for typing only: every permitted tag takes the same
-     props we pass, but the union collapses the ref type to an impossible
-     intersection. The runtime still renders the requested element. */
   const Tag = as as 'div';
   return (
     <Tag
@@ -99,17 +172,7 @@ export function Reveal({
   );
 }
 
-/**
- * Scrolls to the fragment of the current URL once that element exists.
- *
- * Needed on every marketing route because they are lazily loaded: the browser
- * gives up on `#section` long before the chunk has painted, and React Router
- * does not scroll for hash changes at all. Without this, every cross-page
- * anchor — /landing#screens from the footer, /features#targets from the
- * walkthrough — silently lands at the top of the page.
- *
- * The sections carry scroll-mt-24, which keeps them clear of the fixed header.
- */
+/** Scrolls to the URL hash fragment once a lazily loaded marketing route mounts. */
 export function useHashScroll(): void {
   const { hash } = useLocation();
 
@@ -120,13 +183,6 @@ export function useHashScroll(): void {
     let raf = requestAnimationFrame(function seek() {
       const target = document.getElementById(id);
       if (target) {
-        /* 'instant', not the inherited smooth. The stylesheet sets
-           scroll-behavior: smooth for in-page nav clicks, and a smooth scroll
-           is an animation the browser abandons the moment layout shifts under
-           it — which is exactly what a landing page does while its fonts,
-           images and lazy chunks arrive. A deep link that lands on `#safety`
-           on first load would silently stay at the top of the page. It should
-           land anyway, and arriving instantly is what a deep link means. */
         target.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
         return;
       }
@@ -136,16 +192,22 @@ export function useHashScroll(): void {
   }, [hash]);
 }
 
-/** Normalised scroll progress (0→1) of the document, for the top rail. */
-export function useScrollProgress(): number {
-  const [progress, setProgress] = useState(0);
+/**
+ * Reading-progress rail written directly to a DOM ref inside rAF so TopBar
+ * never re-renders or re-reads localStorage attribution while scrolling.
+ */
+export function ScrollProgressRail() {
+  const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let raf = 0;
     const update = () => {
       raf = 0;
+      const el = barRef.current;
+      if (!el) return;
       const max = document.documentElement.scrollHeight - window.innerHeight;
-      setProgress(max > 0 ? Math.min(1, window.scrollY / max) : 0);
+      const p = max > 0 ? Math.min(1, window.scrollY / max) : 0;
+      el.style.transform = `scaleX(${p})`;
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update);
@@ -160,5 +222,12 @@ export function useScrollProgress(): number {
     };
   }, []);
 
-  return progress;
+  return (
+    <div
+      ref={barRef}
+      className="h-px origin-left bg-primary/70"
+      style={{ transform: 'scaleX(0)' }}
+      aria-hidden="true"
+    />
+  );
 }

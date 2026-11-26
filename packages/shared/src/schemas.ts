@@ -44,6 +44,7 @@ export const localDateSchema = z
 export const passwordSchema = z
   .string()
   .min(12, 'Password must be at least 12 characters')
+  .max(128, 'Password must be at most 128 characters')
   .regex(/[a-z]/, 'Password must include a lowercase letter')
   .regex(/[A-Z]/, 'Password must include an uppercase letter')
   .regex(/[0-9]/, 'Password must include a digit');
@@ -64,7 +65,7 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1),
+  password: z.string().min(1).max(1024),
 });
 
 // refreshToken optional in body: cookie-backed refresh (FE-01) sends no body.
@@ -110,9 +111,9 @@ export const profileSchema = z.object({
   goal: z.enum(['lose', 'maintain', 'gain']),
   activityLevel: z.enum(['sedentary', 'light', 'moderate', 'active', 'veryActive']),
   exerciseExperience: z.enum(['beginner', 'intermediate', 'advanced']),
-  dietaryPreferences: z.array(z.enum(DIETARY_PREFERENCES)).default([]),
-  allergies: z.array(z.enum(ALLERGENS)).default([]),
-  equipment: z.array(z.enum(EQUIPMENT)).default(['none']),
+  dietaryPreferences: z.array(z.enum(DIETARY_PREFERENCES)).max(DIETARY_PREFERENCES.length).default([]),
+  allergies: z.array(z.enum(ALLERGENS)).max(ALLERGENS.length).default([]),
+  equipment: z.array(z.enum(EQUIPMENT)).max(EQUIPMENT.length).default(['none']),
   unitPreference: z.enum(['metric', 'imperial']).default('metric'),
   nutritionEmphasis: z.enum(['standard', 'protein_first']).default('standard'),
   targetWeightKg: z
@@ -154,7 +155,7 @@ export const nutritionSummarySchema = z.object({
 export type NutritionSummaryInput = z.infer<typeof nutritionSummarySchema>;
 
 export const mealLogItemSchema = z.object({
-  foodId: z.string().optional(),
+  foodId: z.string().max(128).optional(),
   name: z.string().min(1).max(120),
   grams: z.number().positive().max(5000),
   kcal: z.number().min(0).max(10000),
@@ -244,7 +245,7 @@ export const completeWorkoutSchema = z.object({
   exercises: z
     .array(
       z.object({
-        exerciseId: z.string(),
+        exerciseId: z.string().max(128),
         setsCompleted: z.number().int().min(0).max(20),
         skipped: z.boolean().default(false),
         // Phase 2 optional actuals (target+actual logging); all optional so
@@ -254,13 +255,14 @@ export const completeWorkoutSchema = z.object({
         setLogs: z.array(setLogSchema).max(20).optional(),
       }),
     )
-    .min(1),
+    .min(1)
+    .max(50),
   durationMinutes: z.number().int().min(1).max(300),
   localDate: localDateSchema,
 });
 
 export const swapExerciseSchema = z.object({
-  exerciseId: z.string(),
+  exerciseId: z.string().max(128),
 });
 
 // ---------- chat ----------

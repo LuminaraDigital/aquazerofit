@@ -51,6 +51,7 @@ import {
   type CoachLiveSnapshot,
 } from './snapshot';
 import { pinThreadToLatest } from './threadScroll';
+import { USER_DRAFT_KEYS } from '../../lib/userDrafts';
 
 const SUGGESTED_PROMPTS = [
   'What should I eat tonight?',
@@ -218,7 +219,7 @@ export default function Coach() {
     setInput(stored);
   }, []);
   const { clear: clearComposerDraft } = useDraftPersistence({
-    storageKey: 'azf_coach_composer_v1',
+    storageKey: USER_DRAFT_KEYS.coachComposer,
     value: input,
     enabled: !streaming,
     isDirty: (v) => v.trim().length > 0,

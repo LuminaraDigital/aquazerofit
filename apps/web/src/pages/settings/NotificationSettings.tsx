@@ -14,8 +14,9 @@ import { BottomNav } from '../../components/ui/BottomNav';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Switch } from '../../components/ui/fields';
 import { useToast } from '../../components/ui/Toast';
+import { USER_DRAFT_KEYS } from '../../lib/userDrafts';
 
-const STORAGE_KEY = 'azf.notificationPrefs';
+const STORAGE_KEY = USER_DRAFT_KEYS.notificationPrefs;
 
 interface NotificationPrefs {
   meals: { enabled: boolean; time: string };

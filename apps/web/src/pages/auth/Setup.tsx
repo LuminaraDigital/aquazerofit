@@ -40,6 +40,7 @@ import { RingProgress } from '../../components/ui/RingProgress';
 import { SetupTargetsSkeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../components/ui/Toast';
 import { OptionCardGroup, SegmentedOptions, UnitToggle } from '../../components/ui/fields';
+import { USER_DRAFT_KEYS } from '../../lib/userDrafts';
 
 type ActivityLevel = ProfileInput['activityLevel'];
 
@@ -154,7 +155,7 @@ export default function Setup() {
   }, [isFirstSetup]);
 
   const { clear: clearDraft } = useDraftPersistence({
-    storageKey: 'azf_setup_draft_v1',
+    storageKey: USER_DRAFT_KEYS.setup,
     value: state,
     enabled: isFirstSetup && phase === 'form',
     isDirty: isDirtyDraft,

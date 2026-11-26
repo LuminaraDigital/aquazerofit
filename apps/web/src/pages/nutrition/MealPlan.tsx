@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { DailyNutrition, MealType } from '@aquazerofit/shared';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { queryKeys } from '@/lib/queries';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -19,7 +19,8 @@ import {
   type RecommendationWithRecipe,
 } from '../dashboard/lib';
 
-type SlotStatus = 'loading' | 'ready' | 'error';
+/** `noCredits` is its own state: retrying cannot help until the daily grant. */
+type SlotStatus = 'loading' | 'ready' | 'error' | 'noCredits';
 
 interface Slot {
   status: SlotStatus;
@@ -75,10 +76,11 @@ export default function MealPlan() {
             ? { status: 'ready', rec, feedback: rec.feedback ?? null, logged: false }
             : { status: 'error', rec: null, feedback: null, logged: false },
         }));
-      } catch {
+      } catch (e) {
+        const status = e instanceof ApiError && e.code === 'CREDITS_INSUFFICIENT' ? 'noCredits' : 'error';
         setSlots((s) => ({
           ...s,
-          [mealType]: { status: 'error', rec: null, feedback: null, logged: false },
+          [mealType]: { status, rec: null, feedback: null, logged: false },
         }));
       }
     },
@@ -192,6 +194,24 @@ export default function MealPlan() {
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-10 w-full rounded-xl" />
                   </div>
+                </GlassCard>
+              );
+            }
+            if (slot.status === 'noCredits') {
+              return (
+                <GlassCard key={mealType} className="p-card-padding flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-bold text-on-surface">{MEAL_LABEL[mealType]}</p>
+                    <p className="text-sm text-on-surface-variant">
+                      Out of AI credits for today. Manual logging is always free.
+                    </p>
+                  </div>
+                  <Link
+                    to="/plan"
+                    className="shrink-0 py-2 px-4 rounded-xl border border-primary text-primary font-bold active:scale-95 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                  >
+                    Your plan
+                  </Link>
                 </GlassCard>
               );
             }

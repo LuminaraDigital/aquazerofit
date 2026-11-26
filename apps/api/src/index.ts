@@ -19,6 +19,7 @@ import {
 } from './platform/bootGuards';
 import { warnIfBotProtectionUnconfigured } from './platform/botProtection';
 import { describeStoreInitFailure, getStore, initStore } from './platform/store';
+import { attachAiBudgetStore } from './platform/aiBudget';
 import { sweepExpiredDeletions } from './modules/me/service';
 import { sweepIdempotencyRecords } from './modules/logs/service';
 import { recoverStuckVisionJobs, sweepVisionArtifacts } from './modules/vision/router';
@@ -59,6 +60,7 @@ warnIfNoAiProviderConfigured();
 // and alerts on a legible failure instead of a silent crash.
 try {
   await initStore();
+  attachAiBudgetStore(getStore());
 } catch (err) {
   console.error(`[fatal] store initialisation failed: ${describeStoreInitFailure(err)}`);
   console.error(err);

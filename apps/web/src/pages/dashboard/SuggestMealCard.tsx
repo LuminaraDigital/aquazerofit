@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useToast } from '@/components/ui/Toast';
 import { trackFirstValueMeal } from '@/lib/retention';
@@ -34,7 +34,12 @@ export function SuggestMealCard({ date }: { date: string }) {
         show('Could not read the suggestion. Please try again');
       }
     },
-    onError: () => show('Suggestion unavailable right now'),
+    onError: (e) =>
+      show(
+        e instanceof ApiError && e.code === 'CREDITS_INSUFFICIENT'
+          ? e.message
+          : 'Suggestion unavailable right now',
+      ),
   });
 
   const addToLog = useMutation({

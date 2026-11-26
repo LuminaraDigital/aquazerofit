@@ -6,7 +6,7 @@ export const ANDROID_PLAY_STORE_URL =
 export function joinChallengeUrl(code: string): string {
   const normalised = code.trim().toUpperCase();
   const origin =
-    typeof window !== 'undefined' ? window.location.origin : 'https://app.aquazero.fit';
+    typeof window !== 'undefined' ? window.location.origin : 'https://aquazerofit.com';
   return `${origin}/challenges?code=${encodeURIComponent(normalised)}`;
 }
 

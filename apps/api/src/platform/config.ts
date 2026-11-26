@@ -602,6 +602,34 @@ export const config = {
     return (raw || 'http://localhost:5173').replace(/\/+$/, '');
   },
 
+  /** Parsed APP_PUBLIC_URL when explicitly configured, or null when unset/invalid. */
+  get configuredPublicOrigin(): URL | null {
+    const raw = process.env.APP_PUBLIC_URL?.trim();
+    if (!raw) return null;
+    try {
+      return new URL(raw);
+    } catch {
+      return null;
+    }
+  },
+
+  /** Lowercased hostnames allowed as HTTPS redirect targets when APP_PUBLIC_URL is set. */
+  get allowedHttpsRedirectHosts(): ReadonlySet<string> {
+    const canonical = this.configuredPublicOrigin;
+    if (!canonical) return new Set();
+    const allowed = new Set<string>([canonical.host.toLowerCase()]);
+    if (process.env.CORS_ORIGINS) {
+      for (const origin of this.corsOrigins) {
+        try {
+          allowed.add(new URL(origin).host.toLowerCase());
+        } catch {
+          /* ignore malformed CORS_ORIGINS entry */
+        }
+      }
+    }
+    return allowed;
+  },
+
   /**
    * Mailbox named on the legal pages and in /paysupport. The rule lives in
    * resolveSupportEmail: a blank value falls through to info@luminara.digital.

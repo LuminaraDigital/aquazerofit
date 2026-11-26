@@ -53,8 +53,8 @@ services:
     # read/write exceptions on top of the read-only root.
     read_only: true
     tmpfs:
-      - /tmp:size=100M,mode=1777
-      - /var/run:size=10M,mode=1777
+      - /tmp:size=100M,mode=1777,noexec,nosuid,nodev
+      - /var/run:size=10M,mode=1777,noexec,nosuid,nodev
     security_opt:
       # Prevent any process from gaining more privileges (setuid, file caps).
       - no-new-privileges:true
@@ -70,7 +70,7 @@ services:
     # enforcement would silently vanish on a plain docker compose up.
     pids_limit: 256
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 3s
       start_period: 15s
@@ -84,8 +84,8 @@ services:
     # Pinned by digest (postgres:16-alpine, resolved 2026-08-17).
     # Rotate at deploy: docker buildx imagetools inspect postgres:16-alpine
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
-    env_file:
-      - .env
+    # Do not mount .env via env_file here: API secrets (JWT, LLM, payment keys)
+    # must never enter the database container. POSTGRES_* below interpolate from .env.
     environment:
       - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required - set it in .env}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required - set it in .env}

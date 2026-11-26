@@ -92,6 +92,7 @@ import fit.aquazero.app.core.ui.NutritionFormat
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.Executor
 import androidx.compose.ui.tooling.preview.Preview as ComposePreview
 
@@ -124,6 +125,17 @@ fun CaptureMealScreen(
     var surfaceRequest by remember { mutableStateOf<SurfaceRequest?>(null) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var camera by remember { mutableStateOf<Camera?>(null) }
+    val inFlightCaptures = remember { mutableSetOf<File>() }
+    var screenDisposed by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            screenDisposed = true
+            val pending = inFlightCaptures.toList()
+            inFlightCaptures.clear()
+            pending.forEach { file -> runCatching { file.delete() } }
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -247,17 +259,31 @@ fun CaptureMealScreen(
             },
             onShutter = {
                 val capture = imageCapture ?: return@CaptureOverlay
-                val target = File(context.cacheDir, "capture-${System.currentTimeMillis()}.jpg")
+                val target = File(
+                    context.cacheDir,
+                    "capture-${System.currentTimeMillis()}-${UUID.randomUUID()}.jpg",
+                )
+                inFlightCaptures.add(target)
                 capture.takePicture(
                     ImageCapture.OutputFileOptions.Builder(target).build(),
                     ContextCompat.getMainExecutor(context),
                     object : ImageCapture.OnImageSavedCallback {
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                            viewModel.onPhotoChosen(Uri.fromFile(target), target.name)
+                            inFlightCaptures.remove(target)
+                            if (screenDisposed) {
+                                runCatching { target.delete() }
+                                return
+                            }
+                            viewModel.onPhotoChosen(
+                                uri = Uri.fromFile(target),
+                                displayName = target.name,
+                                ephemeralSource = target,
+                            )
                         }
 
                         override fun onError(exception: ImageCaptureException) {
-                            target.delete()
+                            inFlightCaptures.remove(target)
+                            runCatching { target.delete() }
                             viewModel.onShutterFailed()
                         }
                     },

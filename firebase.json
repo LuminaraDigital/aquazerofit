@@ -49,6 +49,10 @@
           {
             "key": "Permissions-Policy",
             "value": "camera=(self), microphone=(), geolocation=(), interest-cohort=()"
+          },
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; script-src 'self' https://telegram.org https://*.telegram.org https://challenges.cloudflare.com https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; frame-src 'self' https://challenges.cloudflare.com https://*.firebaseapp.com https://accounts.google.com https://www.google.com; connect-src 'self' https://aquazerofit-api-592686987043.australia-southeast1.run.app https://challenges.cloudflare.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com https://firebase.googleapis.com https://www.googleapis.com https://www.google.com https://www.gstatic.com https://tganalytics.xyz; worker-src 'none'; media-src 'self' blob:; frame-ancestors 'self' https://web.telegram.org https://*.telegram.org; object-src 'none'; base-uri 'self'; form-action 'self'"
           }
         ]
       }

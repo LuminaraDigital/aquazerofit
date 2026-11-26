@@ -98,4 +98,14 @@ describe('firebasePasswords REST gateway', () => {
     ).rejects.toMatchObject({ code: 'INTERNAL' });
     await expect(firebasePasswords()!.setPassword('uid', 'pw')).rejects.toMatchObject({ code: 'INTERNAL' });
   });
+
+  it('maps raw Admin SDK failures in setPassword to INTERNAL AppError', async () => {
+    adminAuth.current = {
+      updateUser: vi.fn().mockRejectedValueOnce(new Error('auth/internal-error')),
+    };
+    await expect(firebasePasswords()!.setPassword('uid-1', 'pw')).rejects.toMatchObject({
+      code: 'INTERNAL',
+      message: 'Sign-in is unavailable right now. Please try again.',
+    });
+  });
 });

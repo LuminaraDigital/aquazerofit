@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { timezoneSchema, type User, type UserRole, type UserTier } from '@aquazerofit/shared';
+import { clientIpForRateLimit } from './clientIp';
 import { config } from './config';
 import { timezoneOf } from './dates';
 import { AppError } from './errors';
@@ -319,8 +320,8 @@ export const requireAuth: RequestHandler = (req: Request, _res: Response, next: 
       if (firebaseIdentity) {
         // Dynamic import avoids a load-time cycle: this module is imported by
         // auth/service, and firebaseUsers imports helpers from auth/service.
-        const { ensureUserFromFirebase } = await import('../modules/auth/firebaseUsers');
-        const user = ensureUserFromFirebase(firebaseIdentity, req.ip);
+        const { ensureUserFromFirebaseAsync } = await import('../modules/auth/firebaseUsers');
+        const user = await ensureUserFromFirebaseAsync(firebaseIdentity, clientIpForRateLimit(req));
         if (!isUserDocument(user)) {
           throw new AppError('AUTH_INVALID', 'Account no longer exists');
         }

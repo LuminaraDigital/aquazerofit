@@ -13,16 +13,6 @@
 import type { FirebaseApp, FirebaseOptions } from 'firebase/app';
 import type { Auth, User as FirebaseUser } from 'firebase/auth';
 
-export const firebaseConfig: FirebaseOptions = {
-  apiKey: 'AIzaSyCA04-nC_Rple5xoGAOzwm1jRlyOCSUnLA',
-  authDomain: 'aquazerofit.firebaseapp.com',
-  projectId: 'aquazerofit',
-  storageBucket: 'aquazerofit.firebasestorage.app',
-  messagingSenderId: '592686987043',
-  appId: '1:592686987043:web:be6c7d84103ebb3d697e96',
-  measurementId: 'G-900GD16689',
-};
-
 function readConfig(): FirebaseOptions | null {
   const apiKey = String(import.meta.env.VITE_FIREBASE_API_KEY ?? '').trim();
   const appId = String(import.meta.env.VITE_FIREBASE_APP_ID ?? '').trim();
@@ -64,6 +54,7 @@ export interface FirebaseSdk {
     password: string,
   ) => Promise<{ user: FirebaseUser }>;
   sendPasswordResetEmail: (auth: Auth, email: string) => Promise<void>;
+  sendEmailVerification: (user: FirebaseUser) => Promise<void>;
   signOut: (auth: Auth) => Promise<void>;
   updateProfile: (user: FirebaseUser, profile: { displayName?: string }) => Promise<void>;
 }
@@ -81,6 +72,7 @@ const emptySdk = (): FirebaseSdk => ({
   sendPasswordResetEmail: async () => {
     throw new Error('Firebase Auth is not configured');
   },
+  sendEmailVerification: async () => {},
   signOut: async () => {},
   updateProfile: async () => {},
 });
@@ -130,6 +122,7 @@ export function loadFirebaseSdk(): Promise<FirebaseSdk> {
       signInWithEmailAndPassword: authMod.signInWithEmailAndPassword,
       createUserWithEmailAndPassword: authMod.createUserWithEmailAndPassword,
       sendPasswordResetEmail: authMod.sendPasswordResetEmail,
+      sendEmailVerification: authMod.sendEmailVerification,
       signOut: authMod.signOut,
       updateProfile: authMod.updateProfile,
     };

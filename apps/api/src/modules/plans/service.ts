@@ -40,6 +40,7 @@ import { assessReadiness } from './readiness';
  */
 import { creditLedger, settleReservation } from '../ai/creditLedger';
 import { tierOf } from '../billing/entitlements';
+import { hasConsent } from '../me/service';
 
 const EXPERIENCE_RANK: Record<ExerciseExperience, number> = {
   beginner: 0,
@@ -624,12 +625,14 @@ export async function generatePlanForUser(
   const readiness = assessReadiness(userId, startDate);
 
   // P-05: give the AI lane first pass over the same pre-filtered pool the
-  // deterministic engine uses. The draft is zod- and contract-validated; any
-  // failure falls back to buildPlan unchanged.
+  // deterministic engine uses — ONLY when the user has consented to
+  // aiPersonalisation (the request sends profile details to the model).
+  // Without consent, or on any failure, the deterministic buildPlan answers
+  // without reserving credits.
   let plan: TrainingPlan | null = null;
   /** Set only when a real provider produced a plan we kept — the commit case. */
   let billableAi = false;
-  const engine = await loadPlanEngine();
+  const engine = hasConsent(userId, 'aiPersonalisation') ? await loadPlanEngine() : null;
 
   /*
    * The hold is taken HERE — inside the service, immediately before the model

@@ -276,7 +276,7 @@ export async function register(
     role: 'user',
     tier: 'free',
     displayName,
-    ...(firebaseUid ? { firebaseUid } : {}),
+    ...(firebaseUid ? { firebaseUid, firebasePassword: true } : {}),
     createdAt: new Date().toISOString(),
     deletionRequestedAt: null,
   };
@@ -348,8 +348,11 @@ async function loginThroughFirebase(
   if (!identity) throw new AppError('INTERNAL', 'Sign-in is unavailable right now. Please try again.');
   loginFailures.delete(emailKey);
   // Dynamic: firebaseUsers imports helpers from this module.
-  const { ensureUserFromFirebase } = await import('./firebaseUsers');
-  const user = ensureUserFromFirebase(identity, ip);
+  const { ensureUserFromFirebaseAsync } = await import('./firebaseUsers');
+  const user = await ensureUserFromFirebaseAsync(
+    { ...identity, signInProvider: identity.signInProvider ?? 'password' },
+    ip,
+  );
   auditAuthEvent(user.id, 'login', { method: 'firebase' }, ip);
   return tokensFor(user);
 }
@@ -374,21 +377,42 @@ async function moveCredentialsToFirebase(
   if (!user) return;
   try {
     let uid = user.firebaseUid;
+    let provedVerified = false;
     if (uid) {
       await passwords.setPassword(uid, password);
     } else {
-      uid =
-        (await passwords.create({ email: user.email, password, displayName: user.displayName })) ??
-        (await unlinkedFirebaseUid(passwords, user, password));
+      const createdUid = await passwords.create({
+        email: user.email,
+        password,
+        displayName: user.displayName,
+      });
+      if (createdUid) {
+        uid = createdUid;
+      } else {
+        const existing = await unlinkedFirebaseUid(passwords, user, password);
+        if (existing) {
+          uid = existing.uid;
+          provedVerified = existing.emailVerified;
+        }
+      }
     }
     if (!uid) {
       auditAuthEvent(user.id, 'firebase.move.conflict', { emailHash: hashIdentifier(user.email) }, ip);
       return;
     }
-    store.upsert('users', { ...user, firebaseUid: uid });
+    const nextEmailVerified = user.emailVerified || provedVerified;
+    const migratedFromBcrypt =
+      !nextEmailVerified && user.tgId !== undefined ? true : user.migratedFromBcrypt;
+    store.upsert('users', {
+      ...user,
+      firebaseUid: uid,
+      firebasePassword: true,
+      emailVerified: nextEmailVerified,
+      ...(migratedFromBcrypt !== undefined ? { migratedFromBcrypt } : {}),
+    });
     store.delete('users', credentialsId(user.id));
     auditAuthEvent(user.id, 'firebase.move', { emailHash: hashIdentifier(user.email) }, ip);
-    if (!user.emailVerified) sendVerificationMail(passwords, user.email, password);
+    if (!nextEmailVerified) sendVerificationMail(passwords, user.email, password);
   } catch (err) {
     console.error(
       `[auth] moving credentials to Firebase failed for ${hashIdentifier(user.email)}:`,
@@ -397,18 +421,20 @@ async function moveCredentialsToFirebase(
   }
 }
 
-/** The uid of the Firebase account this password opens, if no one else holds it. */
+/** The uid and verification state of the Firebase account this password opens, if no one else holds it. */
 async function unlinkedFirebaseUid(
   passwords: FirebasePasswords,
   user: User,
   password: string,
-): Promise<string | undefined> {
+): Promise<{ uid: string; emailVerified: boolean } | undefined> {
   const idToken = await passwords.signIn(user.email, password);
   const identity = idToken ? await verifyFirebaseIdToken(idToken) : null;
   if (!identity) return undefined;
   const { findUserByFirebaseUid } = await import('./firebaseUsers');
   const holder = findUserByFirebaseUid(identity.uid);
-  return holder && holder.id !== user.id ? undefined : identity.uid;
+  return holder && holder.id !== user.id
+    ? undefined
+    : { uid: identity.uid, emailVerified: identity.emailVerified };
 }
 
 export function refresh(refreshToken: string, ip?: string): Promise<AuthResponse> {
@@ -644,7 +670,7 @@ export async function setCredentials(
   if (!user || !isUserDoc(user)) throw new AppError('NOT_FOUND', 'Account not found');
   assertFirebaseEmailProved(user);
 
-  if (store.byId<CredentialsDoc>('users', credentialsId(userId))) {
+  if (store.byId<CredentialsDoc>('users', credentialsId(userId)) || user.firebasePassword === true) {
     throw new AppError(
       'CONFLICT',
       'This account already has a password. Use "Forgot password" to change it.',
@@ -658,6 +684,28 @@ export async function setCredentials(
   }
 
   const emailChanged = email !== user.email.trim().toLowerCase();
+  const passwords = firebasePasswords();
+
+  if (user.firebaseUid) {
+    if (emailChanged) {
+      throw new AppError(
+        'CONFLICT',
+        'Use your existing email address to add a password to this account.',
+      );
+    }
+    if (!passwords) {
+      throw new AppError(
+        'CONFLICT',
+        'Use your connected sign-in provider to access this account.',
+      );
+    }
+    await passwords.setPassword(user.firebaseUid, input.password);
+    const withPassword: User = { ...user, firebasePassword: true };
+    store.upsert('users', withPassword);
+    auditAuthEvent(userId, 'credentials.set', { emailHash: hashIdentifier(email) }, ip);
+    return toPublicUser(withPassword);
+  }
+
   const updated: User = {
     ...user,
     email,
@@ -674,6 +722,31 @@ export async function setCredentials(
     // Until then, register returns CONFLICT while this row holds the address.
     emailVerified: emailChanged ? false : user.emailVerified,
   };
+
+  if (passwords) {
+    const firebaseUid = await passwords.create({
+      email,
+      password: input.password,
+      displayName: user.displayName,
+    });
+    if (firebaseUid === null) {
+      throw new AppError('CONFLICT', 'An account already exists for this email address');
+    }
+    const validAfter = await passwords.tokensValidAfter(firebaseUid).catch(() => null);
+    const withFirebase: User = {
+      ...updated,
+      firebaseUid,
+      firebasePassword: true,
+      ...(typeof user.tgId === 'number' && !updated.emailVerified
+        ? { telegramCredentialsValidAfter: validAfter ?? Date.now() }
+        : {}),
+    };
+    store.upsert('users', withFirebase);
+    auditAuthEvent(userId, 'credentials.set', { emailHash: hashIdentifier(email) }, ip);
+    sendVerificationMail(passwords, email, input.password);
+    return toPublicUser(withFirebase);
+  }
+
   store.upsert('users', updated);
   store.upsert('users', {
     id: credentialsId(userId),

@@ -21,6 +21,7 @@ interface FakeAccount {
   password: string;
   emailVerified: boolean;
   displayName?: string;
+  signInProvider?: string;
 }
 
 /** Firebase Auth as the API sees it: accounts by email, ID tokens by uid. */
@@ -99,6 +100,7 @@ vi.mock('../platform/firebaseAdmin', () => ({
       email: account.email,
       emailVerified: account.emailVerified,
       name: account.displayName,
+      signInProvider: account.signInProvider ?? (account.password ? 'password' : 'google.com'),
     };
   },
   getFirebaseAuth: () => null,
@@ -110,7 +112,8 @@ vi.mock('../platform/firebaseAdmin', () => ({
 const { createApp } = await import('../app');
 const { getStore, newId } = await import('../platform/store');
 const { credentialsId } = await import('../modules/me/service');
-const { resetLoginFailures, findUserByEmail } = await import('../modules/auth/service');
+const { resetLoginFailures, resetTelegramNewAccountLimits, findUserByEmail } = await import('../modules/auth/service');
+const { signTelegramInitData } = await import('../modules/auth/telegram');
 const { setFirebasePasswordsForTests } = await import('../modules/auth/firebasePasswords');
 const app = createApp();
 const base = '/api/v1';
@@ -160,6 +163,7 @@ async function requestReset(email: string) {
 beforeEach(() => {
   setFirebasePasswordsForTests(gateway);
   resetLoginFailures();
+  resetTelegramNewAccountLimits();
   firebase.failNext = false;
   firebase.validAfterFails = false;
 });
@@ -496,5 +500,252 @@ describe('with Firebase-held passwords off', () => {
     expect(user.firebaseUid).toBeUndefined();
     expect(hasCredentials(user.id)).toBe(true);
     expect(firebase.accounts.has(email)).toBe(false);
+  });
+});
+
+describe('Firebase password regressions (hasPassword, /me/credentials, legacy Telegram preservation)', () => {
+  const tgInitData = (tgId: number) =>
+    signTelegramInitData({
+      auth_date: String(Math.floor(Date.now() / 1000)),
+      query_id: `AA-fbpw-${tgId}`,
+      user: JSON.stringify({ id: tgId, first_name: 'Tess', username: `tess_${tgId}` }),
+    });
+
+  it('reports hasPassword: true after Firebase register and after bcrypt migration', async () => {
+    const regEmail = nextEmail();
+    const reg = await request(app)
+      .post(`${base}/auth/register`)
+      .send({ email: regEmail, password: PASSWORD, displayName: 'Ada' });
+    expect(reg.status).toBe(201);
+    expect(reg.body.user.hasPassword).toBe(true);
+    const regMe = await request(app)
+      .get(`${base}/me`)
+      .set('Authorization', `Bearer ${reg.body.accessToken}`);
+    expect(regMe.status).toBe(200);
+    expect(regMe.body.user.hasPassword).toBe(true);
+
+    const migEmail = nextEmail();
+    legacyUser(migEmail, PASSWORD);
+    const migrated = await login(migEmail, PASSWORD);
+    expect(migrated.status).toBe(200);
+    expect(migrated.body.user.hasPassword).toBe(true);
+    const migMe = await request(app)
+      .get(`${base}/me`)
+      .set('Authorization', `Bearer ${migrated.body.accessToken}`);
+    expect(migMe.status).toBe(200);
+    expect(migMe.body.user.hasPassword).toBe(true);
+  });
+
+  it('rejects POST /me/credentials with 409 for an existing Firebase account', async () => {
+    const email = nextEmail();
+    const reg = await request(app)
+      .post(`${base}/auth/register`)
+      .send({ email, password: PASSWORD, displayName: 'Ada' });
+    expect(reg.status).toBe(201);
+    // Dev marks local emailVerified true so assertFirebaseEmailProved passes and
+    // the 409 existing-account check is what fires.
+    const res = await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', `Bearer ${reg.body.accessToken}`)
+      .send({ email: nextEmail(), password: 'BrandNew9Password' });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('CONFLICT');
+    expect(res.body.message).toMatch(/already has a password/i);
+    expect(hasCredentials(reg.body.user.id as string)).toBe(false);
+  });
+
+  it('creates a Firebase password (no local bcrypt) when a Telegram user calls POST /me/credentials', async () => {
+    const tg = await request(app)
+      .post(`${base}/auth/telegram`)
+      .send({ initData: tgInitData(980001) });
+    expect(tg.status).toBe(200);
+    expect(tg.body.user.hasPassword).toBe(false);
+
+    const email = nextEmail();
+    const set = await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', `Bearer ${tg.body.accessToken}`)
+      .send({ email, password: PASSWORD });
+    expect(set.status).toBe(200);
+    expect(set.body.user.hasPassword).toBe(true);
+    expect(set.body.user.email).toBe(email);
+    expect(set.body.user.emailVerified).toBe(false);
+
+    const stored = getStore().byId<User>('users', tg.body.user.id as string)!;
+    const fbAccount = firebase.accounts.get(email);
+    expect(fbAccount).toBeDefined();
+    expect(stored.firebaseUid).toBe(fbAccount!.uid);
+    expect(stored.firebasePassword).toBe(true);
+    expect(hasCredentials(stored.id)).toBe(false);
+    await vi.waitFor(() => expect(firebase.verifications).toContain(email));
+
+    // A second Telegram user cannot claim an email Firebase already holds.
+    const tg2 = await request(app)
+      .post(`${base}/auth/telegram`)
+      .send({ initData: tgInitData(980002) });
+    const conflict = await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', `Bearer ${tg2.body.accessToken}`)
+      .send({ email, password: PASSWORD });
+    expect(conflict.status).toBe(409);
+    expect(conflict.body.code).toBe('CONFLICT');
+  });
+
+  it('preserves a pre-existing Telegram link when a migrated legacy bcrypt user verifies their email', async () => {
+    const email = nextEmail();
+    const user = legacyUser(email, PASSWORD);
+    getStore().upsert('users', { ...user, tgId: 980010, tgUsername: 'legacy_tg' });
+
+    // First login moves the bcrypt password into Firebase (unverified) and sets migratedFromBcrypt.
+    const moved = await login(email, PASSWORD);
+    expect(moved.status).toBe(200);
+    const afterMove = getStore().byId<User>('users', user.id)!;
+    expect(afterMove.firebaseUid).toBeDefined();
+    expect(afterMove.firebasePassword).toBe(true);
+    expect(afterMove.emailVerified).toBe(false);
+    expect(afterMove.migratedFromBcrypt).toBe(true);
+    expect(afterMove.tgId).toBe(980010);
+
+    // Later, the user clicks the verification link and signs in via Firebase.
+    firebase.accounts.get(email)!.emailVerified = true;
+    const proved = await login(email, PASSWORD);
+    expect(proved.status).toBe(200);
+    expect(proved.body.user.emailVerified).toBe(true);
+    expect(proved.body.user.telegramLinked).toBe(true);
+    expect(proved.body.user.hasPassword).toBe(true);
+
+    const afterProof = getStore().byId<User>('users', user.id)!;
+    expect(afterProof.tgId).toBe(980010);
+    expect(afterProof.tgUsername).toBe('legacy_tg');
+    expect(afterProof.migratedFromBcrypt).toBeUndefined();
+
+    const events = getStore().where<{ id: string; userId?: string; action?: string; detail?: Record<string, unknown> }>(
+      'audit',
+      (d) => d.userId === user.id && d.action === 'firebase.email.proved',
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0]?.detail).toMatchObject({ droppedPassword: false, droppedTelegram: false });
+  });
+
+  it('marks emailVerified immediately and skips verification mail when linking an already-verified Firebase account', async () => {
+    const email = nextEmail();
+    const user = legacyUser(email, PASSWORD);
+    firebase.add(email, PASSWORD, true);
+    const beforeCount = firebase.verifications.filter((e) => e === email).length;
+
+    const res = await login(email, PASSWORD);
+    expect(res.status).toBe(200);
+    expect(res.body.user.emailVerified).toBe(true);
+    expect(res.body.user.hasPassword).toBe(true);
+    expect(firebase.verifications.filter((e) => e === email)).toHaveLength(beforeCount);
+    expect(getStore().byId<User>('users', user.id)!.migratedFromBcrypt).toBeUndefined();
+  });
+
+  it('preserves tgId when a Telegram user verifies email via password after POST /me/credentials', async () => {
+    const tg = await request(app)
+      .post(`${base}/auth/telegram`)
+      .send({ initData: tgInitData(980020) });
+    expect(tg.status).toBe(200);
+    const email = nextEmail();
+
+    const set = await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', `Bearer ${tg.body.accessToken}`)
+      .send({ email, password: PASSWORD });
+    expect(set.status).toBe(200);
+    expect(set.body.user.telegramLinked).toBe(true);
+    expect(set.body.user.emailVerified).toBe(false);
+
+    // Owner clicks Firebase verification link and signs in with the same password.
+    firebase.accounts.get(email)!.emailVerified = true;
+    const proved = await login(email, PASSWORD);
+    expect(proved.status).toBe(200);
+    expect(proved.body.user.emailVerified).toBe(true);
+    expect(proved.body.user.telegramLinked).toBe(true);
+    expect(proved.body.user.hasPassword).toBe(true);
+    const stored = getStore().byId<User>('users', tg.body.user.id as string)!;
+    expect(stored.tgId).toBe(980020);
+    expect(stored.telegramCredentialsValidAfter).toBeUndefined();
+  });
+
+  it('drops a squatter tgId when the real mailbox owner recovers via password reset or Google OAuth', async () => {
+    // Case A: victim resets password after squatter called POST /me/credentials
+    const tgSquat = await request(app)
+      .post(`${base}/auth/telegram`)
+      .send({ initData: tgInitData(980021) });
+    const emailA = nextEmail();
+    await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', `Bearer ${tgSquat.body.accessToken}`)
+      .send({ email: emailA, password: PASSWORD });
+
+    const accA = firebase.accounts.get(emailA)!;
+    accA.emailVerified = true;
+    changePasswordInFirebase(emailA, 'VictimReset9Password');
+    const recoveredA = await login(emailA, 'VictimReset9Password');
+    expect(recoveredA.status).toBe(200);
+    expect(recoveredA.body.user.emailVerified).toBe(true);
+    expect(recoveredA.body.user.telegramLinked).toBe(false);
+    expect(getStore().byId<User>('users', tgSquat.body.user.id as string)!.tgId).toBeUndefined();
+
+    // Case B: victim signs in via Google OAuth (signInProvider = 'google.com')
+    const tgSquatB = await request(app)
+      .post(`${base}/auth/telegram`)
+      .send({ initData: tgInitData(980022) });
+    const emailB = nextEmail();
+    await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', `Bearer ${tgSquatB.body.accessToken}`)
+      .send({ email: emailB, password: PASSWORD });
+
+    const accB = firebase.accounts.get(emailB)!;
+    accB.emailVerified = true;
+    accB.signInProvider = 'google.com';
+    const recoveredB = await request(app)
+      .post(`${base}/auth/firebase/session`)
+      .set('Authorization', `Bearer idt:${accB.uid}`)
+      .send({});
+    expect(recoveredB.status).toBe(200);
+    expect(recoveredB.body.user.emailVerified).toBe(true);
+    expect(recoveredB.body.user.telegramLinked).toBe(false);
+  });
+
+  it('sets hasPassword: true on web password sign-in and lets Google-only users add a password on their own email', async () => {
+    // Web email/password account hydrating via /auth/firebase/session
+    const webEmail = nextEmail();
+    const webAcc = firebase.add(webEmail, PASSWORD, true);
+    const webRes = await request(app)
+      .post(`${base}/auth/firebase/session`)
+      .set('Authorization', `Bearer idt:${webAcc.uid}`)
+      .send({});
+    expect(webRes.status).toBe(200);
+    expect(webRes.body.user.hasPassword).toBe(true);
+
+    // Google-only Firebase user has hasPassword: false and can attach a password on the same email only
+    const googleEmail = nextEmail();
+    const googleAcc = firebase.add(googleEmail, '', true);
+    googleAcc.signInProvider = 'google.com';
+    const gToken = await request(app)
+      .post(`${base}/auth/firebase/token`)
+      .set('Authorization', `Bearer idt:${googleAcc.uid}`)
+      .send({});
+    expect(gToken.status).toBe(200);
+    expect(gToken.body.user.hasPassword).toBe(false);
+
+    // Changing email is refused (409)
+    const wrongEmail = await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', `Bearer ${gToken.body.accessToken}`)
+      .send({ email: nextEmail(), password: PASSWORD });
+    expect(wrongEmail.status).toBe(409);
+
+    // Same verified email attaches Firebase password cleanly
+    const sameEmail = await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', `Bearer ${gToken.body.accessToken}`)
+      .send({ email: googleEmail, password: PASSWORD });
+    expect(sameEmail.status).toBe(200);
+    expect(sameEmail.body.user.hasPassword).toBe(true);
+    expect(googleAcc.password).toBe(PASSWORD);
   });
 });

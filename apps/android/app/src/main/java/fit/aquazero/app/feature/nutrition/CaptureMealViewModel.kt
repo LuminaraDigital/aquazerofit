@@ -14,13 +14,18 @@ import fit.aquazero.app.core.model.MealType
 import fit.aquazero.app.core.sync.MealPhotoUploadScheduler
 import fit.aquazero.app.core.sync.MealPhotoUploadWorker
 import fit.aquazero.app.core.ui.NutritionFormat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
 /** Where the CAMERA runtime permission currently stands. */
@@ -115,7 +120,7 @@ class CaptureMealViewModel @Inject constructor(
 
     init {
         observeUploads()
-        viewModelScope.launch { visionRepository.sweepStaged() }
+        viewModelScope.launch(Dispatchers.IO) { visionRepository.sweepStaged() }
     }
 
     fun setMealType(mealType: MealType) {
@@ -143,26 +148,45 @@ class CaptureMealViewModel @Inject constructor(
     /**
      * A photo arrived (shutter or Photo Picker). It is validated against the
      * API's limits and re-encoded into the cache before anything else happens.
+     * When [ephemeralSource] is supplied (a raw CameraX capture carrying
+     * unstripped EXIF/GPS metadata), it is deleted once staging completes or
+     * cancels so raw captures are never left behind in `cacheDir`.
      */
-    fun onPhotoChosen(uri: Uri, displayName: String? = null) {
+    fun onPhotoChosen(
+        uri: Uri,
+        displayName: String? = null,
+        ephemeralSource: File? = null,
+    ) {
+        if (!viewModelScope.isActive) {
+            ephemeralSource?.let { file -> runCatching { file.delete() } }
+            return
+        }
         val previous = _state.value.staged?.path
         _state.value = _state.value.copy(preparing = true, banner = null)
         viewModelScope.launch {
-            when (val staged = visionRepository.stagePhoto(uri, displayName)) {
-                is StagedPhotoResult.Ready -> {
-                    visionRepository.discardStaged(previous)
-                    _state.value = _state.value.copy(
-                        preparing = false,
-                        staged = StagedPhoto(staged.file.absolutePath, staged.bytes),
-                        banner = null,
-                    )
-                }
+            try {
+                when (val staged = visionRepository.stagePhoto(uri, displayName)) {
+                    is StagedPhotoResult.Ready -> {
+                        visionRepository.discardStaged(previous)
+                        _state.value = _state.value.copy(
+                            preparing = false,
+                            staged = StagedPhoto(staged.file.absolutePath, staged.bytes),
+                            banner = null,
+                        )
+                    }
 
-                is StagedPhotoResult.Rejected -> {
-                    _state.value = _state.value.copy(
-                        preparing = false,
-                        banner = CaptureBanner(messageRes = staged.reason.messageRes()),
-                    )
+                    is StagedPhotoResult.Rejected -> {
+                        _state.value = _state.value.copy(
+                            preparing = false,
+                            banner = CaptureBanner(messageRes = staged.reason.messageRes()),
+                        )
+                    }
+                }
+            } finally {
+                if (ephemeralSource != null) {
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        runCatching { ephemeralSource.delete() }
+                    }
                 }
             }
         }

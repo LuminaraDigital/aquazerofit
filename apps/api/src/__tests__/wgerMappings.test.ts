@@ -166,4 +166,10 @@ describe('sanitizeWgerDescription', () => {
     const out = sanitizeWgerDescription('<SCRIPT>evil()</SCRIPT><style>body{display:none}</style>ok');
     expect(out).toBe('ok');
   });
+
+  it('strips entity-encoded HTML tags after decoding and ignores out-of-range numeric entities', () => {
+    expect(sanitizeWgerDescription('&lt;script&gt;alert(1)&lt;/script&gt;safe')).toBe('safe');
+    expect(sanitizeWgerDescription('&lt;img src=x onerror=alert(1)&gt;ok')).toBe('ok');
+    expect(sanitizeWgerDescription('&#x110000;&#999999999;ok')).toBe('ok');
+  });
 });

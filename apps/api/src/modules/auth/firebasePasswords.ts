@@ -108,7 +108,11 @@ function restGateway(key: string): FirebasePasswords {
     },
 
     async setPassword(uid, password) {
-      await adminAuth().updateUser(uid, { password });
+      try {
+        await adminAuth().updateUser(uid, { password });
+      } catch (err) {
+        throw err instanceof AppError ? err : new AppError('INTERNAL', UNAVAILABLE);
+      }
     },
 
     async sendPasswordReset(email) {

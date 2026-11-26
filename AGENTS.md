@@ -90,6 +90,12 @@ way — **nothing tool-specific is ever committed to this repository.** If a
 workflow seems to need a config file checked in, it does not; put it in your
 home directory.
 
+## Cursor Cloud specific instructions
+
+Cloud Agents install from the lockfile with `npm ci` (Node 20 or newer). On every boot the environment starts the API with `npm run api` (port 4000) and the web app with `npm run dev --workspace apps/web -- --host 0.0.0.0 --port 5173`. No `.env` and no provider keys are required: the API keeps the JSON store under `apps/api/.data` and the coach answers from the offline engine. Sign in with the seeded demo account documented in the README (`demo@aquazero.fit`). Before a pull request, run `npm run verify`.
+
+`apps/android` is not provisioned here. It needs an Android SDK, and `./gradlew` is not set up in this environment. Web and API work does not need it.
+
 ## Commits
 
 Imperative mood in the subject, and explain *why* in the body when the diff

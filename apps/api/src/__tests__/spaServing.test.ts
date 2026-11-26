@@ -59,9 +59,11 @@ describe('SPA hosting enabled', () => {
    * instead of waiting for the upgrade to fail.
    */
   it('registers the SPA fallback without a bare wildcard path', () => {
-    const app = createApp();
-    const stack = (app as unknown as { _router?: { stack: { route?: { path?: unknown } }[] } })
-      ._router?.stack;
+    const app = createApp() as unknown as {
+      _router?: { stack: { route?: { path?: unknown } }[] };
+      router?: { stack: { route?: { path?: unknown } }[] };
+    };
+    const stack = app._router?.stack ?? app.router?.stack;
     expect(stack).toBeDefined();
     const bareWildcards = stack!.filter((layer) => layer.route?.path === '*');
     expect(bareWildcards).toHaveLength(0);

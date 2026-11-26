@@ -6,8 +6,8 @@ masters, screen captures, Markdown) into the committed artefacts the app and
 the document set consume.
 
 Everything these scripts produce is committed. That is deliberate: neither the
-web build nor the Gradle build has an image pipeline, and the marked
-specification set is submitted as `.docx`. You run a tool when the *source*
+web build nor the Gradle build has an image pipeline, and the
+specification set is distributed as `.docx`. You run a tool when the *source*
 changes, then commit the result.
 
 Root-level npm scripts exist for each, so they are discoverable from
@@ -151,7 +151,7 @@ figure does not mean renumbering the ones after it.
 **House rule, enforced by the build:** no em dashes or en dashes outside fenced
 code blocks. Word autocorrect and pasted text reintroduce them constantly and
 they are banned in this document set, so the renderer fails with line numbers
-rather than let one reach a submitted file. Code fences are exempt, because a
+rather than let one reach a committed file. Code fences are exempt, because a
 document quoting source must quote it verbatim.
 
 Page numbers are fields filled by Word on *Update Field*, not guessed at build

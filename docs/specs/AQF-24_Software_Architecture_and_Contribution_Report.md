@@ -2,21 +2,19 @@
 logo: design/brand/AquaZeroFit(single_Logo).png
 brand: AquaZero
 tagline: AI Wellness Assistant
-unit: NIT3004 IT Capstone Project 2
 title: Software Architecture and Contribution Report
-subtitle: What the system does, how it is built, why it is built that way, and who owns each part
+subtitle: What the system does, how it is built, why it is built that way, and who maintains each part
 details:
   Document ID: AQF-24
   Project: AquaZeroFit, an AI-powered wellness platform (web and Telegram Mini App)
-  Document owner: Babatundji Williams-Fulwood (s8138393), Technical Lead and Software Architect
+  Document owner: Babatundji Williams-Fulwood, Technical Lead and Software Architect
   Contributors: Eric La, Victor Hong
-  Group: Group 15, Victoria University, Melbourne
+  Organisation: Luminara Digital
   System version: 1.0.0
   Baseline: repository branch main at commit c172b1b
   Automated tests at baseline: 770 passing (614 API, 156 web)
   Code listings: 122, verified byte-exact against the baseline
-  Status: Issued for supervisor and lecturer review
-  Supersedes: AquaZeroFit Architecture and Presentation Guide (docs/plans)
+  Status: Issued
   Related documents: AQF-05 Architecture Decision Records, AQF-07 API Contract, AQF-09 Low Level Design, AQF-11 Safety Privacy and Ethical Design
 ---
 
@@ -24,49 +22,49 @@ details:
 
 ## 1.1 What this report is
 
-This is the single reference document for AquaZeroFit. It explains what the product does, how the system is built, why each significant choice was made, and which team member owns each part. It replaces the separate presentation guide the team was previously working from.
+This is the single reference document for the AquaZeroFit software architecture. It explains what the product does, how the system is built, why each significant choice was made, and which engineer wrote and maintains each part.
 
-It is written to be read by three different people without needing three different versions:
+It is written to be read by three kinds of reader without needing three different versions:
 
-- a **lecturer or supervisor**, who needs to understand the product and judge the engineering without reading source code;
-- a **team member**, who needs to explain their own part confidently and follow their team mates' parts;
-- a **developer or senior reviewer**, who needs to check that the claims match the repository.
+- a **technical reviewer or partner**, who needs to understand the product and judge the engineering without reading source code;
+- a **new engineer**, who needs to understand the product, the architecture and the reasoning behind it before changing code;
+- a **maintainer**, who needs to check that the claims match the repository and to find the owner of each module.
 
 ## 1.2 Three reading paths
 
 | If you are | Read | You can skip |
 | :--- | :--- | :--- |
-| A lecturer or supervisor | Sections 2 to 6, then the *In plain English* and *Why it is built this way* paragraphs in sections 9 to 11, then sections 12 to 14 | Every code listing, and sections 7 and 8 |
-| A team member preparing to present | Section 2 to find your part, section 3 for the product summary, then your own subsection of 9, 10 or 11 in full, then section 15 | The other members' feature detail, on a first pass |
-| A developer or reviewer | Everything, in order | Nothing |
+| A technical reviewer or partner | Sections 2 to 6, then the *In plain English* and *Why it is built this way* paragraphs in sections 9 to 11, then sections 12 to 14 | Every code listing, and sections 7 and 8 |
+| A new engineer | Section 3 for the product summary, section 6 for the architecture, section 7 for the codebase map, then the feature sections for the area you are working in, in full, then sections 12 and 13 | The other areas' feature detail, on a first pass |
+| A maintainer checking claims against the repository | Everything, in order | Nothing |
 
-A lecturer who reads only sections 2 to 6 and the plain-English paragraphs will have a complete and accurate picture of the product and its engineering. That path is roughly forty minutes of reading.
+A reviewer who reads only sections 2 to 6 and the plain-English paragraphs will have a complete and accurate picture of the product and its engineering. That path is roughly forty minutes of reading.
 
-## 1.3 How to find your own part
+## 1.3 How to find the owner of a module
 
-Every feature in sections 9 to 11 is labelled with its owner in the heading, so you can find your material by scanning. The three owner sections are:
+Sections 9 to 11 each open with a **Module owner** line naming the engineer who wrote and maintains that area. The three area sections are:
 
-- **Section 9 belongs to Victor Hong** (nutrition and dietary system).
-- **Section 10 belongs to Eric La** (training and workout system).
-- **Section 11 belongs to Babatundji Williams-Fulwood** (platform, AI, safety, security, privacy, analytics and operations).
+- **Section 9** covers the nutrition and dietary system (module owner: Victor Hong).
+- **Section 10** covers the training and workout system (module owner: Eric La).
+- **Section 11** covers platform, AI, safety, security, privacy, analytics and operations (module owner: Babatundji Williams-Fulwood).
 
 Section 2 maps every module in the codebase to its owner, so nothing is unclaimed.
 
 ## 1.4 How each feature is documented
 
-Every feature in sections 9 to 11 uses the same six-part template, so any two features can be compared fairly and so each owner knows exactly what they are expected to be able to say.
+Every feature in sections 9 to 11 uses the same seven-part template, so any two features can be compared fairly and so a reader always knows where to find the reasoning, the code and the summary.
 
 | Heading | Purpose | Written for |
 | :--- | :--- | :--- |
-| In plain English | What the feature does, stated without jargon | Lecturer |
-| Why it is built this way | The reasoning, the rejected alternative, and the risk being managed | Lecturer and reviewer |
-| Where it lives | The files that implement it | Reviewer |
-| The code | A verbatim excerpt from the repository | Reviewer |
-| Talking points | Short prompts the owner speaks from, in their own words | Team member |
-| If asked | The question most likely to be put to the owner, with the answer | Team member |
+| In plain English | What the feature does, stated without jargon | Any reader |
+| Why it is built this way | The reasoning, the rejected alternative, and the risk being managed | Technical reviewers and engineers |
+| Where it lives | The files that implement it | Engineers |
+| The code | A verbatim excerpt from the repository | Engineers |
+| Key points | The facts that matter, in the order that explains the feature fastest | Engineers and partners |
+| Common questions | The question most likely to be put about the feature, with the answer | Engineers and partners |
 | One-line summary | The whole feature compressed to a single sentence | Everyone |
 
-The talking points are deliberately **not** a script. They are the facts, and the order to say them in. Speaking from prompts sounds like understanding; reading sentences aloud sounds like recitation, and a lecturer can tell the difference immediately.
+The key points are a short restatement for a reader who wants the substance without the full prose. The *Why it is built this way* section remains the reference.
 
 ## 1.5 How code is quoted, and how you can check it
 
@@ -76,40 +74,37 @@ This was checked mechanically rather than by eye. A script extracts every line o
 
 The document renderer was amended for this report so that fenced code blocks are exempt from the document set's dash style rule, because a report that quotes source verbatim must not silently rewrite it. Prose is still checked.
 
-## 1.6 Where this report sits, and two discrepancies to resolve
+## 1.6 Where this report sits
 
-This report is the architecture and contribution reference. It does not replace the API reference (AQF-07), the user manual (AQF-18), or the project-level decision register (AQF-05). Section 12 explains precisely how this report relates to AQF-05, including which of its records the shipped system has superseded.
+This report is the architecture reference. It does not replace the API reference (AQF-07), the user manual (AQF-18), or the project-level decision register (AQF-05). Section 12 explains precisely how this report relates to AQF-05, including which of its records the shipped system has superseded.
 
-Two inconsistencies were found in the existing document set while preparing this report. They are recorded here rather than quietly resolved, because only the team can say which is correct.
+# 2. Authorship And Module Ownership
 
-1. **Unit and project number.** AQF-05 states "NIT3003 IT Capstone Project, Project 5". AQF-16, the development diary, states "NIT3004 IT Capstone Project 2". This report follows AQF-16 as the more recent document. One of the two needs correcting before submission.
-2. **Group identifier.** AQF-05 states "Group 15". AQF-16 does not state a group number. This report follows AQF-05.
+## 2.1 Purpose of this section
 
-# 2. Contribution And Ownership Statement
+This section records who wrote and maintains each part of the system, so that a reader knows whom to ask about a module before reading its design. It is placed ahead of the technical content so that the owner of each area is known before the area is read.
 
-## 2.1 Why this section exists
+"Ownership" is used here in the engineering sense of authorship and maintenance responsibility. It makes no statement about legal rights in the code.
 
-A group capstone is assessed on individual contribution as well as on the product. This section states, without ambiguity, who owns what. It is placed before the technical content deliberately, so that a reader knows whose work they are reading before they start reading it.
+## 2.2 Basis of this record
 
-## 2.2 Basis of this statement
+This is a **declaration by the three contributors**, confirmed by each of them. That is stated plainly rather than implied, because the alternative would be to present an inference as a fact.
 
-This is a **declaration by the team**, confirmed by all three members. That is stated plainly rather than implied, because the alternative would be to present an inference as a fact.
+The repository's commit history was produced through a single shared account, so a commit log attributes every change to one identity and therefore cannot evidence individual authorship. Rather than infer authorship from a source that cannot support it, the contributors declare it directly. Each contributor is the first point of contact for questions about, changes to and maintenance of every module listed against their name in section 2.4.
 
-The repository's commit history was produced through a single shared account, so a commit log attributes every change to one identity and therefore cannot evidence individual authorship. Rather than infer authorship from a source that cannot support it, the team declares ownership directly. Each member is accountable for explaining, defending and maintaining every module listed against their name in section 2.4.
-
-Discipline roles were recorded earlier in the project, in AQF-05, and are reproduced here so that the two documents agree rather than appearing to contradict each other.
+Discipline roles are recorded in AQF-05 and are reproduced here so that the two documents agree rather than appearing to contradict each other.
 
 ## 2.3 Roles and module ownership are two different things
 
-The team has both, they are complementary, and confusing them is the most likely way for a reader to think the documents disagree.
+Contributors hold both, they are complementary, and confusing them is the most likely way for a reader to think the documents disagree.
 
-| Member | Discipline role (recorded in AQF-05) | Module ownership (this report) |
+| Contributor | Discipline role (recorded in AQF-05) | Module ownership (this report) |
 | :--- | :--- | :--- |
 | Babatundji Williams-Fulwood | Technical Lead and Software Architect | Platform, AI gateway, safety, authentication, privacy, memory, progress analytics, gamification, payments, growth, operations |
 | Eric La | Frontend | Training and workout system, end to end |
 | Victor Hong | Data and Quality | Nutrition and dietary system, end to end |
 
-The **discipline role** describes the kind of work a member led across the project. The **module ownership** describes the vertical slices of the product each member is accountable for in this report and in the presentation. A member's module ownership includes the client screens, the API endpoints, the domain logic and the tests for that slice, regardless of discipline.
+The **discipline role** describes the kind of work a contributor led across the project. The **module ownership** describes the vertical slices of the product each contributor authored and maintains. A contributor's module ownership includes the client screens, the API endpoints, the domain logic and the tests for that slice, regardless of discipline.
 
 ## 2.4 Ownership map
 
@@ -145,27 +140,13 @@ Every source module in the repository appears exactly once in this table. Nothin
 | `packages/shared` (types, schemas, constants, gamification, coaches) | Babatundji Williams-Fulwood | 11.10, and used throughout |
 | `modules/admin`, deployment configuration | Babatundji Williams-Fulwood | 11.12 |
 
-## 2.5 What each member is expected to be able to answer
+## 2.5 Shared material
 
-This is the standard each member holds themselves to, and it is stated here so that a lecturer knows what to test.
-
-For every module listed against your name you should be able to answer, without notes:
-
-1. What does it do, in one sentence a non-developer would understand?
-2. What was the alternative, and why was it rejected?
-3. Where does it live in the codebase?
-4. What breaks if it is wrong, and what stops that happening?
-5. What is its known limitation?
-
-Sections 9 to 11 give you all five answers for every feature you own. Section 13 gives you the honest limitations. Appendix C is a question bank grouped by owner.
-
-## 2.6 Shared material
-
-Three things belong to the whole team, and any member may be asked about them:
+Three things are shared across every module and belong to no single owner:
 
 - **The architectural invariant** in section 3.2, which every module obeys.
 - **The admission sequence** in section 6.3, which every AI feature runs.
-- **The figures in Appendix A**, which any member may be asked to quote.
+- **The verified figures in Appendix A**, which collect the baseline numbers in one place.
 
 # 3. What AquaZeroFit Is
 
@@ -249,7 +230,7 @@ Stating this prevents a whole category of misunderstanding.
 | Stakeholder | Interest |
 | :--- | :--- |
 | End user | Logs food and training, receives targets and coaching, owns their data |
-| Lecturer and supervisor | Needs to see engineering judgement, not only working software |
+| Technical reviewer or partner | Needs to see engineering judgement, not only working software |
 | Future maintainer | Needs to change the system without reintroducing a hazard already removed |
 | Upstream data providers | wger, Open Food Facts and FoodData Central impose licence and attribution obligations |
 | Telegram | Hosts the Mini App and processes payments, and imposes its own contract |
@@ -453,7 +434,7 @@ Credits are reserved before the guardrail and released if the guardrail blocks, 
 | Passwords | bcryptjs | Portability, at a documented cost. See section 13 |
 | Images | sharp | Re-encoding is both the privacy measure and the real file type check |
 | Testing | Vitest | One runner across three workspaces, fast enough to run on every change |
-| Documents | Custom Markdown to DOCX renderer | Documentation lives in the repository as Markdown and is rendered for submission |
+| Documents | Custom Markdown to DOCX renderer | Documentation lives in the repository as Markdown and is rendered into Word documents |
 
 ## 6.5 Two delivery targets from one codebase
 
@@ -494,7 +475,7 @@ The comment in the source explains the cost that drove this:
 
 ## 6.6 The architectural invariant
 
-The rule every module in this system obeys is stated in full in section 5.2, together with the explicit list of what a model may and may not do. It is not repeated here. Sections 9 to 11 show, feature by feature, where that line is drawn in code.
+The rule every module in this system obeys is stated in full in section 3.2, together with the explicit list of what a model may and may not do. It is not repeated here. Sections 9 to 11 show, feature by feature, where that line is drawn in code.
 
 # 7. Codebase Overview
 
@@ -517,11 +498,11 @@ Two layout constraints are load-bearing and are recorded here because they look 
 
 ## 7.2 Module ownership
 
-| Module group | Owner for this document | Presentation section |
+| Module group | Owner | Feature section |
 | :--- | :--- | :--- |
-| Nutrition: targets, foods, logs, vision, recommendations, recipes, export | Victor Hong | Section 7 |
-| Training: exercises, plans, progression, readiness, workouts, stats | Eric La | Section 8 |
-| Platform, AI gateway, safety, auth, privacy, memory, progress insight, gamification, coaches, payments, growth, operations | Babatundji Williams-Fulwood | Section 9 |
+| Nutrition: targets, foods, logs, vision, recommendations, recipes, export | Victor Hong | Section 9 |
+| Training: exercises, plans, progression, readiness, workouts, stats | Eric La | Section 10 |
+| Platform, AI gateway, safety, auth, privacy, memory, progress insight, gamification, coaches, payments, growth, operations | Babatundji Williams-Fulwood | Section 11 |
 
 ## 7.3 End-to-end trace: logging a meal by photograph
 
@@ -739,7 +720,7 @@ export const KCAL_FLOOR = {
 } as const;
 ```
 
-### Talking points
+### Key points
 
 - The app has to know what the user is aiming for before it can track anything. Six inputs: weight, height, age, sex, activity level, goal.
 - Basal metabolic rate from the Mifflin-St Jeor equation. Multiply by an activity factor, 1.2 sedentary up to 1.9 very active, to get daily expenditure.
@@ -748,7 +729,7 @@ export const KCAL_FLOOR = {
 - **The two points that matter.** No model touches any of this. And the result is clamped to a floor, 1200 or 1500 kcal depending on sex, with the reason shown to the user rather than hidden.
 - The formula version is stored on every set of targets, so we can always say which maths produced a number.
 
-### If asked
+### Common questions
 
 *"Why not let the AI work out the target, since it knows nutrition?"*
 Because a target is the number every other number in the product is measured against. It has to be reproducible and explainable, and a model is neither. Given the same profile this function returns the same answer forever, which also means we can test it.
@@ -868,7 +849,7 @@ Retries are made safe by an idempotency mechanism on every creation route, so a 
  */
 ```
 
-### Talking points
+### Key points
 
 - Four meal slots, breakfast through snacks, around a calorie ring showing target, consumed, burned and remaining.
 - Remaining is defined once, on the server: target minus net intake, where net is eaten minus burned. Defining it twice is how a dashboard and a coach start disagreeing.
@@ -878,7 +859,7 @@ Retries are made safe by an idempotency mechanism on every creation route, so a 
 - We also recompute the calories from the declared macros using the European regulation factors and flag a label that is outside tolerance.
 - Every creation route honours an idempotency key, so a retry on a bad connection cannot double-log a meal.
 
-### If asked
+### Common questions
 
 *"Why is copy-yesterday a server endpoint rather than the app just adding the meals again?"*
 A client loop is several requests that can partly fail and leave half a day logged. One request either copies the day or does not.
@@ -899,7 +880,7 @@ This is the feature where the invariant in section 3.2 earns its keep. The model
 
 The confirmation gate is a product requirement, not a nicety. An automatic commit means a wrong estimate silently becomes a user's history.
 
-Two smaller decisions in this pipeline are worth defending. The upload is decoded and re-encoded before it is stored, which strips every metadata block. A phone photograph carries GPS at home-address precision, a capture timestamp and a camera serial number, and none of that belongs bolted onto health-adjacent records. That same re-encode is also the real file type check, because the type the browser declares in the multipart header is attacker-controlled and proves nothing. And it happens before credits are reserved, because a reservation taken earlier would have no release path if the decode threw.
+Two smaller decisions in this pipeline are worth recording. The upload is decoded and re-encoded before it is stored, which strips every metadata block. A phone photograph carries GPS at home-address precision, a capture timestamp and a camera serial number, and none of that belongs bolted onto health-adjacent records. That same re-encode is also the real file type check, because the type the browser declares in the multipart header is attacker-controlled and proves nothing. And it happens before credits are reserved, because a reservation taken earlier would have no release path if the decode threw.
 
 ### Where it lives
 
@@ -967,7 +948,7 @@ function nutritionFromFood(food: Food, grams: number, nameOverride?: string) {
     kcal: round1(food.per100g.kcal * factor),
 ```
 
-### Talking points
+### Key points
 
 - User photographs the plate. Upload is capped at ten megabytes and restricted to JPEG, PNG or HEIC.
 - Before anything is stored we decode the image and re-encode it from the pixels. That does two jobs at once.
@@ -976,7 +957,7 @@ function nutritionFromFood(food: Food, grams: number, nameOverride?: string) {
 - The model then names the foods and estimates portions. **Its numbers are thrown away.** We look each item up in our own corpus and compute the calories ourselves. Anything we cannot ground is dropped rather than passed through.
 - Nothing reaches the diary until the user confirms. On confirm we re-derive the nutrition a second time, because client-supplied macros are not trusted either, and the photograph is deleted.
 
-### If asked
+### Common questions
 
 *"Why drop an item the model identified but you cannot match?"*
 Because an ungrounded identification has no nutrition data behind it, so the only way to show it would be to invent the numbers. A missing item the user adds by hand is a much smaller harm than a fabricated one they never notice.
@@ -1080,7 +1061,7 @@ Note also that the macro figures on a recommendation come from the content recor
       // Macro figures come from the content record, never from model output.
 ```
 
-### Talking points
+### Key points
 
 - Nine allergen classes: peanuts, tree nuts, milk, eggs, fish, shellfish, soy, wheat, sesame.
 - The filter runs in code, after candidates are selected and **before any model sees them**. A model never gets a vote on allergen safety.
@@ -1089,7 +1070,7 @@ Note also that the macro figures on a recommendation come from the content recor
 - Meal suggestions sit on top. Budget is arithmetic, dietary restriction is a filter, and only the ranking, which has no safety consequence, goes to a model.
 - Even then the model's pick is checked back against the safe set, and its explanatory sentence passes the output guardrail before a user reads it.
 
-### If asked
+### Common questions
 
 *"Could the model overrule the filter if it was confident?"*
 No, and it is not asked. A model that is right ninety-nine times in a hundred is unacceptable for this decision, so it is never in the path.
@@ -1165,7 +1146,7 @@ Every seeded record carries its source and licence, which is what makes the corp
   };
 ```
 
-### Talking points
+### Key points
 
 - Six micronutrients tracked across everything logged: fibre, sugars, sodium, potassium, calcium, iron.
 - Deliberately behind an expandable panel. A screen that shows ten numbers with equal weight teaches the user to read none of them.
@@ -1174,10 +1155,10 @@ Every seeded record carries its source and licence, which is what makes the corp
 - Export returns meals, macro totals, micronutrient totals and hydration, as JSON or CSV, filtered by a date or a range.
 - Export is there for two reasons. The obvious one is taking your data to a dietitian or another app. The real one is that data rights are only meaningful if you can actually exercise them.
 
-### If asked
+### Common questions
 
-*"Why bother with export in a student project?"*
-Because the alternative is claiming the user owns their data while giving them no way to take it anywhere, and that claim is the one a marker should test.
+*"Why build export at all?"*
+Because the alternative is claiming the user owns their data while giving them no way to take it anywhere, and that is the claim most worth testing.
 
 ### One-line summary
 
@@ -1246,7 +1227,7 @@ And the importer carrying it through, including the variation group:
     isAiGeneratedMedia: info.images.some((img) => img.is_ai_generated === true) || undefined,
 ```
 
-### Talking points
+### Key points
 
 - Fifty-one seeded movements, extended by an importer pulling from wger, the open exercise database.
 - Each record carries category, primary and secondary muscles, equipment, difficulty, instructions and demonstration media.
@@ -1255,7 +1236,7 @@ And the importer carrying it through, including the variation group:
 - That matters because attribution is easy to satisfy at import and then lose three refactors later when somebody maps records to a smaller shape. There is an integration test that fails if the licence fields stop appearing in an API response.
 - Records also carry a variation group identifier. That is what makes the in-session swap possible later, because two exercises in the same group are genuinely interchangeable.
 
-### If asked
+### Common questions
 
 *"What actually obliges you to show attribution?"*
 The share-alike licence on the upstream corpus. We take the data under its content licence with full attribution, and we take no source code from the project, which is a separate and stricter obligation recorded in AQF-05.
@@ -1370,7 +1351,7 @@ The AI lane is admitted only after passing the same contract:
       if (result && result.draft && result.ai && aiDraftIsValid(result.draft, pool, input.daysPerWeek)) {
 ```
 
-### Talking points
+### Key points
 
 - Deterministic first, AI second, and the ordering is the point: prescribing training load has real consequences, so the guaranteed path is code.
 - Build a candidate pool: equipment the user actually has, difficulty not above their experience, sorted deterministically.
@@ -1380,7 +1361,7 @@ The AI lane is admitted only after passing the same contract:
 - Three consequences: the plan is inspectable so you can see week five today; the rules are serialisable so a model-generated plan speaks the same vocabulary; and the resolver is a pure function that can be unit tested against a reference example.
 - The resolver also supports autoregulation, where a rule only applies if last week's targets were actually met. That gate fails closed: if the logs cannot confirm it, the progression does not happen.
 
-### If asked
+### Common questions
 
 *"Why not just write the progression as if-statements?"*
 Because branching logic is invisible to the user, cannot be tested in isolation, and a model-generated plan has no way to express it. As data it is all three.
@@ -1499,7 +1480,7 @@ const HEADLINES: Record<ReadinessMode, string> = {
 };
 ```
 
-### Talking points
+### Key points
 
 - Before a plan is built we score how the last seven days actually went, and adjust the volume.
 - Four signals. Completion at forty-five percent, because it is the only one that measures the thing we are modulating. Broad check-in activity at twenty-five. Recency at twenty. Intake at ten.
@@ -1509,7 +1490,7 @@ const HEADLINES: Record<ReadinessMode, string> = {
 - Three bands: Protect eases volume to sixty percent, Maintain leaves it alone, Progress adds ten percent.
 - The multiplier applies to sets, and to the day's set total rather than exercise by exercise, because per-exercise rounding destroys the intent in both directions.
 
-### If asked
+### Common questions
 
 *"Is Protect not just telling the user they failed?"*
 It is written specifically not to. A hard week is the ordinary case, not a failure state, and holding somebody to a plan built for a week they did not get is how plans get abandoned. Every string in that module is written to read that way, and that constraint is stated in the file header.
@@ -1602,7 +1583,7 @@ The rest countdown on the client, which also drives an accessibility announcemen
   }, [phase, restLeft]);
 ```
 
-### Talking points
+### Key points
 
 - Today's session is derived from the plan by counting days since it started, not stored in advance, so a plan edit does not have to migrate a queue of future sessions.
 - But once resolved, the targets are frozen onto the session document, so a later plan edit does not rewrite the user's history. The session records target and actual for weight, reps and reps in reserve.
@@ -1611,7 +1592,7 @@ The rest countdown on the client, which also drives an accessibility announcemen
 - The swap is constrained, not free: same variation group first, then optionally a model ranking, then same primary muscle. The model's suggestion is re-validated against the deterministic constraints, and a model failure never blocks the swap.
 - The energy estimate is scaled by how much of the prescribed work was actually performed, with a floor, so skipping most of a session does not award a full session's burn.
 
-### If asked
+### Common questions
 
 *"Why freeze the targets instead of recomputing them?"*
 Because analytics needs to know what was asked for as well as what happened. If the plan changes in March, the January sessions must still say what January prescribed.
@@ -1685,7 +1666,7 @@ And the achievement decision, with its reasoning preserved in the source:
       // once, kept.
 ```
 
-### Talking points
+### Key points
 
 - This layer has no AI in it at all, and that is exactly what makes it useful: the weekly insight feature quotes these numbers, so they have to be trustworthy on their own.
 - Completed sessions are bucketed into ISO weeks. We compute set counts and volume, load multiplied by reps, per exercise and per muscle group.
@@ -1694,7 +1675,7 @@ And the achievement decision, with its reasoning preserved in the source:
 - Weeks with no logged work are omitted rather than shown as zero, because a zero on a chart reads as a bad week rather than an absent one.
 - Achievements evaluate eleven seeded definitions. Streak achievements are evaluated against the user's best ever run, not their current one, because revoking a badge somebody already earned is harsher than the resetting counter we removed.
 
-### If asked
+### Common questions
 
 *"Is an estimated one-rep max not just a guess?"*
 It is an estimate from a published formula, and we present it as one. The value is in the trend rather than the absolute number, which is why pinning the formula version matters more than picking the perfect formula.
@@ -1771,7 +1752,7 @@ And the hint colour walk:
   }
 ```
 
-### Talking points
+### Key points
 
 - One React and TypeScript codebase serves two surfaces: a responsive website and a Telegram Mini App. The client detects at bootstrap which one it is in.
 - Inside Telegram we adopt the host's theme, but only the neutrals: background, container ramp, text, hairlines. Brand colours are never rebound, because roughly two hundred usages across the app assume that exact ramp and paired tokens would break outright.
@@ -1780,7 +1761,7 @@ And the hint colour walk:
 - We also do not ship the Telegram SDK in the page head. It is fetched, with a five-second timeout, only when the URL fragment shows a real Mini App launch.
 - That last one was a measured cost: a blocking third-party script was stalling the marketing page for exactly the corporate-network users the browser path exists to serve.
 
-### If asked
+### Common questions
 
 *"Why not just read whether Telegram says light or dark?"*
 Because that flag tells you the host's intent, not whether our fixed brand colours will still be readable on it. We check the thing we actually care about.
@@ -1863,7 +1844,7 @@ export function getStore(): MemoryBackedStore {
     }
 ```
 
-### Talking points
+### Key points
 
 - Ten logical containers, modelled on Cosmos container semantics: users, profiles, logs, plans, content, two segregated nutrition containers, AI, ledger, audit.
 - The nutrition containers are separate for a licence reason, not for tidiness. Open Food Facts carries a share-alike database licence, and commingling it with our curated corpus would attach that obligation to the mixed collection.
@@ -1874,7 +1855,7 @@ export function getStore(): MemoryBackedStore {
 - Two failure behaviours worth naming: a failed flush re-marks its batch dirty and retries, merged underneath newer changes; and a corrupt file is copied aside so the container starts empty rather than the API crashing.
 - **The honest limit:** each instance hydrates its own working set, so this is durable for a single instance. Scaling out needs reads moved off the local copy. That is recorded, not hidden.
 
-### If asked
+### Common questions
 
 *"Is that not just a database you wrote yourself?"*
 It is a persistence layer over a document model, deliberately thin. The container model came from the Cosmos design in AQF-05; what changed is the vendor underneath it, and the reasoning for that change is ADR-028.
@@ -1995,7 +1976,7 @@ Every consuming lane honours it. From the recommendation router:
       }
 ```
 
-### Talking points
+### Key points
 
 - Every AI call goes through one module. Application code never names a vendor or a model, it names a lane: vision primary, chat fast, plan structured, safety cheap, insight batch.
 - Why: naming a vendor in feature code means changing feature code to change vendor, and it means every feature invents its own timeout and retry policy.
@@ -2005,7 +1986,7 @@ Every consuming lane honours it. From the recommendation router:
 - If everything fails, or if no keys are configured at all, we fall back to a deterministic offline engine, so every core journey still works.
 - **The detail that matters most is the degraded flag.** Reaching the offline engine because no keys are configured is the product working as designed, and billing is normal. Reaching it because real providers failed means the user is holding template text, and charging for that is wrong. Every billing lane branches on it.
 
-### If asked
+### Common questions
 
 *"How do you know the fallback actually works?"*
 The offline engine's output is byte-identical for a given input, and the entire test suite and the safety evaluation runner depend on that. If it broke, 614 API tests would fail.
@@ -2119,7 +2100,7 @@ And a deliberate cross-module import, documented as such, so that chat logging p
 import { createMealLog } from '../logs/service';
 ```
 
-### Talking points
+### Key points
 
 - Aqua Coach is grounded: before a turn runs we execute tools that read today's calories, macros and hydration against target, today's workout, the active plan, the progress summary, profile essentials and approved memory.
 - All of that is personal data, so it is behind an explicit consent. With personalisation off, no profile data, no logs, not even the display name enters model context, and each tool reports that personalisation is off. The coach still works, it just answers generically.
@@ -2129,7 +2110,7 @@ import { createMealLog } from '../logs/service';
 - They are two separate messages, never concatenated, so the boundary between who you sound like and what you must do stays visible in the payload. A test fails if anyone merges or reorders them.
 - Chat-native logging follows the photo rule: the model turns a sentence into food name, quantity and unit, and nothing else. Where a phrase matches several records the ambiguity is kept and the user chooses, because silently picking the first is indistinguishable, in the log, from the user having chosen it.
 
-### If asked
+### Common questions
 
 *"Does the chat logging write meals differently from the food tab?"*
 No, deliberately. It calls the same function. A second write path would be a second place for totals, idempotency and the source field to drift apart.
@@ -2216,7 +2197,7 @@ And the second stage's fail-open posture:
  */
 ```
 
-### Talking points
+### Key points
 
 - Safety here is architecture, not a disclaimer. Every model-calling endpoint runs the same seven-step admission sequence, with no exemptions and no fast paths.
 - The input classifier has an explicit priority order: crisis outranks medical, outranks extreme diet, outranks out of scope. A message can match several at once, and somebody in distress must never receive diet content in that turn whatever else they mentioned.
@@ -2226,7 +2207,7 @@ And the second stage's fail-open posture:
 - **The most interesting code here came from a real regression.** A naive calorie-floor check fired on our own arithmetic: "you have around 1135 kcal left" is a normal sentence most evenings, and it was being replaced with the eating-disorder signpost. So the trigger is split by force: directive phrasing is always advice, a hedged figure only counts when its sentence is not reporting what remains.
 - There is an optional model-based second stage on longer or health-adjacent messages, and it fails open to the regex result so chat keeps working offline.
 
-### If asked
+### Common questions
 
 *"What if the classifier misses something?"*
 Then the output guardrail is still in front of the user, and the numeric rules still apply. That is why there are two stages rather than one. The regression cases live in the test suite so a fix cannot silently reintroduce the old behaviour.
@@ -2340,7 +2321,7 @@ const AUTH_LIMIT = 10;
 const ANON_LIMIT = 30;
 ```
 
-### Talking points
+### Key points
 
 - Access tokens are JWTs with a pinned algorithm, valid fifteen minutes. Pinning matters: without an algorithm allowlist, a future config change introducing an asymmetric key opens the classic confusion attack.
 - Role and tier are read from the current user record on every request, not from the token claims, so a downgrade takes effect immediately.
@@ -2351,7 +2332,7 @@ const ANON_LIMIT = 30;
 - Failed logins are uniform so the endpoint is not an account oracle, and repeated failures lock the email rather than the IP, which is the axis an attacker cannot rotate.
 - Four rate-limit lanes: 300 a minute default, 20 for model surfaces, 30 for anonymous writes, 10 for the credential surface per IP.
 
-### If asked
+### Common questions
 
 *"Why store tokens in local storage if that is the weaker option?"*
 Because the primary surface is a Telegram Mini App where cookie sessions are impractical. It is an accepted trade with a stated mitigation, recorded as ADR-027, and the mitigation is what makes theft detectable and containable rather than permanent.
@@ -2452,7 +2433,7 @@ And the deliberate decision not to delete memory on consent revocation:
  */
 ```
 
-### Talking points
+### Key points
 
 - Opt-in by default. Four consents, all starting off: wellness data processing, AI personalisation, anonymised analytics, reminders.
 - The personalisation consent is load-bearing rather than cosmetic. With it off, the coach's grounding tools return nothing, the recommendation engine takes a deterministic path with no model call at all, and the memory layer refuses reads and writes.
@@ -2462,7 +2443,7 @@ And the deliberate decision not to delete memory on consent revocation:
 - Ledger and audit records are retained anonymised for financial integrity and accountability, with any raw identifier replaced by a truncated hash.
 - Revoking personalisation deliberately does not delete stored memory. Consent is re-checked on every access so it becomes immediately unreadable, but keeping it means re-enabling the consent does not lose anything. Permanent removal stays the user's explicit choice.
 
-### If asked
+### Common questions
 
 *"How do you know the purge is complete?"*
 There is an integration test per case, including the two that the generic sweep cannot reach. The nested-membership case is exactly the kind of thing that is only found by writing the test.
@@ -2550,7 +2531,7 @@ And the extractor's lane choice and consent posture:
  * — the user approves or rejects them in the UI; nothing here auto-confirms.
 ```
 
-### Talking points
+### Key points
 
 - Each user has one memory document: a rolling summary plus facts, each with a category and a status.
 - After a successful turn, a cheap model lane reads the exchange and proposes facts. They land as suggested, never confirmed. The user approves, edits or rejects them in settings.
@@ -2560,7 +2541,7 @@ And the extractor's lane choice and consent posture:
 - And every fact is re-run through the input guardrail immediately before injection, not merely when it was written. Defence in depth: even if something unsafe were stored, it still cannot be spoken back.
 - Extraction runs on the cheapest lane and is fired without being awaited, so it can never delay or fail the user's reply.
 
-### If asked
+### Common questions
 
 *"Why not just let the AI remember whatever it decides is important?"*
 Because memory is the feature most likely to feel invasive, and the control has to be real rather than implied. Proposing is useful, deciding is the user's.
@@ -2671,7 +2652,7 @@ The consistency model that replaced the streak:
  */
 ```
 
-### Talking points
+### Key points
 
 - The progress screen answers a harder question than a chart does: what changed, and why.
 - All the statistics are computed by us over a trailing window and compared to the immediately preceding window: weight change across weigh-ins, workouts completed, average intake against target, hydration adherence.
@@ -2681,7 +2662,7 @@ The consistency model that replaced the streak:
 - The endpoint never errors. A brand-new user, a free user, a user with consent off and a user whose providers are down all get a useful insight, because a 404 on somebody's first dashboard is the churn cliff this feature exists to close.
 - Same philosophy replaced the streak: a run that resets to zero on one missed day is a punishment display. Consistency absorbs a missed day, reports active days over a rolling window, and keeps a best figure that never decreases.
 
-### If asked
+### Common questions
 
 *"Why cache the model version but not the deterministic one?"*
 Because caching a deterministic insight would pin a user to "keep logging" for the rest of the week after they started logging, or to the free-tier copy for the rest of the week after they upgraded. It costs nothing to recompute.
@@ -2821,7 +2802,7 @@ And the refusal to sell somebody something they already earned:
  * at render time.
 ```
 
-### Talking points
+### Key points
 
 - One rule governs progression and it is a safety rule, not a design preference: **experience is awarded for behaviour, never for outcomes.**
 - Nothing can score a deficit, a rate of loss or a kilogram moved. In a product that also holds weight and intake, an economy paying out for "less" manufactures disordered eating in exactly the users who engage most.
@@ -2832,7 +2813,7 @@ And the refusal to sell somebody something they already earned:
 - On the roster, the level door is the real door and the Stars price is a shortcut past it. A roster whose best character sits behind a paywall is a slot machine, not a wellness product.
 - Payments rest on three invariants: price read from the roster and never the request, grants idempotent on Telegram's charge id because Telegram redelivers webhooks, and the payload is a lookup key rather than a claim.
 
-### If asked
+### Common questions
 
 *"Would points for hitting a weight goal not be more motivating?"*
 Almost certainly, and that is the problem. The most engaged users are the ones a weight-linked economy would harm, so it is the one design we ruled out on principle rather than on evidence.
@@ -2914,7 +2895,7 @@ And the honesty constraint on generated structured data:
  */
 ```
 
-### Talking points
+### Key points
 
 - Invite codes are drawn from a cryptographic random source, not a general-purpose one, because a code is a bearer capability: whoever holds it can join the group and see other members' names and progress. A predictable code is a guessable one.
 - Progress inside a group is recomputed from the log ledger on read, so it cannot drift from the truth.
@@ -2924,7 +2905,7 @@ And the honesty constraint on generated structured data:
 - Search visibility is generated at build time, one real HTML file per marketing route with its own title, description, canonical, social tags, structured data and a no-script summary. Necessary because the app is client-rendered, so every marketing URL previously served identical markup and an empty container.
 - The structured data deliberately asserts no ratings or reviews, because we have none, and describing ratings that do not exist is fabricated review content.
 
-### If asked
+### Common questions
 
 *"Why is the invite preview public at all?"*
 So somebody receiving a link can see what they are joining before signing up. The design question was not whether to expose it but what it is allowed to cost, which is why it reads only stored fields.
@@ -3003,7 +2984,7 @@ And the startup guard that turns a silent failure into a loud one:
   }
 ```
 
-### Talking points
+### Key points
 
 - Liveness and readiness probes are registered **before** the rate limiter. A rate-limited probe returns 429 under load, the platform concludes the container is unhealthy, and it restarts a container that was merely busy. That is a self-inflicted outage during the traffic spike you least want one.
 - The content security policy has two postures. An API-only process emits no HTML and locks everything down. A process also serving the built client must permit its own scripts, styles and fonts, and must allow Telegram to frame it.
@@ -3013,7 +2994,7 @@ And the startup guard that turns a silent failure into a loud one:
 - **The startup guards exist because the worst production failure is not a crash, it is a deployment that looks healthy while being broken.** Without a real mail transport the password-reset endpoint still answers with success and prints the token to a log nobody reads, so every locked-out user stays locked out while every dashboard is green. The service refuses to start instead.
 - Same posture on secrets, on a wildcard CORS origin, and on plain HTTP origins in production.
 
-### If asked
+### Common questions
 
 *"Is refusing to boot not worse than degrading?"*
 For account recovery, no. A service that cannot deliver mail cannot recover anyone, and the failure is invisible from the outside. Loud and early beats silent and permanent.
@@ -3068,7 +3049,7 @@ AQF-05 was written at the planning stage and records an Azure-hosted serverless 
 
 The remaining AQF-05 records, in particular ADR-001, ADR-013, ADR-014, ADR-015, ADR-016 and ADR-017, hold as written and are implemented as described.
 
-**How to answer this if it is raised.** The honest answer is that AQF-05 recorded the intended platform before implementation, and the implementation diverged for reasons that are themselves recorded. A decision register whose records are never superseded is a register nobody consulted. What matters is that each divergence has a stated reason and a compensating control, which is what section 12.3 provides.
+**Why the divergence is acceptable.** AQF-05 recorded the intended platform before implementation, and the implementation diverged for reasons that are themselves recorded. A decision register whose records are never superseded is a register nobody consulted. What matters is that each divergence has a stated reason and a compensating control, which is what section 12.3 provides.
 
 ## 12.4 Records
 
@@ -3230,7 +3211,7 @@ Recorded honestly, with the remediation, because a document that lists no weakne
 | R4 | In-memory rate limiter and login lockout. State is per process. | Limits reset on restart and are not shared across instances. | Acceptable at one instance; buckets are pruned to bound memory. | Shared store for counters when a second instance appears. |
 | R5 | Prerendered SEO depends on host behaviour. A host that rewrites everything to the app shell silently undoes it. | Marketing pages lose their metadata while appearing to work. | Documented in the README and in the plugin header. | A post-deploy check that fetches a marketing route and asserts its title. |
 | R6 | Client-declared upload MIME. | An attacker controls the declared type. | Extension and served type derive from our own re-encode, never from the header; files are size-capped, unguessably named, never statically served. | None required; recorded so the reasoning is not lost. |
-| R7 | Diagnostics strip contains illustrative values. Model latency and credit readouts are not fully wired to live data. | Could mislead in a demonstration. | Excluded from the presentation script. | Wire to the gateway metadata and the ledger balance, or remove the panel. |
+| R7 | Diagnostics strip contains illustrative values. Model latency and credit readouts are not fully wired to live data. | Could mislead in a product demonstration. | The readouts are not quoted as live figures; see Appendix B. | Wire to the gateway metadata and the ledger balance, or remove the panel. |
 | R8 | Growth events are the only unauthenticated write. | Storage growth and abuse surface. | Dedicated 30 per minute lane plus a scheduled retention sweep. | Signed client token if abuse is observed. |
 | R10 | No infrastructure as code. AQF-05 ADR-010 planned a Bicep declaration under /infra; the hosting change left it unimplemented. | Environment rebuild is manual and unreproducible. | Deployment steps are documented in AQF-22; the production startup guards catch a misconfigured environment at boot. | Declare the deployed stack for the host actually in use, and have the pipeline apply it. |
 | R9 | Allergen keyword net is English-only. | A non-English ingredient list may not trip the keyword net. | The declared allergen field still applies, and over-blocking is preferred. | Localised keyword sets alongside corpus localisation. |
@@ -3268,93 +3249,9 @@ npm run verify
 
 This runs typecheck, then the test suites, then the safety evaluations. It is exactly what continuous integration runs, so a passing local run and a passing pipeline mean the same thing.
 
-# 15. Presentation Plan
+# Appendix A. Verified Figures
 
-This section is a plan, not a script. It gives the running order, the time each part should take, and the one message each part must land. The material to speak from is the **Talking points** block inside each feature in sections 9 to 11. Speak from those prompts in your own words.
-
-## 15.1 Why there is no script here
-
-A read-aloud script fails in three ways in an assessed presentation. It sounds like recitation, and an experienced listener hears the difference immediately. It collapses the moment somebody is interrupted with a question, because there is no way back into the paragraph. And it hides whether the speaker actually understands the material, which is the thing being assessed.
-
-Prompts do the opposite. If you can see the five bullets for your feature and talk around them, you understand it. If you cannot, that is worth discovering in rehearsal rather than on the day.
-
-## 15.2 Running order and timing
-
-| Order | Speaker | Covering | Sections | Time |
-| :--- | :--- | :--- | :--- | :--- |
-| 1 | Babatundji | Opening frame: what the product is and the one idea it is built around | 3.1, 3.2 | 1 minute |
-| 2 | Victor Hong | Nutrition and dietary system, five features | 9.1 to 9.5 | 5 minutes |
-| 3 | Eric La | Training and workout system, five features | 10.1 to 10.5 | 5 minutes |
-| 4 | Babatundji | Platform, AI, safety, security, privacy, analytics, operations | 11.1 to 11.10 | 10 minutes |
-| 5 | Babatundji | Optional depth if the slot allows | 11.11, 11.12 | 2 minutes |
-| 6 | All | Questions | Appendix C | Remainder |
-
-Core running time is twenty-one minutes. With both optional features it is twenty-three. If the slot is shorter, drop 11.11 first, then 11.12. They are chosen for that because nothing else depends on them.
-
-Allow roughly one minute per feature. That is a natural pace for five or six spoken bullets with a sentence of explanation each. Do not merge two features into one minute; the compression is what makes a presentation sound rushed.
-
-## 15.3 The one message per part
-
-If a listener remembers only one sentence from each speaker, it should be this one. Everything else is support.
-
-| Speaker | The message that must land |
-| :--- | :--- |
-| Babatundji, opening | Models identify, code calculates. Every other decision in this system follows from that one. |
-| Victor | Every calorie figure in this product is arithmetic we did ourselves, and the allergen filter never lets a model near a safety decision. |
-| Eric | The training plan is deterministic, its progression is inspectable data rather than hidden logic, and it adapts to the week the user actually had. |
-| Babatundji, platform | Safety, privacy and metering are architecture here, not features bolted on, and the system keeps working when the AI does not. |
-
-## 15.4 Opening frame
-
-Babatundji opens for about a minute, using section 3.2. The purpose is to give the audience the lens before they see any feature, so that every later decision reads as consistent rather than arbitrary.
-
-Cover, in this order:
-
-- What the product is, in one sentence.
-- The problem with using a language model for calorie estimation: it produces a fluent, confident, wrong number, and the user cannot tell.
-- Why that is a health outcome rather than a defect, when applied every day for months.
-- The rule that follows: models identify, interpret and explain; code calculates, filters and enforces.
-- One line of signposting: Victor will show that rule in nutrition, Eric in training, and I will show the platform that enforces it.
-
-## 15.5 Handover cues
-
-Agree these in rehearsal and do not improvise them. A fumbled handover is the most visible thirty seconds of any team presentation.
-
-| From | To | Cue |
-| :--- | :--- | :--- |
-| Opening | Victor | "We will start where the user starts, with food. Victor." |
-| Victor | Eric | "That is the nutrition module. Eric will take you through training." |
-| Eric | Babatundji | "That is the training system. Over to Tundji for the platform underneath it." |
-| Babatundji | Questions | "That is the system. We are happy to take questions." |
-
-## 15.6 If a demonstration is included
-
-Show the fewest screens that prove the most. This order tells the whole story in about three minutes.
-
-| Step | Show | The point it proves |
-| :--- | :--- | :--- |
-| 1 | Dashboard with the calorie ring | Targets are personalised and the day's arithmetic is live |
-| 2 | Photograph a meal, then **pause on the draft** | The confirmation gate. Say out loud that nothing is written yet and the calories on screen were computed by the app, not the model |
-| 3 | Adjust a portion and confirm | The user is in control of what enters their record |
-| 4 | Today's workout, complete one set, rest timer | The plan resolves per day, and the session records actuals |
-| 5 | Ask the coach a question about today | Grounding: the answer contains the user's real numbers |
-| 6 | Ask the coach something medical | The safety boundary, live, with the signpost |
-| 7 | Progress screen | What changed and why, in a sentence rather than a chart |
-
-Step 6 is the most persuasive thing in the demonstration and it is the one most often left out. It takes fifteen seconds.
-
-## 15.7 Rehearsal checklist
-
-- Each member can talk through their own features from the prompts alone, without the document open.
-- Each member can answer the five questions in section 2.5 for every module listed against their name.
-- Handover cues are agreed word for word.
-- Every figure anyone plans to say aloud is in Appendix A. Anything not in Appendix A is not said from memory.
-- Nobody quotes the on-screen diagnostics strip. See Appendix B.
-- The demonstration has been run once end to end on the machine that will be used.
-
-# Appendix A. Figures Safe To Quote
-
-Every number below was read from the source or produced by running the test suite at the baseline commit. If you are asked for a figure that is not listed, say you will check rather than estimating. Estimating one number badly costs more credibility than not knowing it.
+Every number below was read from the source or produced by running the test suite at the baseline commit. A figure that is not listed here should be checked against the source before it is quoted, not estimated.
 
 | Figure | Value |
 | :--- | :--- |
@@ -3397,7 +3294,7 @@ Every number below was read from the source or produced by running the test suit
 
 # Appendix B. Claims Not Supported By The Code
 
-An earlier draft of the team's slide deck contained three statements the code does not support. They are recorded here so that nobody restores them from memory under pressure.
+Earlier drafts of project material contained three statements the code does not support. They are recorded here so that nobody restores them from memory.
 
 1. **"BMR is computed with Mifflin-St Jeor and Katch-McArdle."** Only Mifflin-St Jeor is implemented, and the stored formula version says so. There is no body-fat input, so Katch-McArdle could not be computed even if it were wanted. Say Mifflin-St Jeor.
 
@@ -3405,13 +3302,13 @@ An earlier draft of the team's slide deck contained three statements the code do
 
 3. **"One hundred percent automated test coverage."** The repository has 770 passing tests, which is worth saying and is verifiable. It is not a coverage percentage, and line coverage has not been measured. Say "770 automated tests, all passing".
 
-**One further caution.** Do not quote live model latency or remaining credit figures from the on-screen diagnostics strip during a demonstration. The API round-trip figure there is genuinely measured, but the other readouts are illustrative placeholders. This is recorded as risk R7 in section 13. If a marker asks where a number on screen comes from, the answer has to be one the team can stand behind.
+**One further caution.** Do not quote live model latency or remaining credit figures from the on-screen diagnostics strip in a demonstration or in external material. The API round-trip figure there is genuinely measured, but the other readouts are illustrative placeholders. This is recorded as risk R7 in section 13. If anyone asks where a number on screen comes from, the answer has to be one the team can stand behind.
 
-# Appendix C. Question Bank By Owner
+# Appendix C. Design Questions By Area
 
-Grouped so each member can rehearse their own. Any member may answer a shared question.
+The questions most often raised about the design, with short answers, grouped by area. Module owners are listed in section 2.
 
-## C.1 Shared, any member
+## C.1 Cross-cutting
 
 **How do you stop the AI hallucinating a calorie figure?**
 By never giving it a field to put one in. For photo capture and chat logging the model returns identifiers, quantities and units only. The application looks the item up in its own corpus and computes the calories itself. An item that cannot be grounded is discarded rather than guessed at. See section 3.2 and ADR-019.
@@ -3419,10 +3316,10 @@ By never giving it a field to put one in. For photo capture and chat logging the
 **What happens when the AI provider is down, or you have no API keys?**
 The gateway retries, trips a circuit breaker on a repeatedly failing provider, falls through the chain, and finally lands on a deterministic offline engine, so every core journey still works. The result carries a degraded flag, and any lane that would have charged a credit releases the reservation instead. See section 11.3 and ADR-030.
 
-**What is the biggest thing you would change with more time?**
-Moving reads off the per-instance working set so the service scales horizontally, and replacing the pure-JavaScript password hashing with a native binding at a reassessed cost factor. Both are recorded in section 13 with a stated first hardening step, rather than being gaps discovered late.
+**What are the biggest known limitations of the architecture?**
+The single-instance storage design and the pure-JavaScript password hashing. Addressing them means moving reads off the per-instance working set so the service scales horizontally, and replacing the hashing with a native binding at a reassessed cost factor. Both are recorded in section 13 with a stated first hardening step, rather than being gaps discovered late.
 
-## C.2 Victor Hong, nutrition
+## C.2 Nutrition (module owner: Victor Hong)
 
 **Why is the calorie target not simply what the user asks for?**
 Because an arithmetically correct target can still be unsafe. A light user with an aggressive goal can produce a figure below the floor, so the engine raises it and shows the reason. Silently clamping would be dishonest and refusing to answer would be unhelpful.
@@ -3436,7 +3333,7 @@ The declared allergen field on the record still applies, and it is the authorita
 **Why does the photo feature not just log the meal automatically?**
 Because an automatic commit means a wrong estimate silently becomes the user's history. Confirmation is a product requirement, not a nicety, and it is the point at which the user is in control.
 
-## C.3 Eric La, training
+## C.3 Training (module owner: Eric La)
 
 **Why generate plans in code when an AI could do it?**
 Because prescribing training load has real consequences, so the guaranteed path must be deterministic. The AI lane exists and gets first pass, but its draft is validated structurally and semantically against the same filtered pool, and any failure falls back to the deterministic engine without the user noticing.
@@ -3450,7 +3347,7 @@ Hard caps in the resolver that mirror the shared validation schemas: sets, reps,
 **Is the calorie burn estimate accurate?**
 It is an estimate, scaled by session intensity and by the proportion of prescribed work actually performed. We present it as an estimate. The same honesty applies to the one-rep max, which is why the formula version is pinned in the response.
 
-## C.4 Babatundji Williams-Fulwood, platform
+## C.4 Platform (module owner: Babatundji Williams-Fulwood)
 
 **Why is the credit balance not just a number on the user record?**
 Because a counter can drift and cannot be audited. The ledger is append-only: reserve deducts, release returns, commit settles, and the balance is a fold over the transactions. Reserving before work and settling after means a crashed job returns its hold rather than silently charging the user.

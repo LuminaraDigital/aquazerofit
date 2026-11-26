@@ -535,13 +535,12 @@ npm run verify     # typecheck → test → eval (exact CI pipeline)
 | AQF-13 | Technical Implementation Document | Code-level design |
 | AQF-14 | Test Plan & QA Strategy | Test approach |
 | AQF-15 | Runbook & Deployment Guide | Operations |
-| AQF-16 | Development Diary | Build log |
-| AQF-17 | Progress Report | Milestone tracking |
 | AQF-18 | User Manual | End-user guide |
-| AQF-19 | Final Report | Project closure |
 | AQF-20 | Traceability Matrix | Req → code → test |
 | AQF-21 | Azure Production Readiness | Infra, scaling, monitoring |
 | AQF-22 | Deployment & Domain Guide | Platform-specific ops |
+
+AQF-16, AQF-17, AQF-19 and AQF-28 are retired; their numbers are not reused.
 
 ---
 

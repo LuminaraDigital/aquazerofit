@@ -219,7 +219,9 @@ recommendationsRouter.post(
           createdAt: nowIso(),
         };
         await upsertDoc('ai', recommendation);
-        await creditLedger.commit(reservationId);
+        // No model was called, so nothing billable was delivered: release the
+        // hold, as every lane does for output that is not a model answer.
+        await creditLedger.release(reservationId);
         res.status(201).json({ recommendation, remaining: budget });
       } catch (err) {
         await creditLedger.release(reservationId);

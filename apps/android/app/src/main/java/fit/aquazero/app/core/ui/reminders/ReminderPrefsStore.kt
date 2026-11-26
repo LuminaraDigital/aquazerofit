@@ -54,6 +54,11 @@ class ReminderPrefsStore @Inject constructor(
     /** One-shot read for the worker, which has no lifecycle to collect on. */
     suspend fun current(): ReminderPrefs = prefs.first()
 
+    /** Forget every choice, back to the defaults. Called on logout and account switch. */
+    suspend fun clear() {
+        dataStore.edit { it.clear() }
+    }
+
     /** Apply a change and return the result, so callers can reschedule from it. */
     suspend fun update(transform: (ReminderPrefs) -> ReminderPrefs): ReminderPrefs {
         val next = transform(current())

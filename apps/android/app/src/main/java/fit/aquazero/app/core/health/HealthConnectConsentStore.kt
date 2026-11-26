@@ -60,6 +60,14 @@ class HealthConnectConsentStore @Inject constructor(
     /** One-shot read for the repository, which checks this before every read. */
     suspend fun current(): Boolean = connected.first()
 
+    /**
+     * Forget the opt-in. Called on logout and account switch: the next account
+     * on this handset has not opted in, whoever did before.
+     */
+    suspend fun clear() {
+        dataStore.edit { it.clear() }
+    }
+
     /** Record the user's choice. */
     suspend fun setConnected(connected: Boolean) {
         dataStore.edit { it[Keys.CONNECTED] = connected }

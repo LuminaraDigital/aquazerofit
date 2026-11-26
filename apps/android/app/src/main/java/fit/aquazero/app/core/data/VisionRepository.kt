@@ -203,7 +203,7 @@ class VisionRepository @Inject constructor(
 
     /** App-private staging directory — never on external storage. */
     private fun stagingDir(): File =
-        File(context.cacheDir, STAGING_DIR).apply { mkdirs() }
+        File(context.cacheDir, MEAL_PHOTO_STAGING_DIR).apply { mkdirs() }
 
     /**
      * Copy, orient, downscale and re-encode a captured or picked photo into the
@@ -447,7 +447,6 @@ class VisionRepository @Inject constructor(
     private fun String.sanitizedForFileName(): String = filter { it.isLetterOrDigit() || it == '-' }
 
     private companion object {
-        const val STAGING_DIR = "meal-photos"
         const val STAGE_PREFIX = "stage-"
         const val JOB_PREFIX = "job-"
         const val RAW_CAPTURE_PREFIX = "capture-"
@@ -461,4 +460,16 @@ class VisionRepository @Inject constructor(
         /** Grace period before deleting orphaned raw CameraX captures after a crash. */
         const val RAW_CAPTURE_TTL_MS: Long = 60L * 1000
     }
+}
+
+/** Staged meal photos live here, under the app-private cache. */
+internal const val MEAL_PHOTO_STAGING_DIR = "meal-photos"
+
+/**
+ * Delete every staged meal photo, whatever its age. Logout and account switch
+ * use this: the 24 h sweep would leave the last account's photos on disk, and
+ * a queued upload could still pick one up under the next account.
+ */
+fun discardStagedMealPhotos(cacheDir: File) {
+    File(cacheDir, MEAL_PHOTO_STAGING_DIR).listFiles()?.forEach { if (it.isFile) it.delete() }
 }

@@ -2,137 +2,208 @@
  * AquaZeroFit marketing landing page, served in place at `/` for signed-out
  * browser visitors.
  *
- * Brief
- * - Audience: people who track, or have tried to track, food and training,
- *   arriving cold from a link or the Play listing. Their job here is to pick a
- *   way in: install the Android app, open the Mini App, or sign up on the web.
- * - The one message: your targets are arithmetic you can check, and the app
- *   shows you the working.
- * - Constraints: the brand's own tokens (aqua primary, mint secondary, Barlow
- *   Condensed over DM Sans, a dark ground), a prerendered shell, the
- *   Telegram-first conversion contract in Landing.test.tsx, no invented proof.
- *
- * Direction: precise product clarity on a dark instrument panel. Borrowed
- * moves: the Nutrition Facts label (heavy rules, a big figure, tabular rows),
- * Apple's health pages (one real number set huge, product shown at 1:1), and
- * Linear (surfaces that step up in lightness, hairlines instead of glows).
- *
- * Signature move: the live targets label in the first frame. It runs the
- * shared `computeTargets` and prints its working, so the headline's claim is
- * something the visitor can test before they install anything.
- *
- * Primary action: Telegram, with the browser beside it as the deliberate
- * second path and Google Play leading on Android phones (AppCtas, Chrome.tsx).
- * RequireAuth decides who sees this page; nothing here redirects.
- *
- * Motion budget: one-shot reveals (scale 0.98 and opacity), the screen
- * crossfade, the coach bubbles. No WebGL, no scroll listeners doing layout
- * reads, and everything collapses to static under prefers-reduced-motion.
+ * Preserves the high-trust hero conversion anchor (Barlow Condensed scoreboard
+ * headline, Telegram/Browser/Google Play CTAs, live Mifflin-St Jeor
+ * TargetsLabel fitting cleanly above the fold) paired with a quiet 3D
+ * architectural arena grid, an accessible native `<dialog>` 14s brand reel,
+ * tactile 3D captures, interactive meal trace, 6-fighter Corner Stage, and the
+ * 5-Belt Fight Record ladder.
  */
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AQUA_CHARACTER } from '@aquazerofit/shared';
 import { useSeo } from '../../lib/seo';
 import { AppCtas, Footer, TopBar } from './Chrome';
-import { Reveal, useHashScroll } from './motion';
+import { prefersReducedMotion, useHashScroll } from './motion';
 import { TargetsLabel } from './TargetsLabel';
 import { CoachDemo, Gallery, Safety, Split, WaysIn } from './LandingSections';
+import { ArenaGridCanvas } from './scene/ArenaGridCanvas';
 
-function Hero() {
+function IntroReelDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const reduced = prefersReducedMotion();
+  const src =
+    typeof window !== 'undefined' && window.innerHeight > window.innerWidth
+      ? '/intro/intro-916.mp4'
+      : '/intro/intro-169.mp4';
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const video = videoRef.current;
+
+    if (!dialog.open) {
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      else dialog.setAttribute('open', '');
+    }
+    closeBtnRef.current?.focus();
+
+    return () => {
+      if (video && typeof video.pause === 'function') {
+        try {
+          video.pause();
+        } catch {
+          // jsdom / detached media element
+        }
+      }
+      if (dialog.open) {
+        if (typeof dialog.close === 'function') dialog.close();
+        else dialog.removeAttribute('open');
+      }
+    };
+  }, [open]);
+
+  if (!open) return null;
+
   return (
-    <section className="relative pt-28 pb-20 sm:pt-36 sm:pb-28">
-      {/* One quiet light source: the water the product is named for, falling
-          from the top edge. It frames the label without being a shape. */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[70vh] bg-[radial-gradient(60%_60%_at_70%_0%,rgb(var(--azf-primary)/0.10),transparent_70%)]"
-        aria-hidden="true"
+    <dialog
+      ref={dialogRef}
+      aria-label="AquaZeroFit 14-second brand reel"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === dialogRef.current) onClose();
+      }}
+      className="m-auto w-[min(92vw,56rem)] rounded-card border border-outline/70 bg-surface-container-lowest p-0 text-on-surface backdrop:bg-black/85"
+    >
+      <div className="flex items-center justify-between border-b border-outline-variant/60 px-4 py-3">
+        <span className="stat-label text-primary">AquaZeroFit · 14s Brand Reel</span>
+        <button
+          ref={closeBtnRef}
+          type="button"
+          onClick={onClose}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-outline/80 px-3.5 text-[13px] font-semibold text-on-surface transition-colors hover:border-primary hover:text-primary"
+        >
+          Close
+          <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+            close
+          </span>
+        </button>
+      </div>
+      <video
+        ref={videoRef}
+        src={src}
+        className="max-h-[75dvh] w-full bg-black object-contain"
+        controls
+        autoPlay={!reduced}
+        muted
+        playsInline
       />
-      <div className="relative mx-auto grid max-w-[1240px] items-start gap-14 px-5 sm:px-8 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-16">
-        <div className="min-w-0 lg:pt-6">
-          <Reveal>
-            <h1 className="font-heading font-semibold text-on-surface">
-              <span className="flex items-center gap-2.5 font-body text-[15px] font-normal text-on-surface-variant">
-                <img
-                  src={AQUA_CHARACTER.characterUrl}
-                  alt=""
-                  width={682}
-                  height={1024}
-                  loading="eager"
-                  decoding="async"
-                  className="h-8 w-8 rounded-full bg-black object-cover object-top"
-                />
-                <span>
-                  <span className="font-semibold text-on-surface">AquaZeroFit</span> · food,
-                  training, coaching
-                </span>{' '}
-              </span>
-              {/* Two explicit lines, each unbreakable: the fonts load async,
-                  and a wider fallback would otherwise wrap this to three lines
-                  and shift the whole hero when Barlow Condensed arrives. */}
-              <span className="mt-6 block whitespace-nowrap text-[clamp(3.5rem,2.2rem+6vw,7.25rem)] leading-[0.9] tracking-[-0.025em]">
-                Your day,{' '}
-                <br />
-                <span className="text-primary">measured.</span>
-              </span>
-            </h1>
-          </Reveal>
+    </dialog>
+  );
+}
 
-          <Reveal delay={70}>
-            <p className="mt-7 max-w-[30em] text-[18px] leading-relaxed text-on-surface-variant [text-wrap:pretty] sm:text-[20px]">
-              Photograph a meal and see it counted. Your calorie, macro and water targets come from
-              a published formula you can check yourself, right here. Home training fits your
-              equipment, and the coach answers from what you actually logged.
-            </p>
-          </Reveal>
+function Hero({
+  onOpenReel,
+  reelTriggerRef,
+}: {
+  onOpenReel: () => void;
+  reelTriggerRef: React.RefObject<HTMLButtonElement>;
+}) {
+  return (
+    <section className="relative overflow-hidden pt-24 pb-16 sm:pt-28 sm:pb-20">
+      <ArenaGridCanvas variant="hero" />
 
-          <Reveal delay={140}>
-            <div className="mt-10">
-              {/* The note sits right under the buttons rather than in a FAQ:
-                  the visitor choosing between them is exactly the person who
-                  needs to know the browser path is a real product. */}
-              <AppCtas
-                placement="hero"
-                note={
-                  <p className="-mt-1 max-w-[34em] text-[14px] leading-relaxed text-on-surface-variant">
-                    The Mini App opens inside Telegram with no install. Blocked at work? The browser
-                    version is the same app, same account.
-                  </p>
-                }
+      <div className="relative mx-auto grid max-w-[1240px] items-start gap-10 px-5 sm:px-8 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-14">
+        <div className="min-w-0 lg:pt-4">
+          <h1 className="font-heading font-semibold text-on-surface">
+            <span className="flex items-center gap-2.5 font-body text-[15px] font-normal text-on-surface-variant">
+              <img
+                src={AQUA_CHARACTER.characterUrl}
+                alt=""
+                width={682}
+                height={1024}
+                loading="eager"
+                decoding="async"
+                className="h-8 w-8 rounded-full border border-primary/40 bg-black object-cover object-top"
               />
-            </div>
-          </Reveal>
+              <span>
+                <span className="font-semibold text-on-surface">AquaZeroFit</span> · food,
+                training, coaching
+              </span>{' '}
+            </span>
+            <span className="mt-5 block text-[clamp(2.85rem,1.9rem+5.8vw,7rem)] leading-[0.9] tracking-[-0.025em]">
+              Your day,{' '}
+              <br />
+              <span className="text-primary">measured.</span>
+            </span>
+          </h1>
 
-          <Reveal delay={200}>
-            <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2 border-t border-on-surface/10 pt-5 text-[14px] text-on-surface-variant">
-              <li>Free to start</li>
-              <li>Personalisation is opt-in</li>
-              <li>Open source, AGPL v3</li>
-              <li>
-                <Link
-                  to="/sign-in"
-                  className="-my-2 inline-block py-2 font-semibold text-on-surface underline decoration-on-surface/30 underline-offset-4 transition-colors duration-150 hover:decoration-primary"
-                >
-                  Sign in
-                </Link>
-              </li>
-            </ul>
-          </Reveal>
+          <p className="mt-6 max-w-[30em] text-[17px] leading-relaxed text-on-surface-variant [text-wrap:pretty] sm:text-[19px]">
+            Photograph a meal and see it counted. Your calorie, macro and water targets come from
+            a published formula you can check yourself, right here. Home training fits your
+            equipment, and your fighter coach answers from what you actually logged.
+          </p>
+
+          <div className="mt-8">
+            <AppCtas
+              placement="hero"
+              note={
+                <p className="-mt-1 max-w-[34em] text-[13.5px] leading-relaxed text-on-surface-variant">
+                  The Mini App opens inside Telegram with no install. Blocked at work? The browser
+                  version is the same app, same account.
+                </p>
+              }
+            />
+          </div>
+
+          <ul className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-outline-variant/60 pt-3 text-[14px] text-on-surface-variant">
+            <li className="py-2">Free to start</li>
+            <li className="py-2">28 fighter coaches</li>
+            <li className="py-2">Open source, AGPL v3</li>
+            <li>
+              <button
+                ref={reelTriggerRef}
+                type="button"
+                onClick={onOpenReel}
+                className="inline-flex min-h-[44px] items-center gap-1.5 font-semibold text-primary transition-colors hover:text-on-surface"
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                  play_circle
+                </span>
+                14s reel
+              </button>
+            </li>
+            <li>
+              <Link
+                to="/sign-in"
+                className="inline-flex min-h-[44px] items-center font-semibold text-on-surface underline decoration-outline underline-offset-4 transition-colors duration-150 hover:decoration-primary"
+              >
+                Sign in
+              </Link>
+            </li>
+          </ul>
         </div>
 
-        <Reveal delay={120} className="min-w-0">
+        <div className="min-w-0">
           <TargetsLabel />
-        </Reveal>
+        </div>
       </div>
     </section>
   );
 }
 
 export default function Landing() {
-  /* Title, description, canonical and OG tags for `/`. The prerendered shell
-     already carries them for the first paint; this keeps them right after a
-     client-side navigation back here from another marketing route. */
   useSeo('/');
-  /* Honours `/#screens` arriving from another marketing page. */
   useHashScroll();
+  const [reelOpen, setReelOpen] = useState(false);
+  const reelTriggerRef = useRef<HTMLButtonElement>(null);
+
+  const closeReel = () => {
+    setReelOpen(false);
+    requestAnimationFrame(() => reelTriggerRef.current?.focus());
+  };
 
   return (
     <div className="relative min-h-screen overflow-x-clip bg-surface text-on-surface">
@@ -146,9 +217,9 @@ export default function Landing() {
       <TopBar onLanding />
 
       <main id="main">
-        <Hero />
+        <Hero onOpenReel={() => setReelOpen(true)} reelTriggerRef={reelTriggerRef} />
 
-        <div className="mx-auto max-w-[1240px] space-y-[clamp(5.5rem,3.5rem+6vw,9rem)] px-5 pb-[clamp(5.5rem,3.5rem+6vw,8rem)] sm:px-8">
+        <div className="mx-auto max-w-[1240px] space-y-[clamp(5rem,3.5rem+5.5vw,8.5rem)] px-5 pb-[clamp(5rem,3.5rem+5.5vw,7.5rem)] sm:px-8">
           <Gallery />
           <Split />
           <CoachDemo />
@@ -160,6 +231,8 @@ export default function Landing() {
       <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
         <Footer onLanding />
       </div>
+
+      <IntroReelDialog open={reelOpen} onClose={closeReel} />
     </div>
   );
 }

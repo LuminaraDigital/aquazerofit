@@ -46,6 +46,7 @@
  * that never reaches the boot guard.
  */
 import type { Request } from 'express';
+import { clientIpForRateLimit } from './clientIp';
 import { config } from './config';
 import { AppError } from './errors';
 import { logEvent } from './telemetry';
@@ -251,7 +252,8 @@ export async function assertHuman(req: Request, action: string): Promise<void> {
     );
   }
 
-  const { ok, reason } = await verifyTurnstileToken(token, req.ip);
+  const clientIp = clientIpForRateLimit(req);
+  const { ok, reason } = await verifyTurnstileToken(token, clientIp === 'unknown' ? undefined : clientIp);
   if (ok) return;
 
   logEvent('captcha_rejected', { action, reason });

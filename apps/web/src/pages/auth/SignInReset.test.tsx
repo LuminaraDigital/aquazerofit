@@ -9,21 +9,36 @@
  * the failure mode that makes people give up on account recovery.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-const mocks = vi.hoisted(() => ({
-  tokenStore: { isAuthenticated: false },
-  isTMA: vi.fn(() => false),
-}));
+const mocks = vi.hoisted(() => {
+  class MockApiError extends Error {
+    status: number;
+    body: { code: string; message: string; details?: unknown };
+    constructor(status = 500, body = { code: 'UNKNOWN', message: '' }) {
+      super(body.message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.body = body;
+    }
+    get code() {
+      return this.body.code;
+    }
+  }
+  return {
+    tokenStore: { isAuthenticated: false },
+    isTMA: vi.fn(() => false),
+    firebaseEnabled: false,
+    login: vi.fn(),
+    MockApiError,
+  };
+});
 
 vi.mock('../../lib/api', () => ({
   tokenStore: mocks.tokenStore,
   api: vi.fn(),
-  ApiError: class ApiError extends Error {
-    code = 'UNKNOWN';
-    status = 500;
-  },
+  ApiError: mocks.MockApiError,
 }));
 vi.mock('../../lib/telegram', () => ({
   isTMA: mocks.isTMA,
@@ -32,12 +47,12 @@ vi.mock('../../lib/telegram', () => ({
 }));
 vi.mock('../../lib/queries', () => ({
   useAuthActions: () => ({
-    login: vi.fn(),
+    login: mocks.login,
     register: vi.fn(),
     telegramLogin: vi.fn(),
     requestPasswordReset: vi.fn(),
-    firebaseEnabled: false,
-    mapFirebaseError: (err: unknown) => String(err),
+    firebaseEnabled: mocks.firebaseEnabled,
+    mapFirebaseError: () => 'Something went wrong. Please try again.',
   }),
 }));
 vi.mock('../../lib/useTelegramAutoLogin', () => ({ useTelegramAutoLogin: () => false }));
@@ -54,7 +69,12 @@ function renderAt(entry: string) {
   );
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  mocks.firebaseEnabled = false;
+  mocks.login.mockReset();
+  window.history.replaceState({}, '', '/');
+});
 
 describe('arriving from a password reset email', () => {
   it('opens the reset panel with the token from the link already filled in', () => {
@@ -76,5 +96,37 @@ describe('arriving from a password reset email', () => {
     renderAt('/sign-in');
 
     expect(screen.queryByLabelText(/new password/i)).toBeNull();
+  });
+
+  it('strips ?reset= from the browser address bar after capturing the token', () => {
+    window.history.replaceState({}, '', '/sign-in?from=mail&reset=secret-reset-tok');
+    renderAt('/sign-in?from=mail&reset=secret-reset-tok');
+
+    expect(screen.getByDisplayValue('secret-reset-tok')).toBeDefined();
+    expect(window.location.search).toBe('?from=mail');
+  });
+
+  it('surfaces backend ApiError copy even when Firebase auth is enabled', async () => {
+    mocks.firebaseEnabled = true;
+    mocks.login.mockRejectedValueOnce(
+      new mocks.MockApiError(403, {
+        code: 'AUTH_EMAIL_UNVERIFIED',
+        message: 'Verify your email address before signing in.',
+      }),
+    );
+
+    renderAt('/sign-in');
+
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'user@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: 'ValidPass1234' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Verify your email address before signing in.')).toBeTruthy(),
+    );
   });
 });

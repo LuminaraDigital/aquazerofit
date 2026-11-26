@@ -112,12 +112,15 @@ function structuredData(route: MarketingRoute, cfg: SiteConfig): string {
     });
   }
 
-  return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph });
+  return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(
+    /</g,
+    '\\u003c',
+  );
 }
 
 function headBlock(route: MarketingRoute, cfg: SiteConfig): string {
-  const canonical = canonicalUrl(cfg.siteOrigin, route.path);
-  const image = `${cfg.siteOrigin}${SOCIAL_IMAGE_PATH}`;
+  const canonical = escapeHtml(canonicalUrl(cfg.siteOrigin, route.path));
+  const image = escapeHtml(`${cfg.siteOrigin}${SOCIAL_IMAGE_PATH}`);
   return [
     `<title>${escapeHtml(route.title)}</title>`,
     `<meta name="description" content="${escapeHtml(route.description)}" />`,
@@ -147,9 +150,11 @@ function noscriptBlock(route: MarketingRoute, cfg: SiteConfig): string {
   const links = MARKETING_ROUTES.filter((r) => r.path !== route.path)
     .map((r) => `<li><a href="${r.path}">${escapeHtml(r.title.split(' | ')[0].split(' — ')[0])}</a></li>`)
     .join('');
-  const telegram = `https://t.me/${cfg.telegramBotUsername}${
-    cfg.telegramMiniAppShortName ? `/${cfg.telegramMiniAppShortName}` : ''
-  }`;
+  const telegram = escapeHtml(
+    `https://t.me/${cfg.telegramBotUsername}${
+      cfg.telegramMiniAppShortName ? `/${cfg.telegramMiniAppShortName}` : ''
+    }`,
+  );
   const sections = (route.noscriptSections ?? []).map(
     (section) =>
       `      <h2>${escapeHtml(section.heading)}</h2><ul>${section.items
@@ -170,10 +175,10 @@ function noscriptBlock(route: MarketingRoute, cfg: SiteConfig): string {
 function renderShell(shell: string, route: MarketingRoute, cfg: SiteConfig): string {
   let html = shell;
   for (const pattern of OWNED_TAGS) html = html.replace(pattern, '');
-  html = html.replace(/(\s*)<\/head>/i, `\n${headBlock(route, cfg)}\n  </head>`);
+  html = html.replace(/(\s*)<\/head>/i, () => `\n${headBlock(route, cfg)}\n  </head>`);
   html = html.replace(
     /<div id="root"><\/div>/,
-    `<div id="root"></div>\n${noscriptBlock(route, cfg)}`,
+    () => `<div id="root"></div>\n${noscriptBlock(route, cfg)}`,
   );
   return html;
 }

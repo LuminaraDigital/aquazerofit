@@ -267,6 +267,8 @@ export const swapExerciseSchema = z.object({
 
 export const chatMessageSchema = z.object({
   content: z.string().min(1).max(4000),
+  /** Set by a client that renders coach action cards. */
+  actionCards: z.boolean().optional(),
 });
 
 // ---------- identity (PATCH /me) ----------

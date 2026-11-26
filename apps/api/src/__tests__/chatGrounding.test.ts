@@ -302,11 +302,12 @@ describe('offline coach', () => {
 describe('P-07', () => {
   it('bumps the version and forbids both failure modes, with no em or en dash', () => {
     const prompt = loadPrompt('P-07');
-    expect(prompt.version).toBe('1.0.5');
+    expect(prompt.version).toBe('1.0.6');
     expect(prompt.content).toMatch(/personalisation is off/i);
     expect(prompt.content).toMatch(/Privacy/);
     expect(prompt.content).toMatch(/log is not empty/);
     expect(prompt.content).toMatch(/do not repeat kcal totals/i);
+    expect(prompt.content).toMatch(/do not claim one is on screen/i);
     expect(prompt.content).not.toMatch(/\u2014|\u2013/);
 
     const here = path.dirname(fileURLToPath(import.meta.url));

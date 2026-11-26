@@ -96,6 +96,50 @@ describe('plan launch actions', () => {
   });
 });
 
+describe('deep link path validation and param encoding', () => {
+  it.each([
+    ['protocol-relative URL', '//evil.example'],
+    ['protocol-relative with path', '//evil.example/phish'],
+    ['javascript URI', 'javascript:alert(1)'],
+    ['external https URL', 'https://evil.example/'],
+    ['backslash open-redirect bypass', '/\\evil.example'],
+    ['control characters', '/plan\r\nX-Injected: 1'],
+  ])('blocks unsafe targetPath (%s)', (_label, badPath) => {
+    const navigate = vi.fn();
+    const payload = JSON.stringify({ action: 'custom', path: badPath });
+    expect(handleDeepLink(payload, navigate)).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('allows a safe internal targetPath fallback', () => {
+    const navigate = vi.fn();
+    const payload = JSON.stringify({ action: 'custom', path: '/settings' });
+    expect(handleDeepLink(payload, navigate)).toBe(true);
+    expect(navigate).toHaveBeenCalledWith('/settings');
+  });
+
+  it('URL-encodes dynamic query parameters across default routes', () => {
+    const navigate = vi.fn();
+    expect(
+      handleDeepLink(JSON.stringify({ action: 'log_meal', type: 'lunch&x=1' }), navigate),
+    ).toBe(true);
+    expect(
+      handleDeepLink(JSON.stringify({ action: 'water_add', amount: '250&y=2' }), navigate),
+    ).toBe(true);
+    expect(
+      handleDeepLink(JSON.stringify({ action: 'challenge', id: 'ABC&evil=1#h' }), navigate),
+    ).toBe(true);
+    expect(
+      handleDeepLink(JSON.stringify({ action: 'coach', id: 'akin&z=3' }), navigate),
+    ).toBe(true);
+
+    expect(navigate).toHaveBeenNthCalledWith(1, '/nutrition?action=add_meal&meal=lunch%26x%3D1');
+    expect(navigate).toHaveBeenNthCalledWith(2, '/nutrition?action=water_add&amount=250%26y%3D2');
+    expect(navigate).toHaveBeenNthCalledWith(3, '/challenges?code=ABC%26evil%3D1%23h');
+    expect(navigate).toHaveBeenNthCalledWith(4, '/coach?id=akin%26z%3D3');
+  });
+});
+
 describe('launch listener', () => {
   it('opens /plan from a Telegram start_param of plan', async () => {
     mocks.startParam = 'plan';

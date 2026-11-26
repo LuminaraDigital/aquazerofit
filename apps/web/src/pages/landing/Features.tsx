@@ -1,14 +1,15 @@
 /**
- * /features — the dedicated feature page linked from the footer.
+ * /features — Source-Bound Engineering Reference Sheet.
  *
- * This exists to go deeper than the landing page's summary, not to restate it:
- * the numbers below are imported from @aquazerofit/shared and rendered, not
- * transcribed. If a safety constant changes — a calorie floor, a memory cap, a
- * credit cost — this page changes with it in the same commit, and cannot
- * quietly become a page of stale marketing claims.
+ * Signature architecture: clean editorial header followed by a full-width
+ * 1px-ruled Source Constant Strip (no tilted hero card duplicating `/safety`),
+ * sticky left TOC with active scroll-spy (`aria-current`), 3D hardware frames,
+ * 2x2 target spec grid, and interactive kit-filtering preview.
  */
+import { useEffect, useState } from 'react';
 import {
   ACTIVITY_FACTORS,
+  COACHES,
   CREDIT_COSTS,
   FAT_KCAL_FRACTION_MIN,
   FORMULA_VERSION,
@@ -30,7 +31,7 @@ import {
   WEEKLY_LOSS_FRACTION,
   WELLNESS_DISCLAIMER,
 } from '@aquazerofit/shared';
-import { DeviceFrame } from './PhoneShowcase';
+import { DeviceFrame, type ScreenshotId } from './PhoneShowcase';
 import { Bullet, MarketingPage, PageCta, PageHero, Spec } from './Page';
 import { Reveal } from './motion';
 
@@ -43,9 +44,68 @@ const SECTIONS = [
   { id: 'platform', label: 'Platform & licence' },
 ];
 
-/* ------------------------------------------------------------------ */
-/* Building blocks                                                     */
-/* ------------------------------------------------------------------ */
+const KIT_DEMO: Record<string, { label: string; sample: string[] }> = {
+  bodyweight: {
+    label: 'Bodyweight only',
+    sample: ['Push-up progression', 'Bulgarian split squat', 'Hollow-body hold', 'Shadowboxing intervals'],
+  },
+  dumbbells: {
+    label: 'Dumbbells',
+    sample: ['Goblet squat', 'Romanian deadlift', 'Single-arm row', 'Overhead press'],
+  },
+  pullup: {
+    label: 'Pull-up bar',
+    sample: ['Strict pull-up', 'Hanging knee raise', 'Scapular pull', 'Inverted row'],
+  },
+  bands: {
+    label: 'Resistance bands',
+    sample: ['Band face pull', 'Banded pallof press', 'Banded good morning', 'Rotational punch'],
+  },
+};
+
+function KitFilterDemo() {
+  const [kit, setKit] = useState<string>('bodyweight');
+  const active = KIT_DEMO[kit] ?? KIT_DEMO.bodyweight!;
+
+  return (
+    <div className="mt-6 rounded-card border border-outline-variant/65 bg-surface-container-low p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="stat-label text-primary">Preview kit filtering</span>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Sample equipment kit">
+          {Object.entries(KIT_DEMO).map(([key, item]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setKit(key)}
+              aria-pressed={kit === key}
+              className={`min-h-[44px] rounded-full px-3.5 text-[13px] font-semibold transition-colors sm:min-h-[36px] ${
+                kit === key
+                  ? 'bg-primary-fixed-dim azf-cta-text'
+                  : 'border border-outline/80 bg-surface text-on-surface-variant hover:border-primary hover:text-on-surface'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+        {active.sample.map((move) => (
+          <li
+            key={move}
+            className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant/60 bg-surface px-3.5 py-2.5 text-[14px] text-on-surface"
+          >
+            <span className="min-w-0 leading-snug">{move}</span>
+            <span className="shrink-0 whitespace-nowrap text-[12px] font-medium uppercase tracking-[0.06em] text-secondary">
+              CC BY-SA
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function Block({
   id,
@@ -61,7 +121,7 @@ function Block({
   eyebrow: string;
   title: React.ReactNode;
   lead: string;
-  screenshot?: string;
+  screenshot?: ScreenshotId;
   alt?: string;
   flip?: boolean;
   children: React.ReactNode;
@@ -70,32 +130,24 @@ function Block({
     <section id={id} className="scroll-mt-24">
       <div
         className={`grid items-start gap-10 ${
-          screenshot ? 'lg:grid-cols-[1fr_300px] lg:gap-16' : ''
+          screenshot ? 'lg:grid-cols-[minmax(0,1fr)_292px] lg:gap-14' : ''
         }`}
       >
         <Reveal className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary/80">
-            {eyebrow}
-          </p>
-          <h2 className="mt-3 font-heading text-3xl font-semibold leading-[1.1] text-on-surface sm:text-[38px]">
+          <p className="stat-label text-primary">{eyebrow}</p>
+          <h2 className="mt-2 font-heading text-[32px] font-semibold leading-[1.06] text-on-surface sm:text-[40px]">
             {title}
           </h2>
-          <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-on-surface-variant/75">
+          <p className="mt-3.5 max-w-[60ch] text-[15.5px] leading-relaxed text-on-surface-variant">
             {lead}
           </p>
-          <div className="mt-8">{children}</div>
+          <div className="mt-7">{children}</div>
         </Reveal>
 
         {screenshot && (
-          <Reveal delay={120} className={flip ? 'lg:order-first' : ''}>
-            <div className="relative mx-auto w-[260px] sm:w-[300px]">
-              <div
-                className="pointer-events-none absolute -inset-8 rounded-full bg-[radial-gradient(circle,rgba(47,217,244,0.14),transparent_65%)] blur-2xl"
-                aria-hidden="true"
-              />
-              <div className="relative">
-                <DeviceFrame id={screenshot} alt={alt ?? ''} />
-              </div>
+          <Reveal delay={70} className={flip ? 'lg:order-first' : ''}>
+            <div className="mx-auto w-[256px] sm:w-[288px]">
+              <DeviceFrame id={screenshot} alt={alt ?? ''} />
             </div>
           </Reveal>
         )}
@@ -104,52 +156,88 @@ function Block({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Page                                                                */
-/* ------------------------------------------------------------------ */
-
 export default function FeaturesPage() {
+  const [activeSection, setActiveSection] = useState<string>(SECTIONS[0]!.id);
   const mib = Math.round(MEAL_PHOTO_MAX_BYTES / (1024 * 1024));
   const formats = MEAL_PHOTO_MIME.map((m) => m.replace('image/', '').toUpperCase()).join(', ');
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const els = SECTIONS.map((s) => document.getElementById(s.id)).filter(
+      (el): el is HTMLElement => Boolean(el),
+    );
+    if (!els.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveSection(entry.target.id);
+        }
+      },
+      { rootMargin: '-20% 0px -65% 0px', threshold: 0.01 },
+    );
+    for (const el of els) observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <MarketingPage path="/features">
       <PageHero
         crumb="Features"
-        title={
-          <>
-            Every feature, and <span className="lp-gradient-text">how it actually works</span>
-          </>
-        }
-        lead="The short version is on the home page. This is the long one — including the formulas, the limits and the constants your targets are computed from. The figures below are read straight out of the application's source at build time, so this page cannot drift from the software."
-        secondary={{ to: '/landing', label: 'Back to overview' }}
-      />
+        kicker="Source-bound reference"
+        title="Every feature, and how it actually works"
+        lead="The short version is on the home page. This is the engineering reference — including the formulas, limits and constants your targets are computed from, read straight out of the application's source at build time."
+        secondary={{ to: '/', label: 'Back to overview' }}
+      >
+        {/* Full-width horizontal Corner Card Constant Strip */}
+        <dl className="mt-10 grid gap-x-8 gap-y-5 border-y border-outline-variant/60 py-6 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ['Formula', FORMULA_VERSION, 'Deterministic BMR'],
+            ['Calorie floors', `${KCAL_FLOOR.female} / ${KCAL_FLOOR.male} kcal`, 'Disclosed min clamp'],
+            ['Free daily AI', `${FREE_TIER_DAILY_CREDITS} credits`, 'Deterministic = 0 credits'],
+            ['Fighter roster', `${COACHES.length} coaches`, 'Earned by showing up'],
+          ].map(([label, big, sub]) => (
+            <div key={label}>
+              <dt className="stat-label">{label}</dt>
+              <dd className="mt-1.5 font-heading text-[28px] font-bold leading-none tabular-nums text-on-surface">
+                {big}
+              </dd>
+              <dd className="mt-1 text-[13px] text-on-surface-variant">{sub}</dd>
+            </div>
+          ))}
+        </dl>
+      </PageHero>
 
-      <div className="mx-auto max-w-6xl px-5 pb-24 sm:pb-32">
-        <div className="grid gap-12 lg:grid-cols-[200px_1fr] lg:gap-16">
-          {/* On-this-page rail */}
-          <Reveal className="lg:sticky lg:top-24 lg:self-start">
+      <div className="mx-auto max-w-[1200px] px-5 pb-24 sm:px-8 sm:pb-32">
+        <div className="grid gap-12 lg:grid-cols-[196px_minmax(0,1fr)] lg:gap-14">
+          {/* Sticky left TOC with active indicator and 44px touch rows */}
+          <aside className="lg:sticky lg:top-24 lg:self-start">
             <nav aria-label="On this page">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                On this page
-              </h2>
-              <ul className="mt-4 space-y-2.5 border-l border-white/8 pl-4">
-                {SECTIONS.map((section) => (
-                  <li key={section.id}>
-                    <a
-                      href={`#${section.id}`}
-                      className="text-sm text-on-surface-variant/75 transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-                    >
-                      {section.label}
-                    </a>
-                  </li>
-                ))}
+              <h2 className="stat-label">On this page</h2>
+              <ul className="mt-3 border-l border-outline-variant/60 pl-4">
+                {SECTIONS.map((section) => {
+                  const active = activeSection === section.id;
+                  return (
+                    <li key={section.id}>
+                      <a
+                        href={`#${section.id}`}
+                        aria-current={active ? 'location' : undefined}
+                        className={`inline-flex min-h-[44px] items-center text-[14px] transition-colors ${
+                          active
+                            ? 'font-semibold text-primary'
+                            : 'text-on-surface-variant hover:text-on-surface'
+                        }`}
+                      >
+                        {section.label}
+                      </a>
+                    </li>
+                  );
+                })}
               </ul>
             </nav>
-          </Reveal>
+          </aside>
 
           <div className="min-w-0 space-y-24 sm:space-y-28">
-            {/* -------------------------------------------------- */}
             <Block
               id="nutrition"
               eyebrow="Nutrition"
@@ -184,14 +272,13 @@ export default function FeaturesPage() {
               </ul>
             </Block>
 
-            {/* -------------------------------------------------- */}
             <Block
               id="targets"
               eyebrow="Targets"
               title="The maths, in full"
               lead={`Basal metabolic rate comes from Mifflin-St Jeor (${FORMULA_VERSION}), multiplied by an activity factor and adjusted by a bounded rate of change. No model participates. You can check every number below with a calculator.`}
             >
-              <div className="space-y-4">
+              <div className="grid gap-5 md:grid-cols-2">
                 <Spec
                   rows={Object.entries(ACTIVITY_FACTORS).map(([key, value]) => [
                     key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()),
@@ -207,8 +294,6 @@ export default function FeaturesPage() {
                       `${WEEKLY_LOSS_FRACTION.min * 100}–${WEEKLY_LOSS_FRACTION.max * 100}% of bodyweight`,
                     ],
                     ['Energy per kg of bodyweight', `${KCAL_PER_KG.toLocaleString()} kcal`],
-                    /* One decimal throughout: 2.0 beside 1.6 and 2.2 reads
-                           as a considered figure; a bare 2 reads as a typo. */
                     ['Protein — losing', `${PROTEIN_G_PER_KG.lose.toFixed(1)} g/kg`],
                     ['Protein — maintaining', `${PROTEIN_G_PER_KG.maintain.toFixed(1)} g/kg`],
                     ['Protein — gaining', `${PROTEIN_G_PER_KG.gain.toFixed(1)} g/kg`],
@@ -245,7 +330,6 @@ export default function FeaturesPage() {
               </div>
             </Block>
 
-            {/* -------------------------------------------------- */}
             <Block
               id="training"
               eyebrow="Training"
@@ -273,9 +357,10 @@ export default function FeaturesPage() {
                   discloses it on the card instead of passing it off.
                 </Bullet>
               </ul>
+
+              <KitFilterDemo />
             </Block>
 
-            {/* -------------------------------------------------- */}
             <Block
               id="coach"
               eyebrow="Aqua Coach"
@@ -318,7 +403,6 @@ export default function FeaturesPage() {
               </div>
             </Block>
 
-            {/* -------------------------------------------------- */}
             <Block
               id="progress"
               eyebrow="Progress"
@@ -344,51 +428,52 @@ export default function FeaturesPage() {
               </ul>
             </Block>
 
-            {/* -------------------------------------------------- */}
             <Block
               id="platform"
               eyebrow="Platform"
               title="Where it runs, and what it costs you"
               lead="One codebase serves the responsive web app and the Telegram Mini App. It is free software, and it runs without any AI provider at all if you would rather it did."
             >
-              <ul className="space-y-4">
-                <Bullet title="Telegram Mini App">
-                  The same product inside Telegram, binding the client&apos;s theme and native
-                  controls and signing you in from the launch data.
-                </Bullet>
-                <Bullet title="Runs without AI keys">
-                  With no provider configured the API falls back to a deterministic offline engine,
-                  so every core journey — targets, logging, plans, progress — still works.
-                </Bullet>
-                <Bullet title="Usage is a ledger, not a balance">
-                  Credits are derived by folding an append-only transaction log, so a balance cannot
-                  be quietly rewritten.
-                </Bullet>
-                <Bullet title="Free software, AGPL v3">
-                  Read the calculations, audit the guardrails, or run the whole platform yourself.
-                </Bullet>
-              </ul>
+              <div className="grid items-start gap-6 lg:grid-cols-2">
+                <ul className="space-y-4">
+                  <Bullet title="Telegram Mini App">
+                    The same product inside Telegram, binding the client&apos;s theme and native
+                    controls and signing you in from the launch data.
+                  </Bullet>
+                  <Bullet title="Runs without AI keys">
+                    With no provider configured the API falls back to a deterministic offline engine,
+                    so every core journey — targets, logging, plans, progress — still works.
+                  </Bullet>
+                  <Bullet title="Usage is a ledger, not a balance">
+                    Credits are derived by folding an append-only transaction log, so a balance cannot
+                    be quietly rewritten.
+                  </Bullet>
+                  <Bullet title="Free software, AGPL v3">
+                    Read the calculations, audit the guardrails, or run the whole platform yourself.
+                  </Bullet>
+                </ul>
 
-              <div className="mt-6">
-                <Spec
-                  rows={[
-                    ['Free credits each day', `${FREE_TIER_DAILY_CREDITS}`],
-                    ['Coach message', `${CREDIT_COSTS.chatTurn} credit`],
-                    ['Meal photo analysis', `${CREDIT_COSTS.mealPhoto} credits`],
-                    ['Meal suggestion', `${CREDIT_COSTS.mealRecommendation} credits`],
-                    ['Recipe generation', `${CREDIT_COSTS.recipeGeneration} credits`],
-                    ['Plan generation', `${CREDIT_COSTS.planGeneration} credits`],
-                    ['Progress insight', `${CREDIT_COSTS.progressInsight} credit`],
-                  ]}
-                  caption="Deterministic features — targets, logging, hydration, the exercise library, charts — cost nothing, because no model is involved in them."
-                />
+                <div>
+                  <Spec
+                    rows={[
+                      ['Free credits each day', `${FREE_TIER_DAILY_CREDITS}`],
+                      ['Coach message', `${CREDIT_COSTS.chatTurn} credit`],
+                      ['Meal photo analysis', `${CREDIT_COSTS.mealPhoto} credits`],
+                      ['Meal suggestion', `${CREDIT_COSTS.mealRecommendation} credits`],
+                      ['Recipe generation', `${CREDIT_COSTS.recipeGeneration} credits`],
+                      ['Plan generation', `${CREDIT_COSTS.planGeneration} credits`],
+                      ['Progress insight', `${CREDIT_COSTS.progressInsight} credit`],
+                    ]}
+                    caption="Deterministic features — targets, logging, hydration, the exercise library, charts — cost nothing, because no model is involved in them."
+                  />
+                </div>
               </div>
 
               <a
                 href={SOURCE_CODE_URL}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                className="mt-5 inline-flex min-h-[44px] items-center gap-2 text-[15px] font-semibold text-primary transition-colors hover:text-on-surface"
               >
                 Read the source
                 <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
@@ -397,7 +482,6 @@ export default function FeaturesPage() {
               </a>
             </Block>
 
-            {/* -------------------------------------------------- */}
             <PageCta
               title="Ready to see your own numbers?"
               lead="Building a profile takes a couple of minutes, and the targets are computed the moment you finish."

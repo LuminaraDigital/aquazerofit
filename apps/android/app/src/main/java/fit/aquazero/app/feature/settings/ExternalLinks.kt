@@ -11,6 +11,7 @@ import androidx.core.net.toUri
 import fit.aquazero.app.BuildConfig
 import fit.aquazero.app.core.data.PlayPurchaseRules
 import fit.aquazero.app.core.designsystem.AzfColors
+import java.net.URI
 
 /**
  * The pages this app deliberately does not rebuild natively.
@@ -58,6 +59,16 @@ object ExternalLinks {
 }
 
 /**
+ * Only `https://` URLs with a non-blank host may leave the app via Custom Tabs
+ * or `Intent.ACTION_VIEW` — rejecting `http:`, `javascript:`, `file:`,
+ * `intent:`, `content:`, and opaque schemes.
+ */
+internal fun isAllowedExternalUrl(url: String): Boolean {
+    val parsed = runCatching { URI(url) }.getOrNull() ?: return false
+    return parsed.scheme.equals("https", ignoreCase = true) && !parsed.host.isNullOrBlank()
+}
+
+/**
  * Open Play's subscription settings for this app.
  *
  * A plain view intent, deliberately, where every other link here uses a Custom
@@ -72,7 +83,9 @@ object ExternalLinks {
  * fallback below is the honest answer.
  */
 fun Context.openPlaySubscriptions(): Boolean {
+    if (!isAllowedExternalUrl(ExternalLinks.PLAY_SUBSCRIPTION)) return false
     val uri: Uri = runCatching { ExternalLinks.PLAY_SUBSCRIPTION.toUri() }.getOrNull() ?: return false
+    if (!uri.scheme.equals("https", ignoreCase = true)) return false
     return try {
         startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         true
@@ -90,7 +103,9 @@ fun Context.openPlaySubscriptions(): Boolean {
  * Returns true when something was launched, so callers can say so.
  */
 fun Context.openInCustomTab(url: String): Boolean {
+    if (!isAllowedExternalUrl(url)) return false
     val uri: Uri = runCatching { url.toUri() }.getOrNull() ?: return false
+    if (!uri.scheme.equals("https", ignoreCase = true)) return false
     val intent = CustomTabsIntent.Builder()
         .setShowTitle(true)
         .setUrlBarHidingEnabled(true)

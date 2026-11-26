@@ -88,6 +88,25 @@ describe('enforceHttps', () => {
       .set('X-Forwarded-Proto', 'https');
     expect(res.status).toBe(308);
   });
+
+  it('never redirects off-origin via a spoofed X-Forwarded-Host header', async () => {
+    process.env.FORCE_HTTPS = 'true';
+    delete process.env.APP_PUBLIC_URL;
+    const withoutCanonical = await request(appWithHttps())
+      .get('/dashboard?tab=week')
+      .set('Host', 'app.aquazerofit.com')
+      .set('X-Forwarded-Host', 'attacker.example');
+    expect(withoutCanonical.status).toBe(308);
+    expect(withoutCanonical.headers.location).toBe('https://app.aquazerofit.com/dashboard?tab=week');
+
+    process.env.APP_PUBLIC_URL = 'https://aquazerofit.com';
+    const withCanonical = await request(appWithHttps())
+      .get('/dashboard?tab=week')
+      .set('Host', 'attacker.example')
+      .set('X-Forwarded-Host', 'attacker.example');
+    expect(withCanonical.status).toBe(308);
+    expect(withCanonical.headers.location).toBe('https://aquazerofit.com/dashboard?tab=week');
+  });
 });
 
 describe('redirectWwwToCanonical', () => {

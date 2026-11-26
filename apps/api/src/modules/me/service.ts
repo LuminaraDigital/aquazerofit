@@ -141,7 +141,8 @@ export function toPublicUser(user: User): PublicUser {
     hasProfile: getProfile(user.id) !== undefined,
     telegramLinked: user.tgId !== undefined && user.tgId !== null,
     hasPassword:
-      getStore().byId<CredentialsDoc>('users', credentialsId(user.id)) !== undefined,
+      getStore().byId<CredentialsDoc>('users', credentialsId(user.id)) !== undefined ||
+      user.firebasePassword === true,
     timezone: user.timezone,
     createdAt: user.createdAt,
   };
@@ -302,19 +303,31 @@ export function saveConsents(userId: string, input: Omit<ConsentState, 'updatedA
 // to keep in sync.
 const USER_SCOPED_CONTAINERS: ContainerName[] = ['profiles', 'logs', 'plans', 'ai', 'ledger', 'audit'];
 
+/** Strip server-internal paths and billing hold ids from exported `ai` docs. */
+function sanitizeAiExportDoc(doc: { id: string; userId?: string }): Record<string, unknown> {
+  const {
+    imagePath: _imagePath,
+    imageVariants: _imageVariants,
+    reservationId: _reservationId,
+    ...rest
+  } = doc as Record<string, unknown>;
+  return rest;
+}
+
 export function exportUserData(userId: string): Record<string, unknown> {
   const store = getStore();
   const user = store.byId<User>('users', userId);
   const bundle: Record<string, unknown> = {
     exportedAt: new Date().toISOString(),
-    user,
+    user: user ? toPublicUser(user) : undefined,
     consents: getConsents(userId),
   };
   for (const container of USER_SCOPED_CONTAINERS) {
-    bundle[container] = store.where<{ id: string; userId?: string }>(
+    const docs = store.where<{ id: string; userId?: string }>(
       container,
       (d) => d.userId === userId,
     );
+    bundle[container] = container === 'ai' ? docs.map(sanitizeAiExportDoc) : docs;
   }
   auditDataAccess(userId, 'export', {});
   return bundle;

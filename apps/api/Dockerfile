@@ -77,6 +77,18 @@ ENV VITE_SITE_ORIGIN=$VITE_SITE_ORIGIN \
     VITE_TG_ANALYTICS_APP_NAME=$VITE_TG_ANALYTICS_APP_NAME
 RUN npm run build --workspace apps/web
 
+# Strip devDependencies (vitest, typescript, vite, etc.) and build-only web
+# packages before copying node_modules into the runtime stage. `tsx` and
+# `sharp` are runtime dependencies of apps/api; re-apply the linux-x64 sharp
+# bindings from /tmp/sharpfix and verify both sharp and tsx survive before Stage 2.
+RUN npm ci --omit=dev --workspace packages/shared --workspace apps/api --include-workspace-root --prefer-offline \
+ && mkdir -p /repo/node_modules/sharp/node_modules/@img \
+ && cp -r /tmp/sharpfix/node_modules/@img/sharp-linux-x64 /tmp/sharpfix/node_modules/@img/sharp-libvips-linux-x64 /repo/node_modules/sharp/node_modules/@img/ \
+ && (cp -r /tmp/sharpfix/node_modules/@img /repo/node_modules/@img-linux || true) \
+ && rm -rf /tmp/sharpfix \
+ && node -e "require('sharp'); console.log('[sharp] linux-x64 native binding OK (prod)')" \
+ && test -f /repo/node_modules/tsx/dist/cli.mjs
+
 # Writable runtime paths, plus the workspace node_modules directories.
 # npm omits a workspace node_modules when everything hoisted. Creating them
 # here lets the runtime COPY succeed either way, so a later nested dependency
@@ -102,19 +114,20 @@ COPY apps/api/package.json apps/api/
 
 # Hoisted packages live in the root node_modules. npm can also nest a
 # dependency under a workspace (this is what happened to zod 4.6.7). Copy
-# those trees too. The build stage creates the directories, so this does not
-# fail when a workspace currently hoists everything.
-COPY --from=build --chown=nonroot:nonroot /repo/node_modules /repo/node_modules
-COPY --from=build --chown=nonroot:nonroot /repo/apps/api/node_modules /repo/apps/api/node_modules
-COPY --from=build --chown=nonroot:nonroot /repo/packages/shared/node_modules /repo/packages/shared/node_modules
+# those trees too as root-owned (read-only to nonroot). The build stage
+# creates the directories, so this does not fail when everything hoists.
+COPY --from=build /repo/node_modules /repo/node_modules
+COPY --from=build /repo/apps/api/node_modules /repo/apps/api/node_modules
+COPY --from=build /repo/packages/shared/node_modules /repo/packages/shared/node_modules
 
-# Copy source code. prompts/ is required at runtime: loadPrompt walks up to it
-# and a missing file fails soft to empty content, which ships a silent coach.
-COPY --chown=nonroot:nonroot tsconfig.base.json ./
-COPY --chown=nonroot:nonroot prompts prompts
-COPY --chown=nonroot:nonroot packages/shared packages/shared
-COPY --chown=nonroot:nonroot apps/api apps/api
-COPY --from=build --chown=nonroot:nonroot /repo/apps/web/dist /repo/apps/web/dist
+# Copy source code and SPA bundle as root-owned (read-only to nonroot).
+# prompts/ is required at runtime: loadPrompt walks up to it and a missing
+# file fails soft to empty content, which ships a silent coach.
+COPY tsconfig.base.json ./
+COPY prompts prompts
+COPY packages/shared packages/shared
+COPY apps/api apps/api
+COPY --from=build /repo/apps/web/dist /repo/apps/web/dist
 
 # Writable runtime paths. AZF_DATA_DIR and uploads live on the container
 # filesystem, which Cloud Run discards on every restart. The document store
@@ -139,7 +152,7 @@ ENV PORT=4000
 # Liveness is also declared here so `docker run` behaves like the platform.
 # Note: distroless has no shell, so we use the exec form with node directly.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
-  CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+  CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
 # Distroless entrypoint is `node`, so the CMD must be a JS file path: the
 # .bin/tsx shim is a shell script this image does not have. Resolve the real

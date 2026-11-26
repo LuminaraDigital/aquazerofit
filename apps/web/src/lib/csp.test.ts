@@ -51,12 +51,12 @@ const staticSource = read('../../staticwebapp.config.json');
  * allowed. Anything not listed here has to match.
  *
  * `connect-src`: on the static host the API lives on a different origin
- * (`*.aquazero.fit`), so the browser needs an explicit allowance for it. Under
+ * (`https://aquazerofit.com`), so the browser needs an explicit allowance for it. Under
  * Express the SPA and the API are the same origin and `'self'` already covers
- * it — adding the wildcard there would widen egress for nothing.
+ * it — adding the origin there would widen egress for nothing.
  */
 const ALLOWED_EXTRA_ON_STATIC: Readonly<Record<string, readonly string[]>> = {
-  'connect-src': ['https://*.aquazero.fit'],
+  'connect-src': ['https://aquazerofit.com'],
 };
 
 const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';

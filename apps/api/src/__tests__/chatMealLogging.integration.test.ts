@@ -18,6 +18,7 @@ import { CREDIT_COSTS } from '@aquazerofit/shared';
 import type { Allergen, MealLog } from '@aquazerofit/shared';
 import { creditLedger } from '../modules/ai/creditLedger';
 import { resetProviderCircuits } from '../modules/ai/gateway';
+import { loadPrompt } from '../modules/ai/prompts';
 import {
   bindIsolatedDataDir,
   clearProviderEnv,
@@ -53,11 +54,20 @@ const base = '/api/v1';
 type ProviderScript = { ok: true; payload: unknown } | { ok: false };
 
 let script: ProviderScript = { ok: true, payload: { items: [] } };
+let capturedMessages: Array<{ role: string; content: string }[]> = [];
 
 function stubProvider(): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => {
+    vi.fn(async (_url: string, init?: { body?: string }) => {
+      if (init?.body) {
+        try {
+          const parsed = JSON.parse(init.body) as { messages?: { role: string; content: string }[] };
+          if (Array.isArray(parsed.messages)) capturedMessages.push(parsed.messages);
+        } catch {
+          /* ignore non-JSON bodies */
+        }
+      }
       if (!script.ok) {
         return {
           ok: false,
@@ -210,6 +220,7 @@ const itemBy = (draft: Draft, spokenName: string): DraftItem =>
 beforeEach(() => {
   pinIsolatedDataDir(dataDir);
   script = { ok: true, payload: BREAKFAST_PAYLOAD };
+  capturedMessages = [];
   resetProviderCircuits();
   stubProvider();
 });
@@ -302,6 +313,14 @@ describe('POST /chat/meal-drafts', () => {
     expect(rows.filter((r) => r.reason === 'reserve:chatTurn')).toHaveLength(1);
     expect(rows.filter((r) => r.reason === 'commit:chatTurn')).toHaveLength(1);
     expect(CREDIT_COSTS.chatTurn).toBe(1);
+  });
+
+  it('sends the P-12 system prompt as the first message to the gateway', async () => {
+    await createDraft(plain);
+
+    expect(capturedMessages.length).toBeGreaterThanOrEqual(1);
+    const firstCall = capturedMessages[0]!;
+    expect(firstCall[0]).toEqual({ role: 'system', content: loadPrompt('P-12').content });
   });
 });
 

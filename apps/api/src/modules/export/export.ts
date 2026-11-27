@@ -29,6 +29,11 @@ const round1 = (n: number): number => Math.round(n * 10) / 10;
 
 const CSV_FORMULA_PREFIX = /^[=+\-@\t\r]/;
 
+/**
+ * Quote a CSV cell. Text starting with = + - @ (or a tab or carriage return)
+ * gets a leading apostrophe: spreadsheets read such a cell as a formula, and
+ * a meal name is free text the user typed. Numbers pass through unchanged.
+ */
 function escapeCsv(val: string | number | undefined | null): string {
   if (val === undefined || val === null) return '""';
   if (typeof val === 'string' && CSV_FORMULA_PREFIX.test(val)) {

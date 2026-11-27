@@ -107,6 +107,34 @@ describe('Export diary endpoint GET /api/v1/export/diary', () => {
     expect(res.text).toContain('Water');
   });
 
+  /*
+   * A meal's name is free text the user typed, and the CSV opens in a
+   * spreadsheet. A cell starting with = + - @ (or a tab or carriage return)
+   * is read as a formula there: =HYPERLINK(...) becomes a live link, and
+   * older Excel versions also ran DDE payloads. Such cells get a leading
+   * apostrophe so they stay text. Numbers are left alone.
+   */
+  it('keeps a formula-like meal name as text in the CSV', async () => {
+    const formula = '=HYPERLINK("http://example.com","x")';
+    const logged = await request(app)
+      .post(`${base}/meal-logs`)
+      .set(auth())
+      .send({
+        mealType: 'snack',
+        localDate: '2026-11-10',
+        items: [{ name: formula, grams: 10, kcal: 5, proteinG: 0, carbsG: 1, fatG: 0 }],
+      });
+    expect(logged.status).toBe(201);
+
+    const res = await request(app).get(`${base}/export/diary?format=csv&date=2026-11-10`).set(auth());
+
+    expect(res.status).toBe(200);
+    const row = res.text.split(/\r?\n/).find((line) => line.includes('HYPERLINK'))!;
+    const cells = row.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((c) => c.replace(/^"|"$/g, ''));
+    expect(cells.some((c) => /^[=+\-@\t\r]/.test(c))).toBe(false);
+    expect(row).toContain("'=HYPERLINK");
+  });
+
   it('filters export by date when date query param is provided', async () => {
     const res = await request(app)
       .get(`${base}/export/diary?date=2026-08-10&format=json`)

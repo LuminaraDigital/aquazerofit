@@ -27,6 +27,8 @@ const exportQuerySchema = z.object({
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 
+const CSV_FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
 /**
  * Quote a CSV cell. Text starting with = + - @ (or a tab or carriage return)
  * gets a leading apostrophe: spreadsheets read such a cell as a formula, and
@@ -34,7 +36,10 @@ const round1 = (n: number): number => Math.round(n * 10) / 10;
  */
 function escapeCsv(val: string | number | undefined | null): string {
   if (val === undefined || val === null) return '""';
-  const str = typeof val === 'string' && /^[=+\-@\t\r]/.test(val) ? `'${val}` : String(val);
+  if (typeof val === 'string' && CSV_FORMULA_PREFIX.test(val)) {
+    return `"'${val.replace(/"/g, '""')}"`;
+  }
+  const str = String(val);
   if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replace(/"/g, '""')}"`;
   }

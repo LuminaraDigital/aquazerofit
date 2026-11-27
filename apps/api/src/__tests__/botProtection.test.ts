@@ -28,6 +28,7 @@ import type { AppError } from '../platform/errors';
 
 const ORIGINAL_SECRET = process.env.TURNSTILE_SECRET_KEY;
 const ORIGINAL_SITE = process.env.TURNSTILE_SITE_KEY;
+const ORIGINAL_ORIGIN_SECRET = process.env.ORIGIN_SHARED_SECRET;
 const MOBILE_KEYS = [
   'AUTH_ALLOW_CAPTCHALESS_MOBILE',
   'PLAY_INTEGRITY_ENABLED',
@@ -45,9 +46,15 @@ function configureTurnstile(): void {
 
 /** Minimal Express-request stand-in carrying only what botProtection reads. */
 function fakeRequest(opts: { headers?: Record<string, string>; body?: unknown; ip?: string } = {}) {
-  const headers = opts.headers ?? {};
+  const headers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(opts.headers ?? {})) {
+    headers[k.toLowerCase()] = v;
+  }
+  const remoteAddress = opts.ip ?? '203.0.113.7';
   return {
-    ip: opts.ip ?? '203.0.113.7',
+    ip: remoteAddress,
+    headers,
+    socket: { remoteAddress },
     body: opts.body,
     get: (name: string) => headers[name.toLowerCase()],
   } as unknown as Request;
@@ -64,6 +71,7 @@ function stubVerify(payload: unknown, ok = true) {
 beforeEach(() => {
   delete process.env.TURNSTILE_SECRET_KEY;
   delete process.env.TURNSTILE_SITE_KEY;
+  delete process.env.ORIGIN_SHARED_SECRET;
   for (const k of MOBILE_KEYS) delete process.env[k];
 });
 
@@ -72,6 +80,8 @@ afterEach(() => {
   else process.env.TURNSTILE_SECRET_KEY = ORIGINAL_SECRET;
   if (ORIGINAL_SITE === undefined) delete process.env.TURNSTILE_SITE_KEY;
   else process.env.TURNSTILE_SITE_KEY = ORIGINAL_SITE;
+  if (ORIGINAL_ORIGIN_SECRET === undefined) delete process.env.ORIGIN_SHARED_SECRET;
+  else process.env.ORIGIN_SHARED_SECRET = ORIGINAL_ORIGIN_SECRET;
   for (const k of MOBILE_KEYS) {
     if (ORIGINAL_MOBILE[k] === undefined) delete process.env[k];
     else process.env[k] = ORIGINAL_MOBILE[k];
@@ -207,6 +217,31 @@ describe('assertHuman when configured', () => {
     expect(body).toContain('secret=test-secret');
     expect(body).toContain('response=good');
     expect(body).toContain('remoteip=198.51.100.4');
+  });
+
+  it('forwards CF-Connecting-IP only when the origin shared secret matches', async () => {
+    process.env.ORIGIN_SHARED_SECRET = 'worker-secret';
+    const spy = stubVerify({ success: true });
+
+    await assertHuman(
+      fakeRequest({
+        body: { captchaToken: 'good' },
+        ip: '10.0.0.8',
+        headers: { 'cf-connecting-ip': '198.51.100.77', 'x-origin-shared-secret': 'worker-secret' },
+      }),
+      'register',
+    );
+    expect((spy.mock.calls[0]![1]!.body as URLSearchParams).toString()).toContain('remoteip=198.51.100.77');
+
+    await assertHuman(
+      fakeRequest({
+        body: { captchaToken: 'good' },
+        ip: '10.0.0.8',
+        headers: { 'cf-connecting-ip': '198.51.100.88', 'x-origin-shared-secret': 'spoofed' },
+      }),
+      'register',
+    );
+    expect((spy.mock.calls[1]![1]!.body as URLSearchParams).toString()).toContain('remoteip=10.0.0.8');
   });
 });
 

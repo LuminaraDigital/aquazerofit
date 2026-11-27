@@ -14,6 +14,7 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
+import { signAccess } from '../platform/auth';
 import { config } from '../platform/config';
 import {
   AI_STRICT_PER_MINUTE,
@@ -46,8 +47,14 @@ afterAll(() => {
 });
 
 /** Minimal req/res pair. The limiter keys on the socket when no Worker secret is present. */
-function callOnce(path: string, ip: string, method = 'POST'): { passed: boolean; status?: number } {
-  const req = { method, path, headers: {}, ip, socket: { remoteAddress: ip } } as unknown as Request;
+function callOnce(
+  path: string,
+  ip: string,
+  method = 'POST',
+  authorization?: string,
+): { passed: boolean; status?: number } {
+  const headers: Record<string, string> = authorization ? { authorization } : {};
+  const req = { method, path, headers, ip, socket: { remoteAddress: ip } } as unknown as Request;
   let status: number | undefined;
   const res = {
     setHeader: () => undefined,
@@ -191,5 +198,26 @@ describe('rate limiter lanes', () => {
   it('keeps credential guessing on the per-IP auth lane', () => {
     const limit = config.authRateLimitPerMinute;
     expect(callsUntilBlocked('/api/v1/auth/login', '4.4.4.4', limit + 5)).toBe(limit + 1);
+  });
+
+  it('ignores forged unsigned JWTs so an attacker cannot exhaust a victim user bucket', () => {
+    const b64url = (obj: Record<string, unknown>) =>
+      Buffer.from(JSON.stringify(obj), 'utf8').toString('base64url');
+    const forged = `${b64url({ alg: 'none', typ: 'JWT' })}.${b64url({ sub: 'usr-victim' })}.`;
+
+    // Attacker floods from their own IP presenting a forged token naming usr-victim.
+    for (let i = 0; i < STRICT_LIMIT + 5; i += 1) {
+      callOnce('/api/v1/recommendations/meals', '198.51.100.10', 'POST', `Bearer ${forged}`);
+    }
+
+    // Victim's legitimately signed token from their own IP still has a full bucket.
+    const victimToken = signAccess({ id: 'usr-victim', role: 'user', tier: 'free' });
+    const victimRes = callOnce(
+      '/api/v1/recommendations/meals',
+      '203.0.113.20',
+      'POST',
+      `Bearer ${victimToken}`,
+    );
+    expect(victimRes.passed).toBe(true);
   });
 });

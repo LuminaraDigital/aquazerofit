@@ -24,6 +24,7 @@ import {
 import { estimateSessionMinutes } from '@/lib/workoutEstimate';
 import { api, ApiError, mediaUrl } from '@/lib/api';
 import { asList, orNull } from '@/lib/envelopes';
+import { safeHttpUrl } from '@/lib/safeUrl';
 import { queryKeys, todayWorkoutQuery, unwrapWorkoutSession } from '@/lib/queries';
 import { cacheGeneratedPlan, currentPlanQuery } from '@/lib/trainingPlanCache';
 import { EQUIPMENT_ICONS, EQUIPMENT_LABELS } from '@/lib/equipmentMeta';
@@ -204,6 +205,7 @@ function ExerciseDetailBody({
 }) {
   const { images, isAiGenerated: displayedMediaIsAiGenerated, attributions: mediaAttributions } =
     useMemo(() => getExerciseMediaPresentation(detail), [detail]);
+  const exerciseLicenceUrl = safeHttpUrl(detail.licenceUrl);
 
   // Variations are only meaningful for wger-imported exercises that carry a
   // variation group; the endpoint 404s while the backend rolls out → orNull.
@@ -350,33 +352,36 @@ function ExerciseDetailBody({
       <div className="border-t border-outline-variant pt-3 text-xs text-on-surface-variant">
         {mediaAttributions.length > 0 && (
           <ul className="space-y-1" aria-label="Workout image attribution">
-            {mediaAttributions.map((attribution) => (
-              <li key={attribution.key}>
-                Image: {attribution.text}
-                {attribution.licenceUrl && (
-                  <>
-                    {', via '}
-                    <a
-                      href={attribution.licenceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-                    >
-                      {attribution.source === 'wger' ? 'wger.de' : 'licence'}
-                    </a>
-                  </>
-                )}
-              </li>
-            ))}
+            {mediaAttributions.map((attribution) => {
+              const licenceHref = safeHttpUrl(attribution.licenceUrl);
+              return (
+                <li key={attribution.key}>
+                  Image: {attribution.text}
+                  {licenceHref && (
+                    <>
+                      {', via '}
+                      <a
+                        href={licenceHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                      >
+                        {attribution.source === 'wger' ? 'wger.de' : 'licence'}
+                      </a>
+                    </>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
         <p className={mediaAttributions.length > 0 ? 'mt-1' : undefined}>
           Exercise data: © {detail.licenceAuthor}, {detail.licence}
-          {detail.licenceUrl ? (
+          {exerciseLicenceUrl ? (
             <>
               {', via '}
               <a
-                href={detail.licenceUrl}
+                href={exerciseLicenceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"

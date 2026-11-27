@@ -5,7 +5,10 @@
 # Secrets - never enter the build context
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
+!**/.env*.example
 
 # Dependencies - installed fresh by npm ci inside the image
 node_modules
@@ -27,6 +30,7 @@ node_modules
 
 # Runtime content - mounted via volumes at runtime, never baked in
 data/
+.data/
 apps/api/uploads/
 apps/api/.data/
 uploads/

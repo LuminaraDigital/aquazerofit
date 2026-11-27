@@ -13,6 +13,7 @@ import { useMutation } from '@tanstack/react-query';
 import type { Allergen, MealLogItem, MealType } from '@aquazerofit/shared';
 import { api, ApiError } from '@/lib/api';
 import { useProfile } from '@/lib/queries';
+import { safeHttpUrl } from '@/lib/safeUrl';
 import type { BarcodeLookup } from '@/lib/contracts';
 import { Chip } from '@/components/ui/Chip';
 import { Input } from '@/components/ui/Input';
@@ -263,6 +264,7 @@ export function BarcodeSheet({
   if (!open) return null;
 
   const preview = result ? itemFromFood(result.food, grams) : null;
+  const offSourceUrl = result ? safeHttpUrl(result.food.sourceUrl) : undefined;
 
   return (
     <div
@@ -443,11 +445,11 @@ export function BarcodeSheet({
               {result.origin === 'off-api' && (
                 <p className="mt-2 border-t border-outline-variant pt-2 text-[11px] text-on-surface-variant">
                   © Open Food Facts contributors
-                  {result.food.sourceUrl && (
+                  {offSourceUrl && (
                     <>
                       {' - '}
                       <a
-                        href={result.food.sourceUrl}
+                        href={offSourceUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"

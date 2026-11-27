@@ -42,6 +42,16 @@ export function notFoundHandler(_req: Request, res: Response): void {
   res.status(404).json({ code: 'NOT_FOUND', message: 'Resource not found' } satisfies ApiErrorBody);
 }
 
+/**
+ * express.json turns a body that is not JSON into a SyntaxError and passes it
+ * to next(). That used to fall through to the 500 path. It is a client mistake.
+ */
+function isMalformedJsonBody(err: unknown): boolean {
+  if (!(err instanceof SyntaxError)) return false;
+  const parsed = err as SyntaxError & { type?: string; status?: number };
+  return parsed.type === 'entity.parse.failed' && parsed.status === 400;
+}
+
 export function errorHandler(
   err: unknown,
   _req: Request,
@@ -56,6 +66,13 @@ export function errorHandler(
       if (typeof retry === 'number' && retry > 0) res.setHeader('Retry-After', String(retry));
     }
     res.status(err.status).json(err.toBody());
+    return;
+  }
+  if (isMalformedJsonBody(err)) {
+    res.status(ERROR_CODES.VALIDATION_FAILED).json({
+      code: 'VALIDATION_FAILED',
+      message: 'Request body is not valid JSON.',
+    } satisfies ApiErrorBody);
     return;
   }
   if (err instanceof ZodError) {

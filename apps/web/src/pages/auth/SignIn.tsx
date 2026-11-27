@@ -159,6 +159,16 @@ function SignInInner() {
   const [resetNote, setResetNote] = useState('');
   const [resetBusy, setResetBusy] = useState(false);
 
+  // Strip ?reset=<token> from the address bar immediately after capturing it
+  // into state so browser history and Referer headers do not retain the secret.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('reset')) return;
+    url.searchParams.delete('reset');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [resetTokenFromLink]);
+
   // ---- bot protection ----
   // Two independent widgets: the register form and the reset-request form are
   // never on screen at the same time, but each owns its own token because a
@@ -362,11 +372,7 @@ function SignInInner() {
       navigate(safeInternalPath(from), { replace: true });
     } catch (err) {
       haptic('error');
-      if (firebaseEnabled) {
-        const message = mapFirebaseError(err);
-        if (message.includes('already exists')) setErrors({ email: message });
-        else toast.error(message);
-      } else if (err instanceof ApiError) {
+      if (err instanceof ApiError) {
         if (err.code === 'VALIDATION_FAILED' && isCaptchaError(err)) {
           setRegisterCaptchaReset((n) => n + 1);
           setRegisterCaptcha('');
@@ -384,6 +390,10 @@ function SignInInner() {
         } else {
           toast.error(err.message);
         }
+      } else if (firebaseEnabled) {
+        const message = mapFirebaseError(err);
+        if (message.includes('already exists')) setErrors({ email: message });
+        else toast.error(message);
       } else {
         toast.error('Network error. Please check your connection.');
       }

@@ -27,8 +27,10 @@ import {
 } from '../ai/guardrails';
 import { warnOnStyle } from '../ai/styleLint';
 import { creditLedger, settleReservation } from '../ai/creditLedger';
+import { loadPrompt } from '../ai/prompts';
 import { assertLaneAllowed } from '../ai/tierPolicy';
 import { systemMessagesFor } from '../ai/persona';
+import { hasDelimiterLeakage } from '../ai/untrustedContext';
 import { activeCoachFor } from '../coaches/service';
 import { todayFor } from '../../platform/dates';
 import { asyncHandler, deleteDoc, getUser, newId, nowIso, readProfile, sleep, upsertDoc, whereDocs, byIdDoc } from '../ai/util';
@@ -306,9 +308,11 @@ chatRouter.post(
       // ordering is the safety-relevant part rather than a stylistic one.
       const coach = activeCoachFor(user.id);
       // --- Stream the reply using real SSE from provider (AI-02)
-      // Consent off holds tokens until grounding has run. The Android client
-      // paints each token as the finished bubble until history reloads, so a
-      // quote of an earlier meal total must never be the text that lands.
+      // Hold streamed tokens for every turn until grounding, output guardrail
+      // and delimiter-leakage checks complete. Emitting raw tokens before
+      // postGuardrail lets a blocked reply reach the client ahead of
+      // SAFETY_OUTPUT, and lets an ungrounded reply paint on screen before
+      // grounding replaces it.
       let fullText = '';
       const heldTokens: string[] = [];
       const streamResult = await stream(
@@ -325,12 +329,7 @@ chatRouter.post(
           coachId: coach.id,
           onToken: (token) => {
             fullText += token;
-            if (!consented) {
-              heldTokens.push(token);
-              return;
-            }
-            if (clientGone) return;
-            sendFrame(res, { type: 'token', token });
+            heldTokens.push(token);
           },
         },
       );
@@ -366,8 +365,7 @@ chatRouter.post(
           finalResult = step.value;
           break;
         }
-        // Consent-on tokens already went out through onToken. Consent-off
-        // tokens are held until the reply is checked below.
+        // All tokens are held until grounding and safety checks finish below.
       }
 
       // finalResult is guaranteed to be non-null here due to fallback
@@ -379,11 +377,13 @@ chatRouter.post(
         meta: finalResult!.meta,
       };
 
-      // --- Output guardrail + numeric rules (models never bypass CODE).
+      // --- Output guardrail + numeric rules + prompt-frame leakage (models never bypass CODE).
       const outCheck = postGuardrail(result.text, { userId: user.id });
-      if (outCheck.blocked) {
+      const leakedDelimiter = !outCheck.blocked && hasDelimiterLeakage(result.text);
+      if (outCheck.blocked || leakedDelimiter) {
         await creditLedger.release(reservationId);
-        const safeText = refusalMessageFor(outCheck.category, locale);
+        const category = outCheck.blocked ? outCheck.category : 'outOfScope';
+        const safeText = refusalMessageFor(category, locale);
         const blockedMessage: ChatMessage = {
           id: newId('cm'),
           sessionId,
@@ -391,7 +391,7 @@ chatRouter.post(
           type: 'chatMessage',
           role: 'assistant',
           content: safeText,
-          guardrail: { blocked: true, category: outCheck.category },
+          guardrail: { blocked: true, category },
           ai: result.meta,
           createdAt: nowIso(),
         };
@@ -442,13 +442,11 @@ chatRouter.post(
       }
 
       if (!clientGone) {
-        if (!consented) {
-          const chunks =
-            result.text === fullText && heldTokens.length > 0 ? heldTokens : [result.text];
-          for (const token of chunks) {
-            if (token.length === 0) continue;
-            sendFrame(res, { type: 'token', token });
-          }
+        const chunks =
+          result.text === fullText && heldTokens.length > 0 ? heldTokens : [result.text];
+        for (const token of chunks) {
+          if (token.length === 0) continue;
+          sendFrame(res, { type: 'token', token });
         }
         sendFrame(res, { type: 'done', message: assistantMessage });
       }
@@ -582,7 +580,10 @@ chatRouter.post(
 
       const result = await complete(
         'planStructured',
-        [{ role: 'user', content: `Extract the foods eaten from this message: ${text}` }],
+        [
+          { role: 'system', content: loadPrompt('P-12').content },
+          { role: 'user', content: `Extract the foods eaten from this message: ${text}` },
+        ],
         { json: true, promptId: 'P-12', context: { text } },
       );
 

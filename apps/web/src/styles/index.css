@@ -93,10 +93,24 @@ body,
   min-height: 100%;
 }
 
+@layer base {
+  /* Single canonical keyboard focus ring (WCAG 2.4.7 / H38) so no interactive
+     control across the marketing surface can accidentally drop focus contrast. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid rgb(var(--azf-primary));
+    outline-offset: 2px;
+  }
+}
+
 /* ---- Scroll behavior ---- */
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem;
   -webkit-overflow-scrolling: touch;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 /* A user who asked for less motion should not be flown down the page by an
@@ -215,11 +229,12 @@ html.tg-active .min-h-screen {
     @apply rounded-xl;
   }
 
-  /* Sticky chrome over scrolling content: the one place blur earns its keep. */
+  /* Sticky chrome over scrolling content: high opacity + crisp blur so
+     underlying headings and FABs never bleed through nav controls. */
   .glass-blur {
-    background: rgb(var(--azf-surface) / 0.85);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: rgb(var(--azf-surface) / 0.94);
+    backdrop-filter: blur(20px) saturate(135%);
+    -webkit-backdrop-filter: blur(20px) saturate(135%);
   }
 
   /* Primary action fill: flat aqua under dark ink (10.1:1). The name is kept
@@ -387,15 +402,14 @@ html.tg-active .min-h-screen {
      collide with the product UI above.
      ================================================================ */
 
-  /* Scroll-triggered entrance, one shot. The element settles from 98% scale
-     rather than travelling: it orients without pulling the eye down the page.
-     .lp-in is added by an IntersectionObserver (pages/landing/motion.tsx). */
+  /* Scroll-triggered entrance, one shot. Fast settle (380ms) matching
+     docs/design.md so headings never stall half-visible during scroll. */
   .lp-reveal {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
+    transform: translateY(8px) scale(0.985);
     transition:
-      opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-      transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+      opacity 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
     transition-delay: var(--lp-delay, 0ms);
   }
   .lp-reveal.lp-in {
@@ -403,52 +417,144 @@ html.tg-active .min-h-screen {
     transform: none;
   }
 
-  /* A separate object on the marketing sub-pages: a flat surface one step up
-     from the ground, a hairline, and the radius the landing page uses. */
+  /* ---- Marketing 3D spatial engine (CSS preserve-3d + rAF custom vars) ---- */
+  .lp-perspective {
+    perspective: 1200px;
+  }
+  .lp-tilt-plane {
+    transform-style: preserve-3d;
+    transform: rotateX(var(--lp-rx, 0deg)) rotateY(var(--lp-ry, 0deg));
+    transition: transform 360ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .lp-tilt-plane[data-tilting='true'] {
+    will-change: transform;
+    transition: transform 90ms linear;
+  }
+  .lp-z-1 {
+    transform: translateZ(18px);
+  }
+  .lp-z-2 {
+    transform: translateZ(34px);
+  }
+
+  /* Specular rim catch-light driven by pointer position (--lp-gx / --lp-gy). */
+  .lp-sheen {
+    background: radial-gradient(
+      380px circle at var(--lp-gx, 50%) var(--lp-gy, 22%),
+      rgb(var(--azf-primary) / 0.12),
+      transparent 62%
+    );
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+  .lp-tilt-plane[data-tilting='true'] .lp-sheen,
+  .group:hover .lp-sheen {
+    opacity: 1;
+  }
+
+  /* Diagonal foil catch-light for fighter pedestals and AZH-001. */
+  .lp-holo-foil {
+    background: linear-gradient(
+      115deg,
+      transparent 22%,
+      rgb(255 255 255 / 0.07) 45%,
+      rgb(var(--azf-primary) / 0.14) 50%,
+      rgb(255 255 255 / 0.04) 55%,
+      transparent 78%
+    );
+    background-size: 220% 220%;
+    background-position: var(--lp-gx, 50%) var(--lp-gy, 50%);
+    opacity: 0;
+    mix-blend-mode: screen;
+    transition: opacity 220ms ease;
+  }
+  .lp-tilt-plane[data-tilting='true'] .lp-holo-foil,
+  .group:hover .lp-holo-foil {
+    opacity: 0.85;
+  }
+
+  /* 180-degree 3D collectible card flip (380ms within H33 150-400ms band) */
+  .lp-flip-inner {
+    transform-style: preserve-3d;
+    transition: transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .lp-flip-inner[data-flipped='true'] {
+    transform: rotateY(180deg);
+  }
+  .lp-flip-face {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .lp-flip-back {
+    transform: rotateY(180deg);
+  }
+
+  /* Corner Card tonal web panels: flat tonal step + 1px hairline + subtle
+     top-edge specular rule (no heavy drop shadows, no neon glows, 16px card radius). */
+  .lp-panel {
+    position: relative;
+    background: rgb(var(--azf-surface-container-low));
+    border: 1px solid rgb(var(--azf-outline-variant) / 0.75);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+    @apply rounded-card;
+  }
+
+  /* Standard marketing container: tonal step + 1px hairline, 16px card radius. */
   .lp-card {
     position: relative;
     background: rgb(var(--azf-surface-container-low));
-    border: 1px solid rgb(var(--azf-on-surface) / 0.1);
-    border-radius: 24px;
+    border: 1px solid rgb(var(--azf-outline-variant) / 0.65);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+    @apply rounded-card;
     overflow: hidden;
   }
 
-  /* Kept as a class so the sub-pages' emphasised words still stand apart,
-     now as the one accent colour rather than a gradient fill. */
+  /* Kept as a class where single accent emphasis is deliberate. */
   .lp-gradient-text {
     color: rgb(var(--azf-primary));
   }
 
-  /* Coach bubbles arrive in reading order: continuity, not decoration. */
-  .lp-bubble {
-    opacity: 0;
-    transform: translateY(6px) scale(0.98);
-    transition:
-      opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-      transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-    transition-delay: var(--lp-delay, 0ms);
-  }
-  .lp-in .lp-bubble {
-    opacity: 1;
-    transform: none;
-  }
-
   /* Print: nothing may stay hidden behind an animation that will never run. */
   @media print {
-    .lp-reveal,
-    .lp-bubble {
+    .lp-reveal {
       opacity: 1;
       transform: none;
     }
   }
 
-  /* Honour the user's motion preference: reveals become immediate. */
+  /* Honour the user's motion preference: reveals become immediate, 3D tilt
+     flattens, and card flip swaps faces cleanly without 3D rotation. */
   @media (prefers-reduced-motion: reduce) {
     .lp-reveal,
-    .lp-bubble {
+    .reveal {
       opacity: 1;
       transform: none;
-      transition: none;
+      animation: none !important;
+      transition: none !important;
+    }
+    .float-gentle {
+      animation: none !important;
+    }
+    .lp-tilt-plane {
+      transform: none !important;
+      transition: none !important;
+    }
+    .lp-flip-inner {
+      transform: none !important;
+      transition: none !important;
+    }
+    .lp-flip-back {
+      transform: none !important;
+    }
+    .lp-flip-inner[data-flipped='false'] .lp-flip-back {
+      display: none;
+    }
+    .lp-flip-inner[data-flipped='true'] .lp-flip-front {
+      display: none;
+    }
+    .lp-sheen,
+    .lp-holo-foil {
+      display: none;
     }
     .akin-bob,
     .akin-pose-in,
@@ -499,6 +605,7 @@ html[data-tg-theme='light'] .glass-blur {
 }
 
 html[data-tg-theme='light'] {
+  color-scheme: light;
   --azf-ring-aqua: rgb(var(--azf-primary));
   --azf-ring-green: rgb(var(--azf-secondary));
   --azf-ring-coral: rgb(var(--azf-tertiary-container));

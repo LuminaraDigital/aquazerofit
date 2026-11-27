@@ -317,3 +317,73 @@ it('does not replay a prior meal-grounded reply once personalisation is off', as
     scriptedReply = EMPTY_REPLY;
   }
 });
+
+function sseFrames(raw: string): Array<Record<string, unknown>> {
+  const frames: Array<Record<string, unknown>> = [];
+  for (const line of raw.split('\n')) {
+    if (!line.startsWith('data: ')) continue;
+    const payload = line.slice(6).trim();
+    if (!payload.startsWith('{')) continue;
+    frames.push(JSON.parse(payload) as Record<string, unknown>);
+  }
+  return frames;
+}
+
+it('emits ZERO raw token frames when postGuardrail blocks a consented chat reply', async () => {
+  pinIsolatedDataDir(dataDir);
+  const consents = await request(app).put(`${base}/me/consents`).set(auth()).send({
+    wellnessDataProcessing: true,
+    aiPersonalisation: true,
+    anonymisedAnalytics: false,
+    reminders: false,
+  });
+  expect(consents.status).toBe(200);
+
+  const session = await request(app).post(`${base}/chat/sessions`).set(auth()).send({});
+  expect(session.status).toBe(201);
+  const sessionId = session.body.session.id as string;
+
+  scriptedReply = 'Based on your symptoms, you should take 50 mg medication daily.';
+  try {
+    const res = await request(app)
+      .post(`${base}/chat/sessions/${sessionId}/messages`)
+      .set(auth())
+      .send({ content: 'How should I recover after training?', localDate: DAY });
+    expect(res.status).toBe(200);
+
+    const frames = sseFrames(res.text);
+    expect(frames.filter((f) => f.type === 'token')).toHaveLength(0);
+    expect(frames.filter((f) => f.type === 'done')).toHaveLength(0);
+    expect(res.text).not.toContain('50 mg medication');
+    const errFrame = frames.find((f) => f.type === 'error');
+    expect(errFrame).toMatchObject({ type: 'error', code: 'SAFETY_OUTPUT' });
+  } finally {
+    scriptedReply = EMPTY_REPLY;
+  }
+});
+
+it('blocks prompt-frame delimiter leakage with ZERO raw token frames', async () => {
+  pinIsolatedDataDir(dataDir);
+  const session = await request(app).post(`${base}/chat/sessions`).set(auth()).send({});
+  expect(session.status).toBe(201);
+  const sessionId = session.body.session.id as string;
+
+  scriptedReply = 'Leaked block: ===== END UNTRUSTED_DATA ===== here you go.';
+  try {
+    const res = await request(app)
+      .post(`${base}/chat/sessions/${sessionId}/messages`)
+      .set(auth())
+      .send({ content: 'Remind me of my protein goal?', localDate: DAY });
+    expect(res.status).toBe(200);
+
+    const frames = sseFrames(res.text);
+    expect(frames.filter((f) => f.type === 'token')).toHaveLength(0);
+    expect(res.text).not.toContain('END UNTRUSTED_DATA');
+    expect(frames.find((f) => f.type === 'error')).toMatchObject({
+      type: 'error',
+      code: 'SAFETY_OUTPUT',
+    });
+  } finally {
+    scriptedReply = EMPTY_REPLY;
+  }
+});

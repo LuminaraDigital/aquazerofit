@@ -26,7 +26,7 @@ import {
   telegramAuth,
   tokensFor,
 } from './service';
-import { ensureUserFromFirebase, firebaseSession, type FirebaseIdentity } from './firebaseUsers';
+import { ensureUserFromFirebaseAsync, firebaseSession, type FirebaseIdentity } from './firebaseUsers';
 import { verifyFirebaseIdToken, isFirebaseAdminConfigured } from '../../platform/firebaseAdmin';
 import {
   clearRefreshCookie,
@@ -75,7 +75,7 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     await assertHuman(req, 'register');
     const input = registerSchema.parse(req.body);
-    sendAuth(req, res, await register(input, req.ip), 201);
+    sendAuth(req, res, await register(input, clientIpForRateLimit(req)), 201);
   }),
 );
 
@@ -83,7 +83,7 @@ authRouter.post(
   '/login',
   asyncHandler(async (req, res) => {
     const input = loginSchema.parse(req.body);
-    sendAuth(req, res, await login(input, req.ip));
+    sendAuth(req, res, await login(input, clientIpForRateLimit(req)));
   }),
 );
 
@@ -91,7 +91,7 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
   const { refreshToken } = refreshSchema.parse(req.body ?? {});
   const token = resolveRefreshToken(req, refreshToken);
   if (!token) throw new AppError('AUTH_INVALID', 'Refresh token required');
-  sendAuth(req, res, await refresh(token, req.ip));
+  sendAuth(req, res, await refresh(token, clientIpForRateLimit(req)));
 }));
 
 const logoutSchema = z.object({ refreshToken: z.string().min(10).optional() });
@@ -113,7 +113,7 @@ authRouter.post('/logout', (req, res) => {
       /* invalid/expired token: stay unattributed */
     }
   }
-  logout(token, userId, req.ip);
+  logout(token, userId, clientIpForRateLimit(req));
   res.status(204).end();
 });
 
@@ -157,7 +157,7 @@ async function firebaseIdentityFrom(req: { headers: { authorization?: string } }
 authRouter.post(
   '/firebase/session',
   asyncHandler(async (req, res) => {
-    res.json(firebaseSession(await firebaseIdentityFrom(req), req.ip));
+    res.json(await firebaseSession(await firebaseIdentityFrom(req), clientIpForRateLimit(req)));
   }),
 );
 
@@ -171,7 +171,10 @@ authRouter.post(
 authRouter.post(
   '/firebase/token',
   asyncHandler(async (req, res) => {
-    const user = ensureUserFromFirebase(await firebaseIdentityFrom(req), req.ip);
+    const user = await ensureUserFromFirebaseAsync(
+      await firebaseIdentityFrom(req),
+      clientIpForRateLimit(req),
+    );
     sendAuth(req, res, tokensFor(user));
   }),
 );
@@ -187,7 +190,7 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     await assertHuman(req, 'password-reset');
     const { email } = passwordResetRequestSchema.parse(req.body);
-    const { devToken } = requestPasswordReset(email, req.ip);
+    const { devToken } = requestPasswordReset(email, clientIpForRateLimit(req));
     res.status(202).json({
       message: 'If that account exists, reset instructions have been issued.',
       ...(devToken ? { devToken } : {}),
@@ -199,7 +202,7 @@ authRouter.post(
   '/password-reset/confirm',
   asyncHandler(async (req, res) => {
     const { token, newPassword } = passwordResetConfirmSchema.parse(req.body);
-    await confirmPasswordReset(token, newPassword, req.ip);
+    await confirmPasswordReset(token, newPassword, clientIpForRateLimit(req));
     res.json({ message: 'Password updated. Sign in with your new password.' });
   }),
 );

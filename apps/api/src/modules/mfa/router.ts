@@ -14,6 +14,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { User } from '@aquazerofit/shared';
 import { requireAuth, userIdOf } from '../../platform/auth';
+import { clientIpForRateLimit } from '../../platform/clientIp';
 import { AppError } from '../../platform/errors';
 import { getStore } from '../../platform/store';
 import {
@@ -98,6 +99,6 @@ mfaRouter.post('/challenge', (req, res) => {
   const token = accessTokenOf(req);
   if (!token) throw new AppError('AUTH_REQUIRED', 'Authentication required');
   const input = challengeSchema.parse(req.body ?? {});
-  const result = verifyStepUp(userId, token, input, { ip: req.ip });
+  const result = verifyStepUp(userId, token, input, { ip: clientIpForRateLimit(req) });
   res.json({ stepUp: result });
 });

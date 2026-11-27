@@ -123,6 +123,33 @@ describe('Export diary endpoint GET /api/v1/export/diary', () => {
     expect(emptyRes.status).toBe(200);
     expect(emptyRes.body.mealLogs).toHaveLength(0);
   });
+
+  it('neutralizes CSV formula-injection prefixes on string fields', async () => {
+    const formulaDate = '2026-08-19';
+    const seed = await request(app)
+      .post(`${base}/meal-logs`)
+      .set(auth())
+      .send({
+        mealType: 'snack',
+        localDate: formulaDate,
+        items: [
+          { name: '=CMD|\' /C calc\'!A0', grams: 100, kcal: 100, proteinG: 5, carbsG: 10, fatG: 2 },
+          { name: '+1+1', grams: 100, kcal: 100, proteinG: 5, carbsG: 10, fatG: 2 },
+          { name: '-2+3', grams: 100, kcal: 100, proteinG: 5, carbsG: 10, fatG: 2 },
+          { name: '@SUM(A1:A2)', grams: 100, kcal: 100, proteinG: 5, carbsG: 10, fatG: 2 },
+        ],
+      });
+    expect(seed.status).toBe(201);
+
+    const res = await request(app)
+      .get(`${base}/export/diary?format=csv&date=${formulaDate}`)
+      .set(auth());
+    expect(res.status).toBe(200);
+    expect(res.text).toContain(`"'=CMD|' /C calc'!A0"`);
+    expect(res.text).toContain(`"'+1+1"`);
+    expect(res.text).toContain(`"'-2+3"`);
+    expect(res.text).toContain(`"'@SUM(A1:A2)"`);
+  });
 });
 
 describe('Copy previous day endpoint POST /api/v1/logs/copy-previous', () => {

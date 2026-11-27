@@ -1,6 +1,6 @@
 /**
- * Delivery configuration for the two surfaces: web is marketing, Telegram is
- * the product.
+ * Delivery configuration for the public site. The web app and Google Play are
+ * the primary ways in. Telegram stays available as another surface.
  *
  * This module deliberately imports NOTHING and reads no environment. It is
  * consumed twice - once by the browser bundle and once by `vite-plugins/seo.ts`,
@@ -125,11 +125,11 @@ export interface MarketingRoute {
 export const MARKETING_ROUTES: readonly MarketingRoute[] = [
   {
     path: '/',
-    title: 'AquaZeroFit: AI wellness inside Telegram',
+    title: 'AquaZeroFit: AI wellness on the web and Android',
     description:
-      'Photograph a meal and see it counted. Calorie, macro and hydration targets you could recompute by hand, adaptive home training and a coach grounded in your actual day, inside Telegram.',
+      'Photograph a meal and see it counted. Targets you could recompute by hand, adaptive home training, and a coach grounded in your day. On the web and Google Play. Telegram is another way in.',
     summary:
-      'AquaZeroFit is an AI wellness coach that runs inside Telegram. Photograph a meal and it is logged and counted. Your calorie, macro and hydration targets are computed from your own figures using published formulas you could recompute by hand. No invented numbers. Home training adapts to the equipment you actually have, and Aqua Coach answers from your real logged day inside strict wellness boundaries. AquaZeroFit provides general wellness and fitness support only; it does not provide medical diagnosis, treatment or professional healthcare advice. It is free software under the GNU AGPL v3, and it runs in an ordinary web browser as well, for anyone whose network or workplace blocks Telegram.',
+      'AquaZeroFit is an AI wellness coach for the web and for Android on Google Play. Photograph a meal and it is logged and counted. Your calorie, macro and hydration targets are computed from your own figures using published formulas you could recompute by hand. No invented numbers. Home training adapts to the equipment you actually have, and Aqua Coach answers from your real logged day inside strict wellness boundaries. AquaZeroFit provides general wellness and fitness support only; it does not provide medical diagnosis, treatment or professional healthcare advice. It is free software under the GNU AGPL v3. The same account also opens as a Telegram Mini App.',
     priority: 1,
   },
   {

@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 /**
- * The landing page is the only cold-traffic surface in a Telegram-first
- * product, so what is pinned here is its conversion contract rather than its
- * appearance: the primary action leaves for Telegram carrying attribution with
- * it, and the browser path is offered beside it rather than buried.
+ * The landing page is the cold-traffic surface. The primary actions are the
+ * web app and Google Play. Telegram stays available, and its link still
+ * carries attribution.
  *
- * Who is allowed to see this page at all is no longer decided here — that
+ * Who is allowed to see this page at all is no longer decided here. That
  * moved to RequireAuth, and is covered in RequireAuth.routing.test.tsx.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -69,14 +68,18 @@ describe('Landing', () => {
     expect(heading.textContent).toMatch(/coaching Your day/);
   });
 
-  it('makes Telegram the primary action', () => {
+  it('makes the web app the primary desktop action', () => {
     renderAt();
 
-    const ctas = screen.getAllByRole('link', { name: /open in telegram/i });
-    expect(ctas.length).toBeGreaterThan(0);
-    for (const cta of ctas) {
-      expect(cta.getAttribute('href')).toMatch(/^https:\/\/t\.me\//);
-    }
+    const web = screen.getAllByRole('link', { name: /use it in your browser/i });
+    expect(web.length).toBeGreaterThan(0);
+    expect(web[0].getAttribute('href')).toBe('/sign-in?mode=register');
+    // Hero web link is the filled primary. Telegram on that same hero is ghost.
+    const heroWeb = web.find((link) => link.dataset.variant === 'primary');
+    expect(heroWeb).toBeTruthy();
+    const heroTelegram = screen.getAllByRole('link', { name: /open in telegram/i })[1];
+    expect(heroWeb!.compareDocumentPosition(heroTelegram) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heroTelegram.dataset.variant).toBe('ghost');
   });
 
   it('carries stored attribution into the Telegram deep link', () => {
@@ -101,17 +104,19 @@ describe('Landing', () => {
     expect(href).toContain('s-reddit');
   });
 
-  it('offers the browser as a real second path, not a hidden one', () => {
+  it('names the browser and Google Play in the hero, and keeps Telegram', () => {
     renderAt();
 
-    const fallbacks = screen.getAllByRole('link', { name: /use it in your browser/i });
-    expect(fallbacks.length).toBeGreaterThan(0);
-    expect(fallbacks[0].getAttribute('href')).toBe('/sign-in?mode=register');
-    // The segment this exists for has to be told that it exists.
-    expect(screen.getAllByText(/blocked/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/start in the browser/i)).toBeTruthy();
+    expect(screen.getAllByText(/google play/i).length).toBeGreaterThan(0);
+    const telegram = screen.getAllByRole('link', { name: /open in telegram/i });
+    expect(telegram.length).toBeGreaterThan(0);
+    for (const cta of telegram) {
+      expect(cta.getAttribute('href')).toMatch(/^https:\/\/t\.me\//);
+    }
   });
 
-  it('offers the Google Play app below Telegram on a desktop browser', () => {
+  it('puts Google Play with the web app, ahead of Telegram, on a desktop browser', () => {
     renderAt();
 
     const badges = screen.getAllByRole('link', { name: /get it on google play/i });
@@ -119,10 +124,11 @@ describe('Landing', () => {
     expect(badges[0].getAttribute('href')).toBe(
       'https://play.google.com/store/apps/details?id=fit.aquazero.app',
     );
-    // [0] is the top bar's button; [1] is the hero's.
+    const heroWeb = screen.getAllByRole('link', { name: /use it in your browser/i })[0];
     const heroTelegram = screen.getAllByRole('link', { name: /open in telegram/i })[1];
-    expect(heroTelegram.compareDocumentPosition(badges[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(heroTelegram.dataset.variant).toBe('primary');
+    expect(heroWeb.compareDocumentPosition(badges[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(badges[0].compareDocumentPosition(heroTelegram) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heroTelegram.dataset.variant).toBe('ghost');
   });
 
   it('leads with Google Play on an Android phone browser', () => {
@@ -132,9 +138,10 @@ describe('Landing', () => {
     renderAt();
 
     const [badge] = screen.getAllByRole('link', { name: /get it on google play/i });
-    // [0] is the top bar's button; [1] is the hero's.
+    const heroWeb = screen.getAllByRole('link', { name: /use it in your browser/i })[0];
     const heroTelegram = screen.getAllByRole('link', { name: /open in telegram/i })[1];
-    expect(badge.compareDocumentPosition(heroTelegram) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(badge.compareDocumentPosition(heroWeb) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heroWeb.compareDocumentPosition(heroTelegram) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(heroTelegram.dataset.variant).toBe('ghost');
   });
 

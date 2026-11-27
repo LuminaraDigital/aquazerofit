@@ -8,23 +8,55 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
 import android.os.SystemClock
+import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import fit.aquazero.app.core.designsystem.AzfTheme
+import fit.aquazero.app.core.designsystem.PrimaryButton
+import fit.aquazero.app.core.designsystem.SecondaryButton
 import fit.aquazero.app.core.navigation.DeepLinkStore
+import fit.aquazero.app.core.security.AppLockBlockReason
 import fit.aquazero.app.core.security.DeviceSecurityController
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -46,6 +78,7 @@ class MainActivity : ComponentActivity() {
     private val restrictionsChangedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             deviceSecurityController.refreshRestrictions()
+            maybePromptForDeviceUnlock()
         }
     }
 
@@ -85,6 +118,8 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             AzfTheme {
+                val isLocked by deviceSecurityController.isLocked.collectAsStateWithLifecycle()
+                val lockBlockReason by deviceSecurityController.lockBlockReason.collectAsStateWithLifecycle()
                 // No root Surface. The window background is already
                 // `deep_sea_background` (themes.xml) and every screen's
                 // Scaffold paints `colorScheme.background` over it, so an
@@ -99,8 +134,28 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalContentColor provides MaterialTheme.colorScheme.onBackground,
                 ) {
-                    AzfNavigation()
-                    IntroVideo()
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = if (isLocked) {
+                                Modifier.fillMaxSize().clearAndSetSemantics {}
+                            } else {
+                                Modifier.fillMaxSize()
+                            },
+                        ) {
+                            AzfNavigation()
+                            if (!isLocked) {
+                                IntroVideo()
+                            }
+                        }
+                        if (isLocked) {
+                            AppLockPrivacyVeil(
+                                blockReason = lockBlockReason,
+                                onUnlock = { maybePromptForDeviceUnlock(manualRetry = true) },
+                                onOpenSecuritySettings = ::openSecuritySettings,
+                                onBack = { moveTaskToBack(true) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -149,11 +204,12 @@ class MainActivity : ComponentActivity() {
     }
 
     @Suppress("DEPRECATION")
-    private fun maybePromptForDeviceUnlock() {
+    private fun maybePromptForDeviceUnlock(manualRetry: Boolean = false) {
         val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
         val shouldPrompt = deviceSecurityController.shouldLaunchUnlockPrompt(
             nowElapsedMs = SystemClock.elapsedRealtime(),
             isDeviceSecure = keyguard?.isDeviceSecure == true,
+            manualRetry = manualRetry,
         )
         if (!shouldPrompt) return
         val promptIntent = keyguard?.createConfirmDeviceCredentialIntent(
@@ -163,6 +219,103 @@ class MainActivity : ComponentActivity() {
             deviceSecurityController.onUnlockPromptLaunchFailed()
             return
         }
-        confirmDeviceCredentialLauncher.launch(promptIntent)
+        runCatching { confirmDeviceCredentialLauncher.launch(promptIntent) }
+            .onFailure { deviceSecurityController.onUnlockPromptLaunchFailed() }
+    }
+
+    private fun openSecuritySettings() {
+        val opened = runCatching {
+            startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+        }.isSuccess
+        if (!opened) {
+            runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
+        }
+    }
+}
+
+/**
+ * Full-screen opaque privacy veil rendered over [AzfNavigation] whenever app
+ * lock is active, preventing health and nutrition screens from flashing before
+ * or behind the system credential sheet and holding MDM-enforced locks closed
+ * when the device has no screen lock configured.
+ */
+@Composable
+private fun AppLockPrivacyVeil(
+    blockReason: AppLockBlockReason?,
+    onUnlock: () -> Unit,
+    onOpenSecuritySettings: () -> Unit,
+    onBack: () -> Unit,
+) {
+    BackHandler(enabled = true, onBack = onBack)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+            )
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Lock,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp),
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = stringResource(
+                    if (blockReason == AppLockBlockReason.DEVICE_NOT_SECURE) {
+                        R.string.security_app_lock_setup_title
+                    } else {
+                        R.string.security_app_lock_prompt_title
+                    },
+                ),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = stringResource(
+                    when (blockReason) {
+                        AppLockBlockReason.DEVICE_NOT_SECURE -> R.string.security_app_lock_setup_body
+                        AppLockBlockReason.PROMPT_UNAVAILABLE -> R.string.security_app_lock_unavailable_body
+                        null -> R.string.security_app_lock_prompt_description
+                    },
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(28.dp))
+            if (blockReason == AppLockBlockReason.DEVICE_NOT_SECURE) {
+                PrimaryButton(
+                    text = stringResource(R.string.security_app_lock_open_settings),
+                    onClick = onOpenSecuritySettings,
+                )
+            } else {
+                PrimaryButton(
+                    text = stringResource(R.string.security_app_lock_retry),
+                    onClick = onUnlock,
+                )
+                if (blockReason == AppLockBlockReason.PROMPT_UNAVAILABLE) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    SecondaryButton(
+                        text = stringResource(R.string.security_app_lock_open_settings),
+                        onClick = onOpenSecuritySettings,
+                    )
+                }
+            }
+        }
     }
 }

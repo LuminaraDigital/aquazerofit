@@ -1515,6 +1515,11 @@
     <string name="security_app_lock_managed_body">Enforced by your organisation\'s device policy.</string>
     <string name="security_app_lock_prompt_title">Unlock AquaZeroFit</string>
     <string name="security_app_lock_prompt_description">Confirm your device screen lock to continue.</string>
+    <string name="security_app_lock_setup_title">Screen lock required</string>
+    <string name="security_app_lock_setup_body">Your organisation\'s device policy requires a screen lock (PIN, pattern, password, or biometric) before you can open AquaZeroFit.</string>
+    <string name="security_app_lock_unavailable_body">Device unlock could not open. Try again or check your device security settings.</string>
+    <string name="security_app_lock_retry">Unlock</string>
+    <string name="security_app_lock_open_settings">Open security settings</string>
     <string name="security_screen_capture_title">Block screenshots &amp; recents preview</string>
     <string name="security_screen_capture_body">Hide health and nutrition screens in the app switcher and block screenshots.</string>
     <string name="security_screen_capture_managed_body">Enforced by your organisation\'s device policy.</string>

@@ -1,35 +1,55 @@
 /**
- * /google-play — public page for the Android app.
+ * /google-play — Flagship Native Android Hardware Launch Page.
  *
- * The app is live on Google Play, so the Play badge is this page's primary
- * action in place of Telegram, which stays available in the closing block.
- *
- * Every claim in the privacy panel is a summary of /privacy, which the Play
- * policy at /google-play/privacy-policy renders verbatim; change them together.
+ * Distinct architecture: single dramatic 3D hero Android phone paired with a
+ * ruled native spec strip (zero 320px phone-fan clipping, zero duplication
+ * with `/how-it-works` or `/` Gallery), followed by a 3-up horizontal hardware
+ * gallery of real Android captures and the Play Store Data Safety summary.
  */
 import { Link } from 'react-router-dom';
 import { WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
 import { PlayStoreBadge } from './Chrome';
+import { DeviceFrame, type ScreenshotId } from './PhoneShowcase';
 import { MarketingPage, PageCta, PageHero } from './Page';
 import { Reveal } from './motion';
+import { ArenaGridCanvas } from './scene/ArenaGridCanvas';
 
-const FEATURES = [
+const NATIVE_SCREENS: ReadonlyArray<{
+  id: ScreenshotId;
+  title: string;
+  body: string;
+  caption: string;
+  alt: string;
+}> = [
   {
-    icon: 'track_changes',
+    id: 'dashboard',
     title: 'Track the full day',
-    body: 'Meals, water, workouts and progress in one daily view, with targets computed from your own profile.',
+    body: 'Meals, water, workouts and progress in one native Jetpack Compose view, with targets computed from your own profile.',
+    caption: 'Corner Card UI',
+    alt: 'Android app Home dashboard showing 2,382 kcal remaining, protein, carbs and fat against target, and daily checklist.',
   },
   {
-    icon: 'photo_camera',
+    id: 'capture-meal',
     title: 'Log meals faster',
-    body: 'Photograph a meal, scan a barcode or search. Nothing is added to your log until you confirm it.',
+    body: 'Photograph a plate, scan a barcode or search the corpus natively. Nothing reaches your log until you confirm it.',
+    caption: 'Camera & barcode',
+    alt: 'Android app meal capture viewfinder with framing brackets and meal-type selector.',
   },
   {
-    icon: 'auto_awesome',
+    id: 'coach',
     title: 'Coaching with context',
-    body: 'Aqua Coach and adaptive plans respond to what you have actually logged, with safety boundaries built in.',
+    body: 'Aqua Coach and adaptive training plans respond to what you actually logged, with clinical boundaries always on screen.',
+    caption: '28 fighter personas',
+    alt: 'Android app Coach Akin chat screen displaying contextual advice under the persistent wellness disclaimer.',
   },
 ];
+
+const NATIVE_SPECS = [
+  ['UI Framework', 'Jetpack Compose'],
+  ['Package ID', 'fit.aquazero.app'],
+  ['Sync', 'Same account as web & Telegram'],
+  ['Privacy', 'No ads · no data sale'],
+] as const;
 
 const PRIVACY_POINTS = [
   'No advertising and no sale of personal data',
@@ -42,11 +62,12 @@ export default function GooglePlayPage() {
     <MarketingPage path="/google-play">
       <PageHero
         crumb="Google Play app"
+        kicker="Native Android · fit.aquazero.app"
         title={
           <>
             Your wellness coach,
             <br />
-            <span className="lp-gradient-text">now on Google Play.</span>
+            now on Google Play.
           </>
         }
         lead="AquaZeroFit for Android is on Google Play: meal logging by photograph, barcode or search, targets computed from your own profile, home training and Aqua Coach, on the same account as the Mini App and the web."
@@ -56,53 +77,89 @@ export default function GooglePlayPage() {
           </span>
         }
         secondary={{ to: '/google-play/privacy-policy', label: 'Read the app privacy policy' }}
-      />
+        backdrop={<ArenaGridCanvas variant="stage" />}
+        aside={
+          <div className="mx-auto w-[250px] sm:w-[276px]">
+            <DeviceFrame
+              id="dashboard"
+              alt="AquaZeroFit Android app dashboard showing remaining calories, macros, and daily checklist"
+              priority
+              maxTilt={6}
+              caption="Release build capture"
+            />
+          </div>
+        }
+      >
+        {/* Ruled native hardware spec strip */}
+        <dl className="mt-10 grid gap-x-8 gap-y-4 border-y border-outline-variant/60 py-5 sm:grid-cols-2 lg:grid-cols-4">
+          {NATIVE_SPECS.map(([label, value]) => (
+            <div key={label}>
+              <dt className="stat-label">{label}</dt>
+              <dd className="mt-1 text-[15px] font-semibold text-on-surface">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </PageHero>
 
-      <div className="mx-auto max-w-6xl space-y-20 px-5 pb-24 sm:space-y-28 sm:pb-32">
+      <div className="mx-auto max-w-[1200px] space-y-24 px-5 pb-24 sm:space-y-28 sm:px-8 sm:pb-32">
+        {/* 3-Up Native Hardware Gallery */}
         <section aria-labelledby="android-features">
           <Reveal className="max-w-2xl">
+            <p className="stat-label text-primary">Native Experience</p>
             <h2
               id="android-features"
-              className="font-heading text-3xl font-semibold leading-[1.1] text-on-surface sm:text-[42px]"
+              className="mt-2 font-heading text-[34px] font-semibold leading-[1.04] text-on-surface sm:text-[44px]"
             >
               The same tools, as a native app.
             </h2>
-            <p className="mt-4 text-[15px] leading-relaxed text-on-surface-variant/75 sm:text-base">
-              The Android app connects to the same AquaZeroFit service as the Mini App, with your
-              privacy choices and data controls kept in view.
+            <p className="mt-3.5 text-[16px] leading-relaxed text-on-surface-variant">
+              The Android app connects to the same AquaZeroFit service as the Mini App, with native
+              camera speed and your privacy choices kept in plain sight.
             </p>
           </Reveal>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {FEATURES.map((feature, index) => (
-              <Reveal key={feature.title} delay={index * 80}>
-                <div className="lp-card h-full p-6">
-                  <span className="material-symbols-outlined text-[26px] text-primary" aria-hidden="true">
-                    {feature.icon}
-                  </span>
-                  <h3 className="mt-5 font-heading text-xl font-semibold text-on-surface">{feature.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-on-surface-variant/75">{feature.body}</p>
+          <div className="mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
+            {NATIVE_SCREENS.map((item, idx) => (
+              <Reveal key={item.id} delay={idx * 60} className="flex flex-col">
+                <div className="mx-auto w-[240px] sm:w-[258px] md:w-full md:max-w-[270px]">
+                  <DeviceFrame
+                    id={item.id}
+                    alt={item.alt}
+                    maxTilt={5}
+                    caption={item.caption}
+                  />
                 </div>
+                <h3 className="mt-6 font-heading text-[24px] font-semibold leading-tight text-on-surface">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-[15px] leading-relaxed text-on-surface-variant">
+                  {item.body}
+                </p>
               </Reveal>
             ))}
           </div>
         </section>
 
+        {/* Data safety & Play privacy */}
         <section aria-labelledby="android-privacy">
           <Reveal>
-            <div className="lp-card grid gap-8 p-6 sm:p-9 lg:grid-cols-[1fr_0.85fr] lg:items-center">
+            <div className="lp-panel grid gap-8 p-6 sm:p-9 lg:grid-cols-[1fr_0.85fr] lg:items-center">
               <div>
-                <h2 id="android-privacy" className="font-heading text-2xl font-semibold text-on-surface sm:text-3xl">
+                <p className="stat-label text-primary">Play Data Safety</p>
+                <h2
+                  id="android-privacy"
+                  className="mt-2 font-heading text-[28px] font-semibold leading-tight text-on-surface sm:text-[34px]"
+                >
                   Read what the app collects before it reaches your phone.
                 </h2>
-                <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-on-surface-variant/75">
+                <p className="mt-3.5 max-w-xl text-[15.5px] leading-relaxed text-on-surface-variant">
                   The policy covers account data, wellness and meal logs, meal photographs, AI
                   processing, retention, deletion and your rights. It applies to the Android app and
                   the AquaZeroFit service it connects to.
                 </p>
                 <Link
                   to="/google-play/privacy-policy"
-                  className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                  className="mt-5 inline-flex min-h-[44px] items-center gap-2 text-[15px] font-semibold text-primary transition-colors hover:text-on-surface"
                 >
                   Read the Google Play privacy policy
                   <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
@@ -112,11 +169,11 @@ export default function GooglePlayPage() {
               </div>
               <ul className="space-y-3">
                 {PRIVACY_POINTS.map((item) => (
-                  <li key={item} className="flex gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                  <li key={item} className="flex gap-3 rounded-xl border border-outline-variant/60 bg-surface p-4">
                     <span className="material-symbols-outlined shrink-0 text-[20px] text-secondary" aria-hidden="true">
                       check_circle
                     </span>
-                    <span className="text-sm leading-relaxed text-on-surface-variant/80">{item}</span>
+                    <span className="text-[14.5px] leading-relaxed text-on-surface">{item}</span>
                   </li>
                 ))}
               </ul>
@@ -129,9 +186,7 @@ export default function GooglePlayPage() {
           lead="Not on Android? The same account works in the Telegram Mini App and in any browser."
           disclaimer={WELLNESS_DISCLAIMER}
         >
-          <div className="mt-7 flex justify-center">
-            <PlayStoreBadge placement="google-play-final" />
-          </div>
+          <PlayStoreBadge placement="google-play-final" />
         </PageCta>
       </div>
     </MarketingPage>

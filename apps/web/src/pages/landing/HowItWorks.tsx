@@ -1,17 +1,18 @@
 /**
- * /how-it-works — the dedicated walkthrough linked from the footer.
+ * /how-it-works — Editorial 6-Step Scrollytelling Walkthrough.
  *
- * Deliberately a different shape from /features: that page is a reference of
- * capabilities and constants, this one is the journey in order, with each step
- * split into what you do and what the application does in response. Where a
- * step depends on a specific number, it links across to the reference rather
- * than restating it, so there is exactly one place for those figures to live.
+ * Signature architecture: clean editorial header flowing straight into a
+ * 6-step timeline rail, paired with wide readable stacked "What you do" /
+ * "What the app does" panels beside ONE sticky 3D-tilting Android release
+ * capture (no cloned hero phone fan, no 320px overflow, no onMouseEnter
+ * fighting scroll-spy).
  */
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { WELLNESS_DISCLAIMER } from '@aquazerofit/shared';
-import { DeviceFrame } from './PhoneShowcase';
+import { DeviceFrame, type ScreenshotId } from './PhoneShowcase';
 import { MarketingPage, PageCta, PageHero } from './Page';
-import { Reveal } from './motion';
+import { prefersReducedMotion, Reveal } from './motion';
 
 interface StepSpec {
   id: string;
@@ -21,7 +22,7 @@ interface StepSpec {
   app: string[];
   note?: string;
   link?: { to: string; label: string };
-  screenshot: string;
+  screenshot: ScreenshotId;
   alt: string;
 }
 
@@ -132,187 +133,275 @@ const STEPS: StepSpec[] = [
 
 const RULES = [
   {
-    icon: 'task_alt',
     title: 'You confirm, always',
     body: 'No photograph, suggestion or remembered fact changes your data until you have seen it and agreed.',
   },
   {
-    icon: 'function',
     title: 'Code does the arithmetic',
     body: 'Every number presented as fact — targets, totals, trends — is computed. Models describe; they do not count.',
   },
   {
-    icon: 'lock',
     title: 'Nothing personalises without consent',
     body: 'AI personalisation is off until you turn it on, and turning it back off is one switch.',
   },
 ];
 
-function Step({ step, index }: { step: StepSpec; index: number }) {
-  const flip = index % 2 === 1;
-  return (
-    <section id={step.id} className="scroll-mt-24">
-      <div className="grid items-start gap-10 lg:grid-cols-[1fr_290px] lg:gap-14">
-        <Reveal className="min-w-0">
-          <div className="flex items-baseline gap-4">
-            <span
-              className="font-heading text-5xl font-semibold leading-none text-white/10 tabular-nums"
-              aria-hidden="true"
-            >
-              {String(index + 1).padStart(2, '0')}
-            </span>
-            <h2 className="font-heading text-2xl font-semibold leading-tight text-on-surface sm:text-[32px]">
-              {step.title}
-            </h2>
-          </div>
-
-          <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-on-surface-variant/75">
-            {step.lead}
-          </p>
-
-          <div className="mt-7 grid gap-4 sm:grid-cols-2">
-            <div className="lp-card p-5">
-              <h3 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/90">
-                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
-                  person
-                </span>
-                What you do
-              </h3>
-              <ul className="mt-3 space-y-2.5">
-                {step.you.map((item) => (
-                  <li key={item} className="text-[13px] leading-relaxed text-on-surface-variant/75">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="lp-card p-5">
-              <h3 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
-                  settings_suggest
-                </span>
-                What the app does
-              </h3>
-              <ul className="mt-3 space-y-2.5">
-                {step.app.map((item) => (
-                  <li key={item} className="text-[13px] leading-relaxed text-on-surface-variant/75">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {step.note && (
-            <p className="mt-4 flex gap-3 rounded-2xl border border-primary/20 bg-primary/[0.05] px-4 py-3 text-[13px] leading-relaxed text-on-surface-variant">
-              <span
-                className="material-symbols-outlined shrink-0 text-[18px] text-primary"
-                aria-hidden="true"
-              >
-                shield
-              </span>
-              {step.note}
-            </p>
-          )}
-
-          {step.link && (
-            <Link
-              to={step.link.to}
-              className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-            >
-              {step.link.label}
-              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                arrow_forward
-              </span>
-            </Link>
-          )}
-        </Reveal>
-
-        <Reveal delay={120} className={flip ? 'lg:order-first' : ''}>
-          <div className="relative mx-auto w-[250px] sm:w-[290px]">
-            <div
-              className="pointer-events-none absolute -inset-8 rounded-full bg-[radial-gradient(circle,rgba(47,217,244,0.14),transparent_65%)] blur-2xl"
-              aria-hidden="true"
-            />
-            <div className="relative">
-              <DeviceFrame id={step.screenshot} alt={step.alt} />
-            </div>
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  );
+function scrollStepIntoView(id: string) {
+  document.getElementById(id)?.scrollIntoView({
+    behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+  });
 }
 
 export default function HowItWorksPage() {
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const elements = STEPS.map((s) => document.getElementById(s.id)).filter(
+      (el): el is HTMLElement => Boolean(el),
+    );
+    if (!elements.length) return;
+
+    const visibleMap = new Map<string, number>();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            visibleMap.set(entry.target.id, entry.boundingClientRect.top);
+          } else {
+            visibleMap.delete(entry.target.id);
+          }
+        }
+        if (visibleMap.size === 0) return;
+        let bestId = '';
+        let bestTop = Infinity;
+        for (const [id, top] of visibleMap) {
+          if (top < bestTop) {
+            bestTop = top;
+            bestId = id;
+          }
+        }
+        const idx = STEPS.findIndex((s) => s.id === bestId);
+        if (idx >= 0) setActiveIdx(idx);
+      },
+      { rootMargin: '-18% 0px -45% 0px', threshold: 0.05 },
+    );
+
+    for (const el of elements) observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const activeStep = STEPS[activeIdx] ?? STEPS[0]!;
+
   return (
     <MarketingPage path="/how-it-works">
       <PageHero
         crumb="How it works"
-        title={
-          <>
-            From sign-up to <span className="lp-gradient-text">steady state</span>
-          </>
-        }
-        lead="Six steps, in the order you will meet them. Each one is split into what you do and what the application does in response — including the parts that happen out of sight, because those are the ones worth knowing about in a product that handles what you eat and how much you weigh."
+        kicker="Six steps in order"
+        title="From sign-up to steady state"
+        lead="Six steps, in the order you will meet them. Each step separates what you do from what the code does out of sight — because transparency matters in a product that handles what you eat and weigh."
         secondary={{ to: '/features', label: 'Browse the features' }}
       >
-        {/* Step index */}
-        <Reveal delay={280}>
-          <ol className="mt-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {STEPS.map((step, i) => (
+        {/* Full-width 6-Step Timeline Rail (unique signature of /how-it-works) */}
+        <ol className="mt-10 grid gap-2.5 border-t border-outline-variant/60 pt-8 sm:grid-cols-2 lg:grid-cols-6">
+          {STEPS.map((step, i) => {
+            const selected = i === activeIdx;
+            return (
               <li key={step.id}>
                 <a
                   href={`#${step.id}`}
-                  className="flex items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.015] px-4 py-3 transition-colors hover:border-primary/25 hover:bg-white/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActiveIdx(i);
+                    scrollStepIntoView(step.id);
+                  }}
+                  aria-current={selected ? 'step' : undefined}
+                  className={`flex min-h-[72px] flex-col justify-between rounded-xl border px-3.5 py-3 transition-colors ${
+                    selected
+                      ? 'border-primary-fixed-dim bg-surface-container text-on-surface'
+                      : 'border-outline/75 bg-surface-container-low text-on-surface-variant hover:border-primary hover:text-on-surface'
+                  }`}
                 >
-                  <span
-                    className="font-heading text-sm font-semibold tabular-nums text-primary/70"
-                    aria-hidden="true"
-                  >
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span className="text-sm text-on-surface-variant">{step.title}</span>
+                  <span className="stat-label tabular-nums text-primary">Step 0{i + 1}</span>
+                  <span className="mt-1.5 text-[13.5px] font-medium leading-snug">{step.title}</span>
                 </a>
               </li>
-            ))}
-          </ol>
-        </Reveal>
+            );
+          })}
+        </ol>
       </PageHero>
 
-      <div className="mx-auto max-w-6xl space-y-24 px-5 pb-24 sm:space-y-28 sm:pb-32">
-        {STEPS.map((step, i) => (
-          <Step key={step.id} step={step} index={i} />
-        ))}
+      <div className="mx-auto max-w-[1200px] space-y-24 px-5 pb-24 sm:px-8 sm:pb-32">
+        {/* Sticky 3D Phone Scrollytelling Split */}
+        <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,1fr)_328px] lg:gap-16">
+          <div className="min-w-0 space-y-12 sm:space-y-16">
+            {STEPS.map((step, index) => {
+              const active = index === activeIdx;
+              return (
+                <section
+                  key={step.id}
+                  id={step.id}
+                  className={`scroll-mt-28 rounded-card border p-6 transition-colors sm:p-8 ${
+                    active
+                      ? 'border-primary-fixed-dim/50 bg-surface-container-low'
+                      : 'border-outline-variant/65 bg-surface-container-low/70'
+                  }`}
+                >
+                  <div className="flex items-baseline gap-3.5">
+                    <span
+                      className="font-heading text-[40px] font-bold leading-none tabular-nums text-primary/40"
+                      aria-hidden="true"
+                    >
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <h2 className="font-heading text-[28px] font-semibold leading-tight text-on-surface sm:text-[34px]">
+                      {step.title}
+                    </h2>
+                  </div>
 
-        {/* The through-line */}
+                  <p className="mt-3.5 max-w-[60ch] text-[15.5px] leading-relaxed text-on-surface-variant">
+                    {step.lead}
+                  </p>
+
+                  {/* Full-width stacked bands — comfortable reading measure */}
+                  <div className="mt-6 space-y-4">
+                    <div className="rounded-xl border border-outline-variant/60 bg-surface p-5">
+                      <h3 className="flex items-center gap-2 stat-label text-primary">
+                        <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                          person
+                        </span>
+                        What you do
+                      </h3>
+                      <ul className="mt-3 space-y-2">
+                        {step.you.map((item) => (
+                          <li
+                            key={item}
+                            className="flex gap-2.5 text-[14.5px] leading-relaxed text-on-surface-variant"
+                          >
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/80" aria-hidden="true" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="rounded-xl border border-outline-variant/60 bg-surface p-5">
+                      <h3 className="flex items-center gap-2 stat-label text-secondary">
+                        <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                          settings_suggest
+                        </span>
+                        What the app does
+                      </h3>
+                      <ul className="mt-3 space-y-2">
+                        {step.app.map((item) => (
+                          <li
+                            key={item}
+                            className="flex gap-2.5 text-[14.5px] leading-relaxed text-on-surface-variant"
+                          >
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-secondary/80" aria-hidden="true" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {step.note && (
+                    <p className="mt-4 flex gap-3 rounded-xl border border-primary-fixed-dim/35 bg-primary/[0.06] px-4 py-3 text-[14px] leading-relaxed text-on-surface">
+                      <span
+                        className="material-symbols-outlined shrink-0 text-[18px] text-primary"
+                        aria-hidden="true"
+                      >
+                        shield
+                      </span>
+                      {step.note}
+                    </p>
+                  )}
+
+                  {step.link && (
+                    <Link
+                      to={step.link.to}
+                      className="mt-4 inline-flex min-h-[44px] items-center gap-2 text-[15px] font-semibold text-primary transition-colors hover:text-on-surface"
+                    >
+                      {step.link.label}
+                      <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                        arrow_forward
+                      </span>
+                    </Link>
+                  )}
+
+                  {/* Mobile inline capture */}
+                  <div className="mx-auto mt-6 w-[256px] lg:hidden">
+                    <DeviceFrame id={step.screenshot} alt={step.alt} interactive={false} />
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+
+          {/* Sticky 3D Phone Viewport on Desktop */}
+          <aside
+            className="hidden lg:sticky lg:top-24 lg:block lg:self-start"
+            aria-label="Active step screen preview"
+          >
+            <div className="mb-3 flex items-baseline justify-between px-1">
+              <span className="stat-label tabular-nums text-primary">Step 0{activeIdx + 1}</span>
+              <span className="text-[13px] text-on-surface-variant">{activeStep.title}</span>
+            </div>
+
+            <DeviceFrame
+              id={activeStep.screenshot}
+              alt={activeStep.alt}
+              caption="Android release capture"
+            />
+
+            <div className="mt-3 flex justify-center gap-1" role="group" aria-label="Jump to step">
+              {STEPS.map((step, i) => (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveIdx(i);
+                    scrollStepIntoView(step.id);
+                  }}
+                  aria-label={`Jump to step ${i + 1}: ${step.title}`}
+                  aria-pressed={i === activeIdx}
+                  className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-xl"
+                >
+                  <span
+                    className={`block h-1.5 rounded-full transition-[transform,background-color] duration-200 ${
+                      i === activeIdx
+                        ? 'w-6 bg-primary'
+                        : 'w-2 bg-outline/60 hover:bg-on-surface-variant'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+          </aside>
+        </div>
+
+        {/* Architectural horizontal 3-rule strip */}
         <section id="rules" className="scroll-mt-24">
           <Reveal>
-            <h2 className="text-center font-heading text-2xl font-semibold text-on-surface sm:text-[32px]">
+            <p className="stat-label text-primary">The Through-Line</p>
+            <h2 className="mt-2 font-heading text-[30px] font-semibold text-on-surface sm:text-[38px]">
               Three rules that hold at every step
             </h2>
           </Reveal>
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            {RULES.map((rule, i) => (
-              <Reveal key={rule.title} delay={i * 90}>
-                <div className="lp-card h-full p-6">
-                  <span
-                    className="material-symbols-outlined text-[22px] text-primary"
-                    aria-hidden="true"
-                  >
-                    {rule.icon}
-                  </span>
-                  <h3 className="mt-4 font-heading text-lg font-semibold text-on-surface">
-                    {rule.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-on-surface-variant/75">
-                    {rule.body}
-                  </p>
-                </div>
-              </Reveal>
+          <dl className="mt-8 grid gap-x-10 border-y border-outline-variant/60 sm:grid-cols-3">
+            {RULES.map((rule) => (
+              <div key={rule.title} className="border-t border-outline-variant/60 py-6 first:border-t-0 sm:border-t-0">
+                <dt className="font-heading text-[22px] font-semibold text-on-surface">
+                  {rule.title}
+                </dt>
+                <dd className="mt-2 text-[15px] leading-relaxed text-on-surface-variant">
+                  {rule.body}
+                </dd>
+              </div>
             ))}
-          </div>
+          </dl>
         </section>
 
         <PageCta

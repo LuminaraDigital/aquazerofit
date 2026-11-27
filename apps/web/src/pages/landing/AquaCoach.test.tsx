@@ -6,7 +6,7 @@
  * crisis signpost the application returns are on the page.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import {
   CHAT_HISTORY_MAX_TURNS,
@@ -85,5 +85,22 @@ describe('Aqua Coach page', () => {
     renderPage();
 
     expect(screen.getByText('mini app welcome')).toBeTruthy();
+  });
+
+  it('switches Classifier Lab tabs via click and keyboard arrows', () => {
+    renderPage();
+
+    const tablist = screen.getByRole('tablist', { name: /sample guardrail prompts/i });
+    const tabs = within(tablist).getAllByRole('tab');
+    expect(tabs).toHaveLength(4);
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+
+    fireEvent.keyDown(tablist, { key: 'ArrowRight' });
+    expect(tabs[1].getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tabpanel').textContent).toMatch(/thyroid/i);
+
+    fireEvent.keyDown(tablist, { key: 'End' });
+    expect(tabs[3].getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tabpanel').textContent).toMatch(/hypothetically/i);
   });
 });

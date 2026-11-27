@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { API_ORIGIN } from './proxy.ts';
 import {
@@ -33,7 +34,6 @@ test('script-src and connect-src match Telegram, Turnstile, Firebase, and the AP
     'https://telegram.org',
     'https://*.telegram.org',
     'https://challenges.cloudflare.com',
-    'https://www.googletagmanager.com',
     'https://www.gstatic.com',
     'https://www.google.com',
   ]) {
@@ -47,11 +47,13 @@ test('script-src and connect-src match Telegram, Turnstile, Firebase, and the AP
     'https://securetoken.googleapis.com',
     'https://firebaseinstallations.googleapis.com',
     'https://www.googleapis.com',
-    'https://www.google-analytics.com',
     'https://tganalytics.xyz',
   ]) {
     assert.ok(connect.includes(source), `connect-src missing ${source}`);
   }
+  assert.equal(policy.includes('googletagmanager.com'), false);
+  assert.equal(policy.includes('google-analytics.com'), false);
+  assert.equal(policy.includes('analytics.google.com'), false);
   assert.deepEqual(sources(policy, 'worker-src'), [...WORKER_SRC]);
   assert.deepEqual(WORKER_SRC, ["'none'"]);
   assert.ok(sources(policy, 'frame-src').includes('https://*.firebaseapp.com'));
@@ -81,6 +83,10 @@ test('SPA responses set HSTS, nosniff, and referrer policy, and drop X-Frame-Opt
   assert.equal(response.headers.get('Strict-Transport-Security'), SECURITY_HEADERS['Strict-Transport-Security']);
   assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
   assert.equal(response.headers.get('Referrer-Policy'), 'strict-origin-when-cross-origin');
+  assert.equal(
+    response.headers.get('Permissions-Policy'),
+    'camera=(self), microphone=(), geolocation=(), interest-cohort=()',
+  );
   assert.equal(response.headers.get('Content-Security-Policy'), contentSecurityPolicy());
   assert.equal(response.headers.get('X-Frame-Options'), null);
   assert.equal(response.headers.get('cache-control'), 'no-cache');
@@ -176,4 +182,23 @@ test('the asset path applies those headers and does not invent X-Frame-Options',
   assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
   assert.match(response.headers.get('Content-Security-Policy') ?? '', /frame-ancestors 'self'/);
   assert.equal(response.headers.get('X-Frame-Options'), null);
+});
+
+test('Firebase Hosting configs carry the aligned CSP and Permissions-Policy headers', () => {
+  type FirebaseConfig = {
+    hosting?: { headers?: Array<{ source: string; headers: Array<{ key: string; value: string }> }> };
+  };
+  for (const rel of ['../../firebase.json', '../../apps/web/firebase.json']) {
+    const parsed = JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf8')) as FirebaseConfig;
+    const catchAll = parsed.hosting?.headers?.find((rule) => rule.source === '**');
+    assert.ok(catchAll, `${rel} missing catch-all header rule`);
+    const csp = catchAll.headers.find((h) => h.key === 'Content-Security-Policy')?.value;
+    const perm = catchAll.headers.find((h) => h.key === 'Permissions-Policy')?.value;
+    assert.equal(csp, contentSecurityPolicy(), `${rel} CSP drifted from securityHeaders.ts`);
+    assert.equal(
+      perm,
+      SECURITY_HEADERS['Permissions-Policy'],
+      `${rel} Permissions-Policy drifted from securityHeaders.ts`,
+    );
+  }
 });

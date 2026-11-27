@@ -71,17 +71,14 @@ describe('cloud run packaging', () => {
     expect(lock.packages['packages/shared/node_modules/zod']).toBeUndefined();
   });
 
-  it('copies workspace node_modules and runs the import smoke in the runtime stage', () => {
+  it('copies workspace node_modules read-only to nonroot and runs the import smoke in the runtime stage', () => {
     const dockerfile = fs.readFileSync(path.join(repoRoot, 'apps/api/Dockerfile'), 'utf8');
     const runtime = dockerfile.split('Stage 2: runtime')[1] ?? '';
-    expect(runtime).toContain('COPY --from=build --chown=nonroot:nonroot /repo/node_modules /repo/node_modules');
-    expect(runtime).toContain(
-      'COPY --from=build --chown=nonroot:nonroot /repo/apps/api/node_modules /repo/apps/api/node_modules',
-    );
-    expect(runtime).toContain(
-      'COPY --from=build --chown=nonroot:nonroot /repo/packages/shared/node_modules /repo/packages/shared/node_modules',
-    );
+    expect(runtime).toContain('COPY --from=build /repo/node_modules /repo/node_modules');
+    expect(runtime).toContain('COPY --from=build /repo/apps/api/node_modules /repo/apps/api/node_modules');
+    expect(runtime).toContain('COPY --from=build /repo/packages/shared/node_modules /repo/packages/shared/node_modules');
     expect(runtime).toContain('["/nodejs/bin/node", "apps/api/scripts/runtimeImportSmoke.mjs"]');
+    expect(runtime).toContain('CMD ["/nodejs/bin/node", "-e"');
   });
 
   it('anchors root-only gcloudignore names so apps/api/src/data is uploaded', () => {

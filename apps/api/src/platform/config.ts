@@ -312,6 +312,18 @@ export const config = {
   },
 
   /**
+   * Firebase API key for the Identity Toolkit REST calls the Admin SDK cannot
+   * make: checking an email + password, and sending Firebase's reset email.
+   * Not a secret (Firebase API keys identify the project, they grant nothing).
+   * Set, email/password accounts live in Firebase Auth so one account works
+   * on web and Android. Unset, the API keeps its own bcrypt credentials, which
+   * is what dev, the test suite and the keyless offline demo need.
+   */
+  get firebaseApiKey(): string {
+    return process.env.FIREBASE_API_KEY?.trim() ?? '';
+  },
+
+  /**
    * Turnstile site key. Public by design - it is handed to any caller of
    * GET /auth/captcha.
    *
@@ -588,6 +600,34 @@ export const config = {
   get appPublicUrl(): string {
     const raw = process.env.APP_PUBLIC_URL?.trim();
     return (raw || 'http://localhost:5173').replace(/\/+$/, '');
+  },
+
+  /** Parsed APP_PUBLIC_URL when explicitly configured, or null when unset/invalid. */
+  get configuredPublicOrigin(): URL | null {
+    const raw = process.env.APP_PUBLIC_URL?.trim();
+    if (!raw) return null;
+    try {
+      return new URL(raw);
+    } catch {
+      return null;
+    }
+  },
+
+  /** Lowercased hostnames allowed as HTTPS redirect targets when APP_PUBLIC_URL is set. */
+  get allowedHttpsRedirectHosts(): ReadonlySet<string> {
+    const canonical = this.configuredPublicOrigin;
+    if (!canonical) return new Set();
+    const allowed = new Set<string>([canonical.host.toLowerCase()]);
+    if (process.env.CORS_ORIGINS) {
+      for (const origin of this.corsOrigins) {
+        try {
+          allowed.add(new URL(origin).host.toLowerCase());
+        } catch {
+          /* ignore malformed CORS_ORIGINS entry */
+        }
+      }
+    }
+    return allowed;
   },
 
   /**

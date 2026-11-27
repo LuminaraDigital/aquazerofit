@@ -80,7 +80,7 @@ function socketAddress(req: Request): string {
 function warnIfSecretUnset(req: Request): void {
   if (originSecretWarningEmitted || config.isTest || !config.isProduction) return;
   if (config.originSharedSecret) return;
-  if (!singleHeader(req.headers[CF_CONNECTING_IP_HEADER])) return;
+  if (!singleHeader(req.headers?.[CF_CONNECTING_IP_HEADER])) return;
   originSecretWarningEmitted = true;
   // eslint-disable-next-line no-console
   console.warn(
@@ -128,8 +128,9 @@ export function clientNetworkKey(ip: string): string {
 
 /** Address the rate limiter and the Telegram new-account caps key on; both pass it through clientNetworkKey. */
 export function clientIpForRateLimit(req: Request): string {
-  const presented = singleHeader(req.headers[ORIGIN_SHARED_SECRET_HEADER]);
-  const cfIp = plausibleClientIp(singleHeader(req.headers[CF_CONNECTING_IP_HEADER]));
+  const headers = req.headers ?? {};
+  const presented = singleHeader(headers[ORIGIN_SHARED_SECRET_HEADER]);
+  const cfIp = plausibleClientIp(singleHeader(headers[CF_CONNECTING_IP_HEADER]));
   if (cfIp && isWorkerSecret(presented)) return cfIp;
   warnIfSecretUnset(req);
   return socketAddress(req);

@@ -47,6 +47,7 @@ import { config } from '../../platform/config';
 import { isUnownedEmailDomain } from '../../platform/mailer';
 import { getStore, newId } from '../../platform/store';
 import { credentialsId, toPublicUser } from '../me/service';
+import { firebasePasswords } from './firebasePasswords';
 import { auditAuthEvent, findUserByEmail, hashIdentifier } from './service';
 
 export interface FirebaseIdentity {
@@ -54,6 +55,12 @@ export interface FirebaseIdentity {
   email?: string;
   emailVerified: boolean;
   name?: string;
+  signInProvider?: string;
+}
+
+export interface EnsureFirebaseOptions {
+  /** True only when tokensValidAfter confirms no password reset since /me/credentials. */
+  preserveTelegramOnProof?: boolean;
 }
 
 function isUserDoc(d: { id: string }): d is User {
@@ -65,7 +72,7 @@ function safeDisplayName(candidate: string): string {
   return containsProfanity(candidate) ? 'Aqua member' : candidate;
 }
 
-function findUserByFirebaseUid(uid: string): User | undefined {
+export function findUserByFirebaseUid(uid: string): User | undefined {
   return getStore().findOne<User>(
     'users',
     (d) => isUserDoc(d) && (d as User).firebaseUid === uid,
@@ -88,23 +95,57 @@ function dropAccessAddedBeforeProof(user: User, ip?: string): User {
  * email is already taken.
  * Credentials stay in Firebase Auth. No password hash is written here.
  */
-export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string): User {
+export function ensureUserFromFirebase(
+  identity: FirebaseIdentity,
+  ip?: string,
+  options?: EnsureFirebaseOptions,
+): User {
   const store = getStore();
   const email = identity.email?.trim().toLowerCase();
+  const isPasswordSignIn = identity.signInProvider === 'password';
   const existingByUid = findUserByFirebaseUid(identity.uid);
   if (existingByUid) {
     let user = existingByUid;
+    let dirty = false;
     if (user.deletionRequestedAt) {
       user = { ...user, deletionRequestedAt: null };
-      store.upsert('users', user);
+      dirty = true;
       auditAuthEvent(user.id, 'deletion.cancelled', undefined, ip);
+    }
+    if (isPasswordSignIn && user.firebasePassword !== true) {
+      user = { ...user, firebasePassword: true };
+      dirty = true;
     }
     // A verified token proves the address it carries, which Firebase lets the
     // identity change. Only proof of the stored address verifies it.
     if (identity.emailVerified && !user.emailVerified && email === user.email.trim().toLowerCase()) {
-      user = dropAccessAddedBeforeProof({ ...user, emailVerified: true }, ip);
-      store.upsert('users', user);
+      const keepTelegram =
+        user.migratedFromBcrypt === true ||
+        (user.telegramCredentialsValidAfter !== undefined &&
+          isPasswordSignIn &&
+          options?.preserveTelegramOnProof === true);
+      if (keepTelegram) {
+        user = {
+          ...user,
+          emailVerified: true,
+          migratedFromBcrypt: undefined,
+          telegramCredentialsValidAfter: undefined,
+        };
+        auditAuthEvent(
+          user.id,
+          'firebase.email.proved',
+          { droppedPassword: false, droppedTelegram: false },
+          ip,
+        );
+      } else {
+        user = dropAccessAddedBeforeProof(
+          { ...user, emailVerified: true, telegramCredentialsValidAfter: undefined },
+          ip,
+        );
+      }
+      dirty = true;
     }
+    if (dirty) store.upsert('users', user);
     auditAuthEvent(user.id, 'firebase.session', undefined, ip);
     return user;
   }
@@ -149,7 +190,12 @@ export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string):
             : 'This email is not verified on the existing account',
         );
       }
-      let user: User = { ...byEmail, firebaseUid: identity.uid, emailVerified: true };
+      let user: User = {
+        ...byEmail,
+        firebaseUid: identity.uid,
+        emailVerified: true,
+        ...(isPasswordSignIn ? { firebasePassword: true } : {}),
+      };
       if (user.deletionRequestedAt) {
         user = { ...user, deletionRequestedAt: null };
         auditAuthEvent(user.id, 'deletion.cancelled', undefined, ip);
@@ -177,6 +223,7 @@ export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string):
       identity.name?.trim() || (email ? email.split('@')[0]! : 'Aqua member'),
     ),
     firebaseUid: identity.uid,
+    ...(isPasswordSignIn ? { firebasePassword: true } : {}),
     createdAt: now,
     deletionRequestedAt: null,
   };
@@ -190,11 +237,43 @@ export function ensureUserFromFirebase(identity: FirebaseIdentity, ip?: string):
   return user;
 }
 
-export function firebaseSession(
+/**
+ * Async wrapper around `ensureUserFromFirebase` that checks Firebase
+ * `tokensValidAfter` before preserving a Telegram user's pre-existing `tgId`
+ * on first email proof after `POST /me/credentials`.
+ */
+export async function ensureUserFromFirebaseAsync(
   identity: FirebaseIdentity,
   ip?: string,
-): { user: ReturnType<typeof toPublicUser> } {
-  const user = ensureUserFromFirebase(identity, ip);
+): Promise<User> {
+  const existing = findUserByFirebaseUid(identity.uid);
+  let preserveTelegramOnProof = false;
+  if (
+    existing &&
+    !existing.emailVerified &&
+    identity.emailVerified &&
+    identity.signInProvider === 'password' &&
+    existing.telegramCredentialsValidAfter !== undefined &&
+    identity.email?.trim().toLowerCase() === existing.email.trim().toLowerCase()
+  ) {
+    const passwords = firebasePasswords();
+    if (passwords) {
+      // Let transient Firebase Admin errors propagate as a retryable 500
+      // rather than silently wiping a legitimate Telegram user's tgId.
+      const validAfter = await passwords.tokensValidAfter(identity.uid);
+      if (validAfter !== null && validAfter <= existing.telegramCredentialsValidAfter) {
+        preserveTelegramOnProof = true;
+      }
+    }
+  }
+  return ensureUserFromFirebase(identity, ip, { preserveTelegramOnProof });
+}
+
+export async function firebaseSession(
+  identity: FirebaseIdentity,
+  ip?: string,
+): Promise<{ user: ReturnType<typeof toPublicUser> }> {
+  const user = await ensureUserFromFirebaseAsync(identity, ip);
   return { user: toPublicUser(user) };
 }
 

@@ -117,32 +117,37 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
   hellip: '…',
 };
 
+function decodeCodePoint(code: number): string {
+  return Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+}
+
 function decodeEntities(text: string): string {
   return text
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => {
-      const code = Number.parseInt(hex, 16);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : '';
-    })
-    .replace(/&#(\d+);/g, (_, dec: string) => {
-      const code = Number.parseInt(dec, 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : '';
-    })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => decodeCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => decodeCodePoint(Number.parseInt(dec, 10)))
     .replace(/&([a-zA-Z]+);/g, (match, name: string) => NAMED_ENTITIES[name] ?? match);
 }
 
 /**
  * Strip ALL HTML tags and entities from a wger description and collapse
  * whitespace. Output is plain text safe to store and render as-is.
+ * Tag-stripping runs both before and after entity decoding so entity-encoded
+ * markup (`&lt;script&gt;`, `&lt;img ...&gt;`) cannot survive decoding while
+ * harmless text like `&lt;3` stays intact.
  */
 export function sanitizeWgerDescription(html: string): string {
   if (!html) return '';
-  return decodeEntities(
-    html
-      .replace(/<script[\s\S]*?<\/script\s*>/gi, ' ') // drop script blocks wholesale
-      .replace(/<style[\s\S]*?<\/style\s*>/gi, ' ')
-      .replace(/<[^>]*>/g, ' ') // all remaining tags
-      .replace(/<[^>]*$/g, ''), // truncated trailing tag
-  )
+  const strippedRaw = html
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, ' ') // drop script blocks wholesale
+    .replace(/<style[\s\S]*?<\/style\s*>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ') // all remaining tags
+    .replace(/<[^>]*$/g, ''); // truncated trailing tag
+
+  return decodeEntities(strippedRaw)
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style\s*>/gi, ' ')
+    .replace(/<\/?[a-zA-Z!?][^>]*>/g, ' ')
+    .replace(/<\/?[a-zA-Z!?][^>]*$/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }

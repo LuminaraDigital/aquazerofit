@@ -7,7 +7,7 @@
  * a stale claim about a health product, and it should fail the build.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import {
   ACTIVITY_FACTORS,
@@ -90,5 +90,13 @@ describe('Features page', () => {
     renderPage();
 
     expect(screen.getByText('mini app welcome')).toBeTruthy();
+  });
+
+  it('filters sample exercises in the interactive kit preview', () => {
+    renderPage();
+
+    expect(screen.getByText('Push-up progression')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Dumbbells' }));
+    expect(screen.getByText('Goblet squat')).toBeTruthy();
   });
 });

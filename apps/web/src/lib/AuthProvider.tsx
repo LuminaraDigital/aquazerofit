@@ -10,13 +10,19 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { AuthResponse, PublicUser } from '@aquazerofit/shared';
 import { api, tokenStore } from './api';
-import { isFirebaseAuthEnabled, loadFirebaseSdk, mapFirebaseAuthError } from './firebase';
+import {
+  isFirebaseAuthEnabled,
+  loadFirebaseSdk,
+  mapFirebaseAuthError,
+  type FirebaseSdk,
+} from './firebase';
 
 interface AuthContextValue {
   /** True until the first Firebase auth event (or immediately if disabled). */
@@ -52,6 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(firebaseEnabled);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
+  // Separate sequence counters: listenerSeqRef cancels stale onIdTokenChanged
+  // work, while sessionSeqRef is bumped only by explicit sign-in/register/sign-out
+  // so Firebase's own onIdTokenChanged callbacks cannot abort establishSession.
+  const listenerSeqRef = useRef(0);
+  const sessionSeqRef = useRef(0);
+  const establishingRef = useRef(false);
 
   useEffect(() => {
     if (!firebaseEnabled) {
@@ -72,20 +84,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       unsub = sdk.onIdTokenChanged(sdk.auth, (user) => {
+        const seq = ++listenerSeqRef.current;
         void (async () => {
           try {
             if (!user) {
-              setFirebaseUser(null);
-              setIdToken(null);
+              if (!cancelled && !establishingRef.current && seq === listenerSeqRef.current) {
+                setFirebaseUser(null);
+                setIdToken(null);
+              }
               // Do not clear a legacy JWT session (Telegram cookie refresh may own it).
               return;
             }
             const token = await user.getIdToken();
+            if (
+              cancelled ||
+              establishingRef.current ||
+              seq !== listenerSeqRef.current ||
+              sdk.auth?.currentUser?.uid !== user.uid
+            ) {
+              return;
+            }
             setFirebaseUser(user);
             setIdToken(token);
             tokenStore.set({ accessToken: token });
+          } catch {
+            if (!cancelled && !establishingRef.current && seq === listenerSeqRef.current) {
+              setFirebaseUser(null);
+              setIdToken(null);
+            }
           } finally {
-            setIsLoading(false);
+            if (!cancelled) setIsLoading(false);
           }
         })();
       });
@@ -96,16 +124,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [firebaseEnabled]);
 
-  const signInEmail = useCallback(async (email: string, password: string) => {
-    const sdk = await loadFirebaseSdk();
-    if (!sdk.auth) throw new Error('Firebase Auth is not configured');
-    const cred = await sdk.signInWithEmailAndPassword(sdk.auth, email.trim(), password);
-    const token = await cred.user.getIdToken();
-    tokenStore.set({ accessToken: token });
-    setIdToken(token);
-    setFirebaseUser(cred.user);
-    return hydrateSession();
-  }, []);
+  const establishSession = useCallback(
+    async (sdk: FirebaseSdk, user: FirebaseUser, forceRefresh = false): Promise<PublicUser> => {
+      const sessionSeq = ++sessionSeqRef.current;
+      establishingRef.current = true;
+      listenerSeqRef.current += 1;
+      try {
+        const token = await user.getIdToken(forceRefresh);
+        if (sessionSeq !== sessionSeqRef.current) {
+          throw new Error('Sign-in superseded');
+        }
+        tokenStore.set({ accessToken: token });
+        setIdToken(token);
+        setFirebaseUser(user);
+        return await hydrateSession();
+      } catch (err) {
+        if (sessionSeq === sessionSeqRef.current) {
+          listenerSeqRef.current += 1;
+          tokenStore.clear();
+          setIdToken(null);
+          setFirebaseUser(null);
+          if (sdk.auth) await sdk.signOut(sdk.auth).catch(() => {});
+        }
+        throw err;
+      } finally {
+        if (sessionSeq === sessionSeqRef.current) {
+          establishingRef.current = false;
+        }
+      }
+    },
+    [],
+  );
+
+  const signInEmail = useCallback(
+    async (email: string, password: string) => {
+      const sdk = await loadFirebaseSdk();
+      if (!sdk.auth) throw new Error('Firebase Auth is not configured');
+      const cred = await sdk.signInWithEmailAndPassword(sdk.auth, email.trim(), password);
+      return establishSession(sdk, cred.user);
+    },
+    [establishSession],
+  );
 
   const registerEmail = useCallback(
     async (input: { email: string; password: string; displayName?: string }) => {
@@ -119,13 +178,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (input.displayName?.trim()) {
         await sdk.updateProfile(cred.user, { displayName: input.displayName.trim() });
       }
-      const token = await cred.user.getIdToken(true);
-      tokenStore.set({ accessToken: token });
-      setIdToken(token);
-      setFirebaseUser(cred.user);
-      return hydrateSession();
+      void sdk.sendEmailVerification(cred.user).catch(() => {});
+      return establishSession(sdk, cred.user, true);
     },
-    [],
+    [establishSession],
   );
 
   const resetPassword = useCallback(async (email: string) => {
@@ -135,6 +191,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOutFirebase = useCallback(async () => {
+    sessionSeqRef.current += 1;
+    listenerSeqRef.current += 1;
+    establishingRef.current = false;
     const sdk = await loadFirebaseSdk();
     if (sdk.auth) await sdk.signOut(sdk.auth);
     setFirebaseUser(null);

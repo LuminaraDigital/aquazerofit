@@ -1,5 +1,8 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { tokenStore } from './lib/api';
+import { marketingRoute } from './lib/site';
+import { isTMA } from './lib/telegram';
 import {
   useTelegramBackButton,
   useTelegramHostChrome,
@@ -99,6 +102,13 @@ export default function App() {
   // Last-resort boundary for screens outside AppLayout (auth, settings,
   // capture flows) - AppLayout has its own so the bottom nav survives there.
   const { pathname } = useLocation();
+  // Sync tab title immediately on client-side navigation before lazy route
+  // chunks resolve so tabs never linger on the previous route's title.
+  useEffect(() => {
+    const isSignedInIndex = pathname === '/' && (tokenStore.isAuthenticated || isTMA());
+    const entry = isSignedInIndex ? undefined : marketingRoute(pathname);
+    document.title = entry?.title ?? 'AquaZeroFit';
+  }, [pathname]);
   return (
     <>
     <TelegramChrome />

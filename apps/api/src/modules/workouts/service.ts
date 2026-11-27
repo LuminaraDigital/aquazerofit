@@ -30,6 +30,7 @@ import { AppError } from '../../platform/errors';
 import { getStore } from '../../platform/store';
 import { addDays, daysBetween } from '../../platform/dates';
 import { creditLedger } from '../ai/creditLedger';
+import { pre as preGuardrail } from '../ai/guardrails';
 import { tierOf } from '../billing/entitlements';
 import {
   buildExercisePool,
@@ -43,7 +44,7 @@ import {
   type ProgressionGate,
   type RuleKind,
 } from '../plans/progression';
-import { getProfile } from '../me/service';
+import { getProfile, hasConsent } from '../me/service';
 
 export function planPositionFor(
   plan: TrainingPlan,
@@ -554,9 +555,12 @@ export async function swapExercise(
   // Optional AI ranking (P-06) for the muscle-match tier: the model proposes,
   // code disposes — any AI pick must pass the deterministic equipment/muscle
   // constraints (same primary muscle, pool membership, not already in session).
+  // Skip the model when aiPersonalisation consent is off, or when user-supplied
+  // reason text trips the input guardrail so adversarial text never reaches P-06.
   let reservationId: string | null = null;
   try {
-    if (!replacement) {
+    const reasonBlocked = opts.reason ? preGuardrail(opts.reason, { userId }).blocked : false;
+    if (!replacement && !reasonBlocked && hasConsent(userId, 'aiPersonalisation')) {
       const engine = await loadPlanEngine();
       if (engine) {
         // The hold is taken here rather than on entry because everything above

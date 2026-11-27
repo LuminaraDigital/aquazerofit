@@ -9,8 +9,8 @@
  * the ledger answers 402 CREDITS_INSUFFICIENT.
  */
 import type { NextFunction, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import type { ApiErrorBody } from '@aquazerofit/shared';
+import { verifyAccess } from './auth';
 import { clientIpForRateLimit, clientNetworkKey } from './clientIp';
 import { config } from './config';
 
@@ -121,13 +121,15 @@ function isAnonymousWritePath(path: string): boolean {
   return path.includes('/analytics/events') || path.includes('/challenges/peek');
 }
 
-/** Best-effort subject extraction for limiter keying only. This is not authentication. */
+/** Best-effort subject extraction for limiter keying only. Unverified tokens fall back to IP. */
 function subjectOf(req: Request, clientIp: string): string {
   const header = req.headers.authorization;
   if (header?.startsWith('Bearer ')) {
-    const decoded = jwt.decode(header.slice(7));
-    if (decoded && typeof decoded === 'object' && typeof decoded.sub === 'string') {
-      return `u:${decoded.sub}`;
+    try {
+      const claims = verifyAccess(header.slice(7));
+      return `u:${claims.id}`;
+    } catch {
+      // Unsigned, forged, expired or non-HS256 token: never key on unverified claims.
     }
   }
   return `ip:${clientIp}`;

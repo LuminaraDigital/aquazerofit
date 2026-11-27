@@ -18,6 +18,7 @@ import { creditLedger } from '../ai/creditLedger';
 import { PREMIUM_LANES } from '../ai/tierPolicy';
 import { asyncHandler } from '../../platform/errors';
 import { requireAuth, userIdOf } from '../../platform/auth';
+import { clientIpForRateLimit } from '../../platform/clientIp';
 import { AppError } from '../../platform/errors';
 import { getStore } from '../../platform/store';
 import { setCredentials } from '../auth/service';
@@ -126,7 +127,7 @@ meRouter.post(
   '/credentials',
   asyncHandler(async (req, res) => {
     const input = setCredentialsSchema.parse(req.body);
-    const result = await setCredentials(userIdOf(req), input, req.ip);
+    const result = await setCredentials(userIdOf(req), input, clientIpForRateLimit(req));
     // 202 while the address waits on its confirmation link.
     res.status(result.pendingEmail ? 202 : 200).json(result);
   }),

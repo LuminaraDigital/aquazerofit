@@ -419,6 +419,12 @@ export function unwrapWorkoutSession(data: unknown): WorkoutSession | null {
 // ---------- auth actions ----------
 
 const USER_KEY = 'azf.user';
+const USER_STORAGE_KEYS = [
+  USER_KEY,
+  'azf_setup_draft_v1',
+  'azf_coach_composer_v1',
+  'azf.notificationPrefs',
+] as const;
 
 /**
  * Last authenticated user snapshot  -  instant-boot fallback only.
@@ -543,7 +549,9 @@ export function useAuthActions() {
     }
     tokenStore.clear();
     try {
-      localStorage.removeItem(USER_KEY);
+      for (const key of USER_STORAGE_KEYS) {
+        localStorage.removeItem(key);
+      }
     } catch {
       // ignore
     }

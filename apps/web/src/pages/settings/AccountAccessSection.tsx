@@ -30,18 +30,24 @@ export function AccountAccessSection({ user }: { user: PublicUser }) {
   const toast = useToast();
   const setCredentials = useSetCredentials();
   const linkTelegram = useLinkTelegram();
+  const needsCredentials = user.hasPassword === false;
+  const isTelegramOnly =
+    user.telegramLinked && /^tg-\d+@telegram\.aquazero\.fit$/i.test(user.email);
+  const fixedEmail = !isTelegramOnly ? user.email : null;
   const [formOpen, setFormOpen] = useState(false);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(fixedEmail ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
-  const needsCredentials = user.hasPassword === false;
   const inTelegram = isTMA();
 
   async function submitCredentials(e: FormEvent) {
     e.preventDefault();
-    const check = setCredentialsSchema.safeParse({ email: email.trim(), password });
+    const check = setCredentialsSchema.safeParse({
+      email: (fixedEmail ?? email).trim(),
+      password,
+    });
     if (!check.success) {
       setError(check.error.issues[0]?.message ?? 'Please review your details.');
       return;
@@ -122,16 +128,20 @@ export function AccountAccessSection({ user }: { user: PublicUser }) {
           {needsCredentials && formOpen && (
             <form onSubmit={(e) => void submitCredentials(e)} className="space-y-3">
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                Your account was created through Telegram. Add an email and password to use
-                AquaZeroFit in any browser - your data stays on this one account.
+                {isTelegramOnly
+                  ? 'Your account was created through Telegram. Add an email and password to use AquaZeroFit in any browser - your data stays on this one account.'
+                  : `Add a password for ${user.email} so you can also sign in with email and password on any device.`}
               </p>
               <Input
                 label="Email"
                 icon="mail"
                 type="email"
                 autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={fixedEmail ?? email}
+                readOnly={fixedEmail !== null}
+                onChange={(e) => {
+                  if (fixedEmail === null) setEmail(e.target.value);
+                }}
               />
               <Input
                 label="Password"

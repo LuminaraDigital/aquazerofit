@@ -18,8 +18,9 @@ jobs:
     steps:
       - name: Enforce staging -> main promotion
         if: github.base_ref == 'main'
+        env:
+          HEAD: ${{ github.head_ref }}
         run: |
-          HEAD="${{ github.head_ref }}"
           if [ "$HEAD" != "staging" ]; then
             echo "::error::PRs into main must come from the staging branch (got '$HEAD')."
             echo "::error::Merge feature work into staging first, validate there, then open staging -> main."
@@ -29,10 +30,11 @@ jobs:
 
       - name: Allow feature and hotfix into staging
         if: github.base_ref == 'staging'
+        env:
+          HEAD: ${{ github.head_ref }}
         run: |
-          HEAD="${{ github.head_ref }}"
           case "$HEAD" in
-            feature/*|fix/*|hotfix/*|chore/*|dependabot/*|renovate/*)
+            feat/*|feature/*|fix/*|hotfix/*|chore/*|dependabot/*|renovate/*)
               echo "Staging intake ok: $HEAD -> staging"
               ;;
             main)
@@ -40,7 +42,7 @@ jobs:
               exit 1
               ;;
             *)
-              echo "::warning::Unexpected source branch '$HEAD'. Prefer feature/*, fix/*, or hotfix/*."
+              echo "::warning::Unexpected source branch '$HEAD'. Prefer feat/*, feature/*, fix/*, or hotfix/*."
               echo "Allowing for now so Dependabot-style branches are not blocked without a rename."
               ;;
           esac

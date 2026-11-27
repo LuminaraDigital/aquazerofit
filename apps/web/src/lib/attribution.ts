@@ -128,7 +128,7 @@ export function getAttribution(): Attribution {
 
 /** Build a shareable absolute URL with attribution query params. */
 export function buildShareUrl(path: string, extras: Record<string, string | null | undefined> = {}): string {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://aquazero.fit';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://aquazerofit.com';
   const url = new URL(path.startsWith('http') ? path : `${origin}${path.startsWith('/') ? path : `/${path}`}`);
   for (const [k, v] of Object.entries(extras)) {
     if (v) url.searchParams.set(k, v);

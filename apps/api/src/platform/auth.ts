@@ -56,6 +56,12 @@ export interface RefreshTokenRecord {
   revokedAt: string | null;
   createdAt: string;
   /**
+   * When the family's first token was issued, copied onto every rotation.
+   * A Firebase password change revokes families opened before it. Families
+   * from before this field fall back to their earliest record.
+   */
+  familyCreatedAt?: string;
+  /**
    * Present when the family was opened by Telegram initData. Copied onto
    * every rotation so the access token keeps `channel: telegram`.
    */
@@ -149,6 +155,7 @@ export function issueRefresh(
   userId: string,
   familyId?: string,
   channel?: SessionChannel,
+  familyCreatedAt?: string,
 ): IssuedRefresh {
   const now = new Date();
   const token = crypto.randomBytes(48).toString('base64url');
@@ -162,6 +169,7 @@ export function issueRefresh(
     usedAt: null,
     revokedAt: null,
     createdAt: now.toISOString(),
+    familyCreatedAt: familyCreatedAt ?? now.toISOString(),
     ...(channel === 'telegram' ? { channel: 'telegram' as const } : {}),
   };
   getStore().upsert('users', record);
@@ -219,8 +227,25 @@ export async function rotateRefresh(
     throw new AppError('AUTH_INVALID', 'Refresh token reuse detected; session revoked');
   }
 
-  const next = issueRefresh(existing.userId, existing.familyId, existing.channel);
+  const next = issueRefresh(
+    existing.userId,
+    existing.familyId,
+    existing.channel,
+    existing.familyCreatedAt ?? familyOpenedAt(existing.familyId, existing.createdAt),
+  );
   return { ...next, userId: existing.userId, channel: existing.channel };
+}
+
+/** Earliest issue time in a family that predates familyCreatedAt. */
+function familyOpenedAt(familyId: string, fallback: string): string {
+  let earliest = fallback;
+  for (const rec of getStore().where<RefreshTokenRecord>(
+    'users',
+    (d) => d.type === 'refreshToken' && d.familyId === familyId,
+  )) {
+    if (rec.createdAt < earliest) earliest = rec.createdAt;
+  }
+  return earliest;
 }
 
 export function revokeFamilyByToken(token: string): void {
@@ -295,8 +320,8 @@ export const requireAuth: RequestHandler = (req: Request, _res: Response, next: 
       if (firebaseIdentity) {
         // Dynamic import avoids a load-time cycle: this module is imported by
         // auth/service, and firebaseUsers imports helpers from auth/service.
-        const { ensureUserFromFirebase } = await import('../modules/auth/firebaseUsers');
-        const user = ensureUserFromFirebase(firebaseIdentity, clientIpForRateLimit(req));
+        const { ensureUserFromFirebaseAsync } = await import('../modules/auth/firebaseUsers');
+        const user = await ensureUserFromFirebaseAsync(firebaseIdentity, clientIpForRateLimit(req));
         if (!isUserDocument(user)) {
           throw new AppError('AUTH_INVALID', 'Account no longer exists');
         }

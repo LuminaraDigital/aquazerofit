@@ -1,25 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  firebaseConfig,
-  getFirebaseApp,
-  isFirebaseAuthEnabled,
-  mapFirebaseAuthError,
-} from './firebase';
+import * as firebaseModule from './firebase';
+import { isFirebaseAuthEnabled, mapFirebaseAuthError } from './firebase';
 
 describe('Firebase Web SDK Configuration and Helpers', () => {
-  it('exports valid Firebase configuration matching the aquazerofit project', () => {
-    expect(firebaseConfig.projectId).toBe('aquazerofit');
-    expect(firebaseConfig.authDomain).toBe('aquazerofit.firebaseapp.com');
-    expect(firebaseConfig.storageBucket).toBe('aquazerofit.firebasestorage.app');
-    expect(firebaseConfig.messagingSenderId).toBe('592686987043');
-    expect(firebaseConfig.appId).toBe('1:592686987043:web:be6c7d84103ebb3d697e96');
-    expect(firebaseConfig.measurementId).toBe('G-900GD16689');
+  it('does not export a hardcoded Firebase config object', () => {
+    expect('firebaseConfig' in firebaseModule).toBe(false);
   });
 
   it('keeps test environment safe and deterministic when unconfigured', () => {
     // When test suite runs without explicit API key in env, Firebase Auth is cleanly bypassed
     const enabled = isFirebaseAuthEnabled();
-    expect(typeof enabled).toBe('boolean');
+    expect(enabled).toBe(false);
   });
 
   it('never starts Firebase Analytics, even with web sign-in configured', async () => {
@@ -33,6 +24,7 @@ describe('Firebase Web SDK Configuration and Helpers', () => {
     // Analytics only ever started where window exists; this file runs in node.
     vi.stubGlobal('window', {});
     const getAnalytics = vi.fn(() => ({}));
+    const sendEmailVerification = vi.fn();
     vi.doMock('firebase/app', () => ({
       initializeApp: vi.fn(() => ({})),
       getApps: () => [],
@@ -44,6 +36,7 @@ describe('Firebase Web SDK Configuration and Helpers', () => {
       signInWithEmailAndPassword: vi.fn(),
       createUserWithEmailAndPassword: vi.fn(),
       sendPasswordResetEmail: vi.fn(),
+      sendEmailVerification,
       signOut: vi.fn(),
       updateProfile: vi.fn(),
     }));
@@ -54,6 +47,7 @@ describe('Firebase Web SDK Configuration and Helpers', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(sdk.auth).not.toBeNull();
+      expect(sdk.sendEmailVerification).toBe(sendEmailVerification);
       expect(getAnalytics).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllEnvs();
@@ -84,6 +78,7 @@ describe('Firebase Web SDK Configuration and Helpers', () => {
       signInWithEmailAndPassword: vi.fn(),
       createUserWithEmailAndPassword: vi.fn(),
       sendPasswordResetEmail: vi.fn(),
+      sendEmailVerification: vi.fn(),
       signOut: vi.fn(),
       updateProfile: vi.fn(),
     }));

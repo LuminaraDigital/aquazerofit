@@ -109,14 +109,16 @@ class EnterpriseSecurityPolicyTest {
         controller.onAppStopped(nowElapsedMs = 1_000L, isChangingConfigurations = false)
         controller.onAppStopped(nowElapsedMs = 50_000L, isChangingConfigurations = true)
 
-        // Return after 5 minutes (t = 301,000 ms) -> prompt launches.
+        // Return after 5 minutes (t = 301,000 ms) -> prompt launches and privacy veil locks.
         assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 301_000L, isDeviceSecure = true))
+        assertTrue(controller.isLocked.value)
         // While prompt is in flight, a duplicate onStart does not launch a second prompt.
         assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 301_100L, isDeviceSecure = true))
 
         // User cancels the system credential screen -> returns false, suppresses immediate re-launch
-        // in the same onStart frame while moveTaskToBack(true) runs.
+        // in the same onStart frame while moveTaskToBack(true) runs, and keeps veil locked.
         assertFalse(controller.onUnlockPromptResult(unlocked = false))
+        assertTrue(controller.isLocked.value)
         assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 301_200L, isDeviceSecure = true))
 
         // moveTaskToBack(true) stops the Activity at t = 301,500 ms -> must NOT overwrite lockRequired.
@@ -124,9 +126,11 @@ class EnterpriseSecurityPolicyTest {
 
         // User reopens the app 1 second later (t = 302,500 ms) -> lock is still latched!
         assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 302_500L, isDeviceSecure = true))
+        assertTrue(controller.isLocked.value)
 
-        // User completes unlock -> lock clears.
+        // User completes unlock -> lock and veil clear.
         assertTrue(controller.onUnlockPromptResult(unlocked = true))
+        assertFalse(controller.isLocked.value)
         assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 302_600L, isDeviceSecure = true))
     }
 
@@ -134,15 +138,109 @@ class EnterpriseSecurityPolicyTest {
     fun `DeviceSecurityController locks a cold start when app lock is enabled`() {
         val controller = DeviceSecurityController(DeviceSecurityState(userAppLockEnabled = true))
         controller.onColdStart()
+        assertTrue(controller.isLocked.value)
 
         // No background timestamp exists after process death, yet the lock still applies.
         assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 1_000L, isDeviceSecure = true))
+        assertTrue(controller.isLocked.value)
         assertTrue(controller.onUnlockPromptResult(unlocked = true))
+        assertFalse(controller.isLocked.value)
         assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 2_000L, isDeviceSecure = true))
 
         val off = DeviceSecurityController(DeviceSecurityState())
         off.onColdStart()
+        assertFalse(off.isLocked.value)
         assertFalse(off.shouldLaunchUnlockPrompt(nowElapsedMs = 1_000L, isDeviceSecure = true))
+    }
+
+    @Test
+    fun `MDM forced app lock fails closed on insecure device and recovers once secured`() {
+        val controller = DeviceSecurityController(
+            DeviceSecurityState(
+                restrictions = ManagedRestrictions(forceAppLock = true),
+            ),
+        )
+        controller.onColdStart()
+        assertTrue(controller.isLocked.value)
+
+        // Device has no PIN/biometric: cannot launch credential sheet, must stay locked.
+        assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 1_000L, isDeviceSecure = false))
+        assertTrue(controller.isLocked.value)
+        assertEquals(AppLockBlockReason.DEVICE_NOT_SECURE, controller.lockBlockReason.value)
+
+        // User sets up a device screen lock and returns -> prompt launches and clears block reason.
+        assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 2_000L, isDeviceSecure = true))
+        assertTrue(controller.isLocked.value)
+        assertNull(controller.lockBlockReason.value)
+
+        // Completing the system credential prompt clears the lock veil.
+        assertTrue(controller.onUnlockPromptResult(unlocked = true))
+        assertFalse(controller.isLocked.value)
+        assertNull(controller.lockBlockReason.value)
+    }
+
+    @Test
+    fun `user-only app lock clears lock session on insecure device`() {
+        val controller = DeviceSecurityController(DeviceSecurityState(userAppLockEnabled = true))
+        controller.onColdStart()
+        assertTrue(controller.isLocked.value)
+
+        assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 1_000L, isDeviceSecure = false))
+        assertFalse(controller.isLocked.value)
+        assertNull(controller.lockBlockReason.value)
+    }
+
+    @Test
+    fun `MDM forced app lock fails closed when unlock prompt launch fails`() {
+        val controller = DeviceSecurityController(
+            DeviceSecurityState(
+                restrictions = ManagedRestrictions(forceAppLock = true),
+            ),
+        )
+        controller.onColdStart()
+        assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 1_000L, isDeviceSecure = true))
+
+        // System failed to create or launch the credential intent -> stays locked, allows retry.
+        controller.onUnlockPromptLaunchFailed()
+        assertTrue(controller.isLocked.value)
+        assertEquals(AppLockBlockReason.PROMPT_UNAVAILABLE, controller.lockBlockReason.value)
+
+        // Retry can launch the credential prompt again and unlock on success.
+        assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 2_000L, isDeviceSecure = true))
+        assertTrue(controller.isLocked.value)
+        assertNull(controller.lockBlockReason.value)
+        assertTrue(controller.onUnlockPromptResult(unlocked = true))
+        assertFalse(controller.isLocked.value)
+    }
+
+    @Test
+    fun `user-only app lock clears session when unlock prompt launch fails`() {
+        val controller = DeviceSecurityController(DeviceSecurityState(userAppLockEnabled = true))
+        controller.onColdStart()
+        assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 1_000L, isDeviceSecure = true))
+
+        controller.onUnlockPromptLaunchFailed()
+        assertFalse(controller.isLocked.value)
+        assertNull(controller.lockBlockReason.value)
+    }
+
+    @Test
+    fun `manual retry bypasses post-cancel prompt suppression while locked`() {
+        val controller = DeviceSecurityController(DeviceSecurityState(userAppLockEnabled = true))
+        controller.onColdStart()
+        assertTrue(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 1_000L, isDeviceSecure = true))
+        assertFalse(controller.onUnlockPromptResult(unlocked = false))
+
+        // Automatic onStart is suppressed until stopped, but explicit user tap retries immediately.
+        assertFalse(controller.shouldLaunchUnlockPrompt(nowElapsedMs = 1_100L, isDeviceSecure = true))
+        assertTrue(
+            controller.shouldLaunchUnlockPrompt(
+                nowElapsedMs = 1_200L,
+                isDeviceSecure = true,
+                manualRetry = true,
+            ),
+        )
+        assertTrue(controller.isLocked.value)
     }
 
     @Test

@@ -19,6 +19,17 @@ export type DeepLinkHandler = (
   navigate: (path: string) => void,
 ) => boolean | void;
 
+/** Allow only single-slash internal app paths (blocks open redirects and control chars). */
+function isSafeTargetPath(path: string): boolean {
+  if (!path.startsWith('/') || path.startsWith('//')) return false;
+  if (path.includes('\\')) return false;
+  for (let i = 0; i < path.length; i += 1) {
+    const code = path.charCodeAt(i);
+    if (code <= 0x1f || code === 0x7f) return false;
+  }
+  return true;
+}
+
 export class DeepLinkRouter {
   private handlers = new Map<string, DeepLinkHandler>();
 
@@ -40,7 +51,7 @@ export class DeepLinkRouter {
     // Log Meal (e.g. startapp=log_meal or startapp=log_meal_breakfast)
     this.register('log_meal', (res, navigate) => {
       const type = res.params.type || 'breakfast';
-      navigate(`/nutrition?action=add_meal&meal=${type}`);
+      navigate(`/nutrition?action=add_meal&meal=${encodeURIComponent(type)}`);
       return true;
     });
 
@@ -59,7 +70,7 @@ export class DeepLinkRouter {
     // Water Add (e.g. startapp=water_add or startapp=water_add_250)
     this.register('water_add', (res, navigate) => {
       const amount = res.params.amount || '250';
-      navigate(`/nutrition?action=water_add&amount=${amount}`);
+      navigate(`/nutrition?action=water_add&amount=${encodeURIComponent(amount)}`);
       return true;
     });
 
@@ -67,7 +78,7 @@ export class DeepLinkRouter {
     this.register('challenge', (res, navigate) => {
       const id = res.params.id || res.params.code;
       if (id) {
-        navigate(`/challenges?code=${id}`);
+        navigate(`/challenges?code=${encodeURIComponent(id)}`);
       } else {
         navigate('/challenges');
       }
@@ -78,7 +89,7 @@ export class DeepLinkRouter {
     this.register('coach', (res, navigate) => {
       const id = res.params.id;
       if (id) {
-        navigate(`/coach?id=${id}`);
+        navigate(`/coach?id=${encodeURIComponent(id)}`);
       } else {
         navigate('/coach');
       }
@@ -222,7 +233,7 @@ export class DeepLinkRouter {
     }
 
     // Direct path routing fallback
-    if (parsed.targetPath) {
+    if (parsed.targetPath && isSafeTargetPath(parsed.targetPath)) {
       navigate(parsed.targetPath);
       return true;
     }

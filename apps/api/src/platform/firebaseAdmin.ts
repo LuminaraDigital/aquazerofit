@@ -185,16 +185,19 @@ export async function verifyFirebaseIdToken(idToken: string): Promise<{
   email?: string;
   emailVerified: boolean;
   name?: string;
+  signInProvider?: string;
 } | null> {
   if (!looksLikeFirebaseIdToken(idToken)) return null;
   const auth = getFirebaseAuth();
   if (!auth) return null;
   const decoded = await auth.verifyIdToken(idToken, true);
+  const provider = (decoded.firebase as { sign_in_provider?: unknown } | undefined)?.sign_in_provider;
   return {
     uid: decoded.uid,
     email: typeof decoded.email === 'string' ? decoded.email : undefined,
     emailVerified: decoded.email_verified === true,
     name: typeof decoded.name === 'string' ? decoded.name : undefined,
+    signInProvider: typeof provider === 'string' ? provider : undefined,
   };
 }
 

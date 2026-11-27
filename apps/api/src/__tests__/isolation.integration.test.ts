@@ -338,6 +338,8 @@ describe('meal-photo (vision) jobs', () => {
       type: 'cvJob',
       status: 'succeeded',
       imagePath: path.join(dataDir, 'nonexistent.jpg'),
+      imageVariants: [{ path: path.join(dataDir, 'nonexistent.webp'), mime: 'image/webp' }],
+      reservationId: 'res-internal-a',
       mealType: 'lunch',
       predictions: [
         {
@@ -492,6 +494,15 @@ describe('GDPR export scoping', () => {
     expect(flat).not.toContain(userB.id);
     expect(flat).not.toContain('B-only secret allergy marker fact');
     expect(flat).not.toContain('isolation-b@example.com');
+    // Internal server paths and credit-hold references never leave the API in GDPR exports.
+    expect(flat).not.toContain('nonexistent.jpg');
+    expect(flat).not.toContain('nonexistent.webp');
+    expect(flat).not.toContain('res-internal-a');
+    for (const aiDoc of res.body.ai as Record<string, unknown>[]) {
+      expect(aiDoc.imagePath).toBeUndefined();
+      expect(aiDoc.imageVariants).toBeUndefined();
+      expect(aiDoc.reservationId).toBeUndefined();
+    }
   });
 });
 

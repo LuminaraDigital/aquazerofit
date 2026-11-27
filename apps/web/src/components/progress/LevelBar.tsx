@@ -65,7 +65,7 @@ export function LevelBar({
       {!compact && (
         <p className="text-xs text-on-surface-variant mt-1.5 tabular-nums">
           {nextLevelXp === null
-            ? `${totalXp.toLocaleString()} XP — top of the ladder.`
+            ? `${totalXp.toLocaleString()} XP - top of the ladder.`
             : `${intoLevel.toLocaleString()} / ${levelSpan.toLocaleString()} XP to level ${level + 1}`}
         </p>
       )}

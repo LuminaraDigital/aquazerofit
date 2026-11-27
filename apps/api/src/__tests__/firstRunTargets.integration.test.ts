@@ -79,7 +79,7 @@ describe('a registered account that has not supplied its essentials', () => {
     expect(profile.body.profile).toBeNull();
   });
 
-  it('gets no targets at all — not a default one', async () => {
+  it('gets no targets at all - not a default one', async () => {
     const targets = await request(app).get(`${base}/me/targets`).set(auth());
     expect(targets.status).toBe(404);
     expect(JSON.stringify(targets.body)).not.toMatch(/kcalTarget/);

@@ -25,7 +25,7 @@ const INVARIANTS = [
   {
     code: 'INV-01',
     title: 'Code calculates, models describe',
-    body: 'Every figure presented as fact — calorie targets, macro splits, meal totals, trends — is produced by deterministic arithmetic. A language model never generates a number you are shown as truth.',
+    body: 'Every figure presented as fact - calorie targets, macro splits, meal totals, trends - is produced by deterministic arithmetic. A language model never generates a number you are shown as truth.',
     enforced: 'Target calculator and nutrition totals are pure functions with unit tests.',
   },
   {
@@ -80,7 +80,7 @@ export default function SafetyPage() {
           id="invariants"
           eyebrow="Invariants"
           title="Six things that hold in every build"
-          lead="Not aspirations. Each of these is enforced somewhere specific and covered by the test suite — a build that breaks one does not ship."
+          lead="Not aspirations. Each of these is enforced somewhere specific and covered by the test suite - a build that breaks one does not ship."
         >
           <dl className="grid gap-x-12 border-b border-outline-variant/60 md:grid-cols-2">
             {INVARIANTS.map((item) => (
@@ -115,11 +115,11 @@ export default function SafetyPage() {
             <div className="space-y-5">
               <Spec
                 rows={[
-                  ['Calorie floor — female', `${KCAL_FLOOR.female.toLocaleString()} kcal`],
-                  ['Calorie floor — male', `${KCAL_FLOOR.male.toLocaleString()} kcal`],
-                  ['Calorie floor — unspecified', `${KCAL_FLOOR.unspecified.toLocaleString()} kcal`],
+                  ['Calorie floor - female', `${KCAL_FLOOR.female.toLocaleString()} kcal`],
+                  ['Calorie floor - male', `${KCAL_FLOOR.male.toLocaleString()} kcal`],
+                  ['Calorie floor - unspecified', `${KCAL_FLOOR.unspecified.toLocaleString()} kcal`],
                 ]}
-                caption="Read from the same constants the target calculator uses. When a clamp binds, the advisory is shown with the target — not instead of it."
+                caption="Read from the same constants the target calculator uses. When a clamp binds, the advisory is shown with the target - not instead of it."
               />
 
               <div className="lp-card p-6">
@@ -129,7 +129,7 @@ export default function SafetyPage() {
                 <p className="mt-2 text-[14.5px] leading-relaxed text-on-surface-variant">
                   Generated text is scanned before it reaches you for numeric claims that break the
                   floor or basic macro sanity. The rule distinguishes a model <em>prescribing</em> a
-                  sub-floor intake from a routine readout — &quot;you have around 1,135 kcal
+                  sub-floor intake from a routine readout - &quot;you have around 1,135 kcal
                   left&quot; is normal most evenings, and treating it as advice would have blocked
                   ordinary answers.
                 </p>
@@ -169,7 +169,7 @@ export default function SafetyPage() {
             <div className="bg-surface-container-low p-6">
               <ul className="space-y-4">
                 <Bullet title="Declared once, applied everywhere">
-                  Meal suggestions, generated plans and recipes all pass the same filter — there is
+                  Meal suggestions, generated plans and recipes all pass the same filter - there is
                   no path around it.
                 </Bullet>
                 <Bullet title="Not a substitute for reading the label">
@@ -205,7 +205,7 @@ export default function SafetyPage() {
               <div className="lp-card p-6">
                 <ul className="space-y-4">
                   <Bullet title="Metadata is discarded on arrival">
-                    EXIF, XMP, IPTC and ICC blocks are dropped by re-encoding the image — a phone
+                    EXIF, XMP, IPTC and ICC blocks are dropped by re-encoding the image - a phone
                     photo carries GPS at home-address precision, the capture time and the camera
                     serial, and none of it may land on disk beside a health record.
                   </Bullet>
@@ -230,7 +230,7 @@ export default function SafetyPage() {
                 </h3>
                 <p className="mt-2 text-[14.5px] leading-relaxed text-on-surface-variant">
                   Security events are recorded so abuse can be investigated, but the raw email
-                  address never lands in the audit container — the identifier is stored hashed,
+                  address never lands in the audit container - the identifier is stored hashed,
                   re-identifiable only by someone who already knows the address they are looking
                   for.
                 </p>
@@ -262,7 +262,7 @@ export default function SafetyPage() {
                 ['Limit applied', 'per user and per IP'],
                 ['On exceeding', '429 with Retry-After'],
               ]}
-              caption="Model-calling surfaces — chat and meal photos — get the stricter lane, because they are the ones that cost money as well as capacity."
+              caption="Model-calling surfaces - chat and meal photos - get the stricter lane, because they are the ones that cost money as well as capacity."
             />
           </div>
 
@@ -271,7 +271,7 @@ export default function SafetyPage() {
               Guardrail decisions are recorded
             </h3>
             <p className="mt-2 max-w-3xl text-[14.5px] leading-relaxed text-on-surface-variant">
-              Every refusal — inbound classification and outbound block alike — writes an audit
+              Every refusal - inbound classification and outbound block alike - writes an audit
               entry with its category and reason. That is what makes it possible to answer &quot;is
               the classifier actually firing?&quot; with evidence rather than confidence.
             </p>
@@ -300,7 +300,7 @@ export default function SafetyPage() {
               </h3>
               <p className="mt-2 text-[14.5px] leading-relaxed text-on-surface-variant">
                 A photograph cannot weigh your dinner. Portion estimates carry real error, which is
-                exactly why they arrive as an editable proposal rather than a fact — and why the
+                exactly why they arrive as an editable proposal rather than a fact - and why the
                 trend over weeks is more trustworthy than any single entry.
               </p>
             </div>
@@ -361,7 +361,7 @@ export default function SafetyPage() {
                 Known trade-offs, in writing
               </h3>
               <p className="mt-2 text-[14.5px] leading-relaxed text-on-surface-variant">
-                The security policy carries a section on accepted trade-offs — the things we know
+                The security policy carries a section on accepted trade-offs - the things we know
                 about and have decided to live with. A safety page that lists only strengths is
                 marketing.
               </p>
@@ -371,7 +371,7 @@ export default function SafetyPage() {
 
         <PageCta
           title="Safe by construction, not by promise"
-          lead="Build a profile and the first thing you get is a number you can check by hand — which is the whole idea."
+          lead="Build a profile and the first thing you get is a number you can check by hand - which is the whole idea."
           disclaimer={WELLNESS_DISCLAIMER}
         />
       </div>

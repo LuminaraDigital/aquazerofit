@@ -129,7 +129,7 @@ describe('level curve', () => {
 });
 
 describe('progression cannot go backwards', () => {
-  it('is monotonic in effort — adding a day never lowers total XP', () => {
+  it('is monotonic in effort - adding a day never lowers total XP', () => {
     const days: XpDayActivity[] = [];
     let previous = 0;
     for (let d = 1; d <= 20; d += 1) {

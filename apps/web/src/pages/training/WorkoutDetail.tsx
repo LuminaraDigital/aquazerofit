@@ -66,7 +66,7 @@ function localDateToday(): string {
 /** "3 × 8–10" style rep prescription from a resolved entry. */
 function repScheme(entry: ResolvedTodayEntry): string {
   const reps = entry.repsMax != null && entry.repsMax !== entry.reps
-    ? `${entry.reps}–${entry.repsMax}`
+    ? `${entry.reps}-${entry.repsMax}`
     : String(entry.reps);
   return `${entry.sets} × ${reps}`;
 }

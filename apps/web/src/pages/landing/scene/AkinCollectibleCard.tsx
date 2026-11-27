@@ -48,7 +48,7 @@ export function AkinCollectibleCard({ className = '' }: { className?: string }) 
           >
             <img
               src="/cards/akin-divinus.webp"
-              alt="Akin Celsus, Divinus — AZH-001 Middleweight fighter card"
+              alt="Akin Celsus, Divinus - AZH-001 Middleweight fighter card"
               width={750}
               height={1050}
               loading="eager"
@@ -107,14 +107,14 @@ export function AkinCollectibleCard({ className = '' }: { className?: string }) 
               </dl>
 
               <blockquote className="mt-3 border-l-2 border-primary-fixed-dim/60 pl-3 text-[13px] italic leading-relaxed text-on-surface">
-                “You&apos;re still here. That is the whole fight — showing up when it stops being
+                “You&apos;re still here. That is the whole fight - showing up when it stops being
                 exciting. Again.”
               </blockquote>
             </div>
 
             <div className="mt-3 flex items-center justify-between gap-2 border-t border-outline-variant/50 pt-3">
               <span className="text-[12px] leading-snug text-on-surface-variant">
-                Voice skin only — safety stays in code.
+                Voice skin only - safety stays in code.
               </span>
               <button
                 ref={backBtnRef}

@@ -78,7 +78,7 @@ export default function RecipeDetail() {
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
       navigate('/nutrition');
     },
-    onError: () => show('Could not log this meal — please try again'),
+    onError: () => show('Could not log this meal - please try again'),
   });
 
   const notFound =

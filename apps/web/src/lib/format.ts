@@ -21,13 +21,13 @@ export function fmtInt(n: number): string {
 
 /** "1,850" (no unit) — em dash for missing values. */
 export function formatKcal(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return '—';
+  if (n == null || !Number.isFinite(n)) return '-';
   return Math.round(n).toLocaleString('en-US');
 }
 
 /** "1,250 ml" or "1.3 L" when >= 1000. */
 export function formatMl(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return '—';
+  if (n == null || !Number.isFinite(n)) return '-';
   if (n >= 1000) return `${round1(n / 1000)} L`;
   return `${Math.round(n)} ml`;
 }
@@ -58,7 +58,7 @@ export function weightUnit(unit: UnitPreference): 'kg' | 'lbs' {
 
 /** "72.5 kg" / "159.8 lbs". */
 export function formatWeight(kg: number | null | undefined, unit: UnitPreference): string {
-  if (kg == null || !Number.isFinite(kg)) return '—';
+  if (kg == null || !Number.isFinite(kg)) return '-';
   return `${kgToDisplay(kg, unit)} ${weightUnit(unit)}`;
 }
 
@@ -81,7 +81,7 @@ export function ftInToCm(ft: number, inches: number): number {
 
 /** "178 cm" / 5'10" depending on preference. */
 export function formatHeight(cm: number | null | undefined, unit: UnitPreference): string {
-  if (cm == null || !Number.isFinite(cm)) return '—';
+  if (cm == null || !Number.isFinite(cm)) return '-';
   if (unit === 'imperial') {
     const { ft, inches } = cmToFtIn(cm);
     return `${ft}'${inches}"`;
@@ -133,7 +133,7 @@ export function relativeDay(dateStr: string): string {
 /** "Just now" / "5m ago" / "3h ago" / "Yesterday" / "Tue, 29 Jul" from an ISO timestamp. */
 export function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return '—';
+  if (!Number.isFinite(then)) return '-';
   const diffMs = Date.now() - then;
   const minutes = Math.floor(diffMs / 60_000);
   if (minutes < 1) return 'Just now';

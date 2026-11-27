@@ -29,9 +29,9 @@ const GOAL_OPTIONS: Array<{ value: Goal; label: string }> = [
 
 const ACTIVITY_OPTIONS: Array<{ value: ActivityLevel; label: string }> = [
   { value: 'sedentary', label: 'Mostly sitting' },
-  { value: 'light', label: 'Light · 1–3 days' },
-  { value: 'moderate', label: 'Moderate · 3–5 days' },
-  { value: 'active', label: 'Hard · 6–7 days' },
+  { value: 'light', label: 'Light · 1-3 days' },
+  { value: 'moderate', label: 'Moderate · 3-5 days' },
+  { value: 'active', label: 'Hard · 6-7 days' },
   { value: 'veryActive', label: 'Physical job + training' },
 ];
 
@@ -252,7 +252,7 @@ export function TargetsLabel() {
         </p>
       )}
       <p className="mt-3 border-t border-outline-variant/50 pt-2.5 text-[12.5px] leading-relaxed text-on-surface-variant">
-        Mifflin–St Jeor, the same function the app runs on your saved profile. General wellness
+        Mifflin-St Jeor, the same function the app runs on your saved profile. General wellness
         guidance, not medical advice.
       </p>
     </section>

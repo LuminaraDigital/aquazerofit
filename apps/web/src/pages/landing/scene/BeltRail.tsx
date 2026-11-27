@@ -12,11 +12,11 @@ import { BeltBadge } from '@/components/fightRecord/BeltBadge';
 import { BELT_COLOUR, beltName } from '@/lib/fightRecord';
 
 const BELT_NOTE: Record<BeltTier, string> = {
-  white: 'First week on the mat — three logged days puts your season on the board.',
+  white: 'First week on the mat - three logged days puts your season on the board.',
   blue: 'Steady rhythm forming across the first month without chasing perfection.',
-  purple: 'Three active days a week across the season — the durable habit line.',
+  purple: 'Three active days a week across the season - the durable habit line.',
   brown: 'Five days a week of showing up cleanly across meals, water or training.',
-  black: 'Six days in seven across eight weeks — with a built-in rest day every week.',
+  black: 'Six days in seven across eight weeks - with a built-in rest day every week.',
 };
 
 export function BeltRail() {
@@ -35,7 +35,7 @@ export function BeltRail() {
           </h3>
         </div>
         <p className="max-w-[34em] text-[14px] leading-relaxed text-on-surface-variant">
-          A belt counts active days — never weight lost or calories restricted — and once earned,
+          A belt counts active days - never weight lost or calories restricted - and once earned,
           a belt is never taken away.
         </p>
       </div>

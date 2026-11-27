@@ -63,10 +63,10 @@ describe('Safety page', () => {
   it('quotes the calorie floors the calculator actually enforces', () => {
     renderPage();
 
-    const female = screen.getByRole('row', { name: /calorie floor — female/i });
+    const female = screen.getByRole('row', { name: /calorie floor - female/i });
     expect(within(female).getByText(`${KCAL_FLOOR.female.toLocaleString()} kcal`)).toBeTruthy();
 
-    const male = screen.getByRole('row', { name: /calorie floor — male/i });
+    const male = screen.getByRole('row', { name: /calorie floor - male/i });
     expect(within(male).getByText(`${KCAL_FLOOR.male.toLocaleString()} kcal`)).toBeTruthy();
   });
 

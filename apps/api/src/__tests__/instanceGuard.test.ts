@@ -73,7 +73,7 @@ describe('config.instanceCount', () => {
 });
 
 describe('assertSingleInstance', () => {
-  it('permits the default (unset) — normal local dev must never see this', () => {
+  it('permits the default (unset) - normal local dev must never see this', () => {
     asServingProcess(() => {
       delete process.env[INSTANCE_COUNT_ENV];
       delete process.env.K_SERVICE;

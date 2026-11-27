@@ -94,7 +94,7 @@ export default function AccountDeletionPage() {
         />
         <P>
           If you signed up through Telegram and have never set a password, the Mini App is the route
-          — or set an email address and password in Settings first, which gives the same account a
+          - or set an email address and password in Settings first, which gives the same account a
           second way in.
         </P>
       </Section>
@@ -132,7 +132,7 @@ export default function AccountDeletionPage() {
           items={[
             'Your account record, sign-in credentials and any linked Telegram identity.',
             'Your wellness profile: height, weight, age, goal, activity level, equipment, allergies and dietary preferences.',
-            'Every log you have kept — meals, water, workouts and weights.',
+            'Every log you have kept - meals, water, workouts and weights.',
             'Meal plans, training plans and recipes generated for you.',
             'Coach conversations, and every fact the coach had remembered about you.',
             'Any meal photographs still on disk from an analysis in flight.',
@@ -159,11 +159,11 @@ export default function AccountDeletionPage() {
           rows={[
             [
               'Credit ledger',
-              'Kept for financial integrity — it is the record of what AI work was authorised. The user reference is replaced with “anonymised”.',
+              'Kept for financial integrity - it is the record of what AI work was authorised. The user reference is replaced with “anonymised”.',
             ],
             [
               'Security audit events',
-              'Kept for abuse investigation: sign-in failures and refused requests are how a platform notices an attack. The user reference is replaced with “anonymised”, and any identifier left inside an entry — email address, Telegram id, display name — is replaced with a truncated hash.',
+              'Kept for abuse investigation: sign-in failures and refused requests are how a platform notices an attack. The user reference is replaced with “anonymised”, and any identifier left inside an entry - email address, Telegram id, display name - is replaced with a truncated hash.',
             ],
             [
               'Referral and sharing counts',
@@ -200,7 +200,7 @@ export default function AccountDeletionPage() {
           <Link to="/sign-in" className="text-primary hover:text-secondary">
             sign-in page
           </Link>{' '}
-          — a reset restores access, and the deletion control is then where this page says it is.
+          - a reset restores access, and the deletion control is then where this page says it is.
         </P>
         <P>
           If you cannot get back in at all, write to{' '}

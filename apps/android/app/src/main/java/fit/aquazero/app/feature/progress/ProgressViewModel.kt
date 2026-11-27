@@ -169,7 +169,7 @@ class ProgressViewModel @Inject constructor(
             return
         }
         val body = buildString {
-            appendLine("AquaZeroFit export — ${LocalDates.today()}")
+            appendLine("AquaZeroFit export - ${LocalDates.today()}")
             appendLine("Range: ${state.range.apiRange}")
             summary?.let {
                 appendLine("Current weight (kg): ${it.currentWeightKg ?: "-"}")

@@ -146,12 +146,12 @@ export function classify(text: string): ClassificationResult {
 // ---------------------------------------------------------------------------
 
 const MEDICAL_SIGNPOST =
-  'I can’t help with medical questions like diagnosis, medication, dosages or test results — that’s important enough that it deserves a real professional. A GP or an Accredited Practising Dietitian can give you advice that’s safe for your specific situation. I’m always here for everyday nutrition, hydration and training support.';
+  'I can’t help with medical questions like diagnosis, medication, dosages or test results - that’s important enough that it deserves a real professional. A GP or an Accredited Practising Dietitian can give you advice that’s safe for your specific situation. I’m always here for everyday nutrition, hydration and training support.';
 
-const EXTREME_DIET_SIGNPOST = `I can’t support that — very low intakes, prolonged fasting or purging can cause real harm, and AquaZeroFit never recommends eating below ${KCAL_FLOOR.unspecified} kcal a day. If food or eating feels stressful right now, the Butterfly Foundation National Helpline (1800 33 4673) is a kind, judgement-free place to talk. I’d be glad to help you build a safe, sustainable plan instead — just say the word.`;
+const EXTREME_DIET_SIGNPOST = `I can’t support that - very low intakes, prolonged fasting or purging can cause real harm, and AquaZeroFit never recommends eating below ${KCAL_FLOOR.unspecified} kcal a day. If food or eating feels stressful right now, the Butterfly Foundation National Helpline (1800 33 4673) is a kind, judgement-free place to talk. I’d be glad to help you build a safe, sustainable plan instead - just say the word.`;
 
 const OUT_OF_SCOPE_SIGNPOST =
-  'That’s outside what I can help with — I stick to everyday wellness: nutrition, hydration, movement and progress. For legal, financial or mental-health treatment questions, a qualified professional is the right person to ask. Happy to help with your wellness goals any time.';
+  'That’s outside what I can help with - I stick to everyday wellness: nutrition, hydration, movement and progress. For legal, financial or mental-health treatment questions, a qualified professional is the right person to ask. Happy to help with your wellness goals any time.';
 
 /**
  * `locale` is the caller's Accept-Language string (see platform/locale.ts).

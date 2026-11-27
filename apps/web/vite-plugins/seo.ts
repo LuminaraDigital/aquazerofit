@@ -148,7 +148,7 @@ function headBlock(route: MarketingRoute, cfg: SiteConfig): string {
  */
 function noscriptBlock(route: MarketingRoute, cfg: SiteConfig): string {
   const links = MARKETING_ROUTES.filter((r) => r.path !== route.path)
-    .map((r) => `<li><a href="${r.path}">${escapeHtml(r.title.split(' | ')[0].split(' — ')[0])}</a></li>`)
+    .map((r) => `<li><a href="${r.path}">${escapeHtml(r.title.split(' | ')[0].split(' - ')[0])}</a></li>`)
     .join('');
   const telegram = escapeHtml(
     `https://t.me/${cfg.telegramBotUsername}${
@@ -186,7 +186,7 @@ function renderShell(shell: string, route: MarketingRoute, cfg: SiteConfig): str
 function renderRobots(cfg: SiteConfig): string {
   const disallow = NON_INDEXABLE_PREFIXES.map((p) => `Disallow: ${p}`).join('\n');
   return [
-    '# AquaZeroFit — the marketing pages are the crawlable surface.',
+    '# AquaZeroFit - the marketing pages are the crawlable surface.',
     '# The signed-in application below is not useful in search results and',
     '# competes with the marketing pages for the same queries.',
     'User-agent: *',

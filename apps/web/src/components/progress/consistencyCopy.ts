@@ -40,7 +40,7 @@ export const CONSISTENCY_STATE_COPY: Record<ConsistencyState, ConsistencyStateCo
   },
   recovering: {
     label: 'Back at it',
-    body: 'Good to see you back — coming back is the hard part, and today already counts.',
+    body: 'Good to see you back - coming back is the hard part, and today already counts.',
     icon: 'waving_hand',
   },
   building: {
@@ -56,7 +56,7 @@ export const CONSISTENCY_STATE_COPY: Record<ConsistencyState, ConsistencyStateCo
 };
 
 /** Shown when grace has quietly absorbed a day away. Reassurance, never a warning. */
-export const CONSISTENCY_GRACE_COPY = 'A day off is already covered — you’re still going.';
+export const CONSISTENCY_GRACE_COPY = 'A day off is already covered - you’re still going.';
 
 /** Headline shown before anything has been logged inside the window. */
 export const CONSISTENCY_EMPTY_HEADLINE = 'Ready when you are';

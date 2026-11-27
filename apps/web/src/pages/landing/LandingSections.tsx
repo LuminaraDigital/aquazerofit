@@ -232,7 +232,7 @@ const MEAL_STEPS: Array<{ actor: Actor; title: string; body: string }> = [
 const FACTS = [
   {
     term: 'Targets',
-    body: 'Mifflin–St Jeor, an activity factor and a safe weekly rate, clamped to a calorie floor with the clamp disclosed on screen.',
+    body: 'Mifflin-St Jeor, an activity factor and a safe weekly rate, clamped to a calorie floor with the clamp disclosed on screen.',
   },
   {
     term: 'Allergens',
@@ -322,7 +322,7 @@ export function CoachDemo() {
             {[
               'Grounded in your real targets, logs and plan, not a generic chatbot',
               'Remembers only what you confirm; suggested facts wait for your approval',
-              'Every fighter is unlockable by showing up — never locked behind a paywall',
+              'Every fighter is unlockable by showing up - never locked behind a paywall',
             ].map((item) => (
               <li key={item} className="flex gap-3 border-t border-outline-variant/60 py-3.5 text-[15.5px] leading-relaxed text-on-surface">
                 <span className="material-symbols-outlined mt-0.5 text-[20px] text-secondary" aria-hidden="true">

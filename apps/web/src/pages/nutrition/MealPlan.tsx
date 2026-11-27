@@ -345,7 +345,7 @@ export default function MealPlan() {
                 </h4>
               </div>
               <p className="text-base text-on-surface-variant mb-5">
-                Regenerate a fresh plan built around what you have left today — your targets,
+                Regenerate a fresh plan built around what you have left today - your targets,
                 preferences and allergies are always respected.
               </p>
               <button

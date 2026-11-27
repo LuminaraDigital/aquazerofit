@@ -38,7 +38,7 @@ export function TargetsNotSetCard({ returnTo }: { returnTo?: string }) {
           </h2>
           <p className="text-sm text-on-surface-variant mt-1 leading-relaxed">
             Not set up yet. We work your calories, macros and water out from your height,
-            weight, age and how active you are — we never guess them, so there is nothing to
+            weight, age and how active you are - we never guess them, so there is nothing to
             show until you tell us.
           </p>
         </div>
@@ -69,7 +69,7 @@ export function TargetsNotSetScreen({ title, back = false }: { title: string; ba
       <main className="px-container-margin pt-6 pb-8">
         <TargetsNotSetCard returnTo={`${location.pathname}${location.search}`} />
         <p className="text-xs text-on-surface-variant/60 text-center mt-6 leading-relaxed">
-          Everything you log is kept — it just has nothing to be measured against yet.
+          Everything you log is kept - it just has nothing to be measured against yet.
         </p>
       </main>
     </div>

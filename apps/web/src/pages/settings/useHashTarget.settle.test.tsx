@@ -89,7 +89,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('useHashTarget — surviving a page that grows under the first scroll', () => {
+describe('useHashTarget - surviving a page that grows under the first scroll', () => {
   it('keeps correcting while the target is off screen and scrolling has stopped', () => {
     const raf = installManualRaf();
     const scrollIntoView = vi.fn();

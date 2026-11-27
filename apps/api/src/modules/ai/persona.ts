@@ -41,7 +41,7 @@ export function systemMessagesFor(coach: CoachPersona | undefined): GatewayMessa
     {
       role: 'system',
       content:
-        `COACH PERSONA — voice only.\n${persona.voice.block}\n` +
+        `COACH PERSONA - voice only.\n${persona.voice.block}\n` +
         `You are introduced to the user as ${persona.name} ("${persona.ringName}"), ` +
         `who coaches ${persona.domain.toLowerCase()}.`,
     },

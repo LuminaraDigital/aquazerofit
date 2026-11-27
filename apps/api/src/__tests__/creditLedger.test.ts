@@ -436,7 +436,7 @@ describe('sweepStaleReservations', () => {
     expect(await ledger.balance(userId)).toBe(settled);
   });
 
-  it('is idempotent — a second sweep finds nothing left to return', async () => {
+  it('is idempotent - a second sweep finds nothing left to return', async () => {
     await ledger.grantDailyIfNeeded(userId);
     const reservationId = await ledger.reserve(userId, 'chatTurn');
     ageReservation(reservationId, wellPastCutoff);

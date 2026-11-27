@@ -190,7 +190,7 @@ describe('a WebP variant is stored alongside the JPEG', () => {
     }
   });
 
-  it('imagePath still points at the JPEG — it is the canonical fallback copy', () => {
+  it('imagePath still points at the JPEG - it is the canonical fallback copy', () => {
     expect(job.imagePath!.endsWith('.jpg')).toBe(true);
     const jpegVariant = job.imageVariants!.find((v) => v.mime === 'image/jpeg');
     expect(jpegVariant!.path).toBe(job.imagePath);

@@ -141,4 +141,4 @@ export function containsProfanity(value: string): boolean {
 
 /** Message shown when a name is refused. Deliberately not quoting the match. */
 export const PROFANITY_MESSAGE =
-  'Please choose a different display name — other members of a huddle can see it.';
+  'Please choose a different display name - other members of a huddle can see it.';

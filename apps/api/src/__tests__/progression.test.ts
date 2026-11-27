@@ -34,7 +34,7 @@ describe('wger docs reference example', () => {
   );
 });
 
-describe('legacy absolute rules (no op) — exact pre-Phase-2 behaviour', () => {
+describe('legacy absolute rules (no op) - exact pre-Phase-2 behaviour', () => {
   const rules: ProgressionRule[] = [
     { slotEntryId: ENTRY, kind: 'reps', iteration: 2, value: 12 },
     { slotEntryId: ENTRY, kind: 'reps', iteration: 4, value: 15 },
@@ -105,7 +105,7 @@ describe('repeat', () => {
   });
 });
 
-describe('requires (autoregulation) — fails closed', () => {
+describe('requires (autoregulation) - fails closed', () => {
   const rules: ProgressionRule[] = [
     { slotEntryId: ENTRY, kind: 'weight', iteration: 2, op: 'add', step: 'abs', value: 2.5, requires: ['weight'] },
   ];

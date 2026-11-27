@@ -50,7 +50,7 @@ export default function FirstRun() {
             Hey{firstName ? `, ${firstName}` : ''}
           </h1>
           <p className="text-sm text-on-surface-variant mt-1.5 leading-relaxed">
-            You are in — nothing to fill in first. Have a look around, and set your targets
+            You are in - nothing to fill in first. Have a look around, and set your targets
             whenever you are ready.
           </p>
         </section>

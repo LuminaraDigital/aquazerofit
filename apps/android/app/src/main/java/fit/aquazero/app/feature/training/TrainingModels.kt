@@ -60,7 +60,7 @@ object TrainingFormat {
     /** "3 × 8–10", collapsing to "3 × 8" when there is no rep range. */
     fun repScheme(entry: ResolvedEntry): String {
         val reps = if (entry.repsMax != null && entry.repsMax != entry.reps) {
-            "${entry.reps}–${entry.repsMax}"
+            "${entry.reps}-${entry.repsMax}"
         } else {
             entry.reps.toString()
         }

@@ -48,7 +48,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <main className="px-container-margin py-10 max-w-md mx-auto min-h-[60vh] flex flex-col justify-center">
           <ErrorState
-            message="This screen hit an unexpected error. Your data is safe — try again, or switch to another tab."
+            message="This screen hit an unexpected error. Your data is safe - try again, or switch to another tab."
             retry={() => this.setState({ error: null })}
           />
         </main>

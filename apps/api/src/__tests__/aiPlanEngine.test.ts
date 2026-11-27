@@ -161,7 +161,7 @@ describe('validatePlanDraft', () => {
     expect((result as { error: string }).error).toMatch(/calendar week/);
   });
 
-  it('rejects seven unique day orders that are not 1–7', () => {
+  it('rejects seven unique day orders that are not 1-7', () => {
     const draft = validDraft();
     // Seven distinct orders, one out of range. A bare uniqueness check passes
     // this and the downstream gate then rejects it — the same wasted-tokens

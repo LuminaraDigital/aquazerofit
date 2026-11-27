@@ -70,7 +70,7 @@ describe('encodePayload', () => {
 });
 
 describe('decodePayload', () => {
-  it('is total — a hostile payload costs attribution, never the launch', () => {
+  it('is total - a hostile payload costs attribution, never the launch', () => {
     for (const bad of [null, undefined, '', '__', 'x', '-nokey', 'zz-unknownkey', 'r-']) {
       expect(() => decodePayload(bad)).not.toThrow();
     }

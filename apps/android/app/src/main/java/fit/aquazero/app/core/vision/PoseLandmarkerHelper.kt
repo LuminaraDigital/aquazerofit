@@ -122,7 +122,7 @@ class SquatFormAnalyzer {
                         repCount++
                         feedback = "Rep $repCount complete!"
                     } else {
-                        feedback = "Incomplete depth — go lower next rep"
+                        feedback = "Incomplete depth - go lower next rep"
                     }
                     phase = SquatPhase.STANDING
                     reachedDepthInCurrentRep = false

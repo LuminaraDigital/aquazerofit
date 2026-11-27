@@ -307,8 +307,8 @@ private fun RecipeBody(
                 Text(
                     text = stringResource(
                         R.string.recipe_attribution,
-                        recipe.source.ifBlank { "—" },
-                        recipe.licence.ifBlank { "—" },
+                        recipe.source.ifBlank { "-" },
+                        recipe.licence.ifBlank { "-" },
                     ),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -383,11 +383,11 @@ private fun AzfFormControlsPreview() {
                 ),
                 selected = "light",
                 onSelect = {},
-                hint = "Light exercise 1–3 days a week.",
+                hint = "Light exercise 1-3 days a week.",
             )
             AzfOptionCard(
                 title = "Lose weight",
-                body = "A sustainable calorie deficit — never below safe floors.",
+                body = "A sustainable calorie deficit - never below safe floors.",
                 selected = true,
                 onClick = {},
             )
@@ -400,7 +400,7 @@ private fun AzfFormControlsPreview() {
             AzfCard {
                 AzfSwitchRow(
                     title = "All reminders",
-                    body = "Master switch — stored with your consents.",
+                    body = "Master switch - stored with your consents.",
                     checked = true,
                     onCheckedChange = {},
                 )

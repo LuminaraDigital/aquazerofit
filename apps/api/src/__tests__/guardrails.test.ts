@@ -111,7 +111,7 @@ describe('NumericRules.check (rules a model cannot be trusted to respect)', () =
   it('does not flag a remaining-calorie readout below the floor', () => {
     const readouts = [
       "You've had 954 kcal so far. You have around 1135 calories left for today.",
-      'Nice work — that leaves you about 1135 kcal to play with before dinner.',
+      'Nice work - that leaves you about 1135 kcal to play with before dinner.',
       'You have about 900 kcal remaining today.',
       'That is around 1100 calories to go before you hit your target.',
     ];

@@ -14,7 +14,7 @@ function kcal(): string {
 }
 
 describe('TargetsLabel', () => {
-  it('shows the Mifflin–St Jeor result and its working for the default profile', () => {
+  it('shows the Mifflin-St Jeor result and its working for the default profile', () => {
     render(<TargetsLabel />);
 
     // Female, 34 y, 168 cm, 72 kg: BMR = 720 + 1050 − 170 − 161 = 1,439.

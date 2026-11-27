@@ -25,8 +25,8 @@ class TrainingModelsTest {
             rir = 2.0,
             restSeconds = 90,
         )
-        assertEquals("3 × 8–10", TrainingFormat.repScheme(entry))
-        assertEquals("3 × 8–10 @ 40 kg • RiR 2 • 90s rest", TrainingFormat.targetLine(entry))
+        assertEquals("3 × 8-10", TrainingFormat.repScheme(entry))
+        assertEquals("3 × 8-10 @ 40 kg • RiR 2 • 90s rest", TrainingFormat.targetLine(entry))
     }
 
     @Test
@@ -100,7 +100,7 @@ class TrainingModelsTest {
         val entries = resolveEntries(
             TodayWorkoutEnvelopeDto(session = sessionWith(), resolved = resolved),
         )
-        assertEquals("4 × 6–8 @ 24 kg • 120s rest", TrainingFormat.targetLine(entries.first()))
+        assertEquals("4 × 6-8 @ 24 kg • 120s rest", TrainingFormat.targetLine(entries.first()))
     }
 
     @Test

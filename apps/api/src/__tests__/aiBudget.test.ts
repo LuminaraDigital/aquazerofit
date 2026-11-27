@@ -130,7 +130,7 @@ describe('daily token budget accounting', () => {
 });
 
 describe('the kill switch in the gateway', () => {
-  it('does not mark the keyless path degraded — the offline engine IS the product there', async () => {
+  it('does not mark the keyless path degraded - the offline engine IS the product there', async () => {
     const result = await complete('safetyCheap', [{ role: 'user', content: 'hello' }], {});
     expect(result.meta.degraded).not.toBe(true);
     expect(result.meta.degradedReason).toBeUndefined();

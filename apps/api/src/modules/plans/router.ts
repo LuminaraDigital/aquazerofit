@@ -18,7 +18,7 @@ plansRouter.use(requireAuth);
 plansRouter.get('/current', (req, res) => {
   const plan = getCurrentPlan(userIdOf(req));
   if (!plan) {
-    throw new AppError('NOT_FOUND', 'No active training plan yet — generate one to get started');
+    throw new AppError('NOT_FOUND', 'No active training plan yet - generate one to get started');
   }
   res.json({ plan });
 });

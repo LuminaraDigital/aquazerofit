@@ -67,7 +67,7 @@ afterAll(async () => {
 });
 
 describe('GET /auth/captcha', () => {
-  it('is public — the browser reads it before anyone has an account', async () => {
+  it('is public - the browser reads it before anyone has an account', async () => {
     const res = await request(app).get(`${base}/auth/captcha`);
     expect(res.status).toBe(200);
   });
@@ -137,7 +137,7 @@ describe('challenged deployment', () => {
     expect(res.body.accessToken).toBeTruthy();
   });
 
-  it('guards password-reset request too — it mails an address the caller chose', async () => {
+  it('guards password-reset request too - it mails an address the caller chose', async () => {
     challenged();
     const res = await request(app)
       .post(`${base}/auth/password-reset/request`)
@@ -146,7 +146,7 @@ describe('challenged deployment', () => {
     expect(res.body.details.fieldErrors.captchaToken).toBeTruthy();
   });
 
-  it('leaves sign-in unchallenged — the lockout and IP lane already cover it', async () => {
+  it('leaves sign-in unchallenged - the lockout and IP lane already cover it', async () => {
     challenged();
     stubSiteVerify(true);
     await request(app).post(`${base}/auth/register`).send({

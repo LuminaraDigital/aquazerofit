@@ -257,7 +257,7 @@ export function MealDraftCard({
                 className="rounded-card border border-outline-variant bg-surface-container-low/40 p-3"
               >
                 <p className="text-sm text-on-surface-variant">
-                  “{item.phrase}” — not in the food database yet.
+                  “{item.phrase}” - not in the food database yet.
                 </p>
                 <Link to="/nutrition" className="mt-1 inline-block text-sm font-semibold text-primary">
                   Log it manually
@@ -356,7 +356,7 @@ export function MealDraftCard({
 
                   {match && match.allergenConflicts.length > 0 && (
                     <p className="mt-1 text-xs font-semibold text-coral">
-                      Contains {match.allergenConflicts.join(', ')} — on your allergy list.
+                      Contains {match.allergenConflicts.join(', ')} - on your allergy list.
                     </p>
                   )}
                 </div>
@@ -436,7 +436,7 @@ export function MealDraftCard({
               onChange={(e) => setAcknowledged(e.target.checked)}
               className="mt-0.5 h-5 w-5 shrink-0 rounded border-outline-variant bg-transparent accent-coral"
             />
-            I know — log it anyway.
+            I know - log it anyway.
           </label>
         </div>
       )}

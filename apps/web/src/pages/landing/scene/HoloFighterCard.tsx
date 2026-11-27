@@ -90,7 +90,7 @@ export function HoloFighterCard({
             {coach.domain}
           </span>
           <span className="mt-2.5 flex items-center justify-between gap-2 border-t border-outline-variant/40 pt-2 text-[12px] text-on-surface-variant">
-            <span className="truncate">{coach.discipline.split('—')[0]?.trim()}</span>
+            <span className="truncate">{coach.discipline.split('-')[0]?.trim()}</span>
             <span className="shrink-0 font-semibold tabular-nums text-on-surface">
               {coach.unlock.kind === 'free' ? 'Free' : `Lv ${coach.unlock.level}`}
             </span>

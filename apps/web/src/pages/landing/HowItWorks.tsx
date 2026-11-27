@@ -33,12 +33,12 @@ const STEPS: StepSpec[] = [
     lead: 'Two minutes of setup, and the first thing you see is a set of targets computed from your own figures.',
     you: [
       'Age, height, weight, sex and how active your week usually is.',
-      'Your goal — losing, maintaining or gaining.',
+      'Your goal - losing, maintaining or gaining.',
       'The equipment you own, and anything you need to avoid eating.',
     ],
     app: [
       'Computes your basal rate with Mifflin-St Jeor, applies the activity factor for the week you described, and adjusts it by a rate of change bounded to a safe fraction of bodyweight.',
-      'Clamps the result to a calorie floor — and tells you on screen when the clamp binds, rather than showing a quietly adjusted number.',
+      'Clamps the result to a calorie floor - and tells you on screen when the clamp binds, rather than showing a quietly adjusted number.',
       'Sets protein and fat from your bodyweight and goal, gives carbohydrate the remainder, and derives a hydration target from your weight.',
     ],
     link: { to: '/features#targets', label: 'See the exact formulas and constants' },
@@ -51,11 +51,11 @@ const STEPS: StepSpec[] = [
     lead: 'Three ways in, one rule out: a model may propose what you ate, but nothing is recorded until you say so.',
     you: [
       'Photograph the plate, search the food corpus by name, or scan a barcode.',
-      'Say which meal it belongs to — breakfast, lunch, dinner or a snack.',
+      'Say which meal it belongs to - breakfast, lunch, dinner or a snack.',
       'Check the proposal, correct a portion if it is off, and confirm.',
     ],
     app: [
-      'Discards the photo’s EXIF, XMP, IPTC and ICC metadata on upload — a phone picture carries GPS at home-address precision — and stores it under an unguessable name that is never served publicly.',
+      'Discards the photo’s EXIF, XMP, IPTC and ICC metadata on upload - a phone picture carries GPS at home-address precision - and stores it under an unguessable name that is never served publicly.',
       'Queues the analysis as a background job, so you can close the screen and come back to the result.',
       'Multiplies the confirmed portions out against per-100 g values in code, then sweeps the photo within a day of the job finishing.',
     ],
@@ -84,7 +84,7 @@ const STEPS: StepSpec[] = [
     title: 'Train with the kit you actually own',
     lead: 'The training week is assembled from an openly licensed exercise corpus, filtered to your equipment.',
     you: [
-      'Pick your equipment once — bodyweight-only is a complete answer, not a compromise.',
+      'Pick your equipment once - bodyweight-only is a complete answer, not a compromise.',
       'Follow the week, and log the sessions you complete.',
     ],
     app: [
@@ -98,7 +98,7 @@ const STEPS: StepSpec[] = [
   {
     id: 'ask',
     title: 'Ask the coach',
-    lead: 'Aqua Coach answers from the day you have actually logged — and declines the questions it has no business answering.',
+    lead: 'Aqua Coach answers from the day you have actually logged - and declines the questions it has no business answering.',
     you: [
       'Ask in plain language: how am I tracking, what should I eat tonight, why is my weight flat.',
       'Approve or reject anything it offers to remember about you.',
@@ -118,7 +118,7 @@ const STEPS: StepSpec[] = [
     title: 'Watch the trend, not the day',
     lead: 'Weigh in when you feel like it. What matters is the shape of the line, and the app is built to show you that instead of a daily verdict.',
     you: [
-      'Log your weight whenever you like — daily, weekly, or when you remember.',
+      'Log your weight whenever you like - daily, weekly, or when you remember.',
       'Switch between 7, 30 and 90 days to see the trend at the scale you care about.',
     ],
     app: [
@@ -138,7 +138,7 @@ const RULES = [
   },
   {
     title: 'Code does the arithmetic',
-    body: 'Every number presented as fact — targets, totals, trends — is computed. Models describe; they do not count.',
+    body: 'Every number presented as fact - targets, totals, trends - is computed. Models describe; they do not count.',
   },
   {
     title: 'Nothing personalises without consent',
@@ -200,7 +200,7 @@ export default function HowItWorksPage() {
         crumb="How it works"
         kicker="Six steps in order"
         title="From sign-up to steady state"
-        lead="Six steps, in the order you will meet them. Each step separates what you do from what the code does out of sight — because transparency matters in a product that handles what you eat and weigh."
+        lead="Six steps, in the order you will meet them. Each step separates what you do from what the code does out of sight - because transparency matters in a product that handles what you eat and weigh."
         secondary={{ to: '/features', label: 'Browse the features' }}
       >
         {/* Full-width 6-Step Timeline Rail (unique signature of /how-it-works) */}

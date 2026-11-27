@@ -49,7 +49,7 @@ const SEVEN_DAYS_TO_THE_9TH = [
   '2026-07-09',
 ];
 
-describe('computeConsistency — a missed day cannot destroy the run', () => {
+describe('computeConsistency - a missed day cannot destroy the run', () => {
   it('bridges a single missed day: Mon, Tue, (miss Wed), Thu is one 3-day run', () => {
     // 2026-07-06 Mon, 07 Tue, 09 Thu — Wednesday the 8th is missed.
     const activity = activityOn(['2026-07-06', '2026-07-07', '2026-07-09']);
@@ -82,7 +82,7 @@ describe('computeConsistency — a missed day cannot destroy the run', () => {
     expect(stillGoing.graceRemaining).toBe(CONSISTENCY_GRACE_DAYS);
   });
 
-  it('counts a day once — as active or as grace, never both', () => {
+  it('counts a day once - as active or as grace, never both', () => {
     // Five active days bridged by a single gap: 06 07 (miss 08) 09 10 11.
     const c = computeConsistency(
       activityOn(['2026-07-06', '2026-07-07', '2026-07-09', '2026-07-10', '2026-07-11']),
@@ -94,7 +94,7 @@ describe('computeConsistency — a missed day cannot destroy the run', () => {
   });
 });
 
-describe('computeConsistency — bestDays', () => {
+describe('computeConsistency - bestDays', () => {
   it('survives a fully broken run and is never below currentDays', () => {
     const long = ['05-01', '05-02', '05-03', '05-04', '05-05'].map((d) => `2026-${d}`);
     const c = computeConsistency(activityOn([...long, '2026-07-09']), '2026-07-09');
@@ -120,7 +120,7 @@ describe('computeConsistency — bestDays', () => {
   });
 });
 
-describe('computeConsistency — window', () => {
+describe('computeConsistency - window', () => {
   it('counts only the trailing window and ignores older activity', () => {
     const today = '2026-07-09';
     const oldest = '2026-06-12'; // exactly 27 days back — the window edge
@@ -136,7 +136,7 @@ describe('computeConsistency — window', () => {
   });
 });
 
-describe('computeConsistency — state', () => {
+describe('computeConsistency - state', () => {
   it('rests for a brand-new user with no logs, with grace intact', () => {
     const c = computeConsistency(activityOn([]), '2026-07-09');
 

@@ -249,7 +249,7 @@ export function getTodayWorkout(userId: string, localDate: string): TodayWorkout
   const store = getStore();
   const plan = getCurrentPlan(userId);
   if (!plan) {
-    throw new AppError('NOT_FOUND', 'No active training plan — generate one first');
+    throw new AppError('NOT_FOUND', 'No active training plan - generate one first');
   }
 
   // needLogsToAdvance: stall on the earliest unlogged gated day (default off).

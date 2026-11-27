@@ -182,7 +182,7 @@ async function toStorableImages(
       // The bytes already decoded once, so this is an encoder problem, not a
       // bad upload. Warn and carry on with JPEG only.
       // eslint-disable-next-line no-console
-      console.warn('[vision] WebP encode failed — serving JPEG only', {
+      console.warn('[vision] WebP encode failed - serving JPEG only', {
         reason: webpErr instanceof Error ? webpErr.message : 'unknown',
       });
     }
@@ -200,7 +200,7 @@ async function toStorableImages(
     const looksHeic = declaredMime === 'image/heic' || declaredMime === 'image/heif';
     if (looksHeic) {
       // eslint-disable-next-line no-console
-      console.warn('[vision] HEIC decode failed — libvips build may lack an HEVC decoder', {
+      console.warn('[vision] HEIC decode failed - libvips build may lack an HEVC decoder', {
         reason: err instanceof Error ? err.message : 'unknown',
       });
       throw new AppError(

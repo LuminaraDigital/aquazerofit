@@ -336,7 +336,7 @@ export function validatePlanDraft(
 ): { draft: AiPlanDraft } | { error: string } {
   if (!isRecord(raw)) return { error: 'payload is not a JSON object' };
   if (!Number.isInteger(req.daysPerWeek) || req.daysPerWeek < 1 || req.daysPerWeek > 7) {
-    return { error: `daysPerWeek ${req.daysPerWeek} out of range (1–7)` };
+    return { error: `daysPerWeek ${req.daysPerWeek} out of range (1-7)` };
   }
   if (req.pool.length === 0) return { error: 'exercise pool is empty' };
 
@@ -401,7 +401,7 @@ export function validatePlanDraft(
       (rawDay.order as number) > DAYS_IN_WEEK ||
       seenDayOrders.has(rawDay.order as number)
     ) {
-      return { error: `day order missing, out of range 1–${DAYS_IN_WEEK}, or duplicated` };
+      return { error: `day order missing, out of range 1-${DAYS_IN_WEEK}, or duplicated` };
     }
     seenDayOrders.add(rawDay.order as number);
     if (typeof rawDay.focus !== 'string' || rawDay.focus.trim().length === 0) {

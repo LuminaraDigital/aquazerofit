@@ -56,7 +56,7 @@ export const exercisesSeed: Exercise[] = [
   ex('push-up', 'Push-Up', 'strength', ['chest'], ['triceps', 'shoulders', 'core'], ['none'], 'beginner',
     'Hands under shoulders, body in a straight line. Lower your chest to just above the floor, then press back up without letting your hips sag.'),
   ex('incline-push-up', 'Incline Push-Up', 'strength', ['chest'], ['triceps', 'shoulders'], ['none'], 'beginner',
-    'Push-up with hands elevated on a stable surface. Reduces load — ideal while building towards full push-ups.'),
+    'Push-up with hands elevated on a stable surface. Reduces load - ideal while building towards full push-ups.'),
   ex('decline-push-up', 'Decline Push-Up', 'strength', ['chest'], ['shoulders', 'triceps'], ['none'], 'intermediate',
     'Push-up with feet elevated to shift emphasis to the upper chest and shoulders. Keep the core braced throughout.'),
   ex('diamond-push-up', 'Diamond Push-Up', 'strength', ['triceps'], ['chest', 'shoulders'], ['none'], 'intermediate',
@@ -80,7 +80,7 @@ export const exercisesSeed: Exercise[] = [
   ex('chair-dip', 'Bench Dip', 'strength', ['triceps'], ['chest', 'shoulders'], ['bench'], 'beginner',
     'Hands on the edge of a bench behind you, lower the hips until the elbows reach ninety degrees, then press up.'),
   ex('step-up', 'Step-Up', 'strength', ['quadriceps'], ['glutes', 'calves'], ['bench'], 'beginner',
-    'Step onto a knee-height surface, driving through the leading heel. Control the descent — do not drop.'),
+    'Step onto a knee-height surface, driving through the leading heel. Control the descent - do not drop.'),
   ex('calf-raise', 'Standing Calf Raise', 'strength', ['calves'], [], ['none'], 'beginner',
     'Rise onto the balls of the feet, pause at the top, and lower slowly. Add a step edge for extra range.'),
   ex('wall-sit', 'Wall Sit', 'strength', ['quadriceps'], ['glutes', 'core'], ['none'], 'beginner',
@@ -128,7 +128,7 @@ export const exercisesSeed: Exercise[] = [
 
   // ---- Core ----
   ex('plank', 'Plank', 'core', ['core'], ['shoulders', 'glutes'], ['none'], 'beginner',
-    'Forearms down, body rigid from head to heels. Brace the abs and breathe — no sagging or piking.'),
+    'Forearms down, body rigid from head to heels. Brace the abs and breathe - no sagging or piking.'),
   ex('side-plank', 'Side Plank', 'core', ['core'], ['shoulders'], ['none'], 'intermediate',
     'Stacked on one forearm, lift the hips until the body forms a straight line. Hold each side.'),
   ex('dead-bug', 'Dead Bug', 'core', ['core'], [], ['none'], 'beginner',

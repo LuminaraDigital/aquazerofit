@@ -16,7 +16,7 @@ describe('allergenFilter (deterministic, zero false negatives)', () => {
     expect(result.map((r) => r.name)).toEqual(['Plain Oats']);
   });
 
-  it('catches hidden allergens via name keywords — the "satay" case', () => {
+  it('catches hidden allergens via name keywords - the "satay" case', () => {
     // Deliberately mistagged records: the keyword net must still catch them.
     const tricky = [
       { name: 'Chicken Satay Skewers', allergens: [] }, // peanuts

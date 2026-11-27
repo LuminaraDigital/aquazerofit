@@ -186,7 +186,7 @@ export default function FeaturesPage() {
         crumb="Features"
         kicker="Source-bound reference"
         title="Every feature, and how it actually works"
-        lead="The short version is on the home page. This is the engineering reference — including the formulas, limits and constants your targets are computed from, read straight out of the application's source at build time."
+        lead="The short version is on the home page. This is the engineering reference - including the formulas, limits and constants your targets are computed from, read straight out of the application's source at build time."
         secondary={{ to: '/', label: 'Back to overview' }}
       >
         {/* Full-width horizontal Corner Card Constant Strip */}
@@ -242,7 +242,7 @@ export default function FeaturesPage() {
               id="nutrition"
               eyebrow="Nutrition"
               title="Log a day without doing arithmetic"
-              lead="Three ways in — camera, search, barcode — and one rule holding all of them together: a model may propose what you ate, but the totals are multiplied out in code."
+              lead="Three ways in - camera, search, barcode - and one rule holding all of them together: a model may propose what you ate, but the totals are multiplied out in code."
               screenshot="nutrition"
               alt="The nutrition day view: calorie ring, macro targets, and each meal of the day with its entries."
             >
@@ -256,8 +256,8 @@ export default function FeaturesPage() {
                   only changes when you confirm.
                 </Bullet>
                 <Bullet title="Your photo does not linger">
-                  EXIF, XMP, IPTC and ICC metadata are discarded on upload — a phone photo carries
-                  GPS at home-address precision — the file is stored under an unguessable name,
+                  EXIF, XMP, IPTC and ICC metadata are discarded on upload - a phone photo carries
+                  GPS at home-address precision - the file is stored under an unguessable name,
                   never served publicly, and swept within a day of the job finishing. A failed
                   job&apos;s photo is deleted immediately.
                 </Bullet>
@@ -291,12 +291,12 @@ export default function FeaturesPage() {
                   rows={[
                     [
                       'Weekly rate of change',
-                      `${WEEKLY_LOSS_FRACTION.min * 100}–${WEEKLY_LOSS_FRACTION.max * 100}% of bodyweight`,
+                      `${WEEKLY_LOSS_FRACTION.min * 100}-${WEEKLY_LOSS_FRACTION.max * 100}% of bodyweight`,
                     ],
                     ['Energy per kg of bodyweight', `${KCAL_PER_KG.toLocaleString()} kcal`],
-                    ['Protein — losing', `${PROTEIN_G_PER_KG.lose.toFixed(1)} g/kg`],
-                    ['Protein — maintaining', `${PROTEIN_G_PER_KG.maintain.toFixed(1)} g/kg`],
-                    ['Protein — gaining', `${PROTEIN_G_PER_KG.gain.toFixed(1)} g/kg`],
+                    ['Protein - losing', `${PROTEIN_G_PER_KG.lose.toFixed(1)} g/kg`],
+                    ['Protein - maintaining', `${PROTEIN_G_PER_KG.maintain.toFixed(1)} g/kg`],
+                    ['Protein - gaining', `${PROTEIN_G_PER_KG.gain.toFixed(1)} g/kg`],
                     ['Fat, minimum share of energy', `${FAT_KCAL_FRACTION_MIN * 100}%`],
                   ]}
                   caption="Carbohydrate fills whatever energy remains once protein and fat are set."
@@ -304,10 +304,10 @@ export default function FeaturesPage() {
 
                 <Spec
                   rows={[
-                    ['Calorie floor — female', `${KCAL_FLOOR.female.toLocaleString()} kcal`],
-                    ['Calorie floor — male', `${KCAL_FLOOR.male.toLocaleString()} kcal`],
+                    ['Calorie floor - female', `${KCAL_FLOOR.female.toLocaleString()} kcal`],
+                    ['Calorie floor - male', `${KCAL_FLOOR.male.toLocaleString()} kcal`],
                     [
-                      'Calorie floor — unspecified',
+                      'Calorie floor - unspecified',
                       `${KCAL_FLOOR.unspecified.toLocaleString()} kcal`,
                     ],
                   ]}
@@ -319,11 +319,11 @@ export default function FeaturesPage() {
                     ['Hydration', `${WATER_ML_PER_KG} ml per kg of bodyweight`],
                     [
                       'Clamped to',
-                      `${(WATER_ML_MIN / 1000).toFixed(1)}–${(WATER_ML_MAX / 1000).toFixed(1)} L per day`,
+                      `${(WATER_ML_MIN / 1000).toFixed(1)}-${(WATER_ML_MAX / 1000).toFixed(1)} L per day`,
                     ],
-                    ['Accepted weight', `${RANGES.weightKg.min}–${RANGES.weightKg.max} kg`],
-                    ['Accepted height', `${RANGES.heightCm.min}–${RANGES.heightCm.max} cm`],
-                    ['Accepted age', `${RANGES.age.min}–${RANGES.age.max} years`],
+                    ['Accepted weight', `${RANGES.weightKg.min}-${RANGES.weightKg.max} kg`],
+                    ['Accepted height', `${RANGES.heightCm.min}-${RANGES.heightCm.max} cm`],
+                    ['Accepted age', `${RANGES.age.min}-${RANGES.age.max} years`],
                   ]}
                   caption="Inputs outside these ranges are rejected at the boundary rather than quietly coerced."
                 />
@@ -349,7 +349,7 @@ export default function FeaturesPage() {
                   than being a fixed PDF you fall behind.
                 </Bullet>
                 <Bullet title="Attribution kept intact">
-                  Exercises carry their CC BY-SA licence, author and source link — visible in the
+                  Exercises carry their CC BY-SA licence, author and source link - visible in the
                   app, as the licence requires.
                 </Bullet>
                 <Bullet title="Generated illustrations are labelled">
@@ -365,7 +365,7 @@ export default function FeaturesPage() {
               id="coach"
               eyebrow="Aqua Coach"
               title="A coach with your day in front of it"
-              lead="Each reply is generated against the context you have actually logged — today's nutrition, the session on your plan, your progress summary — and both the question and the answer pass a safety classifier before you see anything."
+              lead="Each reply is generated against the context you have actually logged - today's nutrition, the session on your plan, your progress summary - and both the question and the answer pass a safety classifier before you see anything."
               screenshot="coach"
               alt="Aqua Coach quoting today's logged calories, protein, carbs, fat and water above the persistent wellness disclaimer."
             >
@@ -442,7 +442,7 @@ export default function FeaturesPage() {
                   </Bullet>
                   <Bullet title="Runs without AI keys">
                     With no provider configured the API falls back to a deterministic offline engine,
-                    so every core journey — targets, logging, plans, progress — still works.
+                    so every core journey - targets, logging, plans, progress - still works.
                   </Bullet>
                   <Bullet title="Usage is a ledger, not a balance">
                     Credits are derived by folding an append-only transaction log, so a balance cannot
@@ -464,7 +464,7 @@ export default function FeaturesPage() {
                       ['Plan generation', `${CREDIT_COSTS.planGeneration} credits`],
                       ['Progress insight', `${CREDIT_COSTS.progressInsight} credit`],
                     ]}
-                    caption="Deterministic features — targets, logging, hydration, the exercise library, charts — cost nothing, because no model is involved in them."
+                    caption="Deterministic features - targets, logging, hydration, the exercise library, charts - cost nothing, because no model is involved in them."
                   />
                 </div>
               </div>

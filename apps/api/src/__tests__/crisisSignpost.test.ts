@@ -30,7 +30,7 @@ function fakeRequest(headers: Record<string, string> = {}): Request {
 }
 
 describe('localeOf', () => {
-  it('reads the standard Accept-Language header — no new header was added', () => {
+  it('reads the standard Accept-Language header - no new header was added', () => {
     // The /api/v1 contract is frozen; both the browser and the Android client
     // already send this one.
     expect(localeOf(fakeRequest({ 'accept-language': 'en-GB,en;q=0.9' }))).toBe('en-GB,en;q=0.9');

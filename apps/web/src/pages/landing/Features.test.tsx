@@ -63,10 +63,10 @@ describe('Features page', () => {
   it('states the calorie floors the target calculator actually enforces', () => {
     renderPage();
 
-    const row = screen.getByRole('row', { name: /calorie floor — female/i });
+    const row = screen.getByRole('row', { name: /calorie floor - female/i });
     expect(within(row).getByText(`${KCAL_FLOOR.female.toLocaleString()} kcal`)).toBeTruthy();
 
-    const male = screen.getByRole('row', { name: /calorie floor — male/i });
+    const male = screen.getByRole('row', { name: /calorie floor - male/i });
     expect(within(male).getByText(`${KCAL_FLOOR.male.toLocaleString()} kcal`)).toBeTruthy();
   });
 

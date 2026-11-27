@@ -94,7 +94,7 @@ export function FighterPedestal({
             <img
               key={portraitSrc}
               src={portraitSrc}
-              alt={`${coach.name}, ${coach.ringName} — ${coach.domain}`}
+              alt={`${coach.name}, ${coach.ringName} - ${coach.domain}`}
               width={PORTRAIT_W}
               height={PORTRAIT_H}
               loading="lazy"

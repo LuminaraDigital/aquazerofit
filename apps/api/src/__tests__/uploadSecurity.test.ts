@@ -225,6 +225,28 @@ describe('upload type enforcement (the client mimetype is not evidence)', () => 
     expect(image.headers['content-type']).toContain('image/jpeg');
     expect(image.headers['cache-control']).toContain('no-store');
   });
+
+  it('rejects an SVG payload labelled image/jpeg before reaching sharp/librsvg', async () => {
+    const jobs = () => getStore().where('ai', (d) => (d as { type?: string }).type === 'cvJob').length;
+    const holds = () =>
+      getStore().where('ledger', (d) => (d as { reason?: string }).reason === 'reserve:mealPhoto').length;
+    const jobsBefore = jobs();
+    const holdsBefore = holds();
+
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="red"/></svg>',
+      'utf8',
+    );
+    const res = await request(app)
+      .post(`${base}/meal-photos`)
+      .set(auth())
+      .attach('photo', svg, { filename: 'vector.jpg', contentType: 'image/jpeg' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_FAILED');
+    expect(jobs()).toBe(jobsBefore);
+    expect(holds()).toBe(holdsBefore);
+  });
 });
 
 describe('multipart limits survive the multer v1 → v2 upgrade', () => {

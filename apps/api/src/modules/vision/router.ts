@@ -125,24 +125,59 @@ const STORED_IMAGE_MAX_EDGE = 1600;
  */
 const DECODE_LIMITS = { limitInputPixels: 40_000_000 } as const;
 
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const HEIF_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1']);
+const ALLOWED_SHARP_FORMATS = new Set(['jpeg', 'png', 'heif']);
+
+/**
+ * Pre-libvips magic-byte allowlist (JPEG, PNG, ISO-BMFF HEIC/HEIF).
+ * Blocks non-allowlisted formats such as SVG (librsvg), GIF, WebP or arbitrary
+ * text BEFORE bytes ever reach sharp/libvips decoders.
+ */
+function hasAllowedImageMagicBytes(buffer: Buffer): boolean {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return true;
+  }
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(PNG_MAGIC)) {
+    return true;
+  }
+  if (buffer.length >= 12 && buffer.toString('ascii', 4, 8) === 'ftyp') {
+    if (HEIF_BRANDS.has(buffer.toString('ascii', 8, 12))) return true;
+    const boxEnd = Math.min(buffer.length, buffer.readUInt32BE(0));
+    for (let offset = 16; offset + 4 <= boxEnd; offset += 4) {
+      if (HEIF_BRANDS.has(buffer.toString('ascii', offset, offset + 4))) return true;
+    }
+  }
+  return false;
+}
+
+function invalidImageError(): AppError {
+  return new AppError(
+    'VALIDATION_FAILED',
+    'That file could not be read as an image. Use a jpeg or png photo.',
+    { allowed: MEAL_PHOTO_MIME },
+  );
+}
+
 async function toStorableImages(
   buffer: Buffer,
   declaredMime?: string,
 ): Promise<{ jpeg: Buffer; webp?: Buffer }> {
+  if (!hasAllowedImageMagicBytes(buffer)) throw invalidImageError();
   try {
-    const jpeg = await sharp(buffer, DECODE_LIMITS)
+    const metadata = await sharp(buffer, DECODE_LIMITS).metadata();
+    if (!metadata.format || !ALLOWED_SHARP_FORMATS.has(metadata.format)) {
+      throw invalidImageError();
+    }
+
+    const base = sharp(buffer, DECODE_LIMITS)
       .rotate()
-      .resize(STORED_IMAGE_MAX_EDGE, STORED_IMAGE_MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 82 })
-      .toBuffer();
+      .resize(STORED_IMAGE_MAX_EDGE, STORED_IMAGE_MAX_EDGE, { fit: 'inside', withoutEnlargement: true });
+    const jpeg = await base.clone().jpeg({ quality: 82 }).toBuffer();
 
     let webp: Buffer | undefined;
     try {
-      webp = await sharp(buffer, DECODE_LIMITS)
-        .rotate()
-        .resize(STORED_IMAGE_MAX_EDGE, STORED_IMAGE_MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: 80 })
-        .toBuffer();
+      webp = await base.clone().webp({ quality: 80 }).toBuffer();
     } catch (webpErr) {
       // The bytes already decoded once, so this is an encoder problem, not a
       // bad upload. Warn and carry on with JPEG only.
@@ -154,6 +189,7 @@ async function toStorableImages(
 
     return { jpeg, webp };
   } catch (err) {
+    if (err instanceof AppError) throw err;
     // HEIC is called out separately because it is the one format whose support
     // depends on the codecs compiled into the deployed libvips rather than on
     // the upload being valid. sharp advertises a heif loader, but a build
@@ -174,9 +210,7 @@ async function toStorableImages(
       );
     }
     // A payload we cannot decode is a bad request, not a server fault.
-    throw new AppError('VALIDATION_FAILED', 'That file could not be read as an image. Use a jpeg or png photo.', {
-      allowed: MEAL_PHOTO_MIME,
-    });
+    throw invalidImageError();
   }
 }
 

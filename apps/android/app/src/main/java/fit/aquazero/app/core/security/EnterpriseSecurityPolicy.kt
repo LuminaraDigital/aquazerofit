@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.RestrictionsManager
 import android.content.SharedPreferences
 import android.os.Bundle
+import androidx.annotation.VisibleForTesting
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,6 +69,15 @@ data class ManagedRestrictions(
     }
 }
 
+/** Why an MDM-enforced app lock cannot proceed with a normal credential prompt. */
+enum class AppLockBlockReason {
+    /** The device has no PIN, pattern, password, or biometric configured. */
+    DEVICE_NOT_SECURE,
+
+    /** The system credential prompt could not be created or launched. */
+    PROMPT_UNAVAILABLE,
+}
+
 /**
  * Combined device-security posture (EN-2.1, EN-2.2, EN-3.3).
  *
@@ -80,6 +90,9 @@ data class DeviceSecurityState(
     val appLockTimeoutSeconds: Long = DEFAULT_APP_LOCK_TIMEOUT_SECONDS,
     val restrictions: ManagedRestrictions = ManagedRestrictions(),
 ) {
+    val managedAppLockForced: Boolean
+        get() = restrictions.forceAppLock
+
     val effectiveAppLockEnabled: Boolean
         get() = userAppLockEnabled || restrictions.forceAppLock
 
@@ -155,10 +168,18 @@ class DeviceSecurityController private constructor(
     private val _state = MutableStateFlow(initialState)
     val state: StateFlow<DeviceSecurityState> = _state.asStateFlow()
 
+    private val _isLocked = MutableStateFlow(false)
+    val isLocked: StateFlow<Boolean> = _isLocked.asStateFlow()
+
+    private val _lockBlockReason = MutableStateFlow<AppLockBlockReason?>(null)
+    val lockBlockReason: StateFlow<AppLockBlockReason?> = _lockBlockReason.asStateFlow()
+
     fun refreshRestrictions() {
         _state.value = loadState()
         if (!_state.value.effectiveAppLockEnabled) {
             clearLockSession()
+        } else if (!_state.value.managedAppLockForced && _lockBlockReason.value != null) {
+            _lockBlockReason.value = null
         }
     }
 
@@ -178,7 +199,8 @@ class DeviceSecurityController private constructor(
     }
 
     /** Override MDM restrictions in unit or instrumented tests (`null` restores live restrictions). */
-    fun setRestrictionsOverrideForTesting(restrictions: ManagedRestrictions?) {
+    @VisibleForTesting
+    internal fun setRestrictionsOverrideForTesting(restrictions: ManagedRestrictions?) {
         restrictionsOverride = restrictions
         refreshRestrictions()
     }
@@ -201,28 +223,40 @@ class DeviceSecurityController private constructor(
      * Evaluate whether `MainActivity` must launch the system credential unlock
      * prompt on `onStart()`. Latches [lockRequired] until [onUnlockPromptResult]
      * succeeds so cancelling the credential screen and reopening the app cannot
-     * bypass the timeout.
+     * bypass the timeout. When MDM forces app lock on an insecure device, fails
+     * closed and keeps [isLocked] latched with [AppLockBlockReason.DEVICE_NOT_SECURE].
      */
-    fun shouldLaunchUnlockPrompt(nowElapsedMs: Long, isDeviceSecure: Boolean): Boolean {
+    fun shouldLaunchUnlockPrompt(
+        nowElapsedMs: Long,
+        isDeviceSecure: Boolean,
+        manualRetry: Boolean = false,
+    ): Boolean {
         val current = _state.value
-        if (!current.effectiveAppLockEnabled || !isDeviceSecure) {
-            clearLockSession()
-            return false
+        return when {
+            !current.effectiveAppLockEnabled -> {
+                clearLockSession()
+                false
+            }
+
+            !isDeviceSecure -> {
+                handleInsecureDevice(current.managedAppLockForced)
+                false
+            }
+
+            else -> evaluateSecureUnlock(current, nowElapsedMs, manualRetry)
         }
-        if (suppressPromptUntilStopped || credentialPromptInFlight) {
-            return false
-        }
-        if (lockRequired || current.shouldLockAfterBackground(backgroundedAtElapsedMs, nowElapsedMs)) {
-            lockRequired = true
-            credentialPromptInFlight = true
-            return true
-        }
-        backgroundedAtElapsedMs = null
-        return false
     }
 
     fun onUnlockPromptLaunchFailed() {
-        clearLockSession()
+        if (_state.value.managedAppLockForced) {
+            lockRequired = true
+            credentialPromptInFlight = false
+            suppressPromptUntilStopped = false
+            _isLocked.value = true
+            _lockBlockReason.value = AppLockBlockReason.PROMPT_UNAVAILABLE
+        } else {
+            clearLockSession()
+        }
     }
 
     /**
@@ -239,6 +273,7 @@ class DeviceSecurityController private constructor(
         }
         lockRequired = true
         suppressPromptUntilStopped = true
+        _isLocked.value = true
         return false
     }
 
@@ -248,7 +283,45 @@ class DeviceSecurityController private constructor(
      * background would silently skip the lock on the next launch.
      */
     internal fun onColdStart() {
-        if (_state.value.effectiveAppLockEnabled) lockRequired = true
+        if (_state.value.effectiveAppLockEnabled) {
+            lockRequired = true
+            _isLocked.value = true
+        }
+    }
+
+    private fun handleInsecureDevice(managedAppLockForced: Boolean) {
+        if (managedAppLockForced) {
+            lockRequired = true
+            credentialPromptInFlight = false
+            suppressPromptUntilStopped = false
+            _isLocked.value = true
+            _lockBlockReason.value = AppLockBlockReason.DEVICE_NOT_SECURE
+        } else {
+            clearLockSession()
+        }
+    }
+
+    private fun evaluateSecureUnlock(
+        current: DeviceSecurityState,
+        nowElapsedMs: Long,
+        manualRetry: Boolean,
+    ): Boolean {
+        if (_lockBlockReason.value == AppLockBlockReason.DEVICE_NOT_SECURE) {
+            _lockBlockReason.value = null
+        }
+        if (credentialPromptInFlight || (!manualRetry && suppressPromptUntilStopped)) {
+            return false
+        }
+        if (lockRequired || current.shouldLockAfterBackground(backgroundedAtElapsedMs, nowElapsedMs)) {
+            lockRequired = true
+            credentialPromptInFlight = true
+            suppressPromptUntilStopped = false
+            _isLocked.value = true
+            _lockBlockReason.value = null
+            return true
+        }
+        backgroundedAtElapsedMs = null
+        return false
     }
 
     private fun clearLockSession() {
@@ -256,6 +329,8 @@ class DeviceSecurityController private constructor(
         lockRequired = false
         credentialPromptInFlight = false
         suppressPromptUntilStopped = false
+        _isLocked.value = false
+        _lockBlockReason.value = null
     }
 
     private fun loadState(): DeviceSecurityState {

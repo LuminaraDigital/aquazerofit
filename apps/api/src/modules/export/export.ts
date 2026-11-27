@@ -27,8 +27,13 @@ const exportQuerySchema = z.object({
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 
+const CSV_FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
 function escapeCsv(val: string | number | undefined | null): string {
   if (val === undefined || val === null) return '""';
+  if (typeof val === 'string' && CSV_FORMULA_PREFIX.test(val)) {
+    return `"'${val.replace(/"/g, '""')}"`;
+  }
   const str = String(val);
   if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replace(/"/g, '""')}"`;

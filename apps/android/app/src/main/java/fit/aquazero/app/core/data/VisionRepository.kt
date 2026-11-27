@@ -386,14 +386,23 @@ class VisionRepository @Inject constructor(
     }
 
     /**
-     * Remove staged files older than the server's own 24h artifact TTL — a
-     * crash between capture and confirm must not leave meal photos on disk.
+     * Remove staged files older than the server's own 24h artifact TTL and any
+     * orphaned raw CameraX captures (`capture-*.jpg`) left behind by a crash —
+     * a crash between capture and confirm must not leave meal photos on disk.
      */
     fun sweepStaged(now: Long = System.currentTimeMillis()) {
         val cutoff = now - STAGED_TTL_MS
         stagingDir().listFiles()?.forEach { file ->
             if (file.isFile && file.lastModified() < cutoff) file.delete()
         }
+        val rawCutoff = now - RAW_CAPTURE_TTL_MS
+        context.cacheDir
+            .listFiles { _, name ->
+                name.startsWith(RAW_CAPTURE_PREFIX) && name.endsWith(STAGED_EXT)
+            }
+            ?.forEach { file ->
+                if (file.isFile && file.lastModified() < rawCutoff) file.delete()
+            }
     }
 
     // ----- internals -----
@@ -441,11 +450,15 @@ class VisionRepository @Inject constructor(
         const val STAGING_DIR = "meal-photos"
         const val STAGE_PREFIX = "stage-"
         const val JOB_PREFIX = "job-"
+        const val RAW_CAPTURE_PREFIX = "capture-"
         const val STAGED_EXT = ".jpg"
         const val STAGED_MIME = "image/jpeg"
         const val HTTP_CONFLICT = 409
 
         /** Matches the server's vision-artifact TTL. */
         const val STAGED_TTL_MS: Long = 24L * 60 * 60 * 1000
+
+        /** Grace period before deleting orphaned raw CameraX captures after a crash. */
+        const val RAW_CAPTURE_TTL_MS: Long = 60L * 1000
     }
 }

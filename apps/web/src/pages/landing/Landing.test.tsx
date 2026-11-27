@@ -48,6 +48,7 @@ beforeEach(() => {
   HTMLCanvasElement.prototype.getContext = vi.fn(
     () => null,
   ) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+  HTMLMediaElement.prototype.pause = vi.fn();
 });
 
 afterEach(() => {
@@ -166,5 +167,37 @@ describe('Landing', () => {
     renderAt();
 
     expect(screen.getAllByText(/does not provide medical diagnosis/i).length).toBeGreaterThan(0);
+  });
+
+  it('opens and closes the 14-second brand reel dialog cleanly', () => {
+    renderAt();
+
+    fireEvent.click(screen.getByRole('button', { name: /14s reel/i }));
+    const dialog = screen.getByRole('dialog', { name: /14-second brand reel/i });
+    expect(dialog).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /close/i }));
+    expect(screen.queryByRole('dialog', { name: /14-second brand reel/i })).toBeNull();
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+  });
+
+  it('closes the mobile navigation menu on Escape (restoring focus) and outside pointerdown', () => {
+    const { container } = renderAt();
+
+    const summary = container.querySelector('summary[aria-label="Navigation menu"]') as HTMLElement;
+    const details = summary.closest('details') as HTMLDetailsElement;
+    expect(summary).toBeTruthy();
+    expect(details).toBeTruthy();
+
+    details.open = true;
+    fireEvent(details, new Event('toggle'));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(details.open).toBe(false);
+    expect(document.activeElement).toBe(summary);
+
+    details.open = true;
+    fireEvent(details, new Event('toggle'));
+    fireEvent.pointerDown(document.body);
+    expect(details.open).toBe(false);
   });
 });

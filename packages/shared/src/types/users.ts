@@ -42,6 +42,28 @@ export interface User {
    * accounts until they sign in with Firebase once.
    */
   firebaseUid?: string;
+  /**
+   * True when this account holds an email/password credential in Firebase Auth
+   * (registered with Firebase passwords on, set via /me/credentials, or
+   * migrated from local bcrypt). Kept separate from `firebaseUid` so
+   * Google/OAuth-only Firebase accounts continue to report `hasPassword: false`.
+   */
+  firebasePassword?: boolean;
+  /**
+   * True while a legacy bcrypt account that already had a linked Telegram
+   * identity is waiting for its first verified Firebase sign-in after moving
+   * its password to Firebase. Preserves that pre-existing `tgId` on proof.
+   */
+  migratedFromBcrypt?: boolean;
+  /**
+   * Firebase `tokensValidAfterTime` (ms) recorded when a Telegram-provisioned
+   * account created its Firebase password via `POST /me/credentials`. If the
+   * mailbox is later proved via `'password'` sign-in with no intervening
+   * password reset (`tokensValidAfter <= telegramCredentialsValidAfter`), the
+   * pre-existing `tgId` belongs to the mailbox owner and is preserved; if a
+   * victim instead claims the email via OAuth or password reset, `tgId` is dropped.
+   */
+  telegramCredentialsValidAfter?: number;
   tgId?: number; // unique when present (Telegram link)
   tgUsername?: string;
   timezone?: string; // IANA name (e.g. 'Australia/Sydney'); optional, set via PATCH /me

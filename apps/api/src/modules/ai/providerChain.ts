@@ -117,7 +117,8 @@ export const PROVIDERS: ProviderDef[] = [
  * Is this provider a configured dependency? Its key is set, or, for a
  * key-optional provider, its base URL is: a self-hosted Ollama named by
  * OLLAMA_BASE_URL is as real as a keyed API. A key-optional provider with
- * neither is the opportunistic localhost probe and does not count.
+ * neither is not in the chain. A local Ollama is only tried when
+ * OLLAMA_BASE_URL names it.
  *
  * The single answer for the chain walk, the boot warning and the LLM-safety
  * default, so what gets retried, what marks a fallback degraded, what the
@@ -142,11 +143,19 @@ export function modelFor(provider: ProviderDef, task: ModelGroup): string {
 
 export const DEFAULT_TIMEOUT_MS = 20_000;
 /**
- * Ceiling for chat, plans, and every lane that is not a meal photo. Callers
- * may only tighten it. A photo has its own ceiling so a vision hop can run
- * past this without stretching the chat socket.
+ * Chat ceiling. Callers may only tighten it. A photo and a training plan have
+ * their own ceilings: a vision hop, or a slow plan model after a 429, has to
+ * fit without stretching the chat socket.
  */
 export const CHAT_DEADLINE_MS = 12_000;
+/**
+ * Plan generation is a large JSON document. Groq often answers 429, and NVIDIA
+ * NIM regularly needs longer than the chat ceiling. 55s leaves a full attempt
+ * for the next configured provider after the first one rate-limits or stalls.
+ */
+export const PLAN_DEADLINE_MS = 55_000;
+/** Cap on one plan attempt, so a timeout still leaves the next provider time. */
+export const PLAN_ATTEMPT_MS = 28_000;
 /** Vision ceiling when AI_VISION_DEADLINE_MS is unset. */
 export const DEFAULT_VISION_DEADLINE_MS = 20_000;
 export const VISION_DEADLINE_ENV = 'AI_VISION_DEADLINE_MS';
@@ -163,9 +172,11 @@ export function visionDeadlineMs(env: NodeJS.ProcessEnv = process.env): number {
   return Math.min(VISION_DEADLINE_MAX_MS, Math.max(VISION_DEADLINE_MIN_MS, Math.floor(parsed)));
 }
 
-/** Chat stays at 12s. visionPrimary uses the configurable photo deadline. */
+/** Chat stays at 12s. visionPrimary and planStructured have their own ceilings. */
 export function deadlineCeilingMs(task: ModelGroup, env: NodeJS.ProcessEnv = process.env): number {
-  return task === 'visionPrimary' ? visionDeadlineMs(env) : CHAT_DEADLINE_MS;
+  if (task === 'visionPrimary') return visionDeadlineMs(env);
+  if (task === 'planStructured') return PLAN_DEADLINE_MS;
+  return CHAT_DEADLINE_MS;
 }
 
 /**
@@ -232,6 +243,17 @@ export function parseRetryAfter(header: string | null | undefined): number | und
 export function backoffDelayMs(attempt: number): number {
   const window = BACKOFF_BASE_MS * 2 ** (attempt - 1);
   return Math.round(window / 2 + Math.random() * (window / 2));
+}
+
+/**
+ * Wait before a retry. A Retry-After hint is honoured, plus a little jitter so
+ * callers who all saw the same 429 do not hit the provider again together.
+ * With no hint, the wait is the equal-jitter backoff.
+ */
+export function retryWaitMs(failure: ProviderError, attempt: number): number {
+  if (failure.retryAfterMs === undefined) return backoffDelayMs(attempt);
+  const jitterCap = Math.min(250, Math.max(50, failure.retryAfterMs));
+  return failure.retryAfterMs + Math.round(Math.random() * jitterCap);
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -482,9 +504,10 @@ export type ChainAttempt<T> = (provider: ProviderDef, budgetMs: number) => Async
  * throws for provider trouble: it returns the first answer, or how it ran out.
  *
  * The whole walk shares one deadline. A configured provider gets up to
- * 1 + MAX_RETRIES_PER_PROVIDER attempts, retried only for transient failures,
- * and the photo lane holds part of the deadline back for the next provider
- * that could still take the photo.
+ * 1 + MAX_RETRIES_PER_PROVIDER attempts, retried only for transient failures
+ * (429, 5xx, network, timeout) with jittered backoff. The photo lane and the
+ * plan lane hold part of the deadline back for the next provider. Providers
+ * that are not configured are skipped. The offline engine is not in this walk.
  */
 export async function* walkChain<T>(
   call: ChainCall,
@@ -497,35 +520,35 @@ export async function* walkChain<T>(
   let realProviderInPlay = false;
 
   for (const [index, provider] of PROVIDERS.entries()) {
-    const configured = isConfigured(provider);
-    if (!configured && !provider.keyOptional) continue;
+    // Order is the PROVIDERS list: Groq, OpenAI, Gemini, NVIDIA, then Ollama
+    // only when OLLAMA_BASE_URL is set. An unconfigured localhost probe is not
+    // in the chain. The offline engine is the caller's last resort, not a hop.
+    if (!isConfigured(provider)) continue;
     // Counted before the breaker and vision checks: a provider skipped because
     // it is failing, or cannot see the photo, is still a real dependency the
     // user did not get, so a mock answer after it is degraded (and not billed).
-    realProviderInPlay = realProviderInPlay || configured;
+    realProviderInPlay = true;
     if (call.hasImages && !provider.supportsVision) continue;
     if (circuitIsOpen(provider.name)) continue;
-    // A key-optional provider with neither key nor base URL is an
-    // opportunistic local probe (Ollama on localhost), not a configured
-    // dependency: one shot, no retries, and it never marks the result degraded.
-    const maxAttempts = configured ? 1 + MAX_RETRIES_PER_PROVIDER : 1;
-    const reserve = visionReserveMs(call, index, deadlineMs);
+    const maxAttempts = 1 + MAX_RETRIES_PER_PROVIDER;
+    const reserve = nextHopReserveMs(call, index, deadlineMs);
+    const attemptCap = call.timeoutMs ?? (call.task === 'planStructured' ? PLAN_ATTEMPT_MS : DEFAULT_TIMEOUT_MS);
 
     for (let n = 1; n <= maxAttempts; n += 1) {
       const room = remainingMs() - reserve;
       if (room < MIN_ATTEMPT_MS) return { realProviderInPlay, deadlineExceeded: true };
       const started = Date.now();
       try {
-        const answer = yield* attempt(provider, Math.min(room, call.timeoutMs ?? DEFAULT_TIMEOUT_MS));
+        const answer = yield* attempt(provider, Math.min(room, attemptCap));
         recordProviderSuccess(provider.name);
         return { answer };
       } catch (err) {
         const failure = classify(err);
         call.onFailure(provider, failure, Date.now() - started);
+        // 429 and 5xx retry. A 4xx does not. A timeout is retryable, but only
+        // while the wait still leaves the reserved slice for the next provider.
         if (!failure.retryable || n === maxAttempts) break;
-        const wait = failure.retryAfterMs ?? backoffDelayMs(n);
-        // Sleeping past the deadline, or into the slice reserved for the next
-        // vision provider, only delays the fallback. Move on instead.
+        const wait = retryWaitMs(failure, n);
         if (wait + reserve >= remainingMs()) break;
         await sleep(wait);
       }
@@ -534,14 +557,25 @@ export async function* walkChain<T>(
     // bad attempts, so a single flaky request cannot blackhole a provider.
     recordProviderFailure(provider.name);
   }
-  return { realProviderInPlay, deadlineExceeded: false };
+  // Time ran out when the next attempt would not fit. A fast 429 or 5xx with
+  // budget left is a provider failure, not a deadline.
+  return { realProviderInPlay, deadlineExceeded: remainingMs() < MIN_ATTEMPT_MS };
 }
 
-/** visionHopBudgetMs when a later provider could still take the photo, else 0. */
-function visionReserveMs(call: ChainCall, index: number, deadlineMs: number): number {
-  if (call.task !== 'visionPrimary') return 0;
-  const nextCanTakeIt = PROVIDERS.slice(index + 1).some(
+function laterProviderCanRun(call: ChainCall, index: number): boolean {
+  return PROVIDERS.slice(index + 1).some(
     (next) => isConfigured(next) && (!call.hasImages || next.supportsVision) && !circuitIsOpen(next.name),
   );
-  return nextCanTakeIt ? visionHopBudgetMs(deadlineMs) : 0;
+}
+
+/**
+ * Time held back so the next configured provider still gets an attempt.
+ * Photos keep the vision hop. Plans hold a plan attempt. Chat does not: its
+ * ceiling is already one short wait.
+ */
+function nextHopReserveMs(call: ChainCall, index: number, deadlineMs: number): number {
+  if (!laterProviderCanRun(call, index)) return 0;
+  if (call.task === 'visionPrimary') return visionHopBudgetMs(deadlineMs);
+  if (call.task === 'planStructured') return Math.min(PLAN_ATTEMPT_MS, Math.floor(deadlineMs / 2));
+  return 0;
 }

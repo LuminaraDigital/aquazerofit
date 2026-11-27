@@ -11,12 +11,10 @@
  *
  * The account-side check is what stops a Telegram session from claiming
  * someone else's address through POST /me/credentials and then catching
- * their later Google sign-in. setCredentials stores that address unverified
- * on purpose. There is no email-verification token flow in this codebase
- * (password reset is a different proof and is not reused). Until one exists,
- * an unverified stored address cannot be used for linking. Register still
- * returns CONFLICT while that row holds the address, so the address can be
- * reserved. That reservation is the remaining gap, not a takeover.
+ * their later Google sign-in. setCredentials no longer writes an address it
+ * has not seen proved: it mails a confirmation link (confirmEmailClaim), and
+ * only an opened link attaches the address, verified. Rows from before that
+ * flow can still hold an unverified address, and those still cannot link.
  *
  * A token that matches no existing account still provisions a new local
  * user. That is the current product rule: there is nobody to take over, the

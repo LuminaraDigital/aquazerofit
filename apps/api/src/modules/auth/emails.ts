@@ -52,3 +52,36 @@ export async function sendPasswordResetEmail(to: string, token: string): Promise
 
   await sendMail({ to, subject: 'Reset your AquaZeroFit password', text, html });
 }
+
+/** Mirrors EMAIL_CLAIM_TTL_MS in service.ts. */
+const EMAIL_CLAIM_TTL_HOURS = 24;
+
+/** Opens /confirm-email, which posts the token to /auth/email-confirm. */
+export function emailConfirmLink(token: string): string {
+  return `${config.appPublicUrl}/confirm-email?token=${encodeURIComponent(token)}`;
+}
+
+export async function sendEmailConfirmationEmail(to: string, token: string): Promise<void> {
+  const link = emailConfirmLink(token);
+
+  const text = [
+    'Someone asked to add this address as the email sign-in for an AquaZeroFit account.',
+    '',
+    `Open this link to confirm it: ${link}`,
+    '',
+    `Or enter this code in the app: ${token}`,
+    '',
+    `The link expires in ${EMAIL_CLAIM_TTL_HOURS} hours and can be used once.`,
+    'If this was not you, ignore this email. Nothing is added unless the link is opened.',
+  ].join('\n');
+
+  const html = [
+    '<p>Someone asked to add this address as the email sign-in for an AquaZeroFit account.</p>',
+    `<p><a href="${escapeHtml(link)}">Confirm this email</a></p>`,
+    `<p>Or enter this code in the app: <code>${escapeHtml(token)}</code></p>`,
+    `<p>The link expires in ${EMAIL_CLAIM_TTL_HOURS} hours and can be used once.`,
+    ' If this was not you, ignore this email. Nothing is added unless the link is opened.</p>',
+  ].join('');
+
+  await sendMail({ to, subject: 'Confirm your AquaZeroFit email', text, html });
+}

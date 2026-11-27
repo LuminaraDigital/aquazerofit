@@ -39,6 +39,7 @@ const AccountDeletionPage = lazy(() => import('./pages/legal/AccountDeletion'));
 const MobileCaptchaPage = lazy(() => import('./pages/auth/MobileCaptcha'));
 const Welcome = lazy(() => import('./pages/auth/Welcome'));
 const SignIn = lazy(() => import('./pages/auth/SignIn'));
+const ConfirmEmail = lazy(() => import('./pages/auth/ConfirmEmail'));
 /* Wellness essentials - asked when a target is wanted, not before the app opens. */
 const Setup = lazy(() => import('./pages/auth/Setup'));
 const FirstRun = lazy(() => import('./pages/auth/FirstRun'));
@@ -130,6 +131,7 @@ export default function App() {
         <Route path="/account/deletion" element={<AccountDeletionPage />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/sign-in" element={<SignIn />} />
+        <Route path="/confirm-email" element={<ConfirmEmail />} />
         <Route path="/mobile/captcha" element={<MobileCaptchaPage />} />
 
         {/* `publicIndex` makes `/` the marketing front door for signed-out web

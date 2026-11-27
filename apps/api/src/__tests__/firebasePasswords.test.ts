@@ -160,6 +160,26 @@ async function requestReset(email: string) {
   }
 }
 
+/**
+ * POST /me/credentials with dev token echo on. The address waits on the
+ * mailbox (202) until the returned token is confirmed.
+ */
+async function claimEmail(accessToken: string, email: string) {
+  const previous = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'development';
+  try {
+    return await request(app)
+      .post(`${base}/me/credentials`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ email, password: PASSWORD });
+  } finally {
+    process.env.NODE_ENV = previous;
+  }
+}
+
+const confirmEmail = (token: string) =>
+  request(app).post(`${base}/auth/email-confirm`).send({ token });
+
 beforeEach(() => {
   setFirebasePasswordsForTests(gateway);
   resetLoginFailures();
@@ -554,7 +574,7 @@ describe('Firebase password regressions (hasPassword, /me/credentials, legacy Te
     expect(hasCredentials(reg.body.user.id as string)).toBe(false);
   });
 
-  it('creates a Firebase password (no local bcrypt) when a Telegram user calls POST /me/credentials', async () => {
+  it("holds a Telegram user's email until the link is opened, then moves the password into Firebase", async () => {
     const tg = await request(app)
       .post(`${base}/auth/telegram`)
       .send({ initData: tgInitData(980001) });
@@ -562,31 +582,34 @@ describe('Firebase password regressions (hasPassword, /me/credentials, legacy Te
     expect(tg.body.user.hasPassword).toBe(false);
 
     const email = nextEmail();
-    const set = await request(app)
-      .post(`${base}/me/credentials`)
-      .set('Authorization', `Bearer ${tg.body.accessToken}`)
-      .send({ email, password: PASSWORD });
-    expect(set.status).toBe(200);
-    expect(set.body.user.hasPassword).toBe(true);
-    expect(set.body.user.email).toBe(email);
-    expect(set.body.user.emailVerified).toBe(false);
+    const set = await claimEmail(tg.body.accessToken as string, email);
+    expect(set.status).toBe(202);
+    expect(set.body.pendingEmail).toBe(email);
+    expect(set.body.user.hasPassword).toBe(false);
+    expect(set.body.user.email).not.toBe(email);
+    // Nothing holds the address before the mailbox answers.
+    expect(firebase.accounts.get(email)).toBeUndefined();
+    expect(findUserByEmail(email)).toBeUndefined();
 
+    expect((await confirmEmail(set.body.devToken as string)).status).toBe(200);
+    const signedIn = await login(email, PASSWORD);
+    expect(signedIn.status).toBe(200);
+    expect(signedIn.body.user.emailVerified).toBe(true);
+    expect(signedIn.body.user.hasPassword).toBe(true);
+
+    // The first sign-in moved the confirmed password into Firebase.
     const stored = getStore().byId<User>('users', tg.body.user.id as string)!;
     const fbAccount = firebase.accounts.get(email);
     expect(fbAccount).toBeDefined();
     expect(stored.firebaseUid).toBe(fbAccount!.uid);
     expect(stored.firebasePassword).toBe(true);
     expect(hasCredentials(stored.id)).toBe(false);
-    await vi.waitFor(() => expect(firebase.verifications).toContain(email));
 
-    // A second Telegram user cannot claim an email Firebase already holds.
+    // A second Telegram user cannot claim an address an account now holds.
     const tg2 = await request(app)
       .post(`${base}/auth/telegram`)
       .send({ initData: tgInitData(980002) });
-    const conflict = await request(app)
-      .post(`${base}/me/credentials`)
-      .set('Authorization', `Bearer ${tg2.body.accessToken}`)
-      .send({ email, password: PASSWORD });
+    const conflict = await claimEmail(tg2.body.accessToken as string, email);
     expect(conflict.status).toBe(409);
     expect(conflict.body.code).toBe('CONFLICT');
   });
@@ -641,23 +664,18 @@ describe('Firebase password regressions (hasPassword, /me/credentials, legacy Te
     expect(getStore().byId<User>('users', user.id)!.migratedFromBcrypt).toBeUndefined();
   });
 
-  it('preserves tgId when a Telegram user verifies email via password after POST /me/credentials', async () => {
+  it('preserves tgId when a Telegram user confirms their email and signs in with the password', async () => {
     const tg = await request(app)
       .post(`${base}/auth/telegram`)
       .send({ initData: tgInitData(980020) });
     expect(tg.status).toBe(200);
     const email = nextEmail();
 
-    const set = await request(app)
-      .post(`${base}/me/credentials`)
-      .set('Authorization', `Bearer ${tg.body.accessToken}`)
-      .send({ email, password: PASSWORD });
-    expect(set.status).toBe(200);
+    const set = await claimEmail(tg.body.accessToken as string, email);
+    expect(set.status).toBe(202);
     expect(set.body.user.telegramLinked).toBe(true);
-    expect(set.body.user.emailVerified).toBe(false);
+    expect((await confirmEmail(set.body.devToken as string)).status).toBe(200);
 
-    // Owner clicks Firebase verification link and signs in with the same password.
-    firebase.accounts.get(email)!.emailVerified = true;
     const proved = await login(email, PASSWORD);
     expect(proved.status).toBe(200);
     expect(proved.body.user.emailVerified).toBe(true);
@@ -668,38 +686,35 @@ describe('Firebase password regressions (hasPassword, /me/credentials, legacy Te
     expect(stored.telegramCredentialsValidAfter).toBeUndefined();
   });
 
-  it('drops a squatter tgId when the real mailbox owner recovers via password reset or Google OAuth', async () => {
-    // Case A: victim resets password after squatter called POST /me/credentials
+  it("never attaches an unconfirmed address, so its owner gets an account without the claimant's Telegram", async () => {
+    // Case A: the owner registers with the address a Telegram user claimed.
     const tgSquat = await request(app)
       .post(`${base}/auth/telegram`)
       .send({ initData: tgInitData(980021) });
     const emailA = nextEmail();
-    await request(app)
-      .post(`${base}/me/credentials`)
-      .set('Authorization', `Bearer ${tgSquat.body.accessToken}`)
-      .send({ email: emailA, password: PASSWORD });
+    const claimA = await claimEmail(tgSquat.body.accessToken as string, emailA);
+    expect(claimA.status).toBe(202);
 
-    const accA = firebase.accounts.get(emailA)!;
-    accA.emailVerified = true;
-    changePasswordInFirebase(emailA, 'VictimReset9Password');
-    const recoveredA = await login(emailA, 'VictimReset9Password');
-    expect(recoveredA.status).toBe(200);
-    expect(recoveredA.body.user.emailVerified).toBe(true);
-    expect(recoveredA.body.user.telegramLinked).toBe(false);
-    expect(getStore().byId<User>('users', tgSquat.body.user.id as string)!.tgId).toBeUndefined();
+    const owner = await request(app)
+      .post(`${base}/auth/register`)
+      .send({ email: emailA, password: 'Owner9Password' });
+    expect(owner.status).toBe(201);
+    expect(owner.body.user.telegramLinked).toBe(false);
+    expect(owner.body.user.id).not.toBe(tgSquat.body.user.id);
+    // The claimant's link now finds the address taken.
+    expect((await confirmEmail(claimA.body.devToken as string)).status).toBe(409);
+    const squatter = getStore().byId<User>('users', tgSquat.body.user.id as string)!;
+    expect(squatter.email).not.toBe(emailA);
+    expect(squatter.tgId).toBe(980021);
 
-    // Case B: victim signs in via Google OAuth (signInProvider = 'google.com')
+    // Case B: the owner signs in with Google on the claimed address.
     const tgSquatB = await request(app)
       .post(`${base}/auth/telegram`)
       .send({ initData: tgInitData(980022) });
     const emailB = nextEmail();
-    await request(app)
-      .post(`${base}/me/credentials`)
-      .set('Authorization', `Bearer ${tgSquatB.body.accessToken}`)
-      .send({ email: emailB, password: PASSWORD });
+    expect((await claimEmail(tgSquatB.body.accessToken as string, emailB)).status).toBe(202);
 
-    const accB = firebase.accounts.get(emailB)!;
-    accB.emailVerified = true;
+    const accB = firebase.add(emailB, '', true);
     accB.signInProvider = 'google.com';
     const recoveredB = await request(app)
       .post(`${base}/auth/firebase/session`)

@@ -100,6 +100,9 @@ export const setCredentialsSchema = z.object({
   password: passwordSchema,
 });
 
+/** POST /auth/email-confirm: the token from the confirmation mail. */
+export const emailConfirmSchema = z.object({ token: z.string().min(10).max(200) });
+
 // ---------- profile ----------
 
 export const profileSchema = z.object({

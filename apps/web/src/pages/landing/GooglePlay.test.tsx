@@ -78,4 +78,13 @@ describe('Google Play page', () => {
 
     expect(screen.getByText('mini app welcome')).toBeTruthy();
   });
+
+  it('showcases all three native Android captures', () => {
+    const { container } = renderPage();
+
+    const srcs = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src'));
+    expect(srcs).toContain('/screenshots/dashboard.webp');
+    expect(srcs).toContain('/screenshots/capture-meal.webp');
+    expect(srcs).toContain('/screenshots/coach.webp');
+  });
 });

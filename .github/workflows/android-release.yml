@@ -54,8 +54,9 @@ jobs:
       # so the second release onwards fails at the upload step, after the
       # signing key has been decoded, used and shredded for nothing.
       - name: Derive Version From Tag
+        env:
+          REF: ${{ github.ref_name }}
         run: |
-          REF="${{ github.ref_name }}"
           if ! printf '%s' "$REF" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::Expected a v<major>.<minor>.<patch> tag, got '$REF'."
             echo "::error::A manual dispatch must also be run from such a tag."
@@ -97,6 +98,7 @@ jobs:
       - name: Decode Release Keystore
         env:
           AZF_KEYSTORE_BASE64: ${{ secrets.AZF_KEYSTORE_BASE64 }}
+          AZF_KEYSTORE_PASSWORD: ${{ secrets.AZF_KEYSTORE_PASSWORD }}
         run: |
           if [ -z "$AZF_KEYSTORE_BASE64" ]; then
             echo "::error::AZF_KEYSTORE_BASE64 is not set. Add it as a repository secret:"
@@ -106,7 +108,7 @@ jobs:
           printf '%s' "$AZF_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/azf-release.jks"
           # Prove it decoded to a real keystore before the build trusts it.
           keytool -list -keystore "$RUNNER_TEMP/azf-release.jks" \
-            -storepass "${{ secrets.AZF_KEYSTORE_PASSWORD }}" > /dev/null
+            -storepass:env AZF_KEYSTORE_PASSWORD > /dev/null
           echo "AZF_KEYSTORE_PATH=$RUNNER_TEMP/azf-release.jks" >> "$GITHUB_ENV"
 
       - name: Build Release APK

@@ -1,7 +1,9 @@
 /**
  * The marketing pages show real captures of the app, served from
- * public/screenshots at 1x and 2x. A renamed or deleted capture fails here
- * instead of shipping a broken image to the landing page.
+ * public/screenshots at 1x and 2x, plus the AZH-001 collectible card, intro
+ * brand reels, and every coach portrait/avatar/variant referenced by the
+ * interactive scenes. A renamed or deleted asset fails here instead of
+ * shipping a broken image or video to production.
  *
  * The heading face also keeps its metric-matched fallback: without it the
  * sub-page headlines wrapped wider while Barlow Condensed loaded and shifted
@@ -10,22 +12,41 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { COACHES } from '@aquazerofit/shared';
+import { SCREENSHOT_IDS } from './PhoneShowcase';
 
 const here = (relative: string) => fileURLToPath(new URL(relative, import.meta.url));
 const source = (file: string) => readFileSync(here(file), 'utf8');
-
-const galleryIds = [...source('./LandingSections.tsx').matchAll(/^\s+id: '([a-z-]+)',$/gm)].map((m) => m[1]);
-const stepIds = [...source('./HowItWorks.tsx').matchAll(/screenshot: '([a-z-]+)'/g)].map((m) => m[1]);
+const publicFile = (webPath: string) => here(`../../../public${webPath}`);
 
 describe('landing screenshots', () => {
-  it('finds the six gallery captures and the how-it-works captures', () => {
-    expect(galleryIds).toHaveLength(6);
-    expect(stepIds.length).toBeGreaterThan(0);
+  it('tracks every canonical Android capture used across the marketing routes', () => {
+    expect(SCREENSHOT_IDS.length).toBeGreaterThanOrEqual(8);
   });
 
-  it.each([...new Set([...galleryIds, ...stepIds])])('%s exists at 1x and 2x', (id) => {
-    expect(existsSync(here(`../../../public/screenshots/${id}.webp`))).toBe(true);
-    expect(existsSync(here(`../../../public/screenshots/${id}@2x.webp`))).toBe(true);
+  it.each([...SCREENSHOT_IDS])('%s exists at 1x and 2x', (id) => {
+    expect(existsSync(publicFile(`/screenshots/${id}.webp`))).toBe(true);
+    expect(existsSync(publicFile(`/screenshots/${id}@2x.webp`))).toBe(true);
+  });
+});
+
+describe('marketing media assets', () => {
+  it.each([
+    '/cards/akin-divinus.webp',
+    '/intro/intro-169.mp4',
+    '/intro/intro-916.mp4',
+  ])('%s exists in public/', (assetPath) => {
+    expect(existsSync(publicFile(assetPath))).toBe(true);
+  });
+
+  it('has portrait, avatar, and optional variant artwork for every coach in the roster', () => {
+    for (const coach of COACHES) {
+      expect(existsSync(publicFile(coach.art.portrait)), coach.art.portrait).toBe(true);
+      expect(existsSync(publicFile(coach.art.avatar)), coach.art.avatar).toBe(true);
+      if (coach.art.variant) {
+        expect(existsSync(publicFile(coach.art.variant)), coach.art.variant).toBe(true);
+      }
+    }
   });
 });
 

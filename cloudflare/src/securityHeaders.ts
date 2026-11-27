@@ -9,9 +9,10 @@
  * Script and connect sources are the hosts the client actually requests:
  * - telegram.org/js/telegram-web-app.js, loaded only for a Mini App launch
  * - challenges.cloudflare.com, the Turnstile widget on register and reset
- * - Firebase Auth and Analytics, when the web build has Firebase enabled.
+ * - Firebase Auth, when the web build has Firebase enabled.
  *   The SDK is bundled, so its script is 'self'. It then calls Identity
- *   Toolkit, Secure Token, Installations, and (for Analytics) gtag.
+ *   Toolkit, Secure Token, and Installations. Firebase Analytics / gtag is
+ *   deliberately not loaded on the web and is omitted from the CSP.
  *   Email/password auth also loads reCAPTCHA from google.com / gstatic.com
  *   and frames the auth helper on *.firebaseapp.com.
  * - The API. Production calls same-origin /api ('self'). API_ORIGIN is the
@@ -35,8 +36,8 @@
  *
  * Marketing HTML includes one inline application/ld+json block. That is a
  * script to CSP, so each HTML response gets its own nonce, stamped onto
- * that tag and onto script-src. Host allowlists stay, so Telegram, Turnstile,
- * and gtag still load. 'unsafe-inline' is not used for scripts: a nonce
+ * that tag and onto script-src. Host allowlists stay, so Telegram and
+ * Turnstile still load. 'unsafe-inline' is not used for scripts: a nonce
  * would ignore it anyway, and it would allow injected inline scripts.
  * 'unsafe-eval' is not used either. In the browser, shared schemas set Zod
  * to jitless (packages/shared/src/schemas.ts) so parsing does not call Function.
@@ -50,8 +51,6 @@ export const SCRIPT_SRC = [
   'https://telegram.org',
   'https://*.telegram.org',
   TURNSTILE_ORIGIN,
-  'https://www.googletagmanager.com',
-  'https://www.google-analytics.com',
   'https://www.gstatic.com',
   'https://www.google.com',
   'https://apis.google.com',
@@ -66,11 +65,6 @@ export const CONNECT_SRC = [
   'https://firebaseinstallations.googleapis.com',
   'https://firebase.googleapis.com',
   'https://www.googleapis.com',
-  'https://www.google-analytics.com',
-  'https://*.google-analytics.com',
-  'https://*.analytics.google.com',
-  'https://www.googletagmanager.com',
-  'https://*.googletagmanager.com',
   'https://www.google.com',
   'https://www.gstatic.com',
   'https://tganalytics.xyz',
@@ -131,6 +125,7 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(), interest-cohort=()',
 };
 
 /** Copy a SPA asset response and attach the edge security headers. */

@@ -15,6 +15,7 @@ import {
   type WorkoutSession,
 } from '@aquazerofit/shared';
 import { requireAuth, userIdOf, verifyAccess } from '../../platform/auth';
+import { clientIpForRateLimit, clientNetworkKey } from '../../platform/clientIp';
 import { getStore, newId } from '../../platform/store';
 import {
   ANON_IP_EVENT_BUDGET_PER_HOUR,
@@ -100,7 +101,7 @@ analyticsRouter.post('/events', (req, res, next) => {
     // acknowledged but never persisted: the 202 is shaped identically to a
     // stored write so the budget cannot be probed from outside, and the web
     // client fires these without reading the body back.
-    const budgetKey = userId ? `user:${userId}` : `ip:${req.ip ?? 'unknown'}`;
+    const budgetKey = userId ? `user:${userId}` : `ip:${clientNetworkKey(clientIpForRateLimit(req))}`;
     const budgetLimit = userId ? EVENT_BUDGET_PER_HOUR : ANON_IP_EVENT_BUDGET_PER_HOUR;
     if (!consumeEventBudget(budgetKey, budgetLimit)) {
       res.status(202).json({ ok: true, id: newId('gev') });

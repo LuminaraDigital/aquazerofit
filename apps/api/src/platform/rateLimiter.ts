@@ -9,8 +9,8 @@
  * the ledger answers 402 CREDITS_INSUFFICIENT.
  */
 import type { NextFunction, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import type { ApiErrorBody } from '@aquazerofit/shared';
+import { verifyAccess } from './auth';
 import { clientIpForRateLimit, clientNetworkKey } from './clientIp';
 import { config } from './config';
 
@@ -133,10 +133,10 @@ function subjectOf(req: Request, clientIp: string): string {
   const header = req.headers.authorization;
   if (header?.startsWith('Bearer ')) {
     try {
-      const payload = jwt.verify(header.slice(7), config.jwtAccessSecret, { algorithms: ['HS256'] });
-      if (typeof payload === 'object' && typeof payload.sub === 'string') return `u:${payload.sub}`;
+      const claims = verifyAccess(header.slice(7));
+      return `u:${claims.id}`;
     } catch {
-      // Not ours, expired or forged: fall back to the address.
+      // Unsigned, forged, expired or non-HS256 token: never key on unverified claims.
     }
   }
   return `ip:${clientIp}`;

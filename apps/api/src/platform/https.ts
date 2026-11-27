@@ -64,14 +64,35 @@ export const enforceHttps: RequestHandler = (req: Request, res: Response, next: 
     return;
   }
 
-  // req.host honours the trusted X-Forwarded-Host; fall back to the Host header.
-  const host = req.get('x-forwarded-host')?.split(',')[0]?.trim() || req.get('host');
+  const host = resolveHttpsRedirectHost(req);
   if (!host) {
-    res.status(400).json({ code: 'VALIDATION_FAILED', message: 'Missing Host header.' });
+    res.status(400).json({ code: 'VALIDATION_FAILED', message: 'Missing or invalid Host header.' });
     return;
   }
   res.redirect(308, `https://${host}${req.originalUrl}`);
 };
+
+const STRICT_HOST_RE =
+  /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?::\d{1,5})?$/i;
+
+/**
+ * Derive a safe HTTPS redirect host without ever trusting arbitrary
+ * X-Forwarded-Host headers (open-redirect prevention).
+ *
+ * When APP_PUBLIC_URL is configured, only hosts in the explicit allowlist
+ * (canonical origin + configured CORS_ORIGINS) may be echoed; everything else
+ * redirects to the canonical host. When APP_PUBLIC_URL is unset (e.g. unit
+ * tests), fall back to a strictly validated Host header only.
+ */
+function resolveHttpsRedirectHost(req: Request): string | null {
+  const reqHost = req.get('host')?.trim();
+  const canonical = config.configuredPublicOrigin;
+  if (canonical) {
+    if (reqHost && config.allowedHttpsRedirectHosts.has(reqHost.toLowerCase())) return reqHost;
+    return canonical.host;
+  }
+  return reqHost && STRICT_HOST_RE.test(reqHost) ? reqHost : null;
+}
 
 /**
  * 301 `www.<canonical host>` to the canonical origin, so the site has one URL

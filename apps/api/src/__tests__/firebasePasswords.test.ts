@@ -112,7 +112,7 @@ vi.mock('../platform/firebaseAdmin', () => ({
 const { createApp } = await import('../app');
 const { getStore, newId } = await import('../platform/store');
 const { credentialsId } = await import('../modules/me/service');
-const { resetLoginFailures, resetTelegramNewAccountLimits, findUserByEmail } = await import('../modules/auth/service');
+const { resetLoginFailures, resetNewAccountLimits, findUserByEmail } = await import('../modules/auth/service');
 const { signTelegramInitData } = await import('../modules/auth/telegram');
 const { setFirebasePasswordsForTests } = await import('../modules/auth/firebasePasswords');
 const app = createApp();
@@ -163,7 +163,7 @@ async function requestReset(email: string) {
 beforeEach(() => {
   setFirebasePasswordsForTests(gateway);
   resetLoginFailures();
-  resetTelegramNewAccountLimits();
+  resetNewAccountLimits();
   firebase.failNext = false;
   firebase.validAfterFails = false;
 });

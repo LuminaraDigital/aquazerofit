@@ -22,7 +22,7 @@ delete process.env.MFA_REQUIRE_ADMIN;
 const { createApp } = await import('../app');
 const { getStore } = await import('../platform/store');
 const { signTelegramInitData } = await import('../modules/auth/telegram');
-const { resetTelegramNewAccountLimits } = await import('../modules/auth/service');
+const { resetNewAccountLimits } = await import('../modules/auth/service');
 const { effectiveTier, grantPremium, revokePremium } = await import('../modules/billing/entitlements');
 const telemetry = await import('../platform/telemetry');
 
@@ -76,7 +76,7 @@ let adminToken = '';
 
 beforeAll(async () => {
   vi.stubGlobal('fetch', fetchMock);
-  resetTelegramNewAccountLimits();
+  resetNewAccountLimits();
   const initData = signTelegramInitData({
     auth_date: String(Math.floor(Date.now() / 1000)),
     query_id: 'AA-stars-premium',

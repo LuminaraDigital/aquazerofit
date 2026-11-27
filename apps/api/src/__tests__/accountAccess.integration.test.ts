@@ -24,7 +24,7 @@ process.env.AZF_DATA_DIR = dataDir;
 const { createApp } = await import('../app');
 const { getStore } = await import('../platform/store');
 const { signTelegramInitData } = await import('../modules/auth/telegram');
-const { resetTelegramNewAccountLimits } = await import('../modules/auth/service');
+const { resetNewAccountLimits } = await import('../modules/auth/service');
 
 const app = createApp();
 const base = '/api/v1';
@@ -49,7 +49,7 @@ const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 // The per-IP auto-provision cap is service-level, not middleware, so
 // the test-env rate-limiter bypass does not cover it. Reset it between cases.
 beforeEach(() => {
-  resetTelegramNewAccountLimits();
+  resetNewAccountLimits();
 });
 
 afterAll(async () => {

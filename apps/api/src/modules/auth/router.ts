@@ -83,6 +83,7 @@ authRouter.post(
   '/login',
   asyncHandler(async (req, res) => {
     const input = loginSchema.parse(req.body);
+    // The client's address, not the shared edge's: the lockout is per source.
     sendAuth(req, res, await login(input, clientIpForRateLimit(req)));
   }),
 );

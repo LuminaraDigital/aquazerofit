@@ -98,14 +98,24 @@ export function tokensFor(user: User, channel?: SessionChannel): AuthResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Per-email failure lockout (in-memory; complements the /auth IP rate lane).
-// After MAX_FAILURES consecutive failures the email requires a 15-minute
-// backoff. Reset on successful login; stale entries are pruned lazily.
+// Sign-in failure lockout (in-memory; complements the /auth IP rate lane).
+//
+// Two counters per email. MAX_FAILURES failures from one source address lock
+// that email for that source for 15 minutes. Keyed on the email alone, the
+// lock was a denial of service: it is checked before the password, so anyone
+// could keep any account locked with a guess every few minutes.
+// MAX_FAILURES_PER_EMAIL failures across all sources lock the email for every
+// source except those that have signed in to it before, which stops guessing
+// spread over many addresses without locking the owner out. Success clears
+// the source's counter; stale entries are pruned lazily.
 // ---------------------------------------------------------------------------
 
 const MAX_FAILURES = 5;
+export const MAX_FAILURES_PER_EMAIL = 50;
 const LOCKOUT_MS = 15 * 60_000;
 const FAILURE_TTL_MS = 60 * 60_000;
+/** Sources remembered per email; the oldest is forgotten past this. */
+const MAX_KNOWN_SOURCES = 10;
 
 interface FailureEntry {
   count: number;
@@ -113,7 +123,14 @@ interface FailureEntry {
   lockedUntil: number | null;
 }
 
+/** Keys: `<email>` (all sources) and `<email>|<source>`. */
 const loginFailures = new Map<string, FailureEntry>();
+/** email -> source addresses that have signed in to it. */
+const knownSources = new Map<string, string[]>();
+
+function sourceOf(ip: string | undefined): string {
+  return ip ? clientNetworkKey(ip) : 'unknown';
+}
 
 function pruneFailures(now: number): void {
   for (const [key, entry] of loginFailures) {
@@ -121,9 +138,8 @@ function pruneFailures(now: number): void {
   }
 }
 
-function assertNotLockedOut(emailKey: string, now: number): void {
-  pruneFailures(now);
-  const entry = loginFailures.get(emailKey);
+function assertKeyNotLocked(key: string, now: number): void {
+  const entry = loginFailures.get(key);
   if (entry?.lockedUntil && entry.lockedUntil > now) {
     const retryAfterSeconds = Math.max(1, Math.ceil((entry.lockedUntil - now) / 1000));
     throw new AppError('RATE_LIMITED', 'Too many failed sign-in attempts. Please try again later.', {
@@ -132,12 +148,30 @@ function assertNotLockedOut(emailKey: string, now: number): void {
   }
 }
 
-function recordLoginFailure(emailKey: string, now: number): void {
-  const entry = loginFailures.get(emailKey) ?? { count: 0, lastFailureAt: now, lockedUntil: null };
+function assertNotLockedOut(emailKey: string, source: string, now: number): void {
+  pruneFailures(now);
+  assertKeyNotLocked(`${emailKey}|${source}`, now);
+  if (!knownSources.get(emailKey)?.includes(source)) assertKeyNotLocked(emailKey, now);
+}
+
+function bumpFailure(key: string, max: number, now: number): void {
+  const entry = loginFailures.get(key) ?? { count: 0, lastFailureAt: now, lockedUntil: null };
   entry.count += 1;
   entry.lastFailureAt = now;
-  if (entry.count >= MAX_FAILURES) entry.lockedUntil = now + LOCKOUT_MS;
-  loginFailures.set(emailKey, entry);
+  if (entry.count >= max) entry.lockedUntil = now + LOCKOUT_MS;
+  loginFailures.set(key, entry);
+}
+
+function recordLoginFailure(emailKey: string, source: string, now: number): void {
+  bumpFailure(`${emailKey}|${source}`, MAX_FAILURES, now);
+  bumpFailure(emailKey, MAX_FAILURES_PER_EMAIL, now);
+}
+
+function recordLoginSuccess(emailKey: string, source: string): void {
+  loginFailures.delete(`${emailKey}|${source}`);
+  const sources = (knownSources.get(emailKey) ?? []).filter((s) => s !== source);
+  sources.push(source);
+  knownSources.set(emailKey, sources.slice(-MAX_KNOWN_SOURCES));
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +274,7 @@ export function resetTelegramNewAccountLimits(): void {
 /** Test hook. */
 export function resetLoginFailures(): void {
   loginFailures.clear();
+  knownSources.clear();
 }
 
 export async function register(
@@ -301,18 +336,19 @@ export async function login(input: { email: string; password: string }, ip?: str
   const store = getStore();
   const emailKey = input.email.trim().toLowerCase();
   const now = Date.now();
-  assertNotLockedOut(emailKey, now);
+  const source = sourceOf(ip);
+  assertNotLockedOut(emailKey, source, now);
 
   const user = findUserByEmail(input.email);
   const cred = user ? store.byId<CredentialsDoc>('users', credentialsId(user.id)) : undefined;
   const passwords = firebasePasswords();
   // No local hash: the password, if there is one, is Firebase's.
-  if (passwords && !cred) return loginThroughFirebase(passwords, emailKey, input.password, now, ip);
+  if (passwords && !cred) return loginThroughFirebase(passwords, emailKey, input.password, source, now, ip);
   // Uniform failure path: never reveal whether the email exists.
   if (!user || !cred || !(await bcryptCompareAsync(input.password, cred.passwordHash))) {
-    rejectLogin(user?.id, emailKey, now, ip);
+    rejectLogin(user?.id, emailKey, source, now, ip);
   }
-  loginFailures.delete(emailKey); // success resets the failure counter
+  recordLoginSuccess(emailKey, source);
   // A pending deletion is cancelled by a successful sign-in during grace.
   if (user.deletionRequestedAt) {
     store.upsert('users', { ...user, deletionRequestedAt: null });
@@ -323,8 +359,8 @@ export async function login(input: { email: string; password: string }, ip?: str
   return tokensFor(store.byId<User>('users', user.id) ?? user);
 }
 
-function rejectLogin(userId: string | undefined, emailKey: string, now: number, ip?: string): never {
-  recordLoginFailure(emailKey, now);
+function rejectLogin(userId: string | undefined, emailKey: string, source: string, now: number, ip?: string): never {
+  recordLoginFailure(emailKey, source, now);
   auditAuthEvent(userId ?? 'unknown', 'login.failed', { emailHash: hashIdentifier(emailKey) }, ip);
   throw new AppError('AUTH_INVALID', 'Email or password is incorrect');
 }
@@ -339,14 +375,15 @@ async function loginThroughFirebase(
   passwords: FirebasePasswords,
   emailKey: string,
   password: string,
+  source: string,
   now: number,
   ip?: string,
 ): Promise<AuthResponse> {
   const idToken = await passwords.signIn(emailKey, password);
-  if (!idToken) rejectLogin(findUserByEmail(emailKey)?.id, emailKey, now, ip);
+  if (!idToken) rejectLogin(findUserByEmail(emailKey)?.id, emailKey, source, now, ip);
   const identity = await verifyFirebaseIdToken(idToken);
   if (!identity) throw new AppError('INTERNAL', 'Sign-in is unavailable right now. Please try again.');
-  loginFailures.delete(emailKey);
+  recordLoginSuccess(emailKey, source);
   // Dynamic: firebaseUsers imports helpers from this module.
   const { ensureUserFromFirebaseAsync } = await import('./firebaseUsers');
   const user = await ensureUserFromFirebaseAsync(

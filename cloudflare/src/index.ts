@@ -1,5 +1,6 @@
 /// <reference path="../worker-configuration.d.ts" />
-import { canonicalRedirect, isProxiedPath, legalRedirectTarget, upstreamRequest } from './proxy.ts';
+import { canonicalRedirect, isProxiedPath, samePathSlashRedirect, upstreamRequest } from './proxy.ts';
+import { hasFileExtension, isAppRoute, barePath } from './routes.ts';
 import { secureSpaResponse } from './securityHeaders.ts';
 
 export default {
@@ -34,16 +35,56 @@ export function llmsTxtResponse(request: Request, response: Response): Response 
   });
 }
 
+const NOT_FOUND_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page not found | AquaZeroFit</title>
+<meta name="robots" content="noindex">
+</head>
+<body>
+<main>
+<h1>Page not found</h1>
+<p>That address is not a page on AquaZeroFit.</p>
+<p><a href="/">Back to the home page</a></p>
+</main>
+</body>
+</html>
+`;
+
+function notFoundPage(): Response {
+  return new Response(NOT_FOUND_HTML, {
+    status: 404,
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+  });
+}
+
 /**
- * Legal URLs are published without a trailing slash. The asset host 307s those
- * onto the slash form because the HTML lives at `terms/index.html`. Follow that
- * one hop here and return the page, so the client is not sent through the redirect.
- * Security headers are applied to the page that is actually returned.
+ * Static files pass through. Known pages are served at the slashless URL the
+ * sitemap publishes: a trailing-slash redirect from the asset host is followed
+ * here, so the client is not sent away from that URL. A trailing slash on a
+ * known page redirects to the slashless form. Client routes with no file get
+ * the app shell. Anything else is a 404, not the home page.
  */
 async function serveAsset(request: Request, env: Env): Promise<Response> {
-  const first = await env.ASSETS.fetch(request);
-  if (request.method !== 'GET' && request.method !== 'HEAD') return first;
-  const next = legalRedirectTarget(request.url, first.status, first.headers.get('Location'));
-  const asset = next ? await env.ASSETS.fetch(new Request(next, request)) : first;
+  if (request.method !== 'GET' && request.method !== 'HEAD') return env.ASSETS.fetch(request);
+  const url = new URL(request.url);
+  const path = url.pathname;
+  if (hasFileExtension(path)) {
+    return llmsTxtResponse(request, await env.ASSETS.fetch(request));
+  }
+  if (!isAppRoute(path)) return notFoundPage();
+  if (path.length > 1 && path.endsWith('/')) {
+    const target = new URL(barePath(path) + url.search, url.origin);
+    return Response.redirect(target.href, 301);
+  }
+  let asset = await env.ASSETS.fetch(request);
+  const next = samePathSlashRedirect(request.url, asset.status, asset.headers.get('Location'));
+  if (next) asset = await env.ASSETS.fetch(new Request(next, request));
+  if (asset.status === 404) {
+    const shell = await env.ASSETS.fetch(new Request(new URL('/index.html', url.origin), request));
+    if (shell.ok) return shell;
+  }
   return llmsTxtResponse(request, asset);
 }

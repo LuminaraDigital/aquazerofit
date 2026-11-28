@@ -166,7 +166,7 @@ function noscriptBlock(route: MarketingRoute, cfg: SiteConfig): string {
     `      <h1>${escapeHtml(route.title.split(' | ')[0])}</h1>`,
     `      <p>${escapeHtml(route.summary)}</p>`,
     ...sections,
-    `      <p><a href="${telegram}">Open AquaZeroFit in Telegram</a> or <a href="/sign-in">use it in your browser</a>.</p>`,
+    `      <p><a href="/sign-in">Use AquaZeroFit in your browser</a>, <a href="/google-play">get it on Google Play</a>, or <a href="${telegram}">open it in Telegram</a>.</p>`,
     `      <nav><ul>${links}</ul></nav>`,
     '    </noscript>',
   ].join('\n');

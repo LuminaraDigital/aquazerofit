@@ -151,8 +151,8 @@ function Hero({
               placement="hero"
               note={
                 <p className="-mt-1 max-w-[34em] text-[13.5px] leading-relaxed text-on-surface-variant">
-                  The Mini App opens inside Telegram with no install. Blocked at work? The browser
-                  version is the same app, same account.
+                  Start in the browser, or install the Android app from Google Play. The same
+                  account also opens in Telegram.
                 </p>
               }
             />

@@ -61,7 +61,7 @@ describe('activity factors', () => {
 });
 
 describe('goal adjustment branches', () => {
-  it('lose: deficit at the midpoint of the 0.5–1%/wk band', () => {
+  it('lose: deficit at the midpoint of the 0.5-1%/wk band', () => {
     const t = computeTargets(profile({ goal: 'lose' }));
     // TDEE 2759 - (80 * 0.0075 * 7700 / 7 = 660) = 2099
     expect(t.tdee).toBe(2759);

@@ -61,8 +61,8 @@ export const recipesSeed: Recipe[] = [
     [
       'Pat the salmon dry and season both sides with salt and pepper. Rest at room temperature while you prepare the rest.',
       'Cook the quinoa according to packet instructions and keep warm.',
-      'Heat olive oil in a heavy pan over medium-high heat. Sear the salmon skin-side down for 4 minutes until crisp, then flip for 2–3 minutes more. Remove and rest.',
-      'In the same pan, melt the butter and soften the garlic for 30 seconds. Add the asparagus and toss for 3–4 minutes until charred and tender.',
+      'Heat olive oil in a heavy pan over medium-high heat. Sear the salmon skin-side down for 4 minutes until crisp, then flip for 2-3 minutes more. Remove and rest.',
+      'In the same pan, melt the butter and soften the garlic for 30 seconds. Add the asparagus and toss for 3-4 minutes until charred and tender.',
       'Off the heat, stir the lemon juice, zest and herbs through the pan butter. Plate quinoa, asparagus and salmon, then spoon the lemon herb butter over the top.',
     ],
     ['dinner', 'high-protein', 'omega-3', 'premium'],
@@ -88,7 +88,7 @@ export const recipesSeed: Recipe[] = [
     [
       'Prepare the glaze: whisk the miso paste with honey, soy sauce and a splash of warm water until smooth and pourable.',
       'Cook the quinoa: simmer the black quinoa in salted water for 15 minutes until the germ spirals out, then drain and fluff.',
-      'Sear the salmon and vegetables: brush the fillet generously with glaze and grill 8–10 minutes until caramelised, tossing the asparagus alongside. Rest 2 minutes, then serve over the quinoa.',
+      'Sear the salmon and vegetables: brush the fillet generously with glaze and grill 8-10 minutes until caramelised, tossing the asparagus alongside. Rest 2 minutes, then serve over the quinoa.',
     ],
     ['dinner', 'high-protein', 'omega-3-rich', 'dairy-free', 'premium'],
     ['pescatarian', 'dairyFree', 'highProtein'],
@@ -140,7 +140,7 @@ export const recipesSeed: Recipe[] = [
     ],
     [
       'Roast the pumpkin with half the olive oil at 200 °C for 20 minutes.',
-      'Season and grill the chicken 5–6 minutes per side; rest, then slice.',
+      'Season and grill the chicken 5-6 minutes per side; rest, then slice.',
       'Whisk tahini, lemon juice and a splash of water into a dressing.',
       'Build bowls: quinoa, spinach, pumpkin, chicken, then dressing.',
     ],
@@ -168,7 +168,7 @@ export const recipesSeed: Recipe[] = [
     ],
     [
       'Press the tofu, cube it and pan-fry in oil until golden on all sides. Set aside.',
-      'Stir-fry the garlic and vegetables over high heat for 3–4 minutes, keeping them crisp.',
+      'Stir-fry the garlic and vegetables over high heat for 3-4 minutes, keeping them crisp.',
       'Return the tofu, add soy sauce and a splash of water, and toss to glaze.',
       'Serve immediately over warm brown rice.',
     ],
@@ -295,7 +295,7 @@ export const recipesSeed: Recipe[] = [
     [
       'Heat the oven to 200 °C. Lay each fillet on baking paper with the vegetables.',
       'Drizzle with oil, scatter garlic and thyme, top with lemon slices.',
-      'Fold the paper into sealed parcels and bake for 16–18 minutes.',
+      'Fold the paper into sealed parcels and bake for 16-18 minutes.',
       'Open at the table and serve straight from the parcel.',
     ],
     ['dinner', 'light', 'low-carb'],

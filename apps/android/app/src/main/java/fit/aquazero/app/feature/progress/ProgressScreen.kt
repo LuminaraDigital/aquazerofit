@@ -403,7 +403,7 @@ private fun WeightHeroRow(state: ProgressUiState, modifier: Modifier = Modifier)
         AzfSectionHeading(text = stringResource(R.string.progress_current_weight))
         Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 4.dp)) {
             Text(
-                text = state.currentWeightKg?.let(::formatKg) ?: "–",
+                text = state.currentWeightKg?.let(::formatKg) ?: "-",
                 style = Scoreboard,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -417,7 +417,7 @@ private fun WeightHeroRow(state: ProgressUiState, modifier: Modifier = Modifier)
         // Neutral ink in both directions, deliberately.
         AzfStatRow(
             label = stringResource(R.string.progress_since_start),
-            value = state.deltaKg?.let { signedKg(it) } ?: "–",
+            value = state.deltaKg?.let { signedKg(it) } ?: "-",
             divider = false,
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -432,7 +432,7 @@ private fun WeightHeroRow(state: ProgressUiState, modifier: Modifier = Modifier)
 private fun weightChartDescription(state: ProgressUiState): String {
     val first = state.weightSeries.firstOrNull()?.date.orEmpty()
     val last = state.weightSeries.lastOrNull()
-    val latest = last?.value?.let(::formatKg) ?: "–"
+    val latest = last?.value?.let(::formatKg) ?: "-"
     val goal = state.goalWeightKg
     return if (goal != null) {
         stringResource(

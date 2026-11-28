@@ -25,7 +25,7 @@ function scrub(value: unknown): Record<string, unknown> {
   return scrubLogFields(value) as Record<string, unknown>;
 }
 
-describe('scrubLogFields — what must never survive', () => {
+describe('scrubLogFields - what must never survive', () => {
   it('redacts the denylisted keys at the top level', () => {
     const out = scrub({
       password: 'hunter2',
@@ -91,7 +91,7 @@ describe('scrubLogFields — what must never survive', () => {
   });
 });
 
-describe('scrubLogFields — false positives, which are the real design question', () => {
+describe('scrubLogFields - false positives, which are the real design question', () => {
   it('leaves ordinary operational fields alone', () => {
     // Every key here is one an existing logEvent call site passes today.
     const fields = {
@@ -129,14 +129,14 @@ describe('scrubLogFields — false positives, which are the real design question
     });
   });
 
-  it('matches KEYS only — a food called "cookie" is a value and passes through', () => {
+  it('matches KEYS only - a food called "cookie" is a value and passes through', () => {
     // The whole reason `cookie` is safe to substring-match in a nutrition app.
     const fields = { foodName: 'cookie', items: ['cookie', 'password'], note: 'my api key is 5' };
     expect(scrub(fields)).toEqual(fields);
   });
 });
 
-describe('scrubLogFields — it must not throw or hang inside a logger', () => {
+describe('scrubLogFields - it must not throw or hang inside a logger', () => {
   it('replaces a direct cycle rather than recursing forever', () => {
     const node: Record<string, unknown> = { id: 'n-1' };
     node.self = node;

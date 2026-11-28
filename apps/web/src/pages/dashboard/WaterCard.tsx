@@ -50,7 +50,7 @@ export function WaterCard({ date, consumedMl, targetMl }: WaterCardProps) {
       if (context?.previous) {
         queryClient.setQueryData(queryKeys.nutritionDaily(date), context.previous);
       }
-      show('Could not log water — please try again');
+      show('Could not log water - please try again');
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['nutrition'] });

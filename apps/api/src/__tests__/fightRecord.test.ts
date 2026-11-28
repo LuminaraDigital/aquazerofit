@@ -158,7 +158,7 @@ describe('active days by season', () => {
     expect(counts.has(2)).toBe(false); // the season-2 date is in the future
   });
 
-  it('GR-01: depends only on dates — weights, calories and macros change nothing', () => {
+  it('GR-01: depends only on dates - weights, calories and macros change nothing', () => {
     const random = rng(20261025);
     for (let trial = 0; trial < 200; trial += 1) {
       const dates = Array.from({ length: Math.floor(random() * 60) }, () =>

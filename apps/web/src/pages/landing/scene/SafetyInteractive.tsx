@@ -177,7 +177,7 @@ export function CalorieFloorSimulator() {
       >
         {clamped
           ? `Clamp engaged: raw ${requested.toLocaleString()} kcal was raised to the ${floor.toLocaleString()} kcal floor and disclosed explicitly on screen.`
-          : `Above the ${floor.toLocaleString()} kcal floor — target passes through unmodified.`}
+          : `Above the ${floor.toLocaleString()} kcal floor - target passes through unmodified.`}
       </p>
     </div>
   );

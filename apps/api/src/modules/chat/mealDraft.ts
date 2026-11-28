@@ -595,7 +595,7 @@ export function applyRememberedPortions(
 export function draftNotes(items: readonly ChatMealItem[], allergyCheck: ChatMealDraft['allergyCheck']): string[] {
   const notes: string[] = [];
   if (items.some((item) => item.status === 'ambiguous')) {
-    notes.push('Some items matched more than one food — pick the right one before logging.');
+    notes.push('Some items matched more than one food - pick the right one before logging.');
   }
   if (items.some((item) => item.status === 'unmatched')) {
     notes.push('Some items aren’t in the food database yet. Search for them on the food log instead.');
@@ -604,13 +604,13 @@ export function draftNotes(items: readonly ChatMealItem[], allergyCheck: ChatMea
     item.matches.some((m) => m.gramsBasis === 'defaultServing' || m.gramsBasis === 'assumed'),
   );
   if (assumed) {
-    notes.push('Portion sizes you didn’t state come from the standard serving — adjust the grams if that’s off.');
+    notes.push('Portion sizes you didn’t state come from the standard serving - adjust the grams if that’s off.');
   }
   if (items.some((item) => item.matches.some((m) => m.gramsBasis === 'statedVolume'))) {
     notes.push('Millilitres were converted to grams at 1 ml = 1 g.');
   }
   if (allergyCheck === 'skippedNoConsent') {
-    notes.push('Allergy checks are off — turn on wellness data processing in Settings to have them applied.');
+    notes.push('Allergy checks are off - turn on wellness data processing in Settings to have them applied.');
   }
   return notes;
 }

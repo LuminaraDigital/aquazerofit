@@ -78,7 +78,7 @@ export default function CoachSelect() {
         // client's optimism about a payment it did not process.
         await roster.refetch();
       } else if (status === 'pending') {
-        toast.show('Payment is still processing — your coach will appear shortly.');
+        toast.show('Payment is still processing - your coach will appear shortly.');
       } else if (status === 'failed') {
         toast.show('That purchase could not be completed.');
       }
@@ -120,7 +120,7 @@ export default function CoachSelect() {
             <GlassCard className="p-card-padding mb-5">
               <LevelBar experience={roster.data.experience} />
               <p className="text-xs text-on-surface-variant mt-2.5 leading-relaxed">
-                You earn XP for logging, training, hydrating and resting — never for eating less.
+                You earn XP for logging, training, hydrating and resting - never for eating less.
               </p>
             </GlassCard>
 

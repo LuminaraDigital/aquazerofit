@@ -177,7 +177,7 @@ it('consented turn: memory + profile + name reach the provider inside a framed U
   expect(calls.some((c) => c.model === EXTRACTION_MODEL)).toBe(true);
 });
 
-it('after consent revocation: the next turn carries no memory, no profile, no name — and no extraction fires', async () => {
+it('after consent revocation: the next turn carries no memory, no profile, no name - and no extraction fires', async () => {
   await setConsents(false);
   const before = calls.length;
 
@@ -205,7 +205,7 @@ it('after consent revocation: the next turn carries no memory, no profile, no na
 it('re-enabling consent restores the same memory into context (retention, not deletion)', async () => {
   await setConsents(true);
   const before = calls.length;
-  await runTurn('Back again — plans for tomorrow?');
+  await runTurn('Back again - plans for tomorrow?');
   await settleBackgroundWork();
 
   const chatCall = calls.slice(before).find((c) => c.model === CHAT_MODEL);

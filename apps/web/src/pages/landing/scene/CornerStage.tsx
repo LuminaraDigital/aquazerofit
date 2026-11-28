@@ -31,7 +31,7 @@ export function CornerStage() {
       text:
         coach.id === 'akin'
           ? "You have around 768 kcal left and you're 32 g short on protein. A Greek yoghurt with berries would close most of that gap without crowding dinner."
-          : `${coach.reactions.greeting} Today: 768 kcal left and 32 g short on protein — a Greek yoghurt with berries closes most of that gap cleanly.`,
+          : `${coach.reactions.greeting} Today: 768 kcal left and 32 g short on protein - a Greek yoghurt with berries closes most of that gap cleanly.`,
     },
     { from: 'user' as const, text: 'Should I take something for my thyroid?' },
     {
@@ -160,7 +160,7 @@ export function CornerStage() {
                       <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                         shield
                       </span>
-                      Boundary held — identical for all {COACHES.length} coaches
+                      Boundary held - identical for all {COACHES.length} coaches
                     </p>
                   )}
                   {turn.text}

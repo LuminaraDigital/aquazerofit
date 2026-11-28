@@ -271,7 +271,7 @@ export default function Memory() {
     try {
       await updateFact.mutateAsync({ factId: fact.id, status });
       haptic('success');
-      toast.success(status === 'confirmed' ? 'Memory kept.' : 'Okay — the coach will not use that.');
+      toast.success(status === 'confirmed' ? 'Memory kept.' : 'Okay - the coach will not use that.');
     } catch {
       haptic('error');
       toast.error('Could not update that memory. Please try again.');
@@ -312,7 +312,7 @@ export default function Memory() {
     } catch (err) {
       haptic('error');
       if (err instanceof ApiError && err.code === 'CONSENT_REQUIRED') {
-        toast.error('AI personalisation is switched off — enable it in Settings first.');
+        toast.error('AI personalisation is switched off - enable it in Settings first.');
       } else {
         toast.error('Could not save that memory. Please try again.');
       }
@@ -350,7 +350,7 @@ export default function Memory() {
             </h2>
             <p className="text-sm text-on-surface-variant max-w-xs leading-relaxed">
               Coach memory needs the AI personalisation consent, which is currently switched off.
-              Nothing new is remembered while it is off — you decide if and when to turn it back
+              Nothing new is remembered while it is off - you decide if and when to turn it back
               on.
             </p>
             <SecondaryButton
@@ -377,7 +377,7 @@ export default function Memory() {
             What your coach remembers
           </h2>
           <p className="text-sm text-on-surface-variant leading-relaxed">
-            Memories help Aqua Coach personalise your guidance — and you are always in control:
+            Memories help Aqua Coach personalise your guidance - and you are always in control:
             review, edit or delete anything here.
           </p>
         </section>
@@ -414,7 +414,7 @@ export default function Memory() {
               <EmptyState
                 icon="psychology"
                 title="Nothing remembered yet"
-                body="As you chat and log, Aqua Coach will suggest memories here for you to review — or add one yourself below."
+                body="As you chat and log, Aqua Coach will suggest memories here for you to review - or add one yourself below."
               />
             )}
 
@@ -425,7 +425,7 @@ export default function Memory() {
                   Needs your review ({suggested.length})
                 </h3>
                 <p className="text-xs text-on-surface-variant mb-3 px-2">
-                  Your coach noticed these — keep the ones that are right.
+                  Your coach noticed these - keep the ones that are right.
                 </p>
                 <div className="space-y-3">
                   {suggested.map((fact) => (
@@ -576,7 +576,7 @@ export default function Memory() {
               <div className="glass-card border-coral/40 p-card-padding space-y-3">
                 <p className="text-xs text-on-surface-variant leading-relaxed">
                   Forgetting everything permanently deletes the summary and every memory above.
-                  Your coach starts fresh — this cannot be undone.
+                  Your coach starts fresh - this cannot be undone.
                 </p>
                 <SecondaryButton
                   onClick={() => setConfirmForget(true)}
@@ -608,7 +608,7 @@ export default function Memory() {
             </h4>
             <p className="text-sm text-on-surface-variant leading-relaxed">
               Every memory and the coach summary will be permanently deleted. Aqua Coach will
-              still work — it just starts with a blank slate.
+              still work - it just starts with a blank slate.
             </p>
             <div className="space-y-2">
               <PrimaryButton

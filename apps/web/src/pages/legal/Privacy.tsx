@@ -63,7 +63,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
       <Section id="summary" index={1} heading="The short version">
         <List
           items={[
-            'We collect what you enter — your wellness profile, food and water logs, workouts, weights — plus the account details needed to sign you in.',
+            'We collect what you enter - your wellness profile, food and water logs, workouts, weights - plus the account details needed to sign you in.',
             'Meal photographs are stripped of their metadata on upload, never served publicly, and deleted within a day of the analysis finishing, unless you choose to let us keep them to improve food recognition.',
             'AI features send the relevant slice of your data to a model provider. They are off until you consent, and the coach only remembers facts you have approved.',
             'You can delete your account from the app. Doing so erases your data and anonymises the records we must keep.',
@@ -100,7 +100,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
           rows={[
             [
               'Account',
-              'Email address and a password hash, or — if you arrive through Telegram — the account identifier Telegram supplies. A display name and timezone if you set them.',
+              'Email address and a password hash, or - if you arrive through Telegram - the account identifier Telegram supplies. A display name and timezone if you set them.',
             ],
             [
               'Wellness profile',
@@ -108,7 +108,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
             ],
             [
               'Logs',
-              'Meals and their nutrition values, water, workouts completed, and weights you record — each with the date you assigned it.',
+              'Meals and their nutrition values, water, workouts completed, and weights you record - each with the date you assigned it.',
             ],
             [
               'Generated content',
@@ -129,7 +129,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
           ]}
         />
         <P>
-          Health-adjacent data — what you eat, what you weigh — is treated as sensitive throughout,
+          Health-adjacent data - what you eat, what you weigh - is treated as sensitive throughout,
           which is why the AI features that use it are gated behind consent rather than on by
           default.
         </P>
@@ -185,14 +185,14 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
         <P>
           Some features send a slice of your data to a third-party model provider: analysing a meal
           photograph, generating a plan or recipe, and answering in the coach. The slice is the
-          minimum the feature needs — for the coach, that is today&apos;s nutrition totals, the
+          minimum the feature needs - for the coach, that is today&apos;s nutrition totals, the
           session on your plan, a progress summary, and recent conversation.
         </P>
         <List
           items={[
             'AI personalisation is off until you turn it on, and can be switched off again at any time.',
             'The coach may propose facts to remember about you. They stay proposals until you confirm them, and confirmed facts can be deleted individually or all at once.',
-            'Facts you reject are kept briefly — so the same suggestion is not made again — and then erased.',
+            'Facts you reject are kept briefly - so the same suggestion is not made again - and then erased.',
             <>
               The providers in use on this deployment are{' '}
               <Fact name="aiProviders" hint="configured AI providers" />, reached through their
@@ -205,8 +205,8 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
           ]}
         />
         <Notice icon="lock">
-          The deterministic parts of the product — your targets, meal totals, hydration, charts, the
-          exercise library — involve no model and no third party at all.
+          The deterministic parts of the product - your targets, meal totals, hydration, charts, the
+          exercise library - involve no model and no third party at all.
         </Notice>
       </Section>
 
@@ -217,7 +217,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
         </P>
         <List
           items={[
-            `Uploads are limited to ${mib} MB and must actually decode as an image — the type your device declares is not trusted.`,
+            `Uploads are limited to ${mib} MB and must actually decode as an image - the type your device declares is not trusted.`,
             'EXIF, XMP, IPTC and ICC metadata are discarded by re-encoding the image before it is stored. GPS coordinates, capture time and camera serial do not survive.',
             'The file is stored under an unguessable name and is never exposed on a public path.',
             'It is sent to the vision provider for analysis, and the result is returned to you as a proposal. Nothing is written to your logs until you confirm it.',
@@ -303,7 +303,7 @@ export default function PrivacyPage({ googlePlay = false }: { googlePlay?: boole
             [
               'Open Food Facts',
               'Looks up a barcode that is not in our local mirror.',
-              'The barcode. No account identifier or token is sent — but the request reveals to them that someone at your IP address scanned that product.',
+              'The barcode. No account identifier or token is sent - but the request reveals to them that someone at your IP address scanned that product.',
               'France.',
             ],
           ]}

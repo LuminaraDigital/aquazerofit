@@ -151,7 +151,7 @@ describe('WeeklyInsightCard', () => {
         insight={{
           ...insight,
           changes: [],
-          narrative: 'Keep logging — a couple more days and this fills in.',
+          narrative: 'Keep logging - a couple more days and this fills in.',
           ai: { ...insight.ai, model: 'insufficient-data' },
         }}
       />,
@@ -217,7 +217,7 @@ describe('ReadinessChip', () => {
         readiness={{
           mode: 'maintain',
           score: 57,
-          signals: [{ label: 'History', detail: 'Not enough history yet — starting steady.' }],
+          signals: [{ label: 'History', detail: 'Not enough history yet - starting steady.' }],
           headline: 'Holding this week steady while we learn your rhythm.',
           volumeMultiplier: 1,
           periodDays: 7,

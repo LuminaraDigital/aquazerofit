@@ -13,11 +13,11 @@ import { mockComplete, type MockChatContext } from '../modules/ai/providers/mock
 describe('lintStyle', () => {
   it('counts em dashes (U+2014)', () => {
     expect(lintStyle('plain text').emDashCount).toBe(0);
-    expect(lintStyle('one — two — three').emDashCount).toBe(2);
+    expect(lintStyle(`one ${EM_DASH} two ${EM_DASH} three`).emDashCount).toBe(2);
   });
 
   it('does not fire on hyphens or en dashes', () => {
-    const findings = lintStyle('protein-forward snack, 10–12 reps, week-to-week');
+    const findings = lintStyle('protein-forward snack, 10\u201312 reps, week-to-week');
     expect(findings.emDashCount).toBe(0);
     expect(findings.slopWords).toHaveLength(0);
   });
@@ -59,7 +59,7 @@ describe('warnOnStyle', () => {
   it('warns without blocking and never logs the reply text', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const findings = warnOnStyle('Time to unleash your potential — today!', {
+      const findings = warnOnStyle(`Time to unleash your potential ${EM_DASH} today!`, {
         promptId: 'P-07',
         provider: 'groq',
       });

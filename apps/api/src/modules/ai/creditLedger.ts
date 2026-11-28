@@ -277,7 +277,7 @@ export function createCreditLedger(getContainer: () => LedgerContainer): CreditL
       if (available < cost) {
         throw new AppError(
           'CREDITS_INSUFFICIENT',
-          'You have run out of AI credits for today. Credits refresh daily — manual logging is always free.',
+          'You have run out of AI credits for today. Credits refresh daily - manual logging is always free.',
           { required: cost, available, task },
         );
       }

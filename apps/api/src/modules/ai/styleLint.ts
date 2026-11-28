@@ -13,7 +13,7 @@
  * signposts, UI strings) never passes through here.
  */
 
-export const EM_DASH = '—';
+export const EM_DASH = '\u2014';
 
 /**
  * Banned filler vocabulary, mirrored from prompts/P-07 §Style rules. Keep the

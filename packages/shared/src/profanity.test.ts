@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { containsProfanity } from './profanity';
 
-describe('containsProfanity — must NOT reject real names', () => {
+describe('containsProfanity - must NOT reject real names', () => {
   const innocent = [
     'Alex Waters', 'Cassidy', 'Cockburn', 'Scunthorpe', 'Penistone',
     'Michelle', 'Assumpta', 'Titus', 'Fukuda', 'Hancock', 'Dickens',
@@ -23,7 +23,7 @@ describe('containsProfanity — must NOT reject real names', () => {
   }
 });
 
-describe('containsProfanity — must reject the obvious cases', () => {
+describe('containsProfanity - must reject the obvious cases', () => {
   const blocked = [
     'fuck', 'FUCK', 'Fuck You', 'shit', 'a bitch', 'cunt', 'nigger', 'faggot',
   ];
@@ -34,7 +34,7 @@ describe('containsProfanity — must reject the obvious cases', () => {
   }
 });
 
-describe('containsProfanity — normalisation defeats the usual evasion', () => {
+describe('containsProfanity - normalisation defeats the usual evasion', () => {
   const evasions: Array<[string, string]> = [
     ['f.u.c.k', 'separators'],
     ['f u c k', 'spaces'],
@@ -52,21 +52,21 @@ describe('containsProfanity — normalisation defeats the usual evasion', () => 
   }
 });
 
-describe('containsProfanity — accepted false positives', () => {
+describe('containsProfanity - accepted false positives', () => {
   // Documented rather than hidden. Each of these is innocent English, but as a
   // 60-character DISPLAY NAME shown to other people the slur reading is far more
   // likely than the innocent one, so the filter deliberately errs towards
   // refusing. If a real user ever hits one, the fix is a review path, not a
   // looser wordlist.
-  it('refuses "a chink of light" — innocent prose, implausible as a name', () => {
+  it('refuses "a chink of light" - innocent prose, implausible as a name', () => {
     expect(containsProfanity('a chink of light')).toBe(true);
   });
-  it('refuses "Niggardly" — obscure real word that contains a slur', () => {
+  it('refuses "Niggardly" - obscure real word that contains a slur', () => {
     expect(containsProfanity('Niggardly')).toBe(true);
   });
 });
 
-describe('containsProfanity — edge cases must not throw', () => {
+describe('containsProfanity - edge cases must not throw', () => {
   it('treats empty and whitespace as clean', () => {
     expect(containsProfanity('')).toBe(false);
     expect(containsProfanity('   ')).toBe(false);

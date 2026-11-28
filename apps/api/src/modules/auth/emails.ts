@@ -39,7 +39,7 @@ export async function sendPasswordResetEmail(to: string, token: string): Promise
     `Or enter this code in the app: ${token}`,
     '',
     `The code expires in ${RESET_TTL_MINUTES} minutes and can be used once.`,
-    'If this was not you, no action is needed — your password has not changed.',
+    'If this was not you, no action is needed - your password has not changed.',
   ].join('\n');
 
   const html = [
@@ -47,7 +47,7 @@ export async function sendPasswordResetEmail(to: string, token: string): Promise
     `<p><a href="${escapeHtml(link)}">Choose a new password</a></p>`,
     `<p>Or enter this code in the app: <code>${escapeHtml(token)}</code></p>`,
     `<p>The code expires in ${RESET_TTL_MINUTES} minutes and can be used once.`,
-    ' If this was not you, no action is needed — your password has not changed.</p>',
+    ' If this was not you, no action is needed - your password has not changed.</p>',
   ].join('');
 
   await sendMail({ to, subject: 'Reset your AquaZeroFit password', text, html });

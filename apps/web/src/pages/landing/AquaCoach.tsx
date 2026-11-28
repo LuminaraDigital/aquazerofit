@@ -41,7 +41,7 @@ const CATEGORIES = [
   {
     label: 'crisis',
     covers:
-      'Self-harm or suicidal language, and eating-disorder indicators — guilt or punishment around eating, fear of food, binge-purge language.',
+      'Self-harm or suicidal language, and eating-disorder indicators - guilt or punishment around eating, fear of food, binge-purge language.',
     response: 'Stops and signposts real support. No answer is generated.',
     tone: 'coral' as const,
   },
@@ -89,7 +89,7 @@ const EXCHANGES = [
     label: 'Clinical medication',
     question: 'Should I take something for my thyroid?',
     answer:
-      'That one is outside what I can help with — thyroid medication is a clinical decision. Please talk to your doctor or pharmacist. I can keep helping with your meals and training in the meantime.',
+      'That one is outside what I can help with - thyroid medication is a clinical decision. Please talk to your doctor or pharmacist. I can keep helping with your meals and training in the meantime.',
     kind: 'refusal' as const,
     badge: 'medical',
     gate: 'Blocked before generation by deterministic inbound classifier · zero premium tokens spent.',
@@ -160,7 +160,7 @@ export default function AquaCoachPage() {
           id="roster"
           eyebrow="The Corner Roster"
           title={`All ${COACHES.length} fighters, one safety wall`}
-          lead="Personality changes tone and word choice only. Every target calculation, allergen filter and medical refusal stays identical whoever is in your corner — and every fighter unlocks by showing up."
+          lead="Personality changes tone and word choice only. Every target calculation, allergen filter and medical refusal stays identical whoever is in your corner - and every fighter unlocks by showing up."
         >
           <FighterLockerRoom />
         </PageSection>
@@ -197,7 +197,7 @@ export default function AquaCoachPage() {
               </h3>
               <ul className="mt-4 divide-y divide-outline-variant/50">
                 <li className="py-2.5 text-[15px] leading-relaxed text-on-surface-variant">
-                  Anything clinical — diagnosis, medication, test results, treatment, rehab.
+                  Anything clinical - diagnosis, medication, test results, treatment, rehab.
                 </li>
                 <li className="py-2.5 text-[15px] leading-relaxed text-on-surface-variant">
                   Anything below the safety floors, however the request is framed.
@@ -206,7 +206,7 @@ export default function AquaCoachPage() {
                   Legal, financial and mental-health treatment questions.
                 </li>
                 <li className="py-2.5 text-[15px] leading-relaxed text-on-surface-variant">
-                  Crisis conversations — it signposts real support instead of improvising.
+                  Crisis conversations - it signposts real support instead of improvising.
                 </li>
               </ul>
               <p className="mt-5 border-t border-outline-variant/50 pt-4 text-[13px] leading-relaxed text-on-surface-variant">
@@ -240,7 +240,7 @@ export default function AquaCoachPage() {
                   sessions.
                 </Bullet>
                 <Bullet title="Only what you approved">
-                  Remembered facts join that context if — and only if — you have turned
+                  Remembered facts join that context if - and only if - you have turned
                   personalisation on and confirmed them.
                 </Bullet>
               </ul>
@@ -271,7 +271,7 @@ export default function AquaCoachPage() {
           id="guardrails"
           eyebrow="Guardrails"
           title="Checked on the way in, and on the way out"
-          lead="Your message is classified before any premium token is spent, and the generated answer is checked again before it reaches you. The first-line classifier is deterministic pattern matching in code — not a model asked nicely to behave."
+          lead="Your message is classified before any premium token is spent, and the generated answer is checked again before it reaches you. The first-line classifier is deterministic pattern matching in code - not a model asked nicely to behave."
         >
           <div className="lp-card overflow-hidden">
             <table
@@ -376,7 +376,7 @@ export default function AquaCoachPage() {
               </blockquote>
               <p className="mt-4 text-[14px] leading-relaxed text-on-surface-variant">
                 The crisis line named is an Australian service, matching where AquaZeroFit is
-                published. A deployment serving another country is expected to repoint it — it is a
+                published. A deployment serving another country is expected to repoint it - it is a
                 single constant, and it is the kind of thing a fork must not leave stale.
               </p>
               <p className="mt-6 flex gap-3 rounded-xl border border-primary-fixed-dim/35 bg-primary/[0.06] px-4 py-3 text-[14px] leading-relaxed text-on-surface-variant">
@@ -386,7 +386,7 @@ export default function AquaCoachPage() {
                 >
                   info
                 </span>
-                The wellness disclaimer is pinned to the coach screen and the profile — not buried
+                The wellness disclaimer is pinned to the coach screen and the profile - not buried
                 in a settings page you would have to go looking for.
               </p>
             </div>
@@ -411,7 +411,7 @@ export default function AquaCoachPage() {
               <ul className="space-y-4">
                 <Bullet title="Suggested, never assumed">
                   A conversation may produce at most {MEMORY_EXTRACTION_MAX_FACTS_PER_TURN}{' '}
-                  suggested facts, and they arrive as suggestions — never as confirmed memory.
+                  suggested facts, and they arrive as suggestions - never as confirmed memory.
                 </Bullet>
                 <Bullet title="You confirm or reject each one">
                   Confirmed facts join the coach&apos;s context. Rejected ones never do.

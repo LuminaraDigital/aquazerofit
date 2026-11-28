@@ -121,7 +121,7 @@ describe('error classification (retryable vs terminal)', () => {
     expect(groqCalls(calls)).toHaveLength(3);
   });
 
-  it('does NOT retry a 400 — the same bad request fails identically every time', async () => {
+  it('does NOT retry a 400 - the same bad request fails identically every time', async () => {
     process.env.GROQ_API_KEY = 'test-key';
     const { calls } = stubFetch((call) =>
       call.url.includes('groq.com') ? response(400, {}) : Promise.reject(new Error('offline')),
@@ -317,7 +317,7 @@ describe('max_tokens ceiling', () => {
 });
 
 describe('degraded flag', () => {
-  it('is FALSE on the designed keyless path outside production — the mock IS the product offline', async () => {
+  it('is FALSE on the designed keyless path outside production - the mock IS the product offline', async () => {
     // No provider keys at all. Unconfigured providers, including a local Ollama
     // with no OLLAMA_BASE_URL, are not called. The offline engine is the answer.
     stubFetch(() => Promise.reject(new Error('offline')));

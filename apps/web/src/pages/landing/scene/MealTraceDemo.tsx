@@ -87,7 +87,7 @@ export function MealTraceDemo() {
         <div>
           <p className="stat-label text-primary">Interactive meal trace</p>
           <p className="mt-1 text-[14.5px] text-on-surface-variant">
-            Edit any proposed portion below. Nothing logs until you confirm — code multiplies every gram.
+            Edit any proposed portion below. Nothing logs until you confirm - code multiplies every gram.
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-secondary">

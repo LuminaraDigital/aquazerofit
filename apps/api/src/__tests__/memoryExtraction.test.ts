@@ -75,7 +75,7 @@ const memoryOf = (userId: string) => getStore().byId<UserMemory>('ai', memoryId(
 const TURN = {
   userMessageId: 'cm_test_1',
   userMessage: 'I am vegetarian and I hate burpees',
-  assistantReply: 'Noted — plenty of great meat-free protein options and burpee-free conditioning!',
+  assistantReply: 'Noted - plenty of great meat-free protein options and burpee-free conditioning!',
 };
 
 describe('extractMemoryFromTurn', () => {

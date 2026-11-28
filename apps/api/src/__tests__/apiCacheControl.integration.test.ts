@@ -94,7 +94,7 @@ describe('every API response is no-store by default', () => {
     expect(res.headers['cache-control']).toBe(API_DEFAULT_CACHE_CONTROL);
   });
 
-  it('an auth POST — the response most worth never storing — is no-store', async () => {
+  it('an auth POST - the response most worth never storing - is no-store', async () => {
     const res = await request(app)
       .post(`${base}/auth/login`)
       .send({ email: 'cache-policy@example.com', password: 'CorrectHorse9Battery' });
@@ -152,7 +152,7 @@ describe('published catalogue content opts out explicitly', () => {
 });
 
 describe('routes that look public but vary by user are NOT opted out', () => {
-  it('the exercise LIST stays no-store — respectProfile filters it per user', async () => {
+  it('the exercise LIST stays no-store - respectProfile filters it per user', async () => {
     // Same URL, different body depending on the caller's injuries/equipment.
     const res = await request(app)
       .get(`${base}/exercises?respectProfile=true&limit=5`)
@@ -173,7 +173,7 @@ describe('routes that look public but vary by user are NOT opted out', () => {
     expect(res.headers['cache-control']).toBe(API_DEFAULT_CACHE_CONTROL);
   });
 
-  it('the coach roster stays no-store — it ships the caller’s progression with it', async () => {
+  it('the coach roster stays no-store - it ships the caller’s progression with it', async () => {
     const res = await request(app).get(`${base}/coaches`).set(auth());
     expect(res.status).toBe(200);
     // The give-away: per-user fields in what looks like a static roster.
@@ -182,7 +182,7 @@ describe('routes that look public but vary by user are NOT opted out', () => {
     expect(res.headers['cache-control']).toBe(API_DEFAULT_CACHE_CONTROL);
   });
 
-  it('the barcode lookup stays no-store — it is a live upstream fetch, not a catalogue read', async () => {
+  it('the barcode lookup stays no-store - it is a live upstream fetch, not a catalogue read', async () => {
     const res = await request(app).get(`${base}/foods/barcode/not-a-barcode`).set(auth());
     expect(res.status).toBe(400);
     expect(res.headers['cache-control']).toBe(API_DEFAULT_CACHE_CONTROL);

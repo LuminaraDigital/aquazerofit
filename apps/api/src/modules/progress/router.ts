@@ -212,7 +212,7 @@ progressRouter.get(
             role: 'system',
             content:
               prompt.content ||
-              'Summarise the supplied progress statistics supportively in 2–4 sentences. Use no number that is not in the statistics.',
+              'Summarise the supplied progress statistics supportively in 2-4 sentences. Use no number that is not in the statistics.',
           },
           {
             role: 'user',

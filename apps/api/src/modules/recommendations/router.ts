@@ -375,7 +375,7 @@ recommendationsRouter.post(
       console.error('[recommendations] meal suggestion failed', err);
       throw new AppError(
         'AI_UNAVAILABLE',
-        'Meal suggestions are temporarily unavailable — you can still browse recipes and log meals manually.',
+        'Meal suggestions are temporarily unavailable - you can still browse recipes and log meals manually.',
       );
     }
   }),

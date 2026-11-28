@@ -203,7 +203,7 @@ private fun AchievementUnlockBannerPreview() {
             AchievementUnlockBanner(
                 celebration = Celebration.Achievement(
                     coachId = "akin",
-                    reaction = "First Full Week — logged and yours. I'm properly pleased about this one.",
+                    reaction = "First Full Week - logged and yours. I'm properly pleased about this one.",
                 ),
                 visible = true,
                 onShown = {},

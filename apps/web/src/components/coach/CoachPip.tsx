@@ -209,10 +209,18 @@ export function CoachPip() {
 
   return (
     <>
+      {/*
+        Desktop only. The signed-in column is max-w-md and centred, and its
+        stacking context is z-10 (.azf-content). This control used to sit on
+        the column's right edge at z-50, which is outside that context, so it
+        painted over Generate my plan, the coach send button, and every modal
+        and drawer. It now lives in the margin beside the column, under the
+        column's stacking context, so those surfaces cover it when they are open.
+      */}
       <button
         type="button"
         onClick={() => void openPip()}
-        className="fixed bottom-28 right-[max(1rem,calc(50%-240px))] z-50 hidden lg:flex items-center gap-2 rounded-full border border-primary/40 bg-surface/90 backdrop-blur px-4 py-2 text-sm font-medium text-on-surface shadow-lg hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+        className="fixed bottom-28 left-[calc(50%+14rem+1rem)] z-[1] hidden lg:flex items-center gap-2 rounded-full border border-primary/40 bg-surface/90 backdrop-blur px-4 py-2 text-sm font-medium text-on-surface shadow-lg hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
         aria-label="Pin coach to an always-on-top window"
       >
         <span className="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">

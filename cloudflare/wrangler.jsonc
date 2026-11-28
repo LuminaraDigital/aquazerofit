@@ -20,7 +20,12 @@
   "assets": {
     "directory": "../apps/web/dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
+    // Sitemap URLs have no trailing slash. drop-trailing-slash serves
+    // folder/index.html at that URL with 200, and redirects the slash form.
+    "html_handling": "drop-trailing-slash",
+    // Unknown paths must not answer 200 with index.html. The worker serves
+    // the shell itself for real client routes. Missing files use 404.html.
+    "not_found_handling": "404-page",
     "run_worker_first": true
   },
   "routes": [

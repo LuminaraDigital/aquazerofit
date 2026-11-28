@@ -9,7 +9,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  CHAT_DEADLINE_MS,
+  PLAN_DEADLINE_MS,
   complete,
+  deadlineCeilingMs,
   offlineVerdict,
   resetProviderCircuits,
   stream,
@@ -315,8 +318,8 @@ describe('max_tokens ceiling', () => {
 
 describe('degraded flag', () => {
   it('is FALSE on the designed keyless path outside production — the mock IS the product offline', async () => {
-    // No provider keys at all. The key-optional local Ollama probe still runs
-    // and fails; that is not a degradation, it is the offline configuration.
+    // No provider keys at all. Unconfigured providers, including a local Ollama
+    // with no OLLAMA_BASE_URL, are not called. The offline engine is the answer.
     stubFetch(() => Promise.reject(new Error('offline')));
 
     const result = await complete('chatFast', MESSAGES, {});
@@ -583,5 +586,81 @@ describe('LLM safety default', () => {
     process.env.OLLAMA_BASE_URL = 'http://ollama.internal:11434/v1';
     process.env.ENABLE_LLM_SAFETY = 'false';
     expect(config.enableLlmSafety).toBe(false);
+  });
+});
+
+describe('plan generation fallback', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('keeps a longer ceiling than chat so a 429 still leaves a second attempt', () => {
+    expect(deadlineCeilingMs('planStructured')).toBe(PLAN_DEADLINE_MS);
+    expect(PLAN_DEADLINE_MS).toBeGreaterThan(CHAT_DEADLINE_MS);
+  });
+
+  it('does not dial an unconfigured localhost Ollama after Groq rate-limits', async () => {
+    process.env.GROQ_API_KEY = 'test-key';
+    const { calls } = stubFetch(() => response(429, {}, { 'retry-after': '300' }));
+
+    const result = await complete('planStructured', MESSAGES, { json: true });
+
+    expect(calls.every((call) => call.url.includes('groq.com'))).toBe(true);
+    expect(result.meta.provider).toBe('mock');
+    expect(result.meta.degraded).toBe(true);
+  });
+
+  it('serves NVIDIA after a Groq 429 and logs which provider served', async () => {
+    vi.spyOn(config, 'isTest', 'get').mockReturnValue(false);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    process.env.GROQ_API_KEY = 'groq-key';
+    process.env.NVIDIA_API_KEY = 'nvidia-key';
+    stubFetch((call) => {
+      if (call.url.includes('groq.com')) return response(429, {}, { 'retry-after': '300' });
+      if (call.url.includes('nvidia.com')) return response(200, okBody('{"days":[]}'));
+      return Promise.reject(new Error('offline'));
+    });
+
+    const result = await complete('planStructured', MESSAGES, { json: true });
+
+    expect(result.meta.provider).toBe('nvidia');
+    expect(result.meta.degraded).toBe(false);
+    expect(result.json).toEqual({ days: [] });
+    const lines = log.mock.calls.map((call) => JSON.parse(String(call[0])) as { kind?: string; outcome?: string; provider?: string });
+    expect(lines.find((line) => line.outcome === 'provider_error')?.provider).toBe('groq');
+    expect(lines.find((line) => line.outcome === 'served')?.provider).toBe('nvidia');
+  });
+
+  it('aborts a hung Groq plan attempt in time for NVIDIA to answer', async () => {
+    vi.useFakeTimers();
+    process.env.GROQ_API_KEY = 'groq-key';
+    process.env.NVIDIA_API_KEY = 'nvidia-key';
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init: { signal: AbortSignal }) => {
+        const target = String(url);
+        calls.push(target);
+        if (target.includes('groq.com')) {
+          return new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(new Error('aborted')));
+          });
+        }
+        return Promise.resolve(response(200, okBody('{"days":[]}')));
+      }),
+    );
+
+    const pending = complete('planStructured', MESSAGES, { json: true, timeoutMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(CHAT_DEADLINE_MS);
+    expect(calls.some((url) => url.includes('nvidia.com'))).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(PLAN_DEADLINE_MS);
+    const result = await pending;
+
+    expect(result.meta.provider).toBe('nvidia');
+    expect(result.meta.degraded).toBe(false);
+    expect(calls.filter((url) => url.includes('groq.com'))).toHaveLength(1);
+    expect(calls.some((url) => url.includes('nvidia.com'))).toBe(true);
   });
 });

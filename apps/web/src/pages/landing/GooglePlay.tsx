@@ -183,7 +183,7 @@ export default function GooglePlayPage() {
 
         <PageCta
           title="Get AquaZeroFit on Google Play."
-          lead="Not on Android? The same account works in the Telegram Mini App and in any browser."
+          lead="Not on Android? The same account works in the browser and in the Telegram Mini App."
           disclaimer={WELLNESS_DISCLAIMER}
         >
           <PlayStoreBadge placement="google-play-final" />

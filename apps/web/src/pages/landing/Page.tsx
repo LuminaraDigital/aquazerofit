@@ -47,7 +47,7 @@ export function PageHero({
   title,
   lead,
   secondary,
-  primary = <TelegramCta placement="subpage-hero" />,
+  primary = <WebFallbackLink placement="subpage-hero" variant="primary" />,
   aside,
   backdrop,
   children,
@@ -226,8 +226,8 @@ export function PageCta({
           <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
             {children}
             <div className="flex flex-col gap-3 sm:flex-row">
-              <TelegramCta placement="subpage-final" />
-              <WebFallbackLink placement="subpage-final" />
+              <WebFallbackLink placement="subpage-final" variant="primary" />
+              <TelegramCta placement="subpage-final" variant="ghost" />
             </div>
           </div>
         </div>

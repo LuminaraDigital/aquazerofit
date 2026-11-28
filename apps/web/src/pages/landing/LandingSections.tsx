@@ -435,24 +435,24 @@ export function WaysIn() {
       </Reveal>
 
       <div className="mt-10 grid gap-5 lg:grid-cols-12">
-        {/* Dominant primary surface (Telegram) — 7 cols */}
+        {/* Dominant primary surface (web) */}
         <Reveal className="flex flex-col justify-between rounded-card border border-primary-fixed-dim/40 bg-surface-container p-7 sm:p-8 lg:col-span-7">
           <div>
-            <p className="stat-label text-secondary">Zero install · Instant start</p>
+            <p className="stat-label text-secondary">No install · Same account</p>
             <h3 className="mt-2 font-heading text-[32px] font-semibold leading-none text-on-surface sm:text-[38px]">
-              Telegram Mini App
+              Web app
             </h3>
             <p className="mt-3 max-w-[42ch] text-[16px] leading-relaxed text-on-surface-variant">
-              Opens inside the Telegram client you already have. No download, no new password,
-              and your host theme binds cleanly to the interface.
+              Open AquaZeroFit in the browser you already have. Your profile, logs and plan are
+              the same account as the Android app.
             </p>
           </div>
           <div className="mt-8 flex flex-wrap items-center gap-4">
-            <TelegramCta placement="final" />
+            <WebFallbackLink placement="final" variant="primary" />
           </div>
         </Reveal>
 
-        {/* Secondary surfaces stacked on 5 cols */}
+        {/* Play beside the web app, Telegram after both */}
         <div className="grid gap-5 lg:col-span-5">
           <Reveal delay={40} className="lp-card flex flex-col justify-between p-6">
             <div>
@@ -471,14 +471,14 @@ export function WaysIn() {
           <Reveal delay={80} className="lp-card flex flex-col justify-between p-6">
             <div>
               <h3 className="font-heading text-[26px] font-semibold leading-none text-on-surface">
-                Browser
+                Telegram
               </h3>
               <p className="mt-2 text-[15px] leading-relaxed text-on-surface-variant">
-                Telegram blocked at work? The browser version is the same app and the same account.
+                Already in Telegram? The Mini App is the same account, with no separate install.
               </p>
             </div>
             <div className="mt-5 flex">
-              <WebFallbackLink placement="final" />
+              <TelegramCta placement="final" variant="ghost" />
             </div>
           </Reveal>
         </div>

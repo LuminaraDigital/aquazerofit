@@ -68,7 +68,7 @@ export function CtaButton({
   onClick?: () => void;
 }) {
   return (
-    <Link to={to} onClick={onClick} className={`${CTA_BASE} ${ctaStyles(variant)}`}>
+    <Link to={to} onClick={onClick} data-variant={variant} className={`${CTA_BASE} ${ctaStyles(variant)}`}>
       {children}
     </Link>
   );
@@ -135,12 +135,12 @@ export function AppCtas({
   return (
     <div className={`flex flex-col gap-4 ${centered ? 'items-center' : 'items-start'}`}>
       {android && badge}
-      <div className={`flex w-full flex-col gap-3 sm:flex-row ${centered ? 'sm:justify-center' : ''}`}>
-        <TelegramCta placement={placement} variant={android ? 'ghost' : 'primary'} />
-        <WebFallbackLink placement={placement} />
+      <div className={`flex w-full flex-col gap-3 sm:flex-row sm:items-center ${centered ? 'sm:justify-center' : ''}`}>
+        <WebFallbackLink placement={placement} variant={android ? 'ghost' : 'primary'} />
+        {!android && badge}
       </div>
+      <TelegramCta placement={placement} variant="ghost" />
       {note}
-      {!android && badge}
     </div>
   );
 }
@@ -263,23 +263,25 @@ export function TopBar({ onLanding = false }: { onLanding?: boolean }) {
               Sign in
             </Link>
 
-            <a
-              href={telegramHref}
-              aria-label="Open in Telegram"
-              onClick={() => void trackGrowth('telegram_cta_clicked', { placement: 'topbar' })}
-              rel="noreferrer noopener"
+            <Link
+              to="/sign-in?mode=register"
+              onClick={() => void trackGrowth('web_fallback_clicked', { placement: 'topbar' })}
               className={`inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 text-[13px] font-semibold transition-[background-color,border-color,filter,transform] duration-150 ease-out active:scale-[0.97] sm:px-4 sm:text-[14px] ${
                 onGooglePlay
                   ? 'border border-outline/80 text-on-surface hover:border-primary'
                   : 'bg-primary-fixed-dim azf-cta-text hover:brightness-110'
               }`}
             >
-              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
-                send
-              </span>
-              <span>
-                <span className="max-[379px]:sr-only">Open in </span>Telegram
-              </span>
+              Get started
+            </Link>
+            <a
+              href={telegramHref}
+              aria-label="Open in Telegram"
+              onClick={() => void trackGrowth('telegram_cta_clicked', { placement: 'topbar' })}
+              rel="noreferrer noopener"
+              className="hidden min-h-[44px] items-center whitespace-nowrap rounded-xl px-2.5 text-[13px] font-semibold text-on-surface-variant transition-colors hover:text-primary sm:inline-flex sm:px-3 sm:text-[14px]"
+            >
+              Telegram
             </a>
 
             {/* Mobile route menu (< lg) so phone visitors can reach every product page */}

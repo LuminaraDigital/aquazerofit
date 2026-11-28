@@ -236,6 +236,8 @@ export interface AiCallLog {
   guardrail?: { blocked: boolean; category?: string | null };
   task?: string;
   userId?: string;
+  /** served: a real provider answered. provider_error: that hop failed. offline: the mock engine answered. */
+  outcome?: 'served' | 'provider_error' | 'offline';
 }
 
 /** Every model call MUST be recorded through this function (AQF-09 §6 standards). */

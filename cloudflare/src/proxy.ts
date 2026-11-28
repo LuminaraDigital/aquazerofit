@@ -72,6 +72,35 @@ export function legalRedirectTarget(
   return target.href;
 }
 
+/**
+ * A redirect whose only change is a trailing slash on the same path.
+ * The asset host adds one for `folder/index.html` under auto-trailing-slash.
+ * Sitemap URLs are slashless, so the worker follows this hop itself and the
+ * client is not redirected off the URL the sitemap published.
+ */
+export function samePathSlashRedirect(
+  requestUrl: string,
+  status: number,
+  location: string | null,
+): string | null {
+  if (status !== 301 && status !== 302 && status !== 307 && status !== 308) return null;
+  if (!location) return null;
+  let request: URL;
+  let target: URL;
+  try {
+    request = new URL(requestUrl);
+    target = new URL(location, request);
+  } catch {
+    return null;
+  }
+  if (target.origin !== request.origin) return null;
+  const requested = request.pathname.replace(/\/+$/, '') || '/';
+  const landed = target.pathname.replace(/\/+$/, '') || '/';
+  if (requested !== landed) return null;
+  if (target.pathname === request.pathname && target.search === request.search) return null;
+  return target.href;
+}
+
 /** www is a second custom domain. Sessions and canonical links live on the apex. */
 export function canonicalRedirect(url: URL): string | null {
   if (url.hostname !== WWW_HOST) return null;

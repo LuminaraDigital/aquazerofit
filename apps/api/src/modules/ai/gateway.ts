@@ -3,11 +3,12 @@
  * (visionPrimary, chatFast, planStructured, safetyCheap, insightBatch) — real
  * providers, fallback chains and timeouts live here and nowhere else.
  *
- * Provider chain: any OpenAI-compatible endpoint whose key is present in the
- * environment (Groq, then Gemini), each with a hard timeout; on failure the
- * chain falls through and finally lands on the deterministic mock engine so
- * every AI feature keeps working offline (AQF-10 principle 5: any AI feature
- * can fail without taking a core user journey with it).
+ * Provider chain, in order: Groq, OpenAI, Gemini, NVIDIA, then Ollama when
+ * OLLAMA_BASE_URL is set. Each hop has a hard timeout. 429 and 5xx retry with
+ * jittered backoff. On failure the chain falls through and finally lands on
+ * the deterministic mock engine, which is the last resort, so every AI feature
+ * keeps working offline (AQF-10 principle 5: any AI feature can fail without
+ * taking a core user journey with it).
  *
  * Resilience layer around that chain:
  *  - retries with jittered backoff for transient failures (429 / 5xx / network),
@@ -61,6 +62,8 @@ import { validateOutputForInjection, withContextMessage } from './untrustedConte
 // Re-exported so callers and tests keep importing them from the gateway.
 export {
   CHAT_DEADLINE_MS,
+  PLAN_DEADLINE_MS,
+  PLAN_ATTEMPT_MS,
   DEFAULT_VISION_DEADLINE_MS,
   VISION_DEADLINE_ENV,
   deadlineCeilingMs,
@@ -83,7 +86,8 @@ export interface GatewayOptions {
   timeoutMs?: number;
   /**
    * Budget for the whole call including every fallback hop. Callers may only
-   * tighten it. Chat and the other text lanes cap at CHAT_DEADLINE_MS.
+   * tighten it. Chat caps at CHAT_DEADLINE_MS. planStructured caps at
+   * PLAN_DEADLINE_MS so a 429 and a slow next provider still fit.
    * visionPrimary caps at the vision deadline (AI_VISION_DEADLINE_MS, default
    * 20s) so a photo can outlive the 12s chat ceiling.
    */
@@ -292,6 +296,7 @@ function providerAnswer(
     tokens: { prompt: call.promptTokens, total: answer.tokens },
     guardrail: { blocked: false },
     task: call.task,
+    outcome: 'served',
   });
   return {
     text,
@@ -326,6 +331,7 @@ function offlineAnswer(
       tokens: { prompt: promptTokens, total: promptTokens + estimateTokens(result.text) },
       guardrail: { blocked: false },
       task,
+      outcome: 'offline',
     });
     // AI-01: Output validation for mock responses too (for consistency)
     flagInjection(result.text, 'mock', `mock-${task}`, task);
@@ -348,6 +354,7 @@ function offlineAnswer(
       latencyMs: Date.now() - started,
       tokens: { prompt: promptTokens },
       task: `${task}:mockError`,
+      outcome: 'offline',
     });
     // Error hygiene: internals go to the server log only; the client-facing
     // envelope carries no err.message/cause.
@@ -391,6 +398,7 @@ async function* route(
               latencyMs,
               tokens: { prompt: call.promptTokens },
               task: `${call.task}:providerError:${failure.message.slice(0, 80)}`,
+              outcome: 'provider_error',
             }),
         },
         attempt,
